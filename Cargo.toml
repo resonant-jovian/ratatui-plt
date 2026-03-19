@@ -1,0 +1,19 @@
+[package]
+name = "ratatui-sim"
+version = "0.1.0"
+edition = "2021"
+description = "Scientific visualization widgets for ratatui — matplotlib for the terminal"
+license = "GPL-3.0"
+repository = "https://github.com/resonant-jovian/ratatui-sim"
+keywords = ["ratatui", "tui", "plotting", "scientific", "visualization"]
+categories = ["command-line-interface", "visualization", "science"]
+
+[dependencies]
+ratatui = "0.30"
+palette = "0.7"
+ordered-float = "5"
+
+[dev-dependencies]
+crossterm = "0.29"
+color-eyre = "0.6"
+rand = "0.8"
