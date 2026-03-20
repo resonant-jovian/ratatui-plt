@@ -1,5 +1,3 @@
-//! Scatter plot example: random point cloud with color-mapped third value.
-
 use std::io;
 
 use crossterm::{
@@ -34,37 +32,28 @@ fn main() -> color_eyre::Result<()> {
     enable_raw_mode()?;
     let mut terminal = Terminal::new(CrosstermBackend::new(io::stdout()))?;
 
-    // Generate random point cloud
+    // Generate 5000 correlated points
     let mut rng = rand::rng();
-    let n = 3000;
-    let mut points = Vec::with_capacity(n);
-    let mut color_vals = Vec::with_capacity(n);
+    let data: Vec<(f64, f64)> = (0..50000)
+        .map(|_| {
+            let x: f64 = rng.random::<f64>() * 6.0 - 3.0;
+            let y: f64 = x * 0.8 + rng.random::<f64>() * 1.2 - 0.6;
+            (x, y)
+        })
+        .collect();
 
-    for _ in 0..n {
-        let x: f64 = rng.random_range(-5.0..5.0);
-        let y: f64 = rng.random_range(-5.0..5.0);
-        let z = (-(x * x + y * y) / 8.0).exp(); // radial falloff as color value
-        points.push((x, y));
-        color_vals.push(z);
-    }
-
-    let series = Series::new("cloud")
-        .data(points)
-        .marker(MarkerShape::FilledCircle);
-
-    let plot = ScatterPlot::new()
-        .series(series)
-        .color_values(color_vals)
-        .colormap(Viridis)
-        .title("Random Point Cloud (color = radial intensity)")
+    let plot = Hist2D::new(data)
+        .bins_x(40)
+        .bins_y(40)
+        .colormap(Inferno)
+        .show_colorbar(true)
+        .title("Correlated 2D Histogram (q to quit)")
         .x_axis(Axis::new().label("x"))
-        .y_axis(Axis::new().label("y"))
-        .aspect_ratio(AspectRatio::Equal)
-        .show_legend(false);
+        .y_axis(Axis::new().label("y = 0.7x + noise"));
 
     loop {
         terminal.draw(|frame| {
-            frame.render_widget(&plot, frame.area());
+            frame.render_widget(&plot, square_area(frame.area()));
         })?;
 
         if let Event::Key(key) = event::read()?

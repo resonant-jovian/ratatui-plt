@@ -1,5 +1,3 @@
-//! Scatter plot example: random point cloud with color-mapped third value.
-
 use std::io;
 
 use crossterm::{
@@ -7,7 +5,6 @@ use crossterm::{
     event::{self, Event, KeyCode, KeyEventKind},
     terminal::{EnterAlternateScreen, LeaveAlternateScreen, disable_raw_mode, enable_raw_mode},
 };
-use rand::RngExt;
 use ratatui::prelude::*;
 use ratatui_plt::prelude::*;
 
@@ -34,37 +31,20 @@ fn main() -> color_eyre::Result<()> {
     enable_raw_mode()?;
     let mut terminal = Terminal::new(CrosstermBackend::new(io::stdout()))?;
 
-    // Generate random point cloud
-    let mut rng = rand::rng();
-    let n = 3000;
-    let mut points = Vec::with_capacity(n);
-    let mut color_vals = Vec::with_capacity(n);
-
-    for _ in 0..n {
-        let x: f64 = rng.random_range(-5.0..5.0);
-        let y: f64 = rng.random_range(-5.0..5.0);
-        let z = (-(x * x + y * y) / 8.0).exp(); // radial falloff as color value
-        points.push((x, y));
-        color_vals.push(z);
-    }
-
-    let series = Series::new("cloud")
-        .data(points)
-        .marker(MarkerShape::FilledCircle);
-
-    let plot = ScatterPlot::new()
-        .series(series)
-        .color_values(color_vals)
-        .colormap(Viridis)
-        .title("Random Point Cloud (color = radial intensity)")
-        .x_axis(Axis::new().label("x"))
-        .y_axis(Axis::new().label("y"))
-        .aspect_ratio(AspectRatio::Equal)
-        .show_legend(false);
+    let chart = PieChart::new()
+        .slice(PieSlice::new("Python", 28.1).color(Color::Cyan))
+        .slice(PieSlice::new("JS", 17.4).color(Color::Yellow))
+        .slice(PieSlice::new("Java", 15.8).color(Color::Red))
+        .slice(PieSlice::new("C/C++", 12.3).color(Color::Green))
+        .slice(PieSlice::new("C#", 7.5).color(Color::Magenta))
+        .slice(PieSlice::new("Other", 18.9).color(Color::Gray))
+        .donut_ratio(0.35)
+        .show_labels(true)
+        .title("Programming Language Market Share (q to quit)");
 
     loop {
         terminal.draw(|frame| {
-            frame.render_widget(&plot, frame.area());
+            frame.render_widget(&chart, square_area(frame.area()));
         })?;
 
         if let Event::Key(key) = event::read()?

@@ -1,13 +1,17 @@
 //! Hexagonal binning plot for large datasets.
 
+use std::collections::HashMap;
+
 use ratatui::buffer::Buffer;
 use ratatui::layout::Rect;
-use ratatui::style::{Color, Style};
+use ratatui::style::Style;
 use ratatui::widgets::Widget;
 
 use crate::axis::Axis;
 use crate::colormap::{Colormap, Viridis};
 use crate::norm::{LinearNorm, Normalize};
+use crate::theme::Theme;
+use crate::transform::data_to_screen;
 
 /// Aggregation function for hexbin.
 #[derive(Clone, Debug)]
@@ -27,7 +31,7 @@ pub enum HexAggregation {
 /// # Example
 ///
 /// ```
-/// use ratatui_sim::widgets::hexbin::HexbinPlot;
+/// use ratatui_plt::widgets::hexbin::HexbinPlot;
 ///
 /// let data: Vec<(f64, f64)> = (0..1000)
 ///     .map(|i| (i as f64 * 0.01, (i as f64 * 0.1).sin()))
@@ -43,6 +47,7 @@ pub struct HexbinPlot {
     title: Option<String>,
     x_axis: Axis,
     y_axis: Axis,
+    theme: Theme,
 }
 
 impl HexbinPlot {
@@ -56,6 +61,7 @@ impl HexbinPlot {
             title: None,
             x_axis: Axis::new(),
             y_axis: Axis::new(),
+            theme: Theme::get_default(),
         }
     }
 
@@ -84,8 +90,39 @@ impl HexbinPlot {
         self
     }
 
-    pub fn x_axis(mut self, axis: Axis) -> Self { self.x_axis = axis; self }
-    pub fn y_axis(mut self, axis: Axis) -> Self { self.y_axis = axis; self }
+    pub fn x_axis(mut self, axis: Axis) -> Self {
+        self.x_axis = axis;
+        self
+    }
+    pub fn y_axis(mut self, axis: Axis) -> Self {
+        self.y_axis = axis;
+        self
+    }
+
+    pub fn theme(mut self, t: Theme) -> Self {
+        self.theme = t;
+        self
+    }
+}
+
+fn axial_round(q: f64, r: f64) -> (i32, i32) {
+    let s = -q - r;
+    let (rq, rr, rs) = (q.round(), r.round(), s.round());
+    let (dq, dr, ds) = ((rq - q).abs(), (rr - r).abs(), (rs - s).abs());
+    if dq > dr && dq > ds {
+        ((-rr - rs) as i32, rr as i32)
+    } else if dr > ds {
+        (rq as i32, (-rq - rs) as i32)
+    } else {
+        (rq as i32, rr as i32)
+    }
+}
+
+fn pixel_to_hex(dx: f64, dy: f64, s: f64) -> (i32, i32) {
+    let sqrt3 = 3.0_f64.sqrt();
+    let q_frac = (sqrt3 / 3.0 * dx - 1.0 / 3.0 * dy) / s;
+    let r_frac = (2.0 / 3.0 * dy) / s;
+    axial_round(q_frac, r_frac)
 }
 
 impl Widget for &HexbinPlot {
@@ -112,104 +149,131 @@ impl Widget for &HexbinPlot {
             for (i, ch) in title.chars().enumerate() {
                 let x = start + i as u16;
                 if x < area.x + area.width {
-                    buf[(x, area.y)].set_char(ch).set_fg(Color::White);
+                    buf[(x, area.y)].set_char(ch).set_fg(self.theme.foreground);
                 }
             }
         }
 
         // Compute bounds
         let x_min = self.data.iter().map(|p| p.0).fold(f64::INFINITY, f64::min);
-        let x_max = self.data.iter().map(|p| p.0).fold(f64::NEG_INFINITY, f64::max);
+        let x_max = self
+            .data
+            .iter()
+            .map(|p| p.0)
+            .fold(f64::NEG_INFINITY, f64::max);
         let y_min = self.data.iter().map(|p| p.1).fold(f64::INFINITY, f64::min);
-        let y_max = self.data.iter().map(|p| p.1).fold(f64::NEG_INFINITY, f64::max);
+        let y_max = self
+            .data
+            .iter()
+            .map(|p| p.1)
+            .fold(f64::NEG_INFINITY, f64::max);
 
         let (x_lo, x_hi) = self.x_axis.resolve_bounds(x_min, x_max);
         let (y_lo, y_hi) = self.y_axis.resolve_bounds(y_min, y_max);
 
-        // Simple grid-based hexagonal binning approximation
-        // Use rectangular bins as an approximation that works well in terminal cells
-        let n_cols = self.gridsize;
-        let n_rows = (self.gridsize as f64 * ph as f64 / pw as f64).round().max(3.0) as usize;
-
-        let bin_w = (x_hi - x_lo) / n_cols as f64;
-        let bin_h = (y_hi - y_lo) / n_rows as f64;
-
-        // Accumulate into bins
-        let mut counts = vec![vec![0.0f64; n_cols]; n_rows];
-        let mut weights_sum = vec![vec![0.0f64; n_cols]; n_rows];
-
-        for (idx, &(x, y)) in self.data.iter().enumerate() {
-            let col = ((x - x_lo) / bin_w).floor() as usize;
-            let row = ((y - y_lo) / bin_h).floor() as usize;
-            let col = col.min(n_cols - 1);
-            let row = row.min(n_rows - 1);
-            counts[row][col] += 1.0;
-            if let Some(ref w) = self.weights {
-                weights_sum[row][col] += w.get(idx).copied().unwrap_or(1.0);
+        // Draw grid
+        let x_grid = self.x_axis.grid || self.theme.grid_visible;
+        let y_grid = self.y_axis.grid || self.theme.grid_visible;
+        if x_grid {
+            let gx_ticks = self.x_axis.tick_positions(x_lo, x_hi);
+            for &tv in &gx_ticks {
+                let sx = data_to_screen(tv, x_lo, x_hi, px as f64, (px + pw - 1) as f64);
+                let xi = sx.round() as u16;
+                if xi >= px && xi < px + pw {
+                    for y in py..py + ph {
+                        buf[(xi, y)].set_char('·').set_fg(self.theme.grid_color);
+                    }
+                }
             }
         }
-
-        // Compute display values
-        let values: Vec<Vec<f64>> = match self.aggregation {
-            HexAggregation::Count => counts.clone(),
-            HexAggregation::Sum => weights_sum.clone(),
-            HexAggregation::Mean => {
-                counts
-                    .iter()
-                    .zip(weights_sum.iter())
-                    .map(|(cr, wr)| {
-                        cr.iter()
-                            .zip(wr.iter())
-                            .map(|(&c, &w)| if c > 0.0 { w / c } else { 0.0 })
-                            .collect()
-                    })
-                    .collect()
-            }
-        };
-
-        let val_max = values
-            .iter()
-            .flat_map(|r| r.iter())
-            .cloned()
-            .fold(0.0f64, f64::max);
-        let norm = LinearNorm::new(0.0, if val_max == 0.0 { 1.0 } else { val_max });
-
-        // Render bins
-        let cell_w = pw as f64 / n_cols as f64;
-        let cell_h = ph as f64 / n_rows as f64;
-
-        for (row, row_values) in values.iter().enumerate().take(n_rows) {
-            for (col, &val) in row_values.iter().enumerate().take(n_cols) {
-                if val == 0.0 {
-                    continue;
-                }
-                let t = norm.normalize(val);
-                let color = self.colormap.color_at(t);
-
-                let sx_start = (px as f64 + col as f64 * cell_w).round() as u16;
-                let sx_end = (px as f64 + (col + 1) as f64 * cell_w).round() as u16;
-                let sy_start = (py as f64 + (n_rows - 1 - row) as f64 * cell_h).round() as u16;
-                let sy_end = (py as f64 + (n_rows - row) as f64 * cell_h).round() as u16;
-
-                // Use hexagonal-ish character ⬢ for hex bins
-                for sy in sy_start..sy_end {
-                    for sx in sx_start..sx_end {
-                        if sx >= px && sx < px + pw && sy >= py && sy < py + ph {
-                            buf[(sx, sy)]
-                                .set_char('⬢')
-                                .set_style(Style::default().fg(color));
-                        }
+        if y_grid {
+            let gy_ticks = self.y_axis.tick_positions(y_lo, y_hi);
+            for &tv in &gy_ticks {
+                let sy = data_to_screen(tv, y_lo, y_hi, (py + ph - 1) as f64, py as f64);
+                let yi = sy.round() as u16;
+                if yi >= py && yi < py + ph {
+                    for x in px..px + pw {
+                        buf[(x, yi)].set_char('·').set_fg(self.theme.grid_color);
                     }
                 }
             }
         }
 
+        // Hexagonal binning using axial coordinates
+        let sqrt3 = 3.0_f64.sqrt();
+        let hex_w = (x_hi - x_lo) / self.gridsize as f64;
+        let s = hex_w / sqrt3;
+
+        let mut counts: HashMap<(i32, i32), f64> = HashMap::new();
+        let mut weight_sums: HashMap<(i32, i32), f64> = HashMap::new();
+
+        for (idx, &(x, y)) in self.data.iter().enumerate() {
+            let key = pixel_to_hex(x - x_lo, y - y_lo, s);
+            *counts.entry(key).or_insert(0.0) += 1.0;
+            if let Some(ref w) = self.weights {
+                *weight_sums.entry(key).or_insert(0.0) += w.get(idx).copied().unwrap_or(1.0);
+            }
+        }
+
+        // Compute display values
+        let values: HashMap<(i32, i32), f64> = match self.aggregation {
+            HexAggregation::Count => counts.clone(),
+            HexAggregation::Sum => weight_sums.clone(),
+            HexAggregation::Mean => counts
+                .iter()
+                .map(|(k, &c)| {
+                    let w = weight_sums.get(k).copied().unwrap_or(0.0);
+                    (*k, if c > 0.0 { w / c } else { 0.0 })
+                })
+                .collect(),
+        };
+
+        let val_max = values.values().cloned().fold(0.0_f64, f64::max);
+        let norm = LinearNorm::new(0.0, if val_max == 0.0 { 1.0 } else { val_max });
+
+        // Half-block rasterization
+        let effective_height = ph as usize * 2;
+
+        for cy in 0..ph {
+            for cx in 0..pw {
+                let screen_x = px + cx;
+                let screen_y = py + cy;
+                if screen_x >= area.x + area.width || screen_y >= area.y + area.height {
+                    continue;
+                }
+
+                let data_x = x_lo + (cx as f64 / pw as f64) * (x_hi - x_lo);
+
+                // Top half-pixel
+                let top_frac_y = (cy as usize * 2) as f64 / effective_height as f64;
+                let top_data_y = y_hi - top_frac_y * (y_hi - y_lo);
+                let top_key = pixel_to_hex(data_x - x_lo, top_data_y - y_lo, s);
+                let top_val = values.get(&top_key).copied().unwrap_or(0.0);
+                let top_color = self.colormap.color_at(norm.normalize(top_val));
+
+                // Bottom half-pixel
+                let bot_frac_y = (cy as usize * 2 + 1) as f64 / effective_height as f64;
+                let bot_data_y = y_hi - bot_frac_y * (y_hi - y_lo);
+                let bot_key = pixel_to_hex(data_x - x_lo, bot_data_y - y_lo, s);
+                let bot_val = values.get(&bot_key).copied().unwrap_or(0.0);
+                let bot_color = self.colormap.color_at(norm.normalize(bot_val));
+
+                buf[(screen_x, screen_y)]
+                    .set_char('▀')
+                    .set_style(Style::default().fg(top_color).bg(bot_color));
+            }
+        }
+
         // Draw axes
         for x in px..px + pw {
-            buf[(x, py + ph)].set_char('─').set_fg(Color::DarkGray);
+            buf[(x, py + ph)]
+                .set_char('─')
+                .set_fg(self.theme.axis_color);
         }
         for y in py..py + ph {
-            buf[(px.saturating_sub(1), y)].set_char('│').set_fg(Color::DarkGray);
+            buf[(px.saturating_sub(1), y)]
+                .set_char('│')
+                .set_fg(self.theme.axis_color);
         }
     }
 }

@@ -1,5 +1,3 @@
-//! Scatter plot example: random point cloud with color-mapped third value.
-
 use std::io;
 
 use crossterm::{
@@ -7,7 +5,6 @@ use crossterm::{
     event::{self, Event, KeyCode, KeyEventKind},
     terminal::{EnterAlternateScreen, LeaveAlternateScreen, disable_raw_mode, enable_raw_mode},
 };
-use rand::RngExt;
 use ratatui::prelude::*;
 use ratatui_plt::prelude::*;
 
@@ -34,37 +31,20 @@ fn main() -> color_eyre::Result<()> {
     enable_raw_mode()?;
     let mut terminal = Terminal::new(CrosstermBackend::new(io::stdout()))?;
 
-    // Generate random point cloud
-    let mut rng = rand::rng();
-    let n = 3000;
-    let mut points = Vec::with_capacity(n);
-    let mut color_vals = Vec::with_capacity(n);
+    // Saddle flow field: (x, -y)
+    let field = VectorFieldData::from_fn((-2.0, 2.0), (-2.0, 2.0), 20, 20, |x, y| (x, -y));
 
-    for _ in 0..n {
-        let x: f64 = rng.random_range(-5.0..5.0);
-        let y: f64 = rng.random_range(-5.0..5.0);
-        let z = (-(x * x + y * y) / 8.0).exp(); // radial falloff as color value
-        points.push((x, y));
-        color_vals.push(z);
-    }
-
-    let series = Series::new("cloud")
-        .data(points)
-        .marker(MarkerShape::FilledCircle);
-
-    let plot = ScatterPlot::new()
-        .series(series)
-        .color_values(color_vals)
-        .colormap(Viridis)
-        .title("Random Point Cloud (color = radial intensity)")
+    let plot = StreamPlot::new(field)
+        .density(2)
+        .color_by_magnitude(true)
+        .colormap(Coolwarm)
+        .title("Saddle Flow Streamlines (q to quit)")
         .x_axis(Axis::new().label("x"))
-        .y_axis(Axis::new().label("y"))
-        .aspect_ratio(AspectRatio::Equal)
-        .show_legend(false);
+        .y_axis(Axis::new().label("y"));
 
     loop {
         terminal.draw(|frame| {
-            frame.render_widget(&plot, frame.area());
+            frame.render_widget(&plot, square_area(frame.area()));
         })?;
 
         if let Event::Key(key) = event::read()?

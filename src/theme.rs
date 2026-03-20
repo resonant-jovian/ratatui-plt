@@ -6,7 +6,7 @@
 //! # Example
 //!
 //! ```
-//! use ratatui_sim::theme::Theme;
+//! use ratatui_plt::theme::Theme;
 //!
 //! // Use the dark theme (good for most terminals)
 //! let theme = Theme::dark();
@@ -53,10 +53,10 @@ impl Theme {
         Self {
             background: Color::Reset,
             foreground: Color::White,
-            grid_color: Color::DarkGray,
-            axis_color: Color::DarkGray,
+            grid_color: Color::Rgb(60, 60, 60),
+            axis_color: Color::Gray,
             color_cycle: ColorCycle::default(),
-            grid_visible: false,
+            grid_visible: true,
             grid_pattern: DashPattern::Dotted,
             bold_title: true,
         }
@@ -67,10 +67,10 @@ impl Theme {
         Self {
             background: Color::Reset,
             foreground: Color::Black,
-            grid_color: Color::Gray,
-            axis_color: Color::Gray,
+            grid_color: Color::Rgb(160, 160, 160),
+            axis_color: Color::Rgb(80, 80, 80),
             color_cycle: ColorCycle::default(),
-            grid_visible: false,
+            grid_visible: true,
             grid_pattern: DashPattern::Dotted,
             bold_title: true,
         }
@@ -81,8 +81,8 @@ impl Theme {
         Self {
             background: Color::Reset,
             foreground: Color::White,
-            grid_color: Color::DarkGray,
-            axis_color: Color::DarkGray,
+            grid_color: Color::Rgb(80, 80, 80),
+            axis_color: Color::Rgb(120, 120, 120),
             color_cycle: ColorCycle::default(),
             grid_visible: false,
             grid_pattern: DashPattern::Dotted,
@@ -95,7 +95,7 @@ impl Theme {
         Self {
             background: Color::Reset,
             foreground: Color::White,
-            grid_color: Color::DarkGray,
+            grid_color: Color::Rgb(80, 80, 80),
             axis_color: Color::White,
             color_cycle: ColorCycle::new(vec![
                 Color::White,
@@ -114,19 +114,19 @@ impl Theme {
         Self {
             background: Color::Rgb(0, 43, 54),
             foreground: Color::Rgb(131, 148, 150),
-            grid_color: Color::Rgb(7, 54, 66),
+            grid_color: Color::Rgb(30, 70, 80),
             axis_color: Color::Rgb(88, 110, 117),
             color_cycle: ColorCycle::new(vec![
-                Color::Rgb(38, 139, 210),   // blue
-                Color::Rgb(211, 54, 130),   // magenta
-                Color::Rgb(133, 153, 0),    // green
-                Color::Rgb(203, 75, 22),    // orange
-                Color::Rgb(108, 113, 196),  // violet
-                Color::Rgb(42, 161, 152),   // cyan
-                Color::Rgb(181, 137, 0),    // yellow
-                Color::Rgb(220, 50, 47),    // red
+                Color::Rgb(38, 139, 210),  // blue
+                Color::Rgb(211, 54, 130),  // magenta
+                Color::Rgb(133, 153, 0),   // green
+                Color::Rgb(203, 75, 22),   // orange
+                Color::Rgb(108, 113, 196), // violet
+                Color::Rgb(42, 161, 152),  // cyan
+                Color::Rgb(181, 137, 0),   // yellow
+                Color::Rgb(220, 50, 47),   // red
             ]),
-            grid_visible: false,
+            grid_visible: true,
             grid_pattern: DashPattern::Dotted,
             bold_title: true,
         }

@@ -8,7 +8,7 @@
 /// # Example
 ///
 /// ```
-/// use ratatui_sim::spines::Spines;
+/// use ratatui_plt::spines::Spines;
 ///
 /// // Hide the top and right spines for a cleaner look
 /// let spines = Spines::new().top(false).right(false);

@@ -10,7 +10,7 @@ use crate::axis::{AspectRatio, TERMINAL_CELL_ASPECT};
 /// # Example
 ///
 /// ```
-/// use ratatui_sim::transform::Camera3D;
+/// use ratatui_plt::transform::Camera3D;
 ///
 /// let cam = Camera3D::new()
 ///     .azimuth(45.0)
@@ -106,7 +106,7 @@ impl Camera3D {
 /// # Example
 ///
 /// ```
-/// use ratatui_sim::transform::Camera3DState;
+/// use ratatui_plt::transform::Camera3DState;
 ///
 /// let mut state = Camera3DState::default();
 /// state.rotate(5.0, 0.0);  // Rotate 5° horizontally
@@ -261,4 +261,22 @@ pub fn depth_sort(depths: &[f64]) -> Vec<usize> {
             .unwrap_or(std::cmp::Ordering::Equal)
     });
     indices
+}
+
+/// Compute a centered, visually square `Rect` within the given area.
+///
+/// Terminal cells are approximately twice as tall as they are wide, so a visual
+/// square needs `width = 2 * height` in character cells. This function computes
+/// the largest such rectangle that fits within `area` and centers it.
+pub fn square_area(area: ratatui::layout::Rect) -> ratatui::layout::Rect {
+    let max_h = area.height;
+    let max_w = area.width;
+    let (w, h) = if max_w <= max_h * 2 {
+        (max_w, max_w / 2)
+    } else {
+        (max_h * 2, max_h)
+    };
+    let x = area.x + (max_w.saturating_sub(w)) / 2;
+    let y = area.y + (max_h.saturating_sub(h)) / 2;
+    ratatui::layout::Rect::new(x, y, w, h)
 }

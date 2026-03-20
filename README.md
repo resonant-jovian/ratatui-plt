@@ -1,8 +1,8 @@
-# ratatui-sim
+# ratatui-plt
 
 **Scientific visualization widgets for [ratatui](https://ratatui.rs/) — matplotlib for the terminal.**
 
-`ratatui-sim` provides a comprehensive suite of configurable plot widgets, colormaps, axis systems, and layout tools designed for scientific computing and simulation monitoring. Built primarily for astrophysical applications (Vlasov-Poisson solvers, phase-space analysis), it works anywhere you need terminal-based scientific plots.
+`ratatui-plt` provides a comprehensive suite of configurable plot widgets, colormaps, axis systems, and layout tools designed for scientific computing and simulation monitoring. Built primarily for astrophysical applications (Vlasov-Poisson solvers, phase-space analysis), it works anywhere you need terminal-based scientific plots.
 
 ## Features
 
@@ -18,6 +18,11 @@
 - **BoxPlot** — Quartiles, whiskers (1.5xIQR), outlier detection
 - **VectorField** — 2D arrow fields with magnitude coloring (quiver plots)
 - **HexbinPlot** — Hexagonal binning for large datasets (10^4+ points)
+- **PieChart** — Pie/donut charts with explode, percentages, labels
+- **StackedArea** — Stacked filled areas with fill characters
+- **EventPlot** — Event timing / spike raster plots
+- **Hist2D** — 2D histogram rendered as heatmap
+- **ViolinPlot** — Violin plots with KDE and quartiles
 
 ### 3D Plot Widgets
 - **Surface3D** — Colored surface with painter's algorithm, interactive camera
@@ -26,31 +31,49 @@
 
 All 3D widgets support both static (`Widget`) and interactive (`StatefulWidget`) rendering with `Camera3DState` for keyboard-driven rotation and zoom.
 
-### Polar / Multi-Panel
+### Layout / Multi-Panel
 - **RadialPlot** — Polar coordinate rendering with circular grids and angular ticks
 - **MultiPanel** — GridSpec-like subplot grid with `width_ratios` / `height_ratios`
+- **TwinAxes** — Dual y-axis overlay with independent scales
+- **StreamPlot** — Vector field streamlines via Runge-Kutta integration
 
 ### Axis System (matplotlib-inspired)
 - **Scales**: Linear, Log, SymLog (symmetric log), Power
 - **Aspect Ratio**: `Auto`, `Equal`, `Fixed(ratio)` — auto-compensates for terminal cell geometry
-- **Tick Locators**: `MaxNLocator` (nice round numbers), `LogLocator`, `MultipleLocator`, `FixedLocator`
-- **Tick Formatters**: `ScalarFormatter`, `LogFormatter`, `SiFormatter` (engineering prefixes), `FuncFormatter`
+- **Tick Locators**: `MaxNLocator` (nice round numbers), `LogLocator`, `MultipleLocator`, `FixedLocator`, `CategoricalLocator`
+- **Tick Formatters**: `ScalarFormatter`, `LogFormatter`, `SiFormatter` (engineering prefixes), `FuncFormatter`, `CategoricalFormatter`
 
 ### Normalization System
 - `LinearNorm`, `LogNorm`, `SymLogNorm`, `PowerNorm`, `BoundaryNorm`, `TwoSlopeNorm`
 - Essential for astrophysical data spanning many orders of magnitude
 
+### Theme System
+- 5 presets: `dark`, `light`, `minimal`, `publication`, `solarized`
+- Global default via `Theme::set_default()`
+- All examples accept `--theme` CLI argument
+
+### Annotations & Legend
+- `Annotation` with optional arrow styles (`Arrow`, `FancyArrow`, `Bracket`)
+- `Legend` with position control (`TopLeft`, `TopRight`, `BottomLeft`, `BottomRight`, etc.)
+
+### Async Features (feature-gated: `async`)
+- `AnimationConfig` / `run_animation()` — animation loop framework
+- `AsyncSeries` / `AsyncGrid` — tokio-based streaming data
+- `compute_kde_async()` / `compute_histogram_async()` — background computation
+
 ### Scientific Colormaps
 - **Sequential** (perceptually uniform): Viridis, Plasma, Inferno, Magma, Cividis
 - **Diverging**: Coolwarm, RdBu, Seismic
+- **Cyclic**: Hsv, Twilight
+- **Seasonal**: Spring, Summer, Autumn, Winter
 - **Miscellaneous**: Grayscale, Jet, Turbo, Hot
 - **Custom**: `ListedColormap` from user-defined color stops
 - Colorbar widget for value-to-color mapping display
 
 ### MathText
-- Greek letters: `\alpha` -> a, `\beta` -> b, `\Sigma` -> S
-- Superscripts: `x^2` -> x2, `10^{-3}` -> 10^-3
-- Subscripts: `x_0` -> x0
+- Greek letters: `\alpha` → α, `\beta` → β, `\Sigma` → Σ
+- Superscripts: `x^2` → x², `10^{-3}` → 10⁻³
+- Subscripts: `x_0` → x₀
 - Scientific notation formatting
 
 ### Convenience Macros
@@ -78,13 +101,13 @@ let cmap = colormap_custom!("diverging", 0.0 => Color::Blue, 0.5 => Color::White
 Add to your `Cargo.toml`:
 ```toml
 [dependencies]
-ratatui-sim = "0.1"
+ratatui-plt = "0.0.1"
 ratatui = "0.30"
 ```
 
 Basic line plot:
 ```rust
-use ratatui_sim::prelude::*;
+use ratatui_plt::prelude::*;
 
 let series = Series::new("sin(x)")
     .data((0..100).map(|i| {
@@ -105,7 +128,7 @@ frame.render_widget(&plot, area);
 
 Heatmap with forced aspect ratio:
 ```rust
-use ratatui_sim::prelude::*;
+use ratatui_plt::prelude::*;
 
 let data = GridData::from_fn((-2.0, 2.0), (-2.0, 2.0), 50, 50, |x, y| {
     (-(x * x + y * y)).exp()
@@ -121,7 +144,7 @@ frame.render_widget(&heatmap, area);
 
 Interactive 3D surface:
 ```rust
-use ratatui_sim::prelude::*;
+use ratatui_plt::prelude::*;
 
 let data = GridData::from_fn((-3.0, 3.0), (-3.0, 3.0), 30, 30, |x, y| {
     (x * x + y * y).sqrt().sin()
@@ -167,6 +190,8 @@ cargo run --example <name>
 - **Half-block characters** for heatmaps — doubles vertical resolution
 - **Braille-ready** marker support for sub-character resolution
 - **Terminal cell compensation**: aspect ratio system accounts for ~2:1 cell geometry
+- **Theming**: consistent styling via 5 built-in themes or custom `Theme` structs
+- **Annotations & legends**: first-class support for labeling and explaining plots
 - **Minimal dependencies**: only `ratatui`, `palette`, and `ordered-float`
 
 ## License

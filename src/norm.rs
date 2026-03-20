@@ -6,7 +6,7 @@
 //! # Example
 //!
 //! ```
-//! use ratatui_sim::norm::{Normalize, LogNorm};
+//! use ratatui_plt::norm::{Normalize, LogNorm};
 //!
 //! let norm = LogNorm::new(1.0, 1000.0);
 //! assert!((norm.normalize(1.0) - 0.0).abs() < 1e-10);

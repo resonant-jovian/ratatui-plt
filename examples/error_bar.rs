@@ -1,5 +1,3 @@
-//! Scatter plot example: random point cloud with color-mapped third value.
-
 use std::io;
 
 use crossterm::{
@@ -7,7 +5,6 @@ use crossterm::{
     event::{self, Event, KeyCode, KeyEventKind},
     terminal::{EnterAlternateScreen, LeaveAlternateScreen, disable_raw_mode, enable_raw_mode},
 };
-use rand::RngExt;
 use ratatui::prelude::*;
 use ratatui_plt::prelude::*;
 
@@ -34,37 +31,31 @@ fn main() -> color_eyre::Result<()> {
     enable_raw_mode()?;
     let mut terminal = Terminal::new(CrosstermBackend::new(io::stdout()))?;
 
-    // Generate random point cloud
-    let mut rng = rand::rng();
-    let n = 3000;
-    let mut points = Vec::with_capacity(n);
-    let mut color_vals = Vec::with_capacity(n);
+    // Noisy quadratic with asymmetric errors
+    let n = 10;
+    let points: Vec<(f64, f64)> = (0..n)
+        .map(|i| {
+            let x = i as f64;
+            let noise = ((i * 7 + 3) % 5) as f64 * 0.4 - 1.0;
+            (x, x * x * 0.5 + noise)
+        })
+        .collect();
+    let err_low: Vec<f64> = (0..n).map(|i| 0.5 + (i as f64) * 0.2).collect();
+    let err_high: Vec<f64> = (0..n).map(|i| 1.0 + (i as f64) * 0.3).collect();
+    let x_err_low: Vec<f64> = vec![0.3; n];
+    let x_err_high: Vec<f64> = vec![0.3; n];
 
-    for _ in 0..n {
-        let x: f64 = rng.random_range(-5.0..5.0);
-        let y: f64 = rng.random_range(-5.0..5.0);
-        let z = (-(x * x + y * y) / 8.0).exp(); // radial falloff as color value
-        points.push((x, y));
-        color_vals.push(z);
-    }
-
-    let series = Series::new("cloud")
-        .data(points)
-        .marker(MarkerShape::FilledCircle);
-
-    let plot = ScatterPlot::new()
-        .series(series)
-        .color_values(color_vals)
-        .colormap(Viridis)
-        .title("Random Point Cloud (color = radial intensity)")
+    let plot = ErrorBarPlot::new()
+        .data(points, err_low, err_high)
+        .x_errors(x_err_low, x_err_high)
+        .color(Color::Cyan)
+        .title("Noisy Quadratic with Error Bars (q to quit)")
         .x_axis(Axis::new().label("x"))
-        .y_axis(Axis::new().label("y"))
-        .aspect_ratio(AspectRatio::Equal)
-        .show_legend(false);
+        .y_axis(Axis::new().label("y = 0.5x\u{00b2} + noise"));
 
     loop {
         terminal.draw(|frame| {
-            frame.render_widget(&plot, frame.area());
+            frame.render_widget(&plot, square_area(frame.area()));
         })?;
 
         if let Event::Key(key) = event::read()?

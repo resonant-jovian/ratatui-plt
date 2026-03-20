@@ -1,5 +1,3 @@
-//! Scatter plot example: random point cloud with color-mapped third value.
-
 use std::io;
 
 use crossterm::{
@@ -7,9 +5,23 @@ use crossterm::{
     event::{self, Event, KeyCode, KeyEventKind},
     terminal::{EnterAlternateScreen, LeaveAlternateScreen, disable_raw_mode, enable_raw_mode},
 };
-use rand::RngExt;
 use ratatui::prelude::*;
 use ratatui_plt::prelude::*;
+
+/// Simple LCG pseudo-random number generator (deterministic, no rand dependency).
+fn lcg_events(seed: u64, count: usize, range: f64) -> Vec<f64> {
+    let mut state = seed;
+    let mut values = Vec::with_capacity(count);
+    for _ in 0..count {
+        state = state
+            .wrapping_mul(6364136223846793005)
+            .wrapping_add(1442695040888963407);
+        let normalized = (state >> 33) as f64 / u32::MAX as f64;
+        values.push(normalized * range);
+    }
+    values.sort_by(|a, b| a.partial_cmp(b).unwrap());
+    values
+}
 
 fn parse_theme() -> Theme {
     match std::env::args().nth(1).as_deref() {
@@ -34,37 +46,22 @@ fn main() -> color_eyre::Result<()> {
     enable_raw_mode()?;
     let mut terminal = Terminal::new(CrosstermBackend::new(io::stdout()))?;
 
-    // Generate random point cloud
-    let mut rng = rand::rng();
-    let n = 3000;
-    let mut points = Vec::with_capacity(n);
-    let mut color_vals = Vec::with_capacity(n);
+    let colors = [Color::Cyan, Color::Yellow, Color::Magenta, Color::Green, Color::Red];
+    let groups: Vec<EventGroup> = (0..5)
+        .map(|i| {
+            let spikes = lcg_events(42 + i * 17, 10 + (i as usize) * 2, 200.0);
+            EventGroup::new(format!("Neuron {}", i + 1), spikes).color(colors[i as usize])
+        })
+        .collect();
 
-    for _ in 0..n {
-        let x: f64 = rng.random_range(-5.0..5.0);
-        let y: f64 = rng.random_range(-5.0..5.0);
-        let z = (-(x * x + y * y) / 8.0).exp(); // radial falloff as color value
-        points.push((x, y));
-        color_vals.push(z);
-    }
-
-    let series = Series::new("cloud")
-        .data(points)
-        .marker(MarkerShape::FilledCircle);
-
-    let plot = ScatterPlot::new()
-        .series(series)
-        .color_values(color_vals)
-        .colormap(Viridis)
-        .title("Random Point Cloud (color = radial intensity)")
-        .x_axis(Axis::new().label("x"))
-        .y_axis(Axis::new().label("y"))
-        .aspect_ratio(AspectRatio::Equal)
-        .show_legend(false);
+    let plot = EventPlot::new()
+        .groups(groups)
+        .title("Neural Spike Raster (q to quit)")
+        .x_axis(Axis::new().label("Time (ms)"));
 
     loop {
         terminal.draw(|frame| {
-            frame.render_widget(&plot, frame.area());
+            frame.render_widget(&plot, square_area(frame.area()));
         })?;
 
         if let Event::Key(key) = event::read()?

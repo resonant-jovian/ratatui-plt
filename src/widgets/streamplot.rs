@@ -6,8 +6,8 @@
 //! # Example
 //!
 //! ```
-//! use ratatui_sim::prelude::*;
-//! use ratatui_sim::widgets::streamplot::StreamPlot;
+//! use ratatui_plt::prelude::*;
+//! use ratatui_plt::widgets::streamplot::StreamPlot;
 //!
 //! let field = VectorFieldData::from_fn(
 //!     (-2.0, 2.0), (-2.0, 2.0), 20, 20,
@@ -28,6 +28,7 @@ use crate::axis::Axis;
 use crate::colormap::{Colormap, Viridis};
 use crate::norm::{LinearNorm, Normalize};
 use crate::series::VectorFieldData;
+use crate::theme::Theme;
 use crate::transform::data_to_screen;
 
 /// A streamline plot widget for visualising vector fields.
@@ -54,6 +55,8 @@ pub struct StreamPlot {
     colormap: Box<dyn Colormap>,
     /// Arrow rendering scale (controls visual weight of arrow heads).
     arrow_scale: f64,
+    /// Visual theme.
+    theme: Theme,
 }
 
 impl StreamPlot {
@@ -69,6 +72,7 @@ impl StreamPlot {
             color_by_magnitude: false,
             colormap: Box::new(Viridis),
             arrow_scale: 1.0,
+            theme: Theme::get_default(),
         }
     }
 
@@ -119,64 +123,19 @@ impl StreamPlot {
         self.arrow_scale = scale;
         self
     }
+
+    /// Set the visual theme.
+    pub fn theme(mut self, theme: Theme) -> Self {
+        self.theme = theme;
+        self
+    }
 }
 
-/// Interpolate the vector field at an arbitrary (x, y) position using
-/// inverse-distance weighted interpolation of nearby grid vectors.
+/// Interpolate the vector field at an arbitrary (x, y) position.
+/// Delegates to `VectorFieldData::interpolate` which uses O(1) bilinear
+/// lookup for grid-based fields.
 fn interpolate_field(field: &VectorFieldData, x: f64, y: f64) -> (f64, f64) {
-    if field.vectors.is_empty() {
-        return (0.0, 0.0);
-    }
-
-    let mut weight_sum = 0.0f64;
-    let mut dx_sum = 0.0f64;
-    let mut dy_sum = 0.0f64;
-
-    // Find the closest vectors and do inverse-distance weighting.
-    // For performance, we limit to vectors within a reasonable neighbourhood.
-    // First pass: find a rough distance scale from the grid spacing.
-    let mut min_dist_sq = f64::INFINITY;
-    let mut closest_idx = 0;
-    for (i, &(vx, vy, _, _)) in field.vectors.iter().enumerate() {
-        let dsq = (vx - x) * (vx - x) + (vy - y) * (vy - y);
-        if dsq < min_dist_sq {
-            min_dist_sq = dsq;
-            closest_idx = i;
-        }
-    }
-
-    // If we are very close to a grid point, just return its value
-    if min_dist_sq < 1e-12 {
-        let (_, _, dx, dy) = field.vectors[closest_idx];
-        return (dx, dy);
-    }
-
-    // Use inverse-distance weighting with the 4 nearest neighbours
-    let mut dists: Vec<(f64, usize)> = field
-        .vectors
-        .iter()
-        .enumerate()
-        .map(|(i, &(vx, vy, _, _))| {
-            let dsq = (vx - x) * (vx - x) + (vy - y) * (vy - y);
-            (dsq, i)
-        })
-        .collect();
-    dists.sort_by(|a, b| a.0.partial_cmp(&b.0).unwrap_or(std::cmp::Ordering::Equal));
-
-    let n_neighbours = dists.len().min(4);
-    for &(dsq, idx) in &dists[..n_neighbours] {
-        let w = 1.0 / (dsq + 1e-10);
-        let (_, _, fdx, fdy) = field.vectors[idx];
-        dx_sum += w * fdx;
-        dy_sum += w * fdy;
-        weight_sum += w;
-    }
-
-    if weight_sum > 0.0 {
-        (dx_sum / weight_sum, dy_sum / weight_sum)
-    } else {
-        (0.0, 0.0)
-    }
+    field.interpolate(x, y)
 }
 
 /// Integrate a single streamline using 4th-order Runge-Kutta.
@@ -228,23 +187,83 @@ fn trace_streamline(
     points
 }
 
-/// Choose a line-drawing character for connecting consecutive points.
-fn line_char(dx: f64, dy: f64) -> char {
-    if dx.abs() < 1e-10 && dy.abs() < 1e-10 {
-        return '·';
+struct ClipRect {
+    x_min: u16,
+    y_min: u16,
+    x_max: u16,
+    y_max: u16,
+}
+
+const BRAILLE_BITS: [[u8; 4]; 2] = [
+    [0x01, 0x02, 0x04, 0x40],
+    [0x08, 0x10, 0x20, 0x80],
+];
+const BRAILLE_BASE: u32 = 0x2800;
+
+fn write_braille(buf: &mut Buffer, x: u16, y: u16, bits: u8, color: Color) {
+    let existing = {
+        let ch = buf[(x, y)].symbol().chars().next().unwrap_or(' ');
+        let code = ch as u32;
+        if (BRAILLE_BASE..=0x28FF).contains(&code) {
+            (code - BRAILLE_BASE) as u8
+        } else {
+            0
+        }
+    };
+    let combined = existing | bits;
+    if let Some(ch) = char::from_u32(BRAILLE_BASE + combined as u32) {
+        buf[(x, y)].set_char(ch).set_fg(color);
     }
-    let angle = dy.atan2(dx);
-    let octant = ((angle + std::f64::consts::PI) / (std::f64::consts::PI / 4.0)).round() as i32 % 8;
-    match octant {
-        0 => '─',
-        1 => '╲',
-        2 => '│',
-        3 => '╱',
-        4 => '─',
-        5 => '╲',
-        6 => '│',
-        7 => '╱',
-        _ => '─',
+}
+
+fn draw_braille_line(
+    buf: &mut Buffer,
+    x0: f64,
+    y0: f64,
+    x1: f64,
+    y1: f64,
+    color: Color,
+    clip: &ClipRect,
+) {
+    let mut ix0 = (x0 * 2.0).round() as i32;
+    let mut iy0 = (y0 * 4.0).round() as i32;
+    let ix1 = (x1 * 2.0).round() as i32;
+    let iy1 = (y1 * 4.0).round() as i32;
+
+    let dx = (ix1 - ix0).abs();
+    let dy = -(iy1 - iy0).abs();
+    let sx = if ix0 < ix1 { 1 } else { -1 };
+    let sy = if iy0 < iy1 { 1 } else { -1 };
+    let mut err = dx + dy;
+
+    loop {
+        if ix0 >= 0 && iy0 >= 0 {
+            let cell_x = (ix0 / 2) as u16;
+            let cell_y = (iy0 / 4) as u16;
+            if cell_x >= clip.x_min
+                && cell_x < clip.x_max
+                && cell_y >= clip.y_min
+                && cell_y < clip.y_max
+            {
+                let dot_col = (ix0 % 2) as usize;
+                let dot_row = (iy0 % 4) as usize;
+                let bit = BRAILLE_BITS[dot_col][dot_row];
+                write_braille(buf, cell_x, cell_y, bit, color);
+            }
+        }
+
+        if ix0 == ix1 && iy0 == iy1 {
+            break;
+        }
+        let e2 = 2 * err;
+        if e2 >= dy {
+            err += dy;
+            ix0 += sx;
+        }
+        if e2 <= dx {
+            err += dx;
+            iy0 += sy;
+        }
     }
 }
 
@@ -293,7 +312,7 @@ impl Widget for &StreamPlot {
             for (i, ch) in title.chars().enumerate() {
                 let x = start + i as u16;
                 if x < area.x + area.width {
-                    buf[(x, area.y)].set_char(ch).set_fg(Color::White);
+                    buf[(x, area.y)].set_char(ch).set_fg(self.theme.foreground);
                 }
             }
         }
@@ -320,11 +339,43 @@ impl Widget for &StreamPlot {
         // Draw axes
         for x in px..px + pw {
             if x < area.x + area.width {
-                buf[(x, py + ph)].set_char('─').set_fg(Color::DarkGray);
+                buf[(x, py + ph)]
+                    .set_char('─')
+                    .set_fg(self.theme.axis_color);
             }
         }
         for y in py..py + ph {
-            buf[(px.saturating_sub(1), y)].set_char('│').set_fg(Color::DarkGray);
+            buf[(px.saturating_sub(1), y)]
+                .set_char('│')
+                .set_fg(self.theme.axis_color);
+        }
+
+        // Draw grid
+        let x_grid = self.x_axis.grid || self.theme.grid_visible;
+        let y_grid = self.y_axis.grid || self.theme.grid_visible;
+        if x_grid {
+            let gx_ticks = self.x_axis.tick_positions(x_lo, x_hi);
+            for &tv in &gx_ticks {
+                let sx = data_to_screen(tv, x_lo, x_hi, px as f64, (px + pw - 1) as f64);
+                let xi = sx.round() as u16;
+                if xi >= px && xi < px + pw {
+                    for y in py..py + ph {
+                        buf[(xi, y)].set_char('·').set_fg(self.theme.grid_color);
+                    }
+                }
+            }
+        }
+        if y_grid {
+            let gy_ticks = self.y_axis.tick_positions(y_lo, y_hi);
+            for &tv in &gy_ticks {
+                let sy = data_to_screen(tv, y_lo, y_hi, (py + ph - 1) as f64, py as f64);
+                let yi = sy.round() as u16;
+                if yi >= py && yi < py + ph {
+                    for x in px..px + pw {
+                        buf[(x, yi)].set_char('·').set_fg(self.theme.grid_color);
+                    }
+                }
+            }
         }
 
         // Generate seed points on a grid
@@ -348,14 +399,12 @@ impl Widget for &StreamPlot {
                 let sy = y_lo + y_range * (si as f64 + 0.5) / n_seeds_y as f64;
 
                 // Trace forward
-                let forward = trace_streamline(
-                    &self.field, sx, sy, x_lo, x_hi, y_lo, y_hi, max_steps, dt,
-                );
+                let forward =
+                    trace_streamline(&self.field, sx, sy, x_lo, x_hi, y_lo, y_hi, max_steps, dt);
 
                 // Trace backward
-                let backward = trace_streamline(
-                    &self.field, sx, sy, x_lo, x_hi, y_lo, y_hi, max_steps, -dt,
-                );
+                let backward =
+                    trace_streamline(&self.field, sx, sy, x_lo, x_hi, y_lo, y_hi, max_steps, -dt);
 
                 // Combine: reverse of backward (excluding seed) + forward
                 let mut points: Vec<(f64, f64)> = Vec::new();
@@ -368,13 +417,12 @@ impl Widget for &StreamPlot {
                     continue;
                 }
 
-                // Render the streamline
-                let mut prev_screen: Option<(u16, u16)> = None;
+                // Render the streamline using braille sub-pixel lines
+                let clip = ClipRect { x_min: px, y_min: py, x_max: px + pw, y_max: py + ph };
+                let mut prev_screen: Option<(f64, f64)> = None;
                 for (idx, &(ptx, pty)) in points.iter().enumerate() {
-                    let scr_x =
-                        data_to_screen(ptx, x_lo, x_hi, px as f64, (px + pw - 1) as f64);
-                    let scr_y =
-                        data_to_screen(pty, y_lo, y_hi, (py + ph - 1) as f64, py as f64);
+                    let scr_x = data_to_screen(ptx, x_lo, x_hi, px as f64, (px + pw - 1) as f64);
+                    let scr_y = data_to_screen(pty, y_lo, y_hi, (py + ph - 1) as f64, py as f64);
                     let xi = scr_x.round() as u16;
                     let yi = scr_y.round() as u16;
 
@@ -393,40 +441,19 @@ impl Widget for &StreamPlot {
                         self.color
                     };
 
-                    // Choose character: arrow at intervals, line character otherwise
-                    let ch = if idx % arrow_interval == arrow_interval / 2 && idx > 0 {
-                        // Arrow head based on local velocity direction
-                        let (fdx, fdy) = interpolate_field(&self.field, ptx, pty);
-                        arrow_char(fdx, -fdy) // Negate dy for screen coords
-                    } else if let Some((px_prev, py_prev)) = prev_screen {
-                        let sdx = xi as f64 - px_prev as f64;
-                        let sdy = yi as f64 - py_prev as f64;
-                        line_char(sdx, sdy)
-                    } else {
-                        '·'
-                    };
-
-                    buf[(xi, yi)].set_char(ch).set_fg(color);
-
-                    // Fill in gaps between consecutive screen points with Bresenham-like steps
-                    if let Some((px_prev, py_prev)) = prev_screen {
-                        let sdx = xi as i32 - px_prev as i32;
-                        let sdy = yi as i32 - py_prev as i32;
-                        let steps = sdx.abs().max(sdy.abs());
-                        if steps > 1 {
-                            for s in 1..steps {
-                                let frac = s as f64 / steps as f64;
-                                let ix = (px_prev as f64 + sdx as f64 * frac).round() as u16;
-                                let iy = (py_prev as f64 + sdy as f64 * frac).round() as u16;
-                                if ix >= px && ix < px + pw && iy >= py && iy < py + ph {
-                                    let fill_ch = line_char(sdx as f64, sdy as f64);
-                                    buf[(ix, iy)].set_char(fill_ch).set_fg(color);
-                                }
-                            }
-                        }
+                    // Draw braille line from previous point
+                    if let Some((prev_x, prev_y)) = prev_screen {
+                        draw_braille_line(buf, prev_x, prev_y, scr_x, scr_y, color, &clip);
                     }
 
-                    prev_screen = Some((xi, yi));
+                    // Arrow head at intervals (cell resolution, drawn on top)
+                    if idx % arrow_interval == arrow_interval / 2 && idx > 0 {
+                        let (fdx, fdy) = interpolate_field(&self.field, ptx, pty);
+                        let ch = arrow_char(fdx, -fdy);
+                        buf[(xi, yi)].set_char(ch).set_fg(color);
+                    }
+
+                    prev_screen = Some((scr_x, scr_y));
                 }
             }
         }
@@ -443,7 +470,7 @@ impl Widget for &StreamPlot {
                 for (j, ch) in label.chars().enumerate() {
                     let lx = start + j as u16;
                     if lx >= area.x && lx < area.x + area.width {
-                        buf[(lx, y)].set_char(ch).set_fg(Color::DarkGray);
+                        buf[(lx, y)].set_char(ch).set_fg(self.theme.axis_color);
                     }
                 }
             }
@@ -464,7 +491,7 @@ impl Widget for &StreamPlot {
                 for (j, ch) in label.chars().enumerate() {
                     let lx = label_start + j as u16;
                     if lx >= area.x && lx < px.saturating_sub(1) {
-                        buf[(lx, yi)].set_char(ch).set_fg(Color::DarkGray);
+                        buf[(lx, yi)].set_char(ch).set_fg(self.theme.axis_color);
                     }
                 }
             }

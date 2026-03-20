@@ -12,7 +12,7 @@ use crate::style::{LineStyle, MarkerShape};
 /// # Example
 ///
 /// ```
-/// use ratatui_sim::series::Series;
+/// use ratatui_plt::series::Series;
 /// use ratatui::style::Color;
 ///
 /// let s = Series::new("Temperature")
@@ -125,7 +125,11 @@ impl Series {
                 max = x;
             }
         }
-        if min.is_infinite() { None } else { Some((min, max)) }
+        if min.is_infinite() {
+            None
+        } else {
+            Some((min, max))
+        }
     }
 
     /// Compute the y-range of the data (including error bars if present), skipping NaN values.
@@ -148,19 +152,45 @@ impl Series {
                 max = hi;
             }
         }
-        if min.is_infinite() { None } else { Some((min, max)) }
+        if min.is_infinite() {
+            None
+        } else {
+            Some((min, max))
+        }
     }
 
     /// Return a filtered copy with NaN data points removed.
     pub fn filter_nan(&self) -> Self {
         let mut filtered = self.clone();
-        let valid: Vec<bool> = self.data.iter().map(|(x, y)| x.is_finite() && y.is_finite()).collect();
-        filtered.data = self.data.iter().zip(&valid).filter(|(_, &v)| v).map(|(d, _)| *d).collect();
+        let valid: Vec<bool> = self
+            .data
+            .iter()
+            .map(|(x, y)| x.is_finite() && y.is_finite())
+            .collect();
+        filtered.data = self
+            .data
+            .iter()
+            .zip(&valid)
+            .filter(|(_, v)| **v)
+            .map(|(d, _)| *d)
+            .collect();
         if let Some(ref err) = self.y_err_low {
-            filtered.y_err_low = Some(err.iter().zip(&valid).filter(|(_, &v)| v).map(|(e, _)| *e).collect());
+            filtered.y_err_low = Some(
+                err.iter()
+                    .zip(&valid)
+                    .filter(|(_, v)| **v)
+                    .map(|(e, _)| *e)
+                    .collect(),
+            );
         }
         if let Some(ref err) = self.y_err_high {
-            filtered.y_err_high = Some(err.iter().zip(&valid).filter(|(_, &v)| v).map(|(e, _)| *e).collect());
+            filtered.y_err_high = Some(
+                err.iter()
+                    .zip(&valid)
+                    .filter(|(_, v)| **v)
+                    .map(|(e, _)| *e)
+                    .collect(),
+            );
         }
         filtered
     }
@@ -176,7 +206,7 @@ pub fn is_valid_point(x: f64, y: f64) -> bool {
 /// # Example
 ///
 /// ```
-/// use ratatui_sim::series::Series3D;
+/// use ratatui_plt::series::Series3D;
 ///
 /// let s = Series3D::new("Particles")
 ///     .data(vec![(1.0, 2.0, 3.0), (4.0, 5.0, 6.0)]);
@@ -230,7 +260,7 @@ impl Series3D {
 /// # Example
 ///
 /// ```
-/// use ratatui_sim::series::GridData;
+/// use ratatui_plt::series::GridData;
 ///
 /// let grid = GridData::new(
 ///     vec![0.0, 1.0, 2.0],        // x coordinates
@@ -313,12 +343,27 @@ impl GridData {
 pub struct VectorFieldData {
     /// Vector entries: (x, y, dx, dy).
     pub vectors: Vec<(f64, f64, f64, f64)>,
+    /// Grid metadata for O(1) bilinear interpolation (set by `from_fn`).
+    pub grid: Option<GridMeta>,
+}
+
+/// Metadata for regular-grid vector fields enabling fast bilinear interpolation.
+#[derive(Clone, Debug)]
+pub struct GridMeta {
+    /// Number of columns.
+    pub nx: usize,
+    /// Number of rows.
+    pub ny: usize,
+    /// X range (min, max).
+    pub x_range: (f64, f64),
+    /// Y range (min, max).
+    pub y_range: (f64, f64),
 }
 
 impl VectorFieldData {
     /// Create vector field data from a list of (x, y, dx, dy) tuples.
     pub fn new(vectors: Vec<(f64, f64, f64, f64)>) -> Self {
-        Self { vectors }
+        Self { vectors, grid: None }
     }
 
     /// Create from a function (dx, dy) = f(x, y) sampled on a grid.
@@ -338,7 +383,72 @@ impl VectorFieldData {
                 vectors.push((x, y, dx, dy));
             }
         }
-        Self { vectors }
+        Self {
+            vectors,
+            grid: Some(GridMeta { nx, ny, x_range, y_range }),
+        }
+    }
+
+    /// O(1) bilinear interpolation for grid-based fields, with IDW fallback.
+    pub fn interpolate(&self, x: f64, y: f64) -> (f64, f64) {
+        if let Some(ref g) = self.grid {
+            if g.nx < 2 || g.ny < 2 {
+                return self.interpolate_idw(x, y);
+            }
+            let fx = (x - g.x_range.0) / (g.x_range.1 - g.x_range.0) * (g.nx - 1) as f64;
+            let fy = (y - g.y_range.0) / (g.y_range.1 - g.y_range.0) * (g.ny - 1) as f64;
+            let ix = (fx.floor() as usize).min(g.nx - 2);
+            let iy = (fy.floor() as usize).min(g.ny - 2);
+            let tx = (fx - ix as f64).clamp(0.0, 1.0);
+            let ty = (fy - iy as f64).clamp(0.0, 1.0);
+
+            let idx = |r: usize, c: usize| r * g.nx + c;
+            let (_, _, dx00, dy00) = self.vectors[idx(iy, ix)];
+            let (_, _, dx10, dy10) = self.vectors[idx(iy, ix + 1)];
+            let (_, _, dx01, dy01) = self.vectors[idx(iy + 1, ix)];
+            let (_, _, dx11, dy11) = self.vectors[idx(iy + 1, ix + 1)];
+
+            let dx = dx00 * (1.0 - tx) * (1.0 - ty)
+                + dx10 * tx * (1.0 - ty)
+                + dx01 * (1.0 - tx) * ty
+                + dx11 * tx * ty;
+            let dy = dy00 * (1.0 - tx) * (1.0 - ty)
+                + dy10 * tx * (1.0 - ty)
+                + dy01 * (1.0 - tx) * ty
+                + dy11 * tx * ty;
+            (dx, dy)
+        } else {
+            self.interpolate_idw(x, y)
+        }
+    }
+
+    /// Inverse-distance weighted fallback for non-grid fields.
+    fn interpolate_idw(&self, x: f64, y: f64) -> (f64, f64) {
+        if self.vectors.is_empty() {
+            return (0.0, 0.0);
+        }
+        let mut best = [(f64::INFINITY, 0usize); 4];
+        for (i, &(vx, vy, _, _)) in self.vectors.iter().enumerate() {
+            let dsq = (vx - x) * (vx - x) + (vy - y) * (vy - y);
+            if dsq < best[3].0 {
+                best[3] = (dsq, i);
+                best.sort_by(|a, b| a.0.partial_cmp(&b.0).unwrap());
+            }
+        }
+        if best[0].0 < 1e-12 {
+            let (_, _, dx, dy) = self.vectors[best[0].1];
+            return (dx, dy);
+        }
+        let (mut ws, mut dxs, mut dys) = (0.0, 0.0, 0.0);
+        for &(dsq, idx) in &best {
+            if dsq == f64::INFINITY { break; }
+            let w = 1.0 / (dsq + 1e-10);
+            let (_, _, fdx, fdy) = self.vectors[idx];
+            dxs += w * fdx;
+            dys += w * fdy;
+            ws += w;
+        }
+        if ws > 0.0 { (dxs / ws, dys / ws) } else { (0.0, 0.0) }
     }
 
     /// Get the maximum vector magnitude.

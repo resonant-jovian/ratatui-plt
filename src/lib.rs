@@ -1,8 +1,8 @@
-//! # ratatui-sim
+//! # ratatui-plt
 //!
 //! Scientific visualization widgets for [ratatui](https://ratatui.rs/) — matplotlib for the terminal.
 //!
-//! `ratatui-sim` provides a comprehensive suite of configurable plot widgets, colormaps,
+//! `ratatui-plt` provides a comprehensive suite of configurable plot widgets, colormaps,
 //! axis systems, and layout tools designed for scientific computing and simulation monitoring.
 //! Built primarily for astrophysical applications (Vlasov-Poisson solvers, phase-space analysis),
 //! it works anywhere you need publication-quality terminal plots.
@@ -10,7 +10,7 @@
 //! ## Quick Start
 //!
 //! ```rust,no_run
-//! use ratatui_sim::prelude::*;
+//! use ratatui_plt::prelude::*;
 //!
 //! let series = Series::new("sin(x)")
 //!     .data((0..100).map(|i| {
@@ -58,8 +58,8 @@ pub mod transform;
 pub mod widgets;
 
 #[cfg(feature = "async")]
-pub mod async_data;
-#[cfg(feature = "async")]
 pub mod animation;
+#[cfg(feature = "async")]
+pub mod async_data;
 #[cfg(feature = "async")]
 pub mod compute;

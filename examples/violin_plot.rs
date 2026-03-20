@@ -7,22 +7,28 @@ use crossterm::{
 };
 use ratatui::prelude::*;
 use ratatui_plt::prelude::*;
-use ratatui_plt::widgets::box_plot::BoxData;
+use ratatui_plt::widgets::violin_plot::ViolinData;
 
-/// Generate a deterministic pseudo-data sequence for a group.
+/// LCG pseudo-random data generator (deterministic, no rand dependency).
 fn generate_data(seed: u64, count: usize, center: f64, spread: f64) -> Vec<f64> {
     let mut values = Vec::with_capacity(count);
     let mut state = seed;
     for _ in 0..count {
-        // Simple linear congruential generator
         state = state
             .wrapping_mul(6364136223846793005)
             .wrapping_add(1442695040888963407);
-        // Map to [-1, 1] then scale
         let normalized = ((state >> 33) as f64) / (u32::MAX as f64) * 2.0 - 1.0;
         values.push(center + normalized * spread);
     }
     values
+}
+
+/// Generate bimodal data by mixing two centers.
+fn bimodal_data(seed: u64, count: usize) -> Vec<f64> {
+    let mut a = generate_data(seed, count / 2, 3.0, 1.0);
+    let b = generate_data(seed + 100, count / 2, 8.0, 1.0);
+    a.extend(b);
+    a
 }
 
 fn parse_theme() -> Theme {
@@ -48,23 +54,18 @@ fn main() -> color_eyre::Result<()> {
     enable_raw_mode()?;
     let mut terminal = Terminal::new(CrosstermBackend::new(io::stdout()))?;
 
-    let group_a = BoxData::new("Control", generate_data(42, 500, 5.0, 2.0), Color::Cyan);
-    let group_b = BoxData::new(
-        "Treatment A",
-        generate_data(123, 500, 7.5, 3.0),
-        Color::Yellow,
-    );
-    let group_c = BoxData::new(
-        "Treatment B",
-        generate_data(999, 500, 6.0, 1.5),
-        Color::Magenta,
-    );
+    let normal = ViolinData::new("Normal", generate_data(42, 800, 5.0, 2.0), Color::Cyan);
+    let bimodal = ViolinData::new("Bimodal", bimodal_data(123, 800), Color::Yellow);
+    let skewed = ViolinData::new("Skewed", generate_data(999, 800, 3.0, 1.0), Color::Magenta);
+    let wide = ViolinData::new("Wide", generate_data(777, 800, 5.0, 5.0), Color::Green);
 
-    let plot = BoxPlot::new()
-        .box_data(group_a)
-        .box_data(group_b)
-        .box_data(group_c)
-        .title("Distribution Comparison (q to quit)")
+    let plot = ViolinPlot::new()
+        .dataset(normal)
+        .dataset(bimodal)
+        .dataset(skewed)
+        .dataset(wide)
+        .show_box(false)
+        .title("Distribution Shapes (q to quit)")
         .y_axis(Axis::new().label("Value"));
 
     loop {

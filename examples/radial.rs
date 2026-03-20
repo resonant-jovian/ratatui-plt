@@ -1,31 +1,48 @@
 use std::io;
 
 use crossterm::{
-    event::{self, Event, KeyCode, KeyEventKind},
-    terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
     ExecutableCommand,
+    event::{self, Event, KeyCode, KeyEventKind},
+    terminal::{EnterAlternateScreen, LeaveAlternateScreen, disable_raw_mode, enable_raw_mode},
 };
 use ratatui::prelude::*;
-use ratatui_sim::prelude::*;
+use ratatui_plt::prelude::*;
+
+fn parse_theme() -> Theme {
+    match std::env::args().nth(1).as_deref() {
+        Some("light") => Theme::light(),
+        Some("minimal") => Theme::minimal(),
+        Some("publication") => Theme::publication(),
+        Some("solarized") => Theme::solarized(),
+        Some("dark") | None => Theme::dark(),
+        Some(other) => {
+            eprintln!(
+                "Unknown theme '{other}'. Available: dark, light, minimal, publication, solarized"
+            );
+            std::process::exit(1);
+        }
+    }
+}
 
 fn main() -> color_eyre::Result<()> {
     color_eyre::install()?;
+    Theme::set_default(parse_theme());
     io::stdout().execute(EnterAlternateScreen)?;
     enable_raw_mode()?;
     let mut terminal = Terminal::new(CrosstermBackend::new(io::stdout()))?;
 
     // Cardioid: r = 1 + cos(theta)
-    let cardioid: Vec<(f64, f64)> = (0..=360)
+    let cardioid: Vec<(f64, f64)> = (0..=3600)
         .map(|i| {
-            let theta = i as f64 * std::f64::consts::PI / 180.0;
+            let theta = i as f64 * std::f64::consts::PI / 1800.0;
             (theta, 1.0 + theta.cos())
         })
         .collect();
 
     // Rose curve: r = cos(2*theta)
-    let rose: Vec<(f64, f64)> = (0..=360)
+    let rose: Vec<(f64, f64)> = (0..=3600)
         .map(|i| {
-            let theta = i as f64 * std::f64::consts::PI / 180.0;
+            let theta = i as f64 * std::f64::consts::PI / 1800.0;
             (theta, (2.0 * theta).cos().abs())
         })
         .collect();
@@ -48,16 +65,14 @@ fn main() -> color_eyre::Result<()> {
 
     loop {
         terminal.draw(|frame| {
-            let area = frame.area();
-            frame.render_widget(&plot, area);
+            frame.render_widget(&plot, square_area(frame.area()));
         })?;
 
-        if let Event::Key(key) = event::read()? {
-            if key.kind == KeyEventKind::Press
-                && (key.code == KeyCode::Char('q') || key.code == KeyCode::Esc)
-            {
-                break;
-            }
+        if let Event::Key(key) = event::read()?
+            && key.kind == KeyEventKind::Press
+            && (key.code == KeyCode::Char('q') || key.code == KeyCode::Esc)
+        {
+            break;
         }
     }
 

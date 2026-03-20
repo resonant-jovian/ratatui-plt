@@ -9,10 +9,10 @@ use ratatui::style::{Color, Style};
 use ratatui::widgets::Widget;
 
 use crate::series::Series;
+use crate::theme::Theme;
 
 /// Legend position within the plot area.
-#[derive(Clone, Debug, PartialEq, Eq)]
-#[derive(Default)]
+#[derive(Clone, Debug, PartialEq, Eq, Default)]
 pub enum LegendPosition {
     TopLeft,
     #[default]
@@ -22,7 +22,6 @@ pub enum LegendPosition {
     /// Custom position (x, y) in characters from top-left of plot area.
     Custom(u16, u16),
 }
-
 
 /// Legend entry for a single series.
 #[derive(Clone, Debug)]
@@ -51,7 +50,7 @@ impl LegendEntry {
 /// # Example
 ///
 /// ```
-/// use ratatui_sim::legend::{Legend, LegendPosition, LegendEntry};
+/// use ratatui_plt::legend::{Legend, LegendPosition, LegendEntry};
 /// use ratatui::style::Color;
 ///
 /// let legend = Legend::new(vec![
@@ -67,6 +66,8 @@ pub struct Legend {
     pub position: LegendPosition,
     /// Whether to draw a border.
     pub border: bool,
+    /// Theme for styling.
+    pub theme: Theme,
 }
 
 impl Legend {
@@ -76,6 +77,7 @@ impl Legend {
             entries,
             position: LegendPosition::default(),
             border: true,
+            theme: Theme::get_default(),
         }
     }
 
@@ -94,6 +96,12 @@ impl Legend {
     /// Enable or disable the border.
     pub fn border(mut self, show: bool) -> Self {
         self.border = show;
+        self
+    }
+
+    /// Set the theme.
+    pub fn theme(mut self, theme: Theme) -> Self {
+        self.theme = theme;
         self
     }
 
@@ -118,9 +126,7 @@ impl Legend {
         let (x, y) = match &self.position {
             LegendPosition::TopLeft => (area.x + 1, area.y + 1),
             LegendPosition::TopRight => (area.x + area.width.saturating_sub(w + 1), area.y + 1),
-            LegendPosition::BottomLeft => {
-                (area.x + 1, area.y + area.height.saturating_sub(h + 1))
-            }
+            LegendPosition::BottomLeft => (area.x + 1, area.y + area.height.saturating_sub(h + 1)),
             LegendPosition::BottomRight => (
                 area.x + area.width.saturating_sub(w + 1),
                 area.y + area.height.saturating_sub(h + 1),
@@ -151,18 +157,19 @@ impl Widget for &Legend {
         // Draw border
         if self.border {
             let r = rect;
+            let bc = self.theme.axis_color;
             if r.width >= 2 && r.height >= 2 {
-                buf[(r.x, r.y)].set_char('┌');
-                buf[(r.x + r.width - 1, r.y)].set_char('┐');
-                buf[(r.x, r.y + r.height - 1)].set_char('└');
-                buf[(r.x + r.width - 1, r.y + r.height - 1)].set_char('┘');
+                buf[(r.x, r.y)].set_char('┌').set_fg(bc);
+                buf[(r.x + r.width - 1, r.y)].set_char('┐').set_fg(bc);
+                buf[(r.x, r.y + r.height - 1)].set_char('└').set_fg(bc);
+                buf[(r.x + r.width - 1, r.y + r.height - 1)].set_char('┘').set_fg(bc);
                 for x in r.x + 1..r.x + r.width - 1 {
-                    buf[(x, r.y)].set_char('─');
-                    buf[(x, r.y + r.height - 1)].set_char('─');
+                    buf[(x, r.y)].set_char('─').set_fg(bc);
+                    buf[(x, r.y + r.height - 1)].set_char('─').set_fg(bc);
                 }
                 for y in r.y + 1..r.y + r.height - 1 {
-                    buf[(r.x, y)].set_char('│');
-                    buf[(r.x + r.width - 1, y)].set_char('│');
+                    buf[(r.x, y)].set_char('│').set_fg(bc);
+                    buf[(r.x + r.width - 1, y)].set_char('│').set_fg(bc);
                 }
             }
         }
@@ -181,9 +188,7 @@ impl Widget for &Legend {
             // Draw marker/color indicator
             let marker_char = entry.marker.unwrap_or('━');
             if start_x < area.x + area.width {
-                buf[(start_x, y)]
-                    .set_char(marker_char)
-                    .set_fg(entry.color);
+                buf[(start_x, y)].set_char(marker_char).set_fg(entry.color);
             }
 
             // Draw name
@@ -191,7 +196,9 @@ impl Widget for &Legend {
             for (j, ch) in entry.name.chars().enumerate() {
                 let x = name_x + j as u16;
                 if x < start_x + inner_width && x < area.x + area.width {
-                    buf[(x, y)].set_char(ch).set_style(Style::default());
+                    buf[(x, y)]
+                        .set_char(ch)
+                        .set_style(Style::default().fg(self.theme.foreground));
                 }
             }
         }

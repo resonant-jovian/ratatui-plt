@@ -7,23 +7,6 @@ use crossterm::{
 };
 use ratatui::prelude::*;
 use ratatui_plt::prelude::*;
-use ratatui_plt::widgets::box_plot::BoxData;
-
-/// Generate a deterministic pseudo-data sequence for a group.
-fn generate_data(seed: u64, count: usize, center: f64, spread: f64) -> Vec<f64> {
-    let mut values = Vec::with_capacity(count);
-    let mut state = seed;
-    for _ in 0..count {
-        // Simple linear congruential generator
-        state = state
-            .wrapping_mul(6364136223846793005)
-            .wrapping_add(1442695040888963407);
-        // Map to [-1, 1] then scale
-        let normalized = ((state >> 33) as f64) / (u32::MAX as f64) * 2.0 - 1.0;
-        values.push(center + normalized * spread);
-    }
-    values
-}
 
 fn parse_theme() -> Theme {
     match std::env::args().nth(1).as_deref() {
@@ -48,24 +31,52 @@ fn main() -> color_eyre::Result<()> {
     enable_raw_mode()?;
     let mut terminal = Terminal::new(CrosstermBackend::new(io::stdout()))?;
 
-    let group_a = BoxData::new("Control", generate_data(42, 500, 5.0, 2.0), Color::Cyan);
-    let group_b = BoxData::new(
-        "Treatment A",
-        generate_data(123, 500, 7.5, 3.0),
-        Color::Yellow,
-    );
-    let group_c = BoxData::new(
-        "Treatment B",
-        generate_data(999, 500, 6.0, 1.5),
-        Color::Magenta,
-    );
+    let n = 500;
+    let solar = Series::new("Solar")
+        .data(
+            (0..n)
+                .map(|i| {
+                    let t = i as f64;
+                    (t, 20.0 + 15.0 * (t * std::f64::consts::TAU / 50.0).sin())
+                })
+                .collect(),
+        )
+        .color(Color::Yellow);
 
-    let plot = BoxPlot::new()
-        .box_data(group_a)
-        .box_data(group_b)
-        .box_data(group_c)
-        .title("Distribution Comparison (q to quit)")
-        .y_axis(Axis::new().label("Value"));
+    let wind = Series::new("Wind")
+        .data(
+            (0..n)
+                .map(|i| {
+                    let t = i as f64;
+                    (t, 15.0 + 8.0 * (t * std::f64::consts::TAU / 30.0).cos())
+                })
+                .collect(),
+        )
+        .color(Color::Cyan);
+
+    let hydro = Series::new("Hydro")
+        .data(
+            (0..n)
+                .map(|i| {
+                    let t = i as f64;
+                    (t, 10.0 + 3.0 * (t * std::f64::consts::TAU / 80.0).sin())
+                })
+                .collect(),
+        )
+        .color(Color::Blue);
+
+    let nuclear = Series::new("Nuclear")
+        .data((0..n).map(|i| (i as f64, 25.0)).collect())
+        .color(Color::Magenta);
+
+    let plot = StackedArea::new()
+        .series(solar)
+        .series(wind)
+        .series(hydro)
+        .series(nuclear)
+        .title("Energy Production by Source (q to quit)")
+        .x_axis(Axis::new().label("Time (days)"))
+        .y_axis(Axis::new().label("Output (GW)"));
 
     loop {
         terminal.draw(|frame| {

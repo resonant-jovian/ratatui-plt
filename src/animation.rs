@@ -13,7 +13,7 @@ use tokio::time;
 ///
 /// ```rust,no_run
 /// use std::time::Duration;
-/// use ratatui_sim::animation::AnimationConfig;
+/// use ratatui_plt::animation::AnimationConfig;
 ///
 /// let config = AnimationConfig::new(Duration::from_millis(16))
 ///     .frame_count(120); // run for 120 frames (~2 s at 60 fps)
@@ -68,7 +68,7 @@ impl Default for AnimationConfig {
 ///
 /// ```rust,no_run
 /// use std::time::Duration;
-/// use ratatui_sim::animation::{AnimationConfig, run_animation};
+/// use ratatui_plt::animation::{AnimationConfig, run_animation};
 ///
 /// # async fn example() {
 /// let config = AnimationConfig::from_fps(30).frame_count(90);

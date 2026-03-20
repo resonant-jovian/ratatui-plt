@@ -7,7 +7,7 @@
 //! # Example
 //!
 //! ```
-//! use ratatui_sim::color_cycle::ColorCycle;
+//! use ratatui_plt::color_cycle::ColorCycle;
 //!
 //! let mut cycle = ColorCycle::default();
 //! let c1 = cycle.next_color(); // tab10 blue
@@ -32,16 +32,16 @@ impl Default for ColorCycle {
     fn default() -> Self {
         Self {
             colors: vec![
-                Color::Rgb(31, 119, 180),   // blue
-                Color::Rgb(255, 127, 14),   // orange
-                Color::Rgb(44, 160, 44),    // green
-                Color::Rgb(214, 39, 40),    // red
-                Color::Rgb(148, 103, 189),  // purple
-                Color::Rgb(140, 86, 75),    // brown
-                Color::Rgb(227, 119, 194),  // pink
-                Color::Rgb(127, 127, 127),  // gray
-                Color::Rgb(188, 189, 34),   // olive
-                Color::Rgb(23, 190, 207),   // cyan
+                Color::Rgb(31, 119, 180),  // blue
+                Color::Rgb(255, 127, 14),  // orange
+                Color::Rgb(44, 160, 44),   // green
+                Color::Rgb(214, 39, 40),   // red
+                Color::Rgb(148, 103, 189), // purple
+                Color::Rgb(140, 86, 75),   // brown
+                Color::Rgb(227, 119, 194), // pink
+                Color::Rgb(127, 127, 127), // gray
+                Color::Rgb(188, 189, 34),  // olive
+                Color::Rgb(23, 190, 207),  // cyan
             ],
             index: 0,
         }

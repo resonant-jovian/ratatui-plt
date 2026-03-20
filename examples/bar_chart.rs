@@ -1,5 +1,3 @@
-//! Scatter plot example: random point cloud with color-mapped third value.
-
 use std::io;
 
 use crossterm::{
@@ -7,9 +5,9 @@ use crossterm::{
     event::{self, Event, KeyCode, KeyEventKind},
     terminal::{EnterAlternateScreen, LeaveAlternateScreen, disable_raw_mode, enable_raw_mode},
 };
-use rand::RngExt;
 use ratatui::prelude::*;
 use ratatui_plt::prelude::*;
+use ratatui_plt::widgets::bar_chart::{BarDataset, BarMode};
 
 fn parse_theme() -> Theme {
     match std::env::args().nth(1).as_deref() {
@@ -34,37 +32,25 @@ fn main() -> color_eyre::Result<()> {
     enable_raw_mode()?;
     let mut terminal = Terminal::new(CrosstermBackend::new(io::stdout()))?;
 
-    // Generate random point cloud
-    let mut rng = rand::rng();
-    let n = 3000;
-    let mut points = Vec::with_capacity(n);
-    let mut color_vals = Vec::with_capacity(n);
+    let categories = vec!["Q1", "Q2", "Q3", "Q4", "Q5"];
+    let widgets = BarDataset::new("Widgets", vec![120.0, 150.0, 180.0, 140.0, 200.0], Color::Cyan);
+    let gadgets =
+        BarDataset::new("Gadgets", vec![90.0, 110.0, 130.0, 160.0, 175.0], Color::Yellow);
+    let gizmos =
+        BarDataset::new("Gizmos", vec![60.0, 80.0, 100.0, 120.0, 90.0], Color::Magenta);
 
-    for _ in 0..n {
-        let x: f64 = rng.random_range(-5.0..5.0);
-        let y: f64 = rng.random_range(-5.0..5.0);
-        let z = (-(x * x + y * y) / 8.0).exp(); // radial falloff as color value
-        points.push((x, y));
-        color_vals.push(z);
-    }
-
-    let series = Series::new("cloud")
-        .data(points)
-        .marker(MarkerShape::FilledCircle);
-
-    let plot = ScatterPlot::new()
-        .series(series)
-        .color_values(color_vals)
-        .colormap(Viridis)
-        .title("Random Point Cloud (color = radial intensity)")
-        .x_axis(Axis::new().label("x"))
-        .y_axis(Axis::new().label("y"))
-        .aspect_ratio(AspectRatio::Equal)
-        .show_legend(false);
+    let chart = BarChart::new()
+        .categories(categories)
+        .dataset(widgets)
+        .dataset(gadgets)
+        .dataset(gizmos)
+        .mode(BarMode::Grouped)
+        .bar_gap(1)
+        .title("Quarterly Revenue by Product (q to quit)");
 
     loop {
         terminal.draw(|frame| {
-            frame.render_widget(&plot, frame.area());
+            frame.render_widget(&chart, square_area(frame.area()));
         })?;
 
         if let Event::Key(key) = event::read()?

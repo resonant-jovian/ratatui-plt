@@ -192,15 +192,13 @@ impl Default for PlotStyle {
 }
 
 /// Margin in characters.
-#[derive(Clone, Debug)]
-#[derive(Default)]
+#[derive(Clone, Debug, Default)]
 pub struct Margin {
     pub top: u16,
     pub bottom: u16,
     pub left: u16,
     pub right: u16,
 }
-
 
 impl Margin {
     /// Uniform margin on all sides.

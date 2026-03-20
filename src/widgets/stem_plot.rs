@@ -7,6 +7,7 @@ use ratatui::widgets::Widget;
 
 use crate::axis::Axis;
 use crate::style::MarkerShape;
+use crate::theme::Theme;
 use crate::transform::data_to_screen;
 
 /// A stem plot widget — vertical lines from a baseline to data points.
@@ -16,7 +17,7 @@ use crate::transform::data_to_screen;
 /// # Example
 ///
 /// ```
-/// use ratatui_sim::widgets::stem_plot::StemPlot;
+/// use ratatui_plt::widgets::stem_plot::StemPlot;
 /// use ratatui::style::Color;
 ///
 /// let plot = StemPlot::new(vec![(1.0, 3.0), (2.0, 5.0), (3.0, 2.0)])
@@ -32,6 +33,7 @@ pub struct StemPlot {
     title: Option<String>,
     x_axis: Axis,
     y_axis: Axis,
+    theme: Theme,
 }
 
 impl StemPlot {
@@ -44,6 +46,7 @@ impl StemPlot {
             title: None,
             x_axis: Axis::new(),
             y_axis: Axis::new(),
+            theme: Theme::get_default(),
         }
     }
 
@@ -76,6 +79,12 @@ impl StemPlot {
         self.y_axis = axis;
         self
     }
+
+    /// Set the theme.
+    pub fn theme(mut self, theme: Theme) -> Self {
+        self.theme = theme;
+        self
+    }
 }
 
 impl Widget for &StemPlot {
@@ -103,14 +112,18 @@ impl Widget for &StemPlot {
             for (i, ch) in title.chars().enumerate() {
                 let x = start + i as u16;
                 if x < area.x + area.width {
-                    buf[(x, area.y)].set_char(ch).set_fg(Color::White);
+                    buf[(x, area.y)].set_char(ch).set_fg(self.theme.foreground);
                 }
             }
         }
 
         // Compute bounds
         let x_min = self.data.iter().map(|p| p.0).fold(f64::INFINITY, f64::min);
-        let x_max = self.data.iter().map(|p| p.0).fold(f64::NEG_INFINITY, f64::max);
+        let x_max = self
+            .data
+            .iter()
+            .map(|p| p.0)
+            .fold(f64::NEG_INFINITY, f64::max);
         let y_min = self
             .data
             .iter()
@@ -129,10 +142,42 @@ impl Widget for &StemPlot {
 
         // Draw axes
         for x in px..px + pw {
-            buf[(x, py + ph)].set_char('─').set_fg(Color::DarkGray);
+            buf[(x, py + ph)]
+                .set_char('─')
+                .set_fg(self.theme.axis_color);
         }
         for y in py..py + ph {
-            buf[(px.saturating_sub(1), y)].set_char('│').set_fg(Color::DarkGray);
+            buf[(px.saturating_sub(1), y)]
+                .set_char('│')
+                .set_fg(self.theme.axis_color);
+        }
+
+        // Draw grid
+        let x_grid = self.x_axis.grid || self.theme.grid_visible;
+        let y_grid = self.y_axis.grid || self.theme.grid_visible;
+        if x_grid {
+            let gx_ticks = self.x_axis.tick_positions(x_lo, x_hi);
+            for &tv in &gx_ticks {
+                let sx = data_to_screen(tv, x_lo, x_hi, px as f64, (px + pw - 1) as f64);
+                let xi = sx.round() as u16;
+                if xi >= px && xi < px + pw {
+                    for y in py..py + ph {
+                        buf[(xi, y)].set_char('·').set_fg(self.theme.grid_color);
+                    }
+                }
+            }
+        }
+        if y_grid {
+            let gy_ticks = self.y_axis.tick_positions(y_lo, y_hi);
+            for &tv in &gy_ticks {
+                let sy = data_to_screen(tv, y_lo, y_hi, (py + ph - 1) as f64, py as f64);
+                let yi = sy.round() as u16;
+                if yi >= py && yi < py + ph {
+                    for x in px..px + pw {
+                        buf[(x, yi)].set_char('·').set_fg(self.theme.grid_color);
+                    }
+                }
+            }
         }
 
         // Draw baseline
@@ -140,7 +185,9 @@ impl Widget for &StemPlot {
         let base_yi = base_sy.round() as u16;
         if base_yi >= py && base_yi < py + ph {
             for x in px..px + pw {
-                buf[(x, base_yi)].set_char('─').set_fg(Color::DarkGray);
+                buf[(x, base_yi)]
+                    .set_char('─')
+                    .set_fg(self.theme.axis_color);
             }
         }
 
@@ -169,7 +216,9 @@ impl Widget for &StemPlot {
 
             // Draw marker at data point
             if yi >= py && yi < py + ph {
-                buf[(xi, yi)].set_char(self.marker.char()).set_fg(self.color);
+                buf[(xi, yi)]
+                    .set_char(self.marker.char())
+                    .set_fg(self.color);
             }
         }
 
@@ -185,7 +234,7 @@ impl Widget for &StemPlot {
                 for (j, ch) in label.chars().enumerate() {
                     let lx = start + j as u16;
                     if lx >= area.x && lx < area.x + area.width {
-                        buf[(lx, y)].set_char(ch).set_fg(Color::DarkGray);
+                        buf[(lx, y)].set_char(ch).set_fg(self.theme.axis_color);
                     }
                 }
             }

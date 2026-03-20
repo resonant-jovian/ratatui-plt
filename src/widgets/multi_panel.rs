@@ -2,8 +2,10 @@
 
 use ratatui::buffer::Buffer;
 use ratatui::layout::Rect;
-use ratatui::style::{Color, Style};
+use ratatui::style::Style;
 use ratatui::widgets::Widget;
+
+use crate::theme::Theme;
 
 /// A callback that renders a widget into a given area.
 pub type RenderFn = Box<dyn Fn(Rect, &mut Buffer)>;
@@ -25,7 +27,7 @@ struct SpanPanel {
 /// # Example
 ///
 /// ```
-/// use ratatui_sim::widgets::multi_panel::MultiPanel;
+/// use ratatui_plt::widgets::multi_panel::MultiPanel;
 ///
 /// let panel = MultiPanel::new(2, 2)
 ///     .width_ratios(vec![2.0, 1.0])  // Left column is twice as wide
@@ -44,6 +46,7 @@ pub struct MultiPanel {
     suptitle: Option<String>,
     /// Panels that span multiple cells.
     span_panels: Vec<SpanPanel>,
+    theme: Theme,
 }
 
 impl MultiPanel {
@@ -58,19 +61,28 @@ impl MultiPanel {
             panels: (0..rows * cols).map(|_| None).collect(),
             suptitle: None,
             span_panels: Vec::new(),
+            theme: Theme::get_default(),
         }
     }
 
     /// Set column width ratios (must have `cols` elements).
     pub fn width_ratios(mut self, ratios: Vec<f64>) -> Self {
-        assert_eq!(ratios.len(), self.cols, "width_ratios length must equal cols");
+        assert_eq!(
+            ratios.len(),
+            self.cols,
+            "width_ratios length must equal cols"
+        );
         self.width_ratios = ratios;
         self
     }
 
     /// Set row height ratios (must have `rows` elements).
     pub fn height_ratios(mut self, ratios: Vec<f64>) -> Self {
-        assert_eq!(ratios.len(), self.rows, "height_ratios length must equal rows");
+        assert_eq!(
+            ratios.len(),
+            self.rows,
+            "height_ratios length must equal rows"
+        );
         self.height_ratios = ratios;
         self
     }
@@ -82,7 +94,12 @@ impl MultiPanel {
     }
 
     /// Set the render callback for a specific panel position.
-    pub fn panel(mut self, row: usize, col: usize, render: impl Fn(Rect, &mut Buffer) + 'static) -> Self {
+    pub fn panel(
+        mut self,
+        row: usize,
+        col: usize,
+        render: impl Fn(Rect, &mut Buffer) + 'static,
+    ) -> Self {
         let idx = row * self.cols + col;
         if idx < self.panels.len() {
             self.panels[idx] = Some(Box::new(render));
@@ -103,6 +120,12 @@ impl MultiPanel {
     /// Set a super-title displayed above the entire grid.
     pub fn suptitle(mut self, title: impl Into<String>) -> Self {
         self.suptitle = Some(title.into());
+        self
+    }
+
+    /// Set the theme.
+    pub fn theme(mut self, theme: Theme) -> Self {
+        self.theme = theme;
         self
     }
 
@@ -149,14 +172,16 @@ impl Widget for &MultiPanel {
                 if x < area.x + area.width {
                     buf[(x, area.y)]
                         .set_char(ch)
-                        .set_style(Style::default().fg(Color::White));
+                        .set_style(Style::default().fg(self.theme.foreground));
                 }
             }
         }
 
         // Compute row heights
         let total_h_ratio: f64 = self.height_ratios.iter().sum();
-        let available_h = grid_area.height.saturating_sub(self.gap * (self.rows.saturating_sub(1)) as u16);
+        let available_h = grid_area
+            .height
+            .saturating_sub(self.gap * (self.rows.saturating_sub(1)) as u16);
         let row_heights: Vec<u16> = self
             .height_ratios
             .iter()
@@ -165,7 +190,9 @@ impl Widget for &MultiPanel {
 
         // Compute column widths
         let total_w_ratio: f64 = self.width_ratios.iter().sum();
-        let available_w = grid_area.width.saturating_sub(self.gap * (self.cols.saturating_sub(1)) as u16);
+        let available_w = grid_area
+            .width
+            .saturating_sub(self.gap * (self.cols.saturating_sub(1)) as u16);
         let col_widths: Vec<u16> = self
             .width_ratios
             .iter()
@@ -193,12 +220,16 @@ impl Widget for &MultiPanel {
             let mut w: u16 = 0;
             for c in sp.col..sp.col + sp.colspan.min(self.cols - sp.col) {
                 w += col_widths[c];
-                if c > sp.col { w += self.gap; }
+                if c > sp.col {
+                    w += self.gap;
+                }
             }
             let mut h: u16 = 0;
             for r in sp.row..sp.row + sp.rowspan.min(self.rows - sp.row) {
                 h += row_heights[r];
-                if r > sp.row { h += self.gap; }
+                if r > sp.row {
+                    h += self.gap;
+                }
             }
             let span_area = Rect::new(
                 x,

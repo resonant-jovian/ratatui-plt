@@ -6,7 +6,7 @@
 //! # Example
 //!
 //! ```
-//! use ratatui_sim::widgets::event_plot::{EventPlot, EventGroup, Orientation};
+//! use ratatui_plt::widgets::event_plot::{EventPlot, EventGroup, Orientation};
 //! use ratatui::style::Color;
 //!
 //! let plot = EventPlot::new()
@@ -22,6 +22,7 @@ use ratatui::style::Color;
 use ratatui::widgets::Widget;
 
 use crate::axis::Axis;
+use crate::theme::Theme;
 use crate::transform::data_to_screen;
 
 /// Orientation for the event plot.
@@ -63,7 +64,11 @@ impl EventGroup {
 
     /// Return positions with NaN values filtered out.
     fn valid_positions(&self) -> Vec<f64> {
-        self.positions.iter().copied().filter(|v| v.is_finite()).collect()
+        self.positions
+            .iter()
+            .copied()
+            .filter(|v| v.is_finite())
+            .collect()
     }
 }
 
@@ -83,6 +88,8 @@ pub struct EventPlot {
     x_axis: Axis,
     /// Y-axis configuration (data axis in vertical mode).
     y_axis: Axis,
+    /// Visual theme.
+    theme: Theme,
 }
 
 impl Default for EventPlot {
@@ -93,6 +100,7 @@ impl Default for EventPlot {
             title: None,
             x_axis: Axis::new(),
             y_axis: Axis::new(),
+            theme: Theme::get_default(),
         }
     }
 }
@@ -138,6 +146,12 @@ impl EventPlot {
         self.y_axis = axis;
         self
     }
+
+    /// Set the visual theme.
+    pub fn theme(mut self, theme: Theme) -> Self {
+        self.theme = theme;
+        self
+    }
 }
 
 impl Widget for &EventPlot {
@@ -154,7 +168,7 @@ impl Widget for &EventPlot {
             for (i, ch) in title.chars().enumerate() {
                 let x = start + i as u16;
                 if x < area.x + area.width {
-                    buf[(x, area.y)].set_char(ch).set_fg(Color::White);
+                    buf[(x, area.y)].set_char(ch).set_fg(self.theme.foreground);
                 }
             }
         }
@@ -216,7 +230,9 @@ impl EventPlot {
         // Draw X-axis line
         for x in px..px + pw {
             if x < area.x + area.width {
-                buf[(x, py + ph)].set_char('─').set_fg(Color::DarkGray);
+                buf[(x, py + ph)]
+                    .set_char('─')
+                    .set_fg(self.theme.axis_color);
             }
         }
 
@@ -224,7 +240,22 @@ impl EventPlot {
         for y in py..py + ph {
             let x = px.saturating_sub(1);
             if x >= area.x {
-                buf[(x, y)].set_char('│').set_fg(Color::DarkGray);
+                buf[(x, y)].set_char('│').set_fg(self.theme.axis_color);
+            }
+        }
+
+        // Draw grid (x-axis only; y-axis is categorical lanes)
+        let x_grid = self.x_axis.grid || self.theme.grid_visible;
+        if x_grid {
+            let gx_ticks = self.x_axis.tick_positions(x_lo, x_hi);
+            for &tv in &gx_ticks {
+                let sx = data_to_screen(tv, x_lo, x_hi, px as f64, (px + pw - 1) as f64);
+                let xi = sx.round() as u16;
+                if xi >= px && xi < px + pw {
+                    for y in py..py + ph {
+                        buf[(xi, y)].set_char('·').set_fg(self.theme.grid_color);
+                    }
+                }
             }
         }
 
@@ -251,7 +282,7 @@ impl EventPlot {
                 // Draw the horizontal baseline for this group
                 for x in px..px + pw {
                     if x < area.x + area.width {
-                        buf[(x, lane_y)].set_char('·').set_fg(Color::DarkGray);
+                        buf[(x, lane_y)].set_char('·').set_fg(self.theme.grid_color);
                     }
                 }
             }
@@ -289,7 +320,7 @@ impl EventPlot {
                 for (j, ch) in label.chars().enumerate() {
                     let lx = start + j as u16;
                     if lx >= area.x && lx < area.x + area.width {
-                        buf[(lx, y)].set_char(ch).set_fg(Color::DarkGray);
+                        buf[(lx, y)].set_char(ch).set_fg(self.theme.axis_color);
                     }
                 }
             }
@@ -334,14 +365,31 @@ impl EventPlot {
         for y in py..py + ph {
             let x = px.saturating_sub(1);
             if x >= area.x {
-                buf[(x, y)].set_char('│').set_fg(Color::DarkGray);
+                buf[(x, y)].set_char('│').set_fg(self.theme.axis_color);
             }
         }
 
         // Draw X-axis line at bottom
         for x in px..px + pw {
             if x < area.x + area.width {
-                buf[(x, py + ph)].set_char('─').set_fg(Color::DarkGray);
+                buf[(x, py + ph)]
+                    .set_char('─')
+                    .set_fg(self.theme.axis_color);
+            }
+        }
+
+        // Draw grid (y-axis only; x-axis is categorical lanes)
+        let y_grid = self.y_axis.grid || self.theme.grid_visible;
+        if y_grid {
+            let gy_ticks = self.y_axis.tick_positions(y_lo, y_hi);
+            for &tv in &gy_ticks {
+                let sy = data_to_screen(tv, y_lo, y_hi, (py + ph - 1) as f64, py as f64);
+                let yi = sy.round() as u16;
+                if yi >= py && yi < py + ph {
+                    for x in px..px + pw {
+                        buf[(x, yi)].set_char('·').set_fg(self.theme.grid_color);
+                    }
+                }
             }
         }
 
@@ -358,8 +406,7 @@ impl EventPlot {
             };
             let label_y = py + ph;
             if label_y < area.y + area.height {
-                let label_start =
-                    lane_x.saturating_sub(label.len() as u16 / 2);
+                let label_start = lane_x.saturating_sub(label.len() as u16 / 2);
                 for (j, ch) in label.chars().enumerate() {
                     let lx = label_start + j as u16;
                     if lx >= px && lx < px + pw {
@@ -371,7 +418,7 @@ impl EventPlot {
             // Draw the vertical baseline for this group
             if lane_x >= px && lane_x < px + pw {
                 for y in py..py + ph {
-                    buf[(lane_x, y)].set_char('·').set_fg(Color::DarkGray);
+                    buf[(lane_x, y)].set_char('·').set_fg(self.theme.grid_color);
                 }
             }
 
@@ -411,7 +458,7 @@ impl EventPlot {
                 for (j, ch) in label.chars().enumerate() {
                     let lx = label_start + j as u16;
                     if lx >= area.x && lx < px.saturating_sub(1) {
-                        buf[(lx, yi)].set_char(ch).set_fg(Color::DarkGray);
+                        buf[(lx, yi)].set_char(ch).set_fg(self.theme.axis_color);
                     }
                 }
             }

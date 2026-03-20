@@ -6,6 +6,7 @@ use ratatui::style::Color;
 use ratatui::widgets::Widget;
 
 use crate::axis::Axis;
+use crate::theme::Theme;
 use crate::transform::data_to_screen;
 
 /// A single box-and-whisker dataset.
@@ -98,7 +99,7 @@ fn percentile(sorted: &[f64], p: f64) -> f64 {
 /// # Example
 ///
 /// ```
-/// use ratatui_sim::widgets::box_plot::{BoxPlot, BoxData};
+/// use ratatui_plt::widgets::box_plot::{BoxPlot, BoxData};
 /// use ratatui::style::Color;
 ///
 /// let plot = BoxPlot::new()
@@ -111,6 +112,7 @@ pub struct BoxPlot {
     title: Option<String>,
     y_axis: Axis,
     show_outliers: bool,
+    theme: Theme,
 }
 
 impl Default for BoxPlot {
@@ -120,6 +122,7 @@ impl Default for BoxPlot {
             title: None,
             y_axis: Axis::new(),
             show_outliers: true,
+            theme: Theme::get_default(),
         }
     }
 }
@@ -148,6 +151,12 @@ impl BoxPlot {
         self.show_outliers = show;
         self
     }
+
+    /// Set the theme.
+    pub fn theme(mut self, theme: Theme) -> Self {
+        self.theme = theme;
+        self
+    }
 }
 
 impl Widget for &BoxPlot {
@@ -174,7 +183,7 @@ impl Widget for &BoxPlot {
             for (i, ch) in title.chars().enumerate() {
                 let x = start + i as u16;
                 if x < area.x + area.width {
-                    buf[(x, area.y)].set_char(ch).set_fg(Color::White);
+                    buf[(x, area.y)].set_char(ch).set_fg(self.theme.foreground);
                 }
             }
         }
@@ -192,7 +201,23 @@ impl Widget for &BoxPlot {
 
         // Draw axes
         for y in py..py + ph {
-            buf[(px.saturating_sub(1), y)].set_char('│').set_fg(Color::DarkGray);
+            buf[(px.saturating_sub(1), y)]
+                .set_char('│')
+                .set_fg(self.theme.axis_color);
+        }
+
+        // Draw grid
+        if self.y_axis.grid || self.theme.grid_visible {
+            let gy_ticks = self.y_axis.tick_positions(y_lo, y_hi);
+            for &tv in &gy_ticks {
+                let sy = data_to_screen(tv, y_lo, y_hi, (py + ph - 1) as f64, py as f64);
+                let yi = sy.round() as u16;
+                if yi >= py && yi < py + ph {
+                    for x in px..px + pw {
+                        buf[(x, yi)].set_char('·').set_fg(self.theme.grid_color);
+                    }
+                }
+            }
         }
 
         let n = self.data.len();
@@ -206,11 +231,16 @@ impl Widget for &BoxPlot {
             let (q1, median, q3) = d.quartiles();
             let (whisker_lo, whisker_hi) = d.whiskers();
 
-            let sy_q1 = data_to_screen(q1, y_lo, y_hi, (py + ph - 1) as f64, py as f64).round() as u16;
-            let sy_median = data_to_screen(median, y_lo, y_hi, (py + ph - 1) as f64, py as f64).round() as u16;
-            let sy_q3 = data_to_screen(q3, y_lo, y_hi, (py + ph - 1) as f64, py as f64).round() as u16;
-            let sy_wlo = data_to_screen(whisker_lo, y_lo, y_hi, (py + ph - 1) as f64, py as f64).round() as u16;
-            let sy_whi = data_to_screen(whisker_hi, y_lo, y_hi, (py + ph - 1) as f64, py as f64).round() as u16;
+            let sy_q1 =
+                data_to_screen(q1, y_lo, y_hi, (py + ph - 1) as f64, py as f64).round() as u16;
+            let sy_median =
+                data_to_screen(median, y_lo, y_hi, (py + ph - 1) as f64, py as f64).round() as u16;
+            let sy_q3 =
+                data_to_screen(q3, y_lo, y_hi, (py + ph - 1) as f64, py as f64).round() as u16;
+            let sy_wlo = data_to_screen(whisker_lo, y_lo, y_hi, (py + ph - 1) as f64, py as f64)
+                .round() as u16;
+            let sy_whi = data_to_screen(whisker_hi, y_lo, y_hi, (py + ph - 1) as f64, py as f64)
+                .round() as u16;
 
             // Draw box (Q1 to Q3)
             for x in box_left..box_right {
@@ -271,7 +301,8 @@ impl Widget for &BoxPlot {
             // Outliers
             if self.show_outliers {
                 for &v in &d.outliers() {
-                    let sy = data_to_screen(v, y_lo, y_hi, (py + ph - 1) as f64, py as f64).round() as u16;
+                    let sy = data_to_screen(v, y_lo, y_hi, (py + ph - 1) as f64, py as f64).round()
+                        as u16;
                     if center_x >= px && center_x < px + pw && sy >= py && sy < py + ph {
                         buf[(center_x, sy)].set_char('○').set_fg(d.color);
                     }
@@ -286,7 +317,9 @@ impl Widget for &BoxPlot {
                 for (j, ch) in label.chars().enumerate() {
                     let lx = label_start + j as u16;
                     if lx >= area.x && lx < area.x + area.width {
-                        buf[(lx, label_y)].set_char(ch).set_fg(Color::DarkGray);
+                        buf[(lx, label_y)]
+                            .set_char(ch)
+                            .set_fg(self.theme.axis_color);
                     }
                 }
             }
@@ -303,7 +336,7 @@ impl Widget for &BoxPlot {
                 for (j, ch) in label.chars().enumerate() {
                     let lx = start + j as u16;
                     if lx >= area.x && lx < px {
-                        buf[(lx, yi)].set_char(ch).set_fg(Color::DarkGray);
+                        buf[(lx, yi)].set_char(ch).set_fg(self.theme.axis_color);
                     }
                 }
             }

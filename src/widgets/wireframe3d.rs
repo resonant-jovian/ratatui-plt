@@ -6,6 +6,7 @@ use ratatui::style::Color;
 use ratatui::widgets::{StatefulWidget, Widget};
 
 use crate::series::GridData;
+use crate::theme::Theme;
 use crate::transform::{Camera3D, Camera3DState, data_to_screen};
 
 /// A 3D wireframe plot widget.
@@ -15,7 +16,7 @@ use crate::transform::{Camera3D, Camera3DState, data_to_screen};
 /// # Example
 ///
 /// ```
-/// use ratatui_sim::prelude::*;
+/// use ratatui_plt::prelude::*;
 ///
 /// let data = GridData::from_fn((-2.0, 2.0), (-2.0, 2.0), 20, 20, |x, y| {
 ///     (-(x*x + y*y)).exp()
@@ -27,6 +28,7 @@ pub struct Wireframe3D {
     camera: Camera3D,
     color: Color,
     title: Option<String>,
+    theme: Theme,
 }
 
 impl Wireframe3D {
@@ -36,12 +38,26 @@ impl Wireframe3D {
             camera: Camera3D::default(),
             color: Color::Cyan,
             title: None,
+            theme: Theme::get_default(),
         }
     }
 
-    pub fn camera(mut self, cam: Camera3D) -> Self { self.camera = cam; self }
-    pub fn color(mut self, c: Color) -> Self { self.color = c; self }
-    pub fn title(mut self, t: impl Into<String>) -> Self { self.title = Some(t.into()); self }
+    pub fn camera(mut self, cam: Camera3D) -> Self {
+        self.camera = cam;
+        self
+    }
+    pub fn color(mut self, c: Color) -> Self {
+        self.color = c;
+        self
+    }
+    pub fn title(mut self, t: impl Into<String>) -> Self {
+        self.title = Some(t.into());
+        self
+    }
+    pub fn theme(mut self, t: Theme) -> Self {
+        self.theme = t;
+        self
+    }
 
     fn render_with_camera(&self, camera: &Camera3D, area: Rect, buf: &mut Buffer) {
         if area.width < 4 || area.height < 4 {
@@ -63,7 +79,7 @@ impl Wireframe3D {
             for (i, ch) in title.chars().enumerate() {
                 let x = start + i as u16;
                 if x < area.x + area.width {
-                    buf[(x, area.y)].set_char(ch).set_fg(Color::White);
+                    buf[(x, area.y)].set_char(ch).set_fg(self.theme.foreground);
                 }
             }
         }
@@ -99,24 +115,41 @@ impl Wireframe3D {
         let sx_max = points.iter().map(|p| p.0).fold(f64::NEG_INFINITY, f64::max);
         let sy_min = points.iter().map(|p| p.1).fold(f64::INFINITY, f64::min);
         let sy_max = points.iter().map(|p| p.1).fold(f64::NEG_INFINITY, f64::max);
+
+        // Apply zoom to viewport
+        let zoom = 5.0 / camera.distance;
+        let (sx_min, sx_max, sy_min, sy_max) = {
+            let cx = (sx_min + sx_max) / 2.0;
+            let cy = (sy_min + sy_max) / 2.0;
+            let hx = (sx_max - sx_min) / 2.0 / zoom;
+            let hy = (sy_max - sy_min) / 2.0 / zoom;
+            (cx - hx, cx + hx, cy - hy, cy + hy)
+        };
+
         let depth_min = points.iter().map(|p| p.2).fold(f64::INFINITY, f64::min);
         let depth_max = points.iter().map(|p| p.2).fold(f64::NEG_INFINITY, f64::max);
-        let depth_range = if depth_max == depth_min { 1.0 } else { depth_max - depth_min };
+        let depth_range = if depth_max == depth_min {
+            1.0
+        } else {
+            depth_max - depth_min
+        };
 
         // Collect line segments
         struct Segment {
-            sx0: u16, sy0: u16,
-            sx1: u16, sy1: u16,
+            sx0: f64,
+            sy0: f64,
+            sx1: f64,
+            sy1: f64,
             depth: f64,
         }
 
         let mut segments: Vec<Segment> = Vec::new();
 
-        let map_x = |sx: f64| -> u16 {
-            data_to_screen(sx, sx_min, sx_max, px as f64, (px + pw - 1) as f64).round() as u16
+        let map_x = |sx: f64| -> f64 {
+            data_to_screen(sx, sx_min, sx_max, px as f64, (px + pw - 1) as f64)
         };
-        let map_y = |sy: f64| -> u16 {
-            data_to_screen(sy, sy_min, sy_max, py as f64, (py + ph - 1) as f64).round() as u16
+        let map_y = |sy: f64| -> f64 {
+            data_to_screen(sy, sy_min, sy_max, py as f64, (py + ph - 1) as f64)
         };
 
         // Row lines
@@ -125,8 +158,10 @@ impl Wireframe3D {
                 let idx0 = j * ncols + i;
                 let idx1 = j * ncols + i + 1;
                 segments.push(Segment {
-                    sx0: map_x(points[idx0].0), sy0: map_y(points[idx0].1),
-                    sx1: map_x(points[idx1].0), sy1: map_y(points[idx1].1),
+                    sx0: map_x(points[idx0].0),
+                    sy0: map_y(points[idx0].1),
+                    sx1: map_x(points[idx1].0),
+                    sy1: map_y(points[idx1].1),
                     depth: (points[idx0].2 + points[idx1].2) / 2.0,
                 });
             }
@@ -137,19 +172,27 @@ impl Wireframe3D {
                 let idx0 = j * ncols + i;
                 let idx1 = (j + 1) * ncols + i;
                 segments.push(Segment {
-                    sx0: map_x(points[idx0].0), sy0: map_y(points[idx0].1),
-                    sx1: map_x(points[idx1].0), sy1: map_y(points[idx1].1),
+                    sx0: map_x(points[idx0].0),
+                    sy0: map_y(points[idx0].1),
+                    sx1: map_x(points[idx1].0),
+                    sy1: map_y(points[idx1].1),
                     depth: (points[idx0].2 + points[idx1].2) / 2.0,
                 });
             }
         }
 
         // Sort by depth (back to front)
-        segments.sort_by(|a, b| a.depth.partial_cmp(&b.depth).unwrap_or(std::cmp::Ordering::Equal));
+        segments.sort_by(|a, b| {
+            a.depth
+                .partial_cmp(&b.depth)
+                .unwrap_or(std::cmp::Ordering::Equal)
+        });
 
         // Draw segments with depth-cued brightness
+        let clip = ClipRect { x_min: px, y_min: py, x_max: px + pw, y_max: py + ph };
         for seg in &segments {
-            let brightness = ((seg.depth - depth_min) / depth_range * 200.0 + 55.0).clamp(55.0, 255.0) as u8;
+            let brightness =
+                ((seg.depth - depth_min) / depth_range * 200.0 + 55.0).clamp(55.0, 255.0) as u8;
             let (r, g, b) = match self.color {
                 Color::Rgb(r, g, b) => (r, g, b),
                 Color::Cyan => (0, 255, 255),
@@ -166,36 +209,88 @@ impl Wireframe3D {
                 (b as f64 * brightness as f64 / 255.0) as u8,
             );
 
-            draw_line_simple(buf, seg.sx0, seg.sy0, seg.sx1, seg.sy1, color, [px, py, px + pw, py + ph]);
+            draw_braille_line(buf, seg.sx0, seg.sy0, seg.sx1, seg.sy1, color, &clip);
         }
     }
 }
 
-fn draw_line_simple(
-    buf: &mut Buffer, x0: u16, y0: u16, x1: u16, y1: u16, color: Color,
-    clip: [u16; 4],
+struct ClipRect {
+    x_min: u16,
+    y_min: u16,
+    x_max: u16,
+    y_max: u16,
+}
+
+const BRAILLE_BITS: [[u8; 4]; 2] = [
+    [0x01, 0x02, 0x04, 0x40],
+    [0x08, 0x10, 0x20, 0x80],
+];
+const BRAILLE_BASE: u32 = 0x2800;
+
+fn write_braille(buf: &mut Buffer, x: u16, y: u16, bits: u8, color: Color) {
+    let existing = {
+        let ch = buf[(x, y)].symbol().chars().next().unwrap_or(' ');
+        let code = ch as u32;
+        if (BRAILLE_BASE..=0x28FF).contains(&code) {
+            (code - BRAILLE_BASE) as u8
+        } else {
+            0
+        }
+    };
+    let combined = existing | bits;
+    if let Some(ch) = char::from_u32(BRAILLE_BASE + combined as u32) {
+        buf[(x, y)].set_char(ch).set_fg(color);
+    }
+}
+
+fn draw_braille_line(
+    buf: &mut Buffer,
+    x0: f64,
+    y0: f64,
+    x1: f64,
+    y1: f64,
+    color: Color,
+    clip: &ClipRect,
 ) {
-    let [clip_x_min, clip_y_min, clip_x_max, clip_y_max] = clip;
-    let mut ix = x0 as i32;
-    let mut iy = y0 as i32;
-    let ix1 = x1 as i32;
-    let iy1 = y1 as i32;
-    let dx = (ix1 - ix).abs();
-    let dy = -(iy1 - iy).abs();
-    let sx = if ix < ix1 { 1 } else { -1 };
-    let sy = if iy < iy1 { 1 } else { -1 };
+    let mut ix0 = (x0 * 2.0).round() as i32;
+    let mut iy0 = (y0 * 4.0).round() as i32;
+    let ix1 = (x1 * 2.0).round() as i32;
+    let iy1 = (y1 * 4.0).round() as i32;
+
+    let dx = (ix1 - ix0).abs();
+    let dy = -(iy1 - iy0).abs();
+    let sx = if ix0 < ix1 { 1 } else { -1 };
+    let sy = if iy0 < iy1 { 1 } else { -1 };
     let mut err = dx + dy;
 
     loop {
-        let px = ix as u16;
-        let py = iy as u16;
-        if px >= clip_x_min && px < clip_x_max && py >= clip_y_min && py < clip_y_max {
-            buf[(px, py)].set_char('·').set_fg(color);
+        if ix0 >= 0 && iy0 >= 0 {
+            let cell_x = (ix0 / 2) as u16;
+            let cell_y = (iy0 / 4) as u16;
+            if cell_x >= clip.x_min
+                && cell_x < clip.x_max
+                && cell_y >= clip.y_min
+                && cell_y < clip.y_max
+            {
+                let dot_col = (ix0 % 2) as usize;
+                let dot_row = (iy0 % 4) as usize;
+                let bit = BRAILLE_BITS[dot_col][dot_row];
+                write_braille(buf, cell_x, cell_y, bit, color);
+            }
         }
-        if ix == ix1 && iy == iy1 { break; }
+
+        if ix0 == ix1 && iy0 == iy1 {
+            break;
+        }
         let e2 = 2 * err;
-        if e2 >= dy { err += dy; ix += sx; }
-        if e2 <= dx { err += dx; iy += sy; }
+        if e2 >= dy {
+            err += dy;
+            ix0 += sx;
+        }
+        if e2 <= dx {
+            err += dx;
+            iy0 += sy;
+        }
     }
 }
 

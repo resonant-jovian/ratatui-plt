@@ -1,5 +1,3 @@
-//! Scatter plot example: random point cloud with color-mapped third value.
-
 use std::io;
 
 use crossterm::{
@@ -7,7 +5,6 @@ use crossterm::{
     event::{self, Event, KeyCode, KeyEventKind},
     terminal::{EnterAlternateScreen, LeaveAlternateScreen, disable_raw_mode, enable_raw_mode},
 };
-use rand::RngExt;
 use ratatui::prelude::*;
 use ratatui_plt::prelude::*;
 
@@ -34,37 +31,42 @@ fn main() -> color_eyre::Result<()> {
     enable_raw_mode()?;
     let mut terminal = Terminal::new(CrosstermBackend::new(io::stdout()))?;
 
-    // Generate random point cloud
-    let mut rng = rand::rng();
-    let n = 3000;
-    let mut points = Vec::with_capacity(n);
-    let mut color_vals = Vec::with_capacity(n);
+    // Temperature and humidity over 24 hours (inversely correlated)
+    let temp = Series::new("Temperature")
+        .data(
+            (0..=240)
+                .map(|h| {
+                    let t = h as f64 * 0.1;
+                    let temp = 15.0 + 10.0 * ((t - 14.0) * std::f64::consts::PI / 12.0).sin();
+                    (t, temp)
+                })
+                .collect(),
+        )
+        .color(Color::Red);
 
-    for _ in 0..n {
-        let x: f64 = rng.random_range(-5.0..5.0);
-        let y: f64 = rng.random_range(-5.0..5.0);
-        let z = (-(x * x + y * y) / 8.0).exp(); // radial falloff as color value
-        points.push((x, y));
-        color_vals.push(z);
-    }
+    let humidity = Series::new("Humidity")
+        .data(
+            (0..=240)
+                .map(|h| {
+                    let t = h as f64 * 0.1;
+                    let hum = 70.0 - 20.0 * ((t - 14.0) * std::f64::consts::PI / 12.0).sin();
+                    (t, hum)
+                })
+                .collect(),
+        )
+        .color(Color::Blue);
 
-    let series = Series::new("cloud")
-        .data(points)
-        .marker(MarkerShape::FilledCircle);
-
-    let plot = ScatterPlot::new()
-        .series(series)
-        .color_values(color_vals)
-        .colormap(Viridis)
-        .title("Random Point Cloud (color = radial intensity)")
-        .x_axis(Axis::new().label("x"))
-        .y_axis(Axis::new().label("y"))
-        .aspect_ratio(AspectRatio::Equal)
-        .show_legend(false);
+    let plot = TwinAxes::new()
+        .primary(temp)
+        .secondary(humidity)
+        .x_axis(Axis::new().label("Hour"))
+        .primary_y_axis(Axis::new().label("Temperature (\u{00b0}C)"))
+        .secondary_y_axis(Axis::new().label("Humidity (%)"))
+        .title("24h Weather: Temperature & Humidity (q to quit)");
 
     loop {
         terminal.draw(|frame| {
-            frame.render_widget(&plot, frame.area());
+            frame.render_widget(&plot, square_area(frame.area()));
         })?;
 
         if let Event::Key(key) = event::read()?

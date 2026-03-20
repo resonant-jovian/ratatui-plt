@@ -11,6 +11,7 @@ use ratatui::widgets::Widget;
 
 use crate::axis::Axis;
 use crate::series::Series;
+use crate::theme::Theme;
 use crate::transform::data_to_screen;
 
 /// Default color cycle for stacked series.
@@ -35,8 +36,8 @@ const FILL_CHARS: &[char] = &['░', '▒', '▓', '█'];
 /// # Example
 ///
 /// ```
-/// use ratatui_sim::widgets::stacked_area::StackedArea;
-/// use ratatui_sim::series::Series;
+/// use ratatui_plt::widgets::stacked_area::StackedArea;
+/// use ratatui_plt::series::Series;
 /// use ratatui::style::Color;
 ///
 /// let chart = StackedArea::new()
@@ -49,6 +50,7 @@ pub struct StackedArea {
     x_axis: Axis,
     y_axis: Axis,
     title: Option<String>,
+    theme: Theme,
 }
 
 impl Default for StackedArea {
@@ -58,6 +60,7 @@ impl Default for StackedArea {
             x_axis: Axis::new(),
             y_axis: Axis::new(),
             title: None,
+            theme: Theme::get_default(),
         }
     }
 }
@@ -84,6 +87,11 @@ impl StackedArea {
 
     pub fn title(mut self, t: impl Into<String>) -> Self {
         self.title = Some(t.into());
+        self
+    }
+
+    pub fn theme(mut self, t: Theme) -> Self {
+        self.theme = t;
         self
     }
 }
@@ -113,7 +121,7 @@ impl Widget for &StackedArea {
             for (i, ch) in title.chars().enumerate() {
                 let x = start + i as u16;
                 if x < area.x + area.width {
-                    buf[(x, area.y)].set_char(ch).set_fg(Color::White);
+                    buf[(x, area.y)].set_char(ch).set_fg(self.theme.foreground);
                 }
             }
         }
@@ -170,11 +178,43 @@ impl Widget for &StackedArea {
         // Draw axes
         for x in px..px + pw {
             if x < area.x + area.width {
-                buf[(x, py + ph)].set_char('─').set_fg(Color::DarkGray);
+                buf[(x, py + ph)]
+                    .set_char('─')
+                    .set_fg(self.theme.axis_color);
             }
         }
         for y in py..py + ph {
-            buf[(px.saturating_sub(1), y)].set_char('│').set_fg(Color::DarkGray);
+            buf[(px.saturating_sub(1), y)]
+                .set_char('│')
+                .set_fg(self.theme.axis_color);
+        }
+
+        // Draw grid
+        let x_grid = self.x_axis.grid || self.theme.grid_visible;
+        let y_grid = self.y_axis.grid || self.theme.grid_visible;
+        if x_grid {
+            let gx_ticks = self.x_axis.tick_positions(x_lo, x_hi);
+            for &tv in &gx_ticks {
+                let sx = data_to_screen(tv, x_lo, x_hi, px as f64, (px + pw - 1) as f64);
+                let xi = sx.round() as u16;
+                if xi >= px && xi < px + pw {
+                    for y in py..py + ph {
+                        buf[(xi, y)].set_char('·').set_fg(self.theme.grid_color);
+                    }
+                }
+            }
+        }
+        if y_grid {
+            let gy_ticks = self.y_axis.tick_positions(y_lo, y_hi);
+            for &tv in &gy_ticks {
+                let sy = data_to_screen(tv, y_lo, y_hi, (py + ph - 1) as f64, py as f64);
+                let yi = sy.round() as u16;
+                if yi >= py && yi < py + ph {
+                    for x in px..px + pw {
+                        buf[(x, yi)].set_char('·').set_fg(self.theme.grid_color);
+                    }
+                }
+            }
         }
 
         // Render filled areas from top series to bottom (painter's algorithm)
@@ -238,7 +278,7 @@ impl Widget for &StackedArea {
                 for (j, ch) in label.chars().enumerate() {
                     let lx = start + j as u16;
                     if lx >= area.x && lx < area.x + area.width {
-                        buf[(lx, tick_y)].set_char(ch).set_fg(Color::DarkGray);
+                        buf[(lx, tick_y)].set_char(ch).set_fg(self.theme.axis_color);
                     }
                 }
             }
@@ -255,7 +295,7 @@ impl Widget for &StackedArea {
                 for (j, ch) in label.chars().enumerate() {
                     let lx = start + j as u16;
                     if lx >= area.x && lx < px {
-                        buf[(lx, yi)].set_char(ch).set_fg(Color::DarkGray);
+                        buf[(lx, yi)].set_char(ch).set_fg(self.theme.axis_color);
                     }
                 }
             }

@@ -2,13 +2,14 @@
 
 use ratatui::buffer::Buffer;
 use ratatui::layout::Rect;
-use ratatui::style::{Color, Style};
+use ratatui::style::Color;
 use ratatui::widgets::Widget;
 
 use crate::axis::{AspectRatio, Axis};
 use crate::colormap::{Colormap, Viridis};
 use crate::norm::{LinearNorm, Normalize};
 use crate::series::GridData;
+use crate::theme::Theme;
 use crate::transform::{apply_aspect_ratio, data_to_screen};
 
 /// A contour plot widget.
@@ -16,7 +17,7 @@ use crate::transform::{apply_aspect_ratio, data_to_screen};
 /// # Example
 ///
 /// ```
-/// use ratatui_sim::prelude::*;
+/// use ratatui_plt::prelude::*;
 ///
 /// let data = GridData::from_fn((-3.0, 3.0), (-3.0, 3.0), 40, 40, |x, y| {
 ///     (-(x*x + y*y) / 2.0).exp()
@@ -34,6 +35,7 @@ pub struct ContourPlot {
     aspect_ratio: AspectRatio,
     filled: bool,
     show_labels: bool,
+    theme: Theme,
 }
 
 impl ContourPlot {
@@ -51,6 +53,7 @@ impl ContourPlot {
             aspect_ratio: AspectRatio::Auto,
             filled: false,
             show_labels: false,
+            theme: Theme::get_default(),
         }
     }
 
@@ -114,6 +117,12 @@ impl ContourPlot {
         self.show_labels = show;
         self
     }
+
+    /// Set the theme.
+    pub fn theme(mut self, theme: Theme) -> Self {
+        self.theme = theme;
+        self
+    }
 }
 
 impl Widget for &ContourPlot {
@@ -141,7 +150,7 @@ impl Widget for &ContourPlot {
             for (i, ch) in title.chars().enumerate() {
                 let x = start + i as u16;
                 if x < area.x + area.width {
-                    buf[(x, area.y)].set_char(ch).set_fg(Color::White);
+                    buf[(x, area.y)].set_char(ch).set_fg(self.theme.foreground);
                 }
             }
         }
@@ -173,39 +182,86 @@ impl Widget for &ContourPlot {
 
         let (_vmin, _vmax) = self.data.value_bounds();
 
-        // Filled contours: color each cell by value band
-        if self.filled {
-            for cy in 0..ah {
-                for cx in 0..aw {
-                    let data_x = x_lo + (cx as f64 / aw as f64) * (x_hi - x_lo);
-                    let data_y = y_hi - (cy as f64 / ah as f64) * (y_hi - y_lo);
-
-                    let col = ((data_x - x_lo) / (x_hi - x_lo) * (ncols - 1) as f64)
-                        .round()
-                        .clamp(0.0, (ncols - 1) as f64) as usize;
-                    let row = ((y_hi - data_y) / (y_hi - y_lo) * (nrows - 1) as f64)
-                        .round()
-                        .clamp(0.0, (nrows - 1) as f64) as usize;
-
-                    let val = self.data.values[row][col];
-                    let t = self.norm.normalize(val);
-                    let color = self.colormap.color_at(t);
-
-                    let sx = px + cx;
-                    let sy = py + cy;
-                    if sx < area.x + area.width && sy < area.y + area.height {
-                        buf[(sx, sy)]
-                            .set_char('█')
-                            .set_style(Style::default().fg(color));
+        // Draw grid
+        let x_grid = self.x_axis.grid || self.theme.grid_visible;
+        let y_grid = self.y_axis.grid || self.theme.grid_visible;
+        if x_grid && !self.filled {
+            let gx_ticks = self.x_axis.tick_positions(x_lo, x_hi);
+            for &tv in &gx_ticks {
+                let sx = data_to_screen(tv, x_lo, x_hi, px as f64, (px + aw - 1) as f64);
+                let xi = sx.round() as u16;
+                if xi >= px && xi < px + aw {
+                    for y in py..py + ah {
+                        buf[(xi, y)].set_char('·').set_fg(self.theme.grid_color);
+                    }
+                }
+            }
+        }
+        if y_grid && !self.filled {
+            let gy_ticks = self.y_axis.tick_positions(y_lo, y_hi);
+            for &tv in &gy_ticks {
+                let sy = data_to_screen(tv, y_lo, y_hi, (py + ah - 1) as f64, py as f64);
+                let yi = sy.round() as u16;
+                if yi >= py && yi < py + ah {
+                    for x in px..px + aw {
+                        buf[(x, yi)].set_char('·').set_fg(self.theme.grid_color);
                     }
                 }
             }
         }
 
-        // Draw contour lines using marching squares
+        // Filled contours: half-block rendering with bilinear interpolation
+        if self.filled {
+            let virt_h = ah as f64 * 2.0;
+            for cy in 0..ah {
+                for cx in 0..aw {
+                    let data_x =
+                        x_lo + (cx as f64 / (aw - 1).max(1) as f64) * (x_hi - x_lo);
+
+                    let sample_color = |vy: f64| -> Color {
+                        let data_y =
+                            y_hi - (vy / (virt_h - 1.0).max(1.0)) * (y_hi - y_lo);
+                        let gx = ((data_x - x_lo) / (x_hi - x_lo) * (ncols - 1) as f64)
+                            .clamp(0.0, (ncols - 1) as f64);
+                        let gy = ((data_y - y_lo) / (y_hi - y_lo) * (nrows - 1) as f64)
+                            .clamp(0.0, (nrows - 1) as f64);
+                        let ix = (gx.floor() as usize).min(ncols - 2);
+                        let iy = (gy.floor() as usize).min(nrows - 2);
+                        let fx = gx - ix as f64;
+                        let fy = gy - iy as f64;
+                        let val = self.data.values[iy][ix] * (1.0 - fx) * (1.0 - fy)
+                            + self.data.values[iy][ix + 1] * fx * (1.0 - fy)
+                            + self.data.values[iy + 1][ix] * (1.0 - fx) * fy
+                            + self.data.values[iy + 1][ix + 1] * fx * fy;
+                        let band = levels.partition_point(|&l| l <= val);
+                        let t = band as f64 / levels.len() as f64;
+                        self.colormap.color_at(t)
+                    };
+
+                    let top = sample_color(cy as f64 * 2.0);
+                    let bot = sample_color(cy as f64 * 2.0 + 1.0);
+
+                    let sx = px + cx;
+                    let sy = py + cy;
+                    if sx < area.x + area.width && sy < area.y + area.height {
+                        buf[(sx, sy)].set_char('▀').set_fg(top).set_bg(bot);
+                    }
+                }
+            }
+        }
+
+        // Draw contour lines (skip when filled — bands already show levels)
+        if !self.filled {
+        // Edge naming: top=v00-v10, right=v10-v11, bottom=v01-v11, left=v00-v01
+        // Corners: v00=top-left(j,i), v10=top-right(j,i+1), v01=bottom-left(j+1,i), v11=bottom-right(j+1,i+1)
         for &level in &levels {
             let t = self.norm.normalize(level);
-            let color = self.colormap.color_at(t);
+            let color = if self.filled {
+                // Use contrasting color for lines on filled contours
+                self.theme.foreground
+            } else {
+                self.colormap.color_at(t)
+            };
 
             for j in 0..nrows - 1 {
                 for i in 0..ncols - 1 {
@@ -214,56 +270,87 @@ impl Widget for &ContourPlot {
                     let v01 = self.data.values[j + 1][i];
                     let v11 = self.data.values[j + 1][i + 1];
 
-                    // Marching squares: classify corners
                     let case = ((v00 >= level) as u8)
                         | (((v10 >= level) as u8) << 1)
                         | (((v01 >= level) as u8) << 2)
                         | (((v11 >= level) as u8) << 3);
 
                     if case == 0 || case == 15 {
-                        continue; // No contour crossing
+                        continue;
                     }
 
-                    // Interpolate crossing points on cell edges and draw
-                    let cx = x_lo + (i as f64 + 0.5) / (ncols - 1) as f64 * (x_hi - x_lo);
-                    let cy_data = y_lo + (j as f64 + 0.5) / (nrows - 1) as f64 * (y_hi - y_lo);
+                    // Interpolation fraction along an edge
+                    let interp = |va: f64, vb: f64| -> f64 {
+                        if (vb - va).abs() < 1e-12 {
+                            0.5
+                        } else {
+                            (level - va) / (vb - va)
+                        }
+                    };
 
-                    let sx = data_to_screen(cx, x_lo, x_hi, px as f64, (px + aw - 1) as f64);
-                    let sy = data_to_screen(
-                        cy_data,
-                        y_lo,
-                        y_hi,
-                        (py + ah - 1) as f64,
-                        py as f64,
-                    );
-                    let xi = sx.round() as u16;
-                    let yi = sy.round() as u16;
+                    // Data coordinates of the four corners
+                    let x0 = self.data.x[i];
+                    let x1 = self.data.x[i + 1];
+                    let y0 = self.data.y[j];
+                    let y1 = self.data.y[j + 1];
 
-                    if xi >= px && xi < px + aw && yi >= py && yi < py + ah {
-                        let ch = match case {
-                            1 | 14 | 4 | 11 => '╲',
-                            2 | 13 | 8 | 7 => '╱',
-                            3 | 12 => '─',
-                            5 | 10 => '│',
-                            6 | 9 => '×',
-                            _ => '·',
-                        };
-                        buf[(xi, yi)].set_char(ch).set_fg(color);
+                    // Edge crossing points in data coordinates
+                    let top = || {
+                        let f = interp(v00, v10);
+                        (x0 + f * (x1 - x0), y0)
+                    };
+                    let bottom = || {
+                        let f = interp(v01, v11);
+                        (x0 + f * (x1 - x0), y1)
+                    };
+                    let left = || {
+                        let f = interp(v00, v01);
+                        (x0, y0 + f * (y1 - y0))
+                    };
+                    let right = || {
+                        let f = interp(v10, v11);
+                        (x1, y0 + f * (y1 - y0))
+                    };
+
+                    // Collect line segments for this cell
+                    let segments: Vec<((f64, f64), (f64, f64))> = match case {
+                        1 | 14 => vec![(top(), left())],
+                        2 | 13 => vec![(top(), right())],
+                        3 | 12 => vec![(left(), right())],
+                        4 | 11 => vec![(bottom(), left())],
+                        5 => vec![(top(), left()), (bottom(), right())],
+                        6 | 9 => vec![(top(), bottom())],
+                        7 | 8 => vec![(bottom(), right())],
+                        10 => vec![(top(), right()), (bottom(), left())],
+                        _ => vec![],
+                    };
+
+                    // Draw each segment using Bresenham
+                    for ((dx0, dy0), (dx1, dy1)) in segments {
+                        let sx0 = data_to_screen(dx0, x_lo, x_hi, px as f64, (px + aw - 1) as f64);
+                        let sy0 = data_to_screen(dy0, y_lo, y_hi, (py + ah - 1) as f64, py as f64);
+                        let sx1 = data_to_screen(dx1, x_lo, x_hi, px as f64, (px + aw - 1) as f64);
+                        let sy1 = data_to_screen(dy1, y_lo, y_hi, (py + ah - 1) as f64, py as f64);
+
+                        draw_contour_line(buf, sx0, sy0, sx1, sy1, color, px, py, aw, ah);
                     }
                 }
             }
+        }
         }
 
         // Draw axes
         for x in px..px + aw {
             if x < area.x + area.width {
-                buf[(x, py + ah)].set_char('─').set_fg(Color::DarkGray);
+                buf[(x, py + ah)]
+                    .set_char('─')
+                    .set_fg(self.theme.axis_color);
             }
         }
         for y in py..py + ah {
             buf[(px.saturating_sub(1), y)]
                 .set_char('│')
-                .set_fg(Color::DarkGray);
+                .set_fg(self.theme.axis_color);
         }
 
         // Tick labels
@@ -278,7 +365,7 @@ impl Widget for &ContourPlot {
                 for (j, ch) in label.chars().enumerate() {
                     let lx = start + j as u16;
                     if lx >= area.x && lx < area.x + area.width {
-                        buf[(lx, y)].set_char(ch).set_fg(Color::DarkGray);
+                        buf[(lx, y)].set_char(ch).set_fg(self.theme.axis_color);
                     }
                 }
             }
@@ -294,10 +381,56 @@ impl Widget for &ContourPlot {
                 for (j, ch) in label.chars().enumerate() {
                     let lx = start + j as u16;
                     if lx >= area.x && lx < px {
-                        buf[(lx, yi)].set_char(ch).set_fg(Color::DarkGray);
+                        buf[(lx, yi)].set_char(ch).set_fg(self.theme.axis_color);
                     }
                 }
             }
+        }
+    }
+}
+
+/// Draw a line between two screen-space points using Bresenham's algorithm.
+#[allow(clippy::too_many_arguments)]
+fn draw_contour_line(
+    buf: &mut Buffer,
+    x0: f64,
+    y0: f64,
+    x1: f64,
+    y1: f64,
+    color: Color,
+    clip_x: u16,
+    clip_y: u16,
+    clip_w: u16,
+    clip_h: u16,
+) {
+    let mut ix0 = x0.round() as i32;
+    let mut iy0 = y0.round() as i32;
+    let ix1 = x1.round() as i32;
+    let iy1 = y1.round() as i32;
+
+    let dx = (ix1 - ix0).abs();
+    let dy = -(iy1 - iy0).abs();
+    let sx = if ix0 < ix1 { 1 } else { -1 };
+    let sy = if iy0 < iy1 { 1 } else { -1 };
+    let mut err = dx + dy;
+
+    loop {
+        let px = ix0 as u16;
+        let py = iy0 as u16;
+        if px >= clip_x && px < clip_x + clip_w && py >= clip_y && py < clip_y + clip_h {
+            buf[(px, py)].set_char('·').set_fg(color);
+        }
+        if ix0 == ix1 && iy0 == iy1 {
+            break;
+        }
+        let e2 = 2 * err;
+        if e2 >= dy {
+            err += dy;
+            ix0 += sx;
+        }
+        if e2 <= dx {
+            err += dx;
+            iy0 += sy;
         }
     }
 }

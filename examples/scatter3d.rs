@@ -32,23 +32,33 @@ fn main() -> color_eyre::Result<()> {
     io::stdout().execute(crossterm::event::EnableMouseCapture)?;
     let mut terminal = Terminal::new(CrosstermBackend::new(io::stdout()))?;
 
-    // Generate sin(sqrt(x^2 + y^2)) surface data
-    let data = GridData::from_fn((-6.0, 6.0), (-6.0, 6.0), 120, 120, |x, y| {
-        let r = (x * x + y * y).sqrt();
-        r.sin()
-    });
+    // Generate helix: (cos(t), sin(t), t/10)
+    let n = 200;
+    let data: Vec<(f64, f64, f64)> = (0..n)
+        .map(|i| {
+            let t = i as f64 * 0.1;
+            (t.cos(), t.sin(), t / (n as f64 * 0.1))
+        })
+        .collect();
+    let values: Vec<f64> = (0..n).map(|i| i as f64 / n as f64).collect();
 
-    let surface = Surface3D::new(data)
-        .colormap(Plasma)
-        .show_wireframe(false)
-        .title("sin(sqrt(x^2 + y^2)) - Arrow keys: rotate, +/-: zoom, q: quit");
+    let s = Series3D::new("Helix")
+        .data(data)
+        .color(Color::Cyan)
+        .values(values);
+    let scatter = Scatter3D::new()
+        .series(s)
+        .color_by_value(true)
+        .colormap(Viridis)
+        .marker(MarkerShape::FilledCircle)
+        .title("3D Helix - Arrow keys: rotate, +/-: zoom, q: quit");
 
     let mut camera_state = Camera3DState::default();
 
     loop {
         terminal.draw(|frame| {
             let area = square_area(frame.area());
-            frame.render_stateful_widget(&surface, area, &mut camera_state);
+            frame.render_stateful_widget(&scatter, area, &mut camera_state);
         })?;
 
         match event::read()? {

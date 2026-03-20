@@ -6,7 +6,7 @@
 //! # Example
 //!
 //! ```
-//! use ratatui_sim::widgets::pie_chart::{PieChart, PieSlice};
+//! use ratatui_plt::widgets::pie_chart::{PieChart, PieSlice};
 //! use ratatui::style::Color;
 //!
 //! let chart = PieChart::new()
@@ -22,6 +22,8 @@ use ratatui::buffer::Buffer;
 use ratatui::layout::Rect;
 use ratatui::style::Color;
 use ratatui::widgets::Widget;
+
+use crate::theme::Theme;
 
 /// A single slice of the pie chart.
 #[derive(Clone, Debug)]
@@ -75,6 +77,8 @@ pub struct PieChart {
     show_labels: bool,
     /// Whether to show percentage text on each slice.
     show_percentages: bool,
+    /// Visual theme.
+    theme: Theme,
 }
 
 impl Default for PieChart {
@@ -85,6 +89,7 @@ impl Default for PieChart {
             donut_ratio: None,
             show_labels: true,
             show_percentages: false,
+            theme: Theme::get_default(),
         }
     }
 }
@@ -130,6 +135,12 @@ impl PieChart {
         self.show_percentages = show;
         self
     }
+
+    /// Set the visual theme.
+    pub fn theme(mut self, theme: Theme) -> Self {
+        self.theme = theme;
+        self
+    }
 }
 
 impl Widget for &PieChart {
@@ -162,7 +173,7 @@ impl Widget for &PieChart {
             for (i, ch) in title.chars().enumerate() {
                 let x = start + i as u16;
                 if x < area.x + area.width {
-                    buf[(x, area.y)].set_char(ch).set_fg(Color::White);
+                    buf[(x, area.y)].set_char(ch).set_fg(self.theme.foreground);
                 }
             }
         }
@@ -173,7 +184,11 @@ impl Widget for &PieChart {
 
         // Radius (account for terminal cells being ~2x tall as wide)
         let r_screen_x = ((pw as f64 / 2.0) - label_margin as f64 - 1.0).max(2.0);
-        let r_screen_y = ((ph as f64 / 2.0) - 1.0).max(2.0);
+        let r_screen_y = if self.show_labels || self.show_percentages {
+            ((ph as f64 / 2.3) - 1.0).max(2.0)
+        } else {
+            ((ph as f64 / 2.0) - 1.0).max(2.0)
+        };
 
         let inner_ratio = self.donut_ratio.unwrap_or(0.0);
 
@@ -201,9 +216,7 @@ impl Widget for &PieChart {
                 }
 
                 // Find which slice this angle belongs to
-                for (slice, &(a_start, a_end)) in
-                    self.slices.iter().zip(angles.iter())
-                {
+                for (slice, &(a_start, a_end)) in self.slices.iter().zip(angles.iter()) {
                     // Handle exploded slices by shifting the centre
                     let (ecx, ecy) = if slice.explode > 0.0 {
                         let mid_angle = (a_start + a_end) / 2.0;
@@ -235,9 +248,7 @@ impl Widget for &PieChart {
 
                     if ea >= a_start && ea < a_end {
                         // Use half-block characters for better vertical resolution
-                        buf[(screen_x, screen_y)]
-                            .set_char('█')
-                            .set_fg(slice.color);
+                        buf[(screen_x, screen_y)].set_char('█').set_fg(slice.color);
                         break;
                     }
                 }
@@ -300,9 +311,7 @@ impl Widget for &PieChart {
                     for (j, ch) in text.chars().enumerate() {
                         let x = xi + j as i32;
                         if x >= area.x as i32 && x < (area.x + area.width) as i32 {
-                            buf[(x as u16, yi)]
-                                .set_char(ch)
-                                .set_fg(slice.color);
+                            buf[(x as u16, yi)].set_char(ch).set_fg(slice.color);
                         }
                     }
                 }
