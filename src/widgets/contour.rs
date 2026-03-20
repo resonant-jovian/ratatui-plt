@@ -220,12 +220,13 @@ impl Widget for &ContourPlot {
                     let col = ((data_x - x_lo) / (x_hi - x_lo) * (ncols - 1) as f64)
                         .round()
                         .clamp(0.0, (ncols - 1) as f64) as usize;
-                    let row = ((y_hi - data_y) / (y_hi - y_lo) * (nrows - 1) as f64)
+                    let row = ((data_y - y_lo) / (y_hi - y_lo) * (nrows - 1) as f64)
                         .round()
                         .clamp(0.0, (nrows - 1) as f64) as usize;
 
                     let val = self.data.values[row][col];
-                    let t = self.norm.normalize(val);
+                    let band = levels.partition_point(|&l| l <= val);
+                    let t = band as f64 / levels.len() as f64;
                     let color = self.colormap.color_at(t);
 
                     let sx = px + cx;
@@ -239,8 +240,8 @@ impl Widget for &ContourPlot {
             }
         }
 
-        // Draw contour lines (only for unfilled mode; filled contours delineate by color band)
-        if !self.filled {
+        // Draw contour lines
+        {
         // Edge naming: top=v00-v10, right=v10-v11, bottom=v01-v11, left=v00-v01
         // Corners: v00=top-left(j,i), v10=top-right(j,i+1), v01=bottom-left(j+1,i), v11=bottom-right(j+1,i+1)
         for &level in &levels {
@@ -326,7 +327,7 @@ impl Widget for &ContourPlot {
                 }
             }
         }
-        } // !self.filled
+        }
 
         // Draw axes
         for x in px..px + aw {

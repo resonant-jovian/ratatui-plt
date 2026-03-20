@@ -155,7 +155,7 @@ impl Widget for &RadialPlot {
                 for (j, ch) in label.chars().enumerate() {
                     let x = lx + j as u16 + 1;
                     if x < area.x + area.width {
-                        buf[(x, ly)].set_char(ch).set_fg(self.theme.grid_color);
+                        buf[(x, ly)].set_char(ch).set_fg(self.theme.axis_color);
                     }
                 }
             }
@@ -189,7 +189,7 @@ impl Widget for &RadialPlot {
                 for (j, ch) in label.chars().enumerate() {
                     buf[(lx + j as u16, ly)]
                         .set_char(ch)
-                        .set_fg(self.theme.grid_color);
+                        .set_fg(self.theme.foreground);
                 }
             }
         }

@@ -52,7 +52,7 @@ fn main() -> color_eyre::Result<()> {
         .show_legend(true);
 
     // --- Density heatmap data ---
-    let density = GridData::from_fn((-3.0, 3.0), (-3.0, 3.0), 50, 50, |x, y| {
+    let density = GridData::from_fn((-3.0, 3.0), (-3.0, 3.0), 100, 100, |x, y| {
         let r2 = x * x + y * y;
         (-r2 / 2.0).exp() + 0.3 * (-(((x - 1.0).powi(2) + (y - 1.0).powi(2)) / 0.5)).exp()
     });
