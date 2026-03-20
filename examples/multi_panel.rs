@@ -7,6 +7,7 @@ use crossterm::{
 };
 use ratatui::prelude::*;
 use ratatui_plt::prelude::*;
+use ratatui_plt::widgets::bar_chart::{BarChart, BarDataset};
 
 fn parse_theme() -> Theme {
     match std::env::args().nth(1).as_deref() {
@@ -31,109 +32,77 @@ fn main() -> color_eyre::Result<()> {
     enable_raw_mode()?;
     let mut terminal = Terminal::new(CrosstermBackend::new(io::stdout()))?;
 
+    // Panel (0,0): Heatmap with gradient
+    let heatmap_data = GridData::from_fn((-3.0, 3.0), (-3.0, 3.0), 60, 60, |x, y| {
+        (-(x * x + y * y) / 4.0).exp()
+    });
+    let heatmap = Heatmap::new(heatmap_data)
+        .colormap(Viridis)
+        .title("Gaussian Heatmap")
+        .show_colorbar(false);
+
+    // Panel (0,1): Scatter plot with point cloud
+    let scatter_points: Vec<(f64, f64)> = (0..200)
+        .map(|i| {
+            let t = i as f64 * 0.0314;
+            let r = 3.0 * (i as f64 * 0.017).sin().abs();
+            (r * t.cos(), r * t.sin())
+        })
+        .collect();
+    let scatter = ScatterPlot::new()
+        .series(
+            Series::new("spiral")
+                .data(scatter_points)
+                .color(Color::Cyan)
+                .marker(MarkerShape::FilledCircle),
+        )
+        .title("Spiral Scatter")
+        .show_legend(false);
+
+    // Panel (1,0): Bar chart
+    let bar_chart = BarChart::new()
+        .categories(vec!["A", "B", "C", "D", "E"])
+        .dataset(BarDataset::new(
+            "Values",
+            vec![8.0, 15.0, 12.0, 20.0, 6.0],
+            Color::Cyan,
+        ))
+        .title("Sample Bars");
+
+    // Panel (1,1): Line plot with sine wave
+    let sine_data: Vec<(f64, f64)> = (0..150)
+        .map(|i| {
+            let x = i as f64 * 0.08;
+            (x, x.sin())
+        })
+        .collect();
+    let cosine_data: Vec<(f64, f64)> = (0..150)
+        .map(|i| {
+            let x = i as f64 * 0.08;
+            (x, x.cos())
+        })
+        .collect();
+    let line_plot = LinePlot::new()
+        .series(Series::new("sin").data(sine_data).color(Color::Cyan))
+        .series(Series::new("cos").data(cosine_data).color(Color::Yellow))
+        .title("Sine & Cosine")
+        .show_legend(true);
+
     let panel = MultiPanel::new(2, 2)
         .width_ratios(vec![1.0, 1.0])
         .height_ratios(vec![1.0, 1.0])
         .gap(1)
-        // Top-left: horizontal gradient using direct buffer writes
-        .panel(0, 0, |area: Rect, buf: &mut Buffer| {
-            let theme = Theme::get_default();
-            let title = "Panel 1: Gradient";
-            let start = area.x + area.width.saturating_sub(title.len() as u16) / 2;
-            for (i, ch) in title.chars().enumerate() {
-                let x = start + i as u16;
-                if x < area.x + area.width {
-                    buf[(x, area.y)].set_char(ch).set_fg(theme.foreground);
-                }
-            }
-            // Draw a horizontal color gradient
-            for y in (area.y + 1)..area.y + area.height {
-                for x in area.x..area.x + area.width {
-                    let t = (x - area.x) as f64 / area.width.max(1) as f64;
-                    let r = (t * 255.0) as u8;
-                    let b = ((1.0 - t) * 255.0) as u8;
-                    buf[(x, y)].set_char('█').set_fg(Color::Rgb(r, 50, b));
-                }
-            }
+        .panel(0, 0, move |area: Rect, buf: &mut Buffer| {
+            (&heatmap).render(area, buf);
         })
-        // Top-right: checkerboard pattern
-        .panel(0, 1, |area: Rect, buf: &mut Buffer| {
-            let theme = Theme::get_default();
-            let title = "Panel 2: Checkerboard";
-            let start = area.x + area.width.saturating_sub(title.len() as u16) / 2;
-            for (i, ch) in title.chars().enumerate() {
-                let x = start + i as u16;
-                if x < area.x + area.width {
-                    buf[(x, area.y)].set_char(ch).set_fg(theme.foreground);
-                }
-            }
-            for y in (area.y + 1)..area.y + area.height {
-                for x in area.x..area.x + area.width {
-                    let parity = ((x - area.x) + (y - area.y)) % 2;
-                    let (ch, color) = if parity == 0 {
-                        ('█', theme.grid_color)
-                    } else {
-                        ('░', theme.axis_color)
-                    };
-                    buf[(x, y)].set_char(ch).set_fg(color);
-                }
-            }
+        .panel(0, 1, move |area: Rect, buf: &mut Buffer| {
+            (&scatter).render(area, buf);
         })
-        // Bottom-left: vertical bars
-        .panel(1, 0, |area: Rect, buf: &mut Buffer| {
-            let theme = Theme::get_default();
-            let title = "Panel 3: Bars";
-            let start = area.x + area.width.saturating_sub(title.len() as u16) / 2;
-            for (i, ch) in title.chars().enumerate() {
-                let x = start + i as u16;
-                if x < area.x + area.width {
-                    buf[(x, area.y)].set_char(ch).set_fg(theme.foreground);
-                }
-            }
-            let colors = [
-                Color::Red,
-                Color::Green,
-                Color::Blue,
-                Color::Yellow,
-                Color::Cyan,
-            ];
-            let bar_width = area.width / colors.len() as u16;
-            for (i, &color) in colors.iter().enumerate() {
-                let bx = area.x + i as u16 * bar_width;
-                // Bar height proportional to index
-                let bar_h =
-                    ((i + 1) as u16 * (area.height.saturating_sub(1))) / colors.len() as u16;
-                let top = area.y + area.height - bar_h;
-                for y in top..area.y + area.height {
-                    for x in bx..bx + bar_width {
-                        if x < area.x + area.width {
-                            buf[(x, y)].set_char('█').set_fg(color);
-                        }
-                    }
-                }
-            }
+        .panel(1, 0, move |area: Rect, buf: &mut Buffer| {
+            (&bar_chart).render(area, buf);
         })
-        // Bottom-right: sine wave drawn with characters
-        .panel(1, 1, |area: Rect, buf: &mut Buffer| {
-            let theme = Theme::get_default();
-            let title = "Panel 4: Sine";
-            let start = area.x + area.width.saturating_sub(title.len() as u16) / 2;
-            for (i, ch) in title.chars().enumerate() {
-                let x = start + i as u16;
-                if x < area.x + area.width {
-                    buf[(x, area.y)].set_char(ch).set_fg(theme.foreground);
-                }
-            }
-            let h = area.height.saturating_sub(1) as f64;
-            let mid = area.y + 1 + area.height.saturating_sub(2) / 2;
-            for x in area.x..area.x + area.width {
-                let t = (x - area.x) as f64 / area.width.max(1) as f64 * 4.0 * std::f64::consts::PI;
-                let sy = mid as f64 - t.sin() * (h / 2.0 - 1.0);
-                let yi = sy.round() as u16;
-                if yi > area.y && yi < area.y + area.height {
-                    buf[(x, yi)].set_char('●').set_fg(Color::Cyan);
-                }
-            }
+        .panel(1, 1, move |area: Rect, buf: &mut Buffer| {
+            (&line_plot).render(area, buf);
         });
 
     loop {

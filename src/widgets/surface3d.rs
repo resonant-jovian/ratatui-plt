@@ -127,7 +127,7 @@ impl Surface3D {
         let z_range = if vmax == vmin { 1.0 } else { vmax - vmin };
 
         // Project all grid points
-        let mut projected: Vec<(f64, f64, f64, f64, f64, f64, f64)> = Vec::new(); // (sx, sy, depth, value, nx, ny, nz)
+        let mut projected: Vec<(f64, f64, f64, f64)> = Vec::new(); // (sx, sy, depth, value)
         for j in 0..nrows {
             for i in 0..ncols {
                 let nx = if x_range > 0.0 {
@@ -147,7 +147,7 @@ impl Surface3D {
                 };
 
                 let (sx, sy, depth) = camera.project(nx, ny, nz * 0.8);
-                projected.push((sx, sy, depth, self.data.values[j][i], nx, ny, nz));
+                projected.push((sx, sy, depth, self.data.values[j][i]));
             }
         }
 
@@ -156,7 +156,7 @@ impl Surface3D {
         let mut sx_max = f64::NEG_INFINITY;
         let mut sy_min = f64::INFINITY;
         let mut sy_max = f64::NEG_INFINITY;
-        for &(sx, sy, _, _, _, _, _) in &projected {
+        for &(sx, sy, _, _) in &projected {
             sx_min = sx_min.min(sx);
             sx_max = sx_max.max(sx);
             sy_min = sy_min.min(sy);
@@ -194,35 +194,7 @@ impl Surface3D {
                 (projected[idx00].3 + projected[idx10].3 + projected[idx01].3 + projected[idx11].3)
                     / 4.0;
             let t = self.norm.normalize(avg_val);
-
-            // Lambertian shading: compute face normal from normalized 3D coords
-            let (_, _, _, _, nx00, ny00, nz00) = projected[idx00];
-            let (_, _, _, _, nx10, ny10, nz10) = projected[idx10];
-            let (_, _, _, _, nx01, ny01, nz01) = projected[idx01];
-
-            // Two edge vectors
-            let e1 = (nx10 - nx00, ny10 - ny00, nz10 - nz00);
-            let e2 = (nx01 - nx00, ny01 - ny00, nz01 - nz00);
-
-            // Cross product for face normal
-            let normal = (
-                e1.1 * e2.2 - e1.2 * e2.1,
-                e1.2 * e2.0 - e1.0 * e2.2,
-                e1.0 * e2.1 - e1.1 * e2.0,
-            );
-            let len = (normal.0 * normal.0 + normal.1 * normal.1 + normal.2 * normal.2).sqrt();
-            let normal = if len > 1e-10 {
-                (normal.0 / len, normal.1 / len, normal.2 / len)
-            } else {
-                (0.0, 0.0, 1.0)
-            };
-
-            // Light direction (normalized (0.3, -0.5, 0.8))
-            let light = (0.302, -0.503, 0.809);
-            let dot = (normal.0 * light.0 + normal.1 * light.1 + normal.2 * light.2).abs();
-            let shade = dot.clamp(0.4, 1.0);
-
-            let color = crate::colormap::scale_color(self.colormap.color_at(t), shade);
+            let color = self.colormap.color_at(t);
 
             // Quad corners in screen space: order as a proper quad (not Z-order)
             // v00--v10

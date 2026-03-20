@@ -523,10 +523,7 @@ fn draw_line(
     let mut step = 0u32;
 
     loop {
-        // Compute step direction for local character selection
         let e2 = 2 * err;
-        let stepped_x = e2 >= dy;
-        let stepped_y = e2 <= dx;
 
         let draw = match pattern {
             DashPattern::Solid => true,
@@ -542,25 +539,18 @@ fn draw_line(
             let px = ix0 as u16;
             let py = iy0 as u16;
             if px >= clip.x_min && px < clip.x_max && py >= clip.y_min && py < clip.y_max {
-                let ch = match (stepped_x, stepped_y) {
-                    (true, false) => '─',
-                    (false, true) => '│',
-                    (true, true) if (sx > 0) == (sy > 0) => '╲',
-                    (true, true) => '╱',
-                    _ => '·',
-                };
-                buf[(px, py)].set_char(ch).set_fg(color);
+                buf[(px, py)].set_char('·').set_fg(color);
             }
         }
 
         if ix0 == ix1 && iy0 == iy1 {
             break;
         }
-        if stepped_x {
+        if e2 >= dy {
             err += dy;
             ix0 += sx;
         }
-        if stepped_y {
+        if e2 <= dx {
             err += dx;
             iy0 += sy;
         }

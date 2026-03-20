@@ -53,8 +53,8 @@ impl Theme {
         Self {
             background: Color::Reset,
             foreground: Color::White,
-            grid_color: Color::DarkGray,
-            axis_color: Color::DarkGray,
+            grid_color: Color::Rgb(60, 60, 60),
+            axis_color: Color::Gray,
             color_cycle: ColorCycle::default(),
             grid_visible: true,
             grid_pattern: DashPattern::Dotted,
@@ -114,7 +114,7 @@ impl Theme {
         Self {
             background: Color::Rgb(0, 43, 54),
             foreground: Color::Rgb(131, 148, 150),
-            grid_color: Color::Rgb(7, 54, 66),
+            grid_color: Color::Rgb(30, 70, 80),
             axis_color: Color::Rgb(88, 110, 117),
             color_cycle: ColorCycle::new(vec![
                 Color::Rgb(38, 139, 210),  // blue

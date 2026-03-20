@@ -27,7 +27,7 @@ pub use crate::ticker::{
     LogLocator, MaxNLocator, MultipleLocator, ScalarFormatter, SiFormatter, TickFormatter,
     TickLocator,
 };
-pub use crate::transform::{Camera3D, Camera3DState};
+pub use crate::transform::{Camera3D, Camera3DState, square_area};
 
 // 2D Plot Widgets
 pub use crate::widgets::bar_chart::BarChart;

@@ -234,38 +234,6 @@ impl Widget for &BarChart {
                             }
                         }
 
-                        // Bar outline
-                        if val > 0.0 {
-                            let bw = bar_width.max(1);
-                            if bar_top >= py && bar_top < py + ph {
-                                for x in bar_x..bar_x + bw {
-                                    if x >= px && x < px + pw {
-                                        buf[(x, bar_top)]
-                                            .set_char('─')
-                                            .set_fg(self.theme.axis_color);
-                                    }
-                                }
-                            }
-                            if bar_x >= px && bar_x < px + pw {
-                                for y in bar_top..py + ph {
-                                    if y >= py && y < py + ph {
-                                        buf[(bar_x, y)]
-                                            .set_char('│')
-                                            .set_fg(self.theme.axis_color);
-                                    }
-                                }
-                            }
-                            let bar_right_x = bar_x + bw;
-                            if bar_right_x >= px && bar_right_x < px + pw {
-                                for y in bar_top..py + ph {
-                                    if y >= py && y < py + ph {
-                                        buf[(bar_right_x, y)]
-                                            .set_char('│')
-                                            .set_fg(self.theme.axis_color);
-                                    }
-                                }
-                            }
-                        }
                     }
                 }
                 BarMode::Stacked => {
@@ -295,16 +263,6 @@ impl Widget for &BarChart {
                             }
                         }
 
-                        // Segment outline
-                        if val > 0.0 && y_top >= py && y_top < py + ph {
-                            for x in bar_x..bar_x + bar_width {
-                                if x >= px && x < px + pw {
-                                    buf[(x, y_top)]
-                                        .set_char('─')
-                                        .set_fg(self.theme.axis_color);
-                                }
-                            }
-                        }
                         bottom += val;
                     }
                 }

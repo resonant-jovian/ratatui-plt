@@ -32,20 +32,21 @@ fn main() -> color_eyre::Result<()> {
     let mut terminal = Terminal::new(CrosstermBackend::new(io::stdout()))?;
 
     // Generate sin(sqrt(x^2 + y^2)) surface data
-    let data = GridData::from_fn((-6.0, 6.0), (-6.0, 6.0), 60, 60, |x, y| {
+    let data = GridData::from_fn((-6.0, 6.0), (-6.0, 6.0), 120, 120, |x, y| {
         let r = (x * x + y * y).sqrt();
         r.sin()
     });
 
     let surface = Surface3D::new(data)
         .colormap(Plasma)
+        .show_wireframe(false)
         .title("sin(sqrt(x^2 + y^2)) - Arrow keys: rotate, +/-: zoom, q: quit");
 
     let mut camera_state = Camera3DState::default();
 
     loop {
         terminal.draw(|frame| {
-            let area = frame.area();
+            let area = square_area(frame.area());
             frame.render_stateful_widget(&surface, area, &mut camera_state);
         })?;
 

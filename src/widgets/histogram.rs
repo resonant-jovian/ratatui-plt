@@ -274,23 +274,6 @@ impl Widget for &Histogram {
                 }
             }
 
-            // Bar outline
-            if heights[i] > 0.0 {
-                if y_top >= py && y_top < py + ph {
-                    for x in x_start..x_end {
-                        if x >= px && x < px + pw {
-                            buf[(x, y_top)].set_char('─').set_fg(self.theme.axis_color);
-                        }
-                    }
-                }
-                if x_start >= px && x_start < px + pw {
-                    for y in y_top..py + ph {
-                        if y >= py && y < py + ph {
-                            buf[(x_start, y)].set_char('│').set_fg(self.theme.axis_color);
-                        }
-                    }
-                }
-            }
         }
 
         // Draw tick labels

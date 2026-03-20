@@ -32,15 +32,22 @@ Raw data → `Series`/`GridData`/`VectorFieldData` → Widget (builder pattern) 
 - **axis.rs** — `Axis` config, `Scale` enum (Linear/Log/SymLog/Power), `AspectRatio`, `Bounds`. `TERMINAL_CELL_ASPECT` (~0.5) compensates for ~2:1 terminal cell geometry.
 - **norm.rs** — `Normalize` trait maps values to [0,1] for color mapping. Implementations: Linear, Log, SymLog, Power, Boundary, TwoSlope. Uses `box_clone()` for cloneable trait objects.
 - **colormap.rs** — `Colormap` trait maps [0,1] → ratatui `Color`. 18 built-in colormaps. `ListedColormap` for custom color stops.
-- **ticker.rs** — `TickLocator` trait (MaxNLocator, LogLocator, MultipleLocator, FixedLocator) and `TickFormatter` trait (ScalarFormatter, LogFormatter, SiFormatter, FuncFormatter).
+- **ticker.rs** — `TickLocator` trait (MaxNLocator, LogLocator, MultipleLocator, FixedLocator, CategoricalLocator) and `TickFormatter` trait (ScalarFormatter, LogFormatter, SiFormatter, FuncFormatter, CategoricalFormatter).
 - **transform.rs** — 3D camera system: `Camera3D` (immutable config) and `Camera3DState` (mutable, for interactive use). `data_to_screen()`, `depth_sort()` (painter's algorithm).
 - **mathtext.rs** — Unicode-based math rendering: Greek letters (`\alpha`→α), superscripts (`x^2`→x²), subscripts (`x_0`→x₀), `scientific_notation()`.
 - **theme.rs** — `Theme` struct with presets (dark, light, minimal, publication, solarized). Thread-local global default.
 - **style.rs** — `LineStyle`, `MarkerShape`, `FillStyle`, `PlotStyle`.
+- **annotation.rs** — `Annotation`, `ArrowStyle` for text annotations with arrows.
+- **legend.rs** — `Legend`, `LegendEntry`, `LegendPosition`.
+- **spines.rs** — `Spines` for axis border visibility control.
+- **color_cycle.rs** — `ColorCycle` for automatic color assignment (tab10 palette).
+- **animation.rs** — `AnimationConfig`, `run_animation()` (async feature).
+- **async_data.rs** — `AsyncSeries`, `AsyncGrid`, async data streaming (async feature).
+- **compute.rs** — Background KDE/histogram computation (async feature).
 
 ### Widgets (src/widgets/)
 
-28 widget files. Key ones: `line_plot`, `scatter_plot`, `heatmap`, `histogram`, `bar_chart`, `contour`, `surface3d`, `wireframe3d`, `scatter3d`, `multi_panel`, `radial`, `twin_axes`.
+23 widget files. Key ones: `line_plot`, `scatter_plot`, `heatmap`, `histogram`, `bar_chart`, `contour`, `surface3d`, `wireframe3d`, `scatter3d`, `multi_panel`, `radial`, `twin_axes`, `pie_chart`, `stacked_area`, `event_plot`, `hist2d`, `violin_plot`, `streamplot`.
 
 ### Key conventions
 

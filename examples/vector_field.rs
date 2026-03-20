@@ -44,8 +44,7 @@ fn main() -> color_eyre::Result<()> {
 
     loop {
         terminal.draw(|frame| {
-            let area = frame.area();
-            frame.render_widget(&plot, area);
+            frame.render_widget(&plot, square_area(frame.area()));
         })?;
 
         if let Event::Key(key) = event::read()?
