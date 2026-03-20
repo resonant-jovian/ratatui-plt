@@ -2,6 +2,10 @@
 
 **Scientific visualization widgets for [ratatui](https://ratatui.rs/) — matplotlib for the terminal.**
 
+[![Crates.io](https://img.shields.io/crates/v/ratatui-plt.svg)](https://crates.io/crates/ratatui-plt)
+[![docs.rs](https://docs.rs/ratatui-plt/badge.svg)](https://docs.rs/ratatui-plt)
+[![License: GPL-3.0](https://img.shields.io/badge/License-GPL--3.0-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)
+
 `ratatui-plt` provides a comprehensive suite of configurable plot widgets, colormaps, axis systems, and layout tools designed for scientific computing and simulation monitoring. Built primarily for astrophysical applications (Vlasov-Poisson solvers, phase-space analysis), it works anywhere you need terminal-based scientific plots.
 
 > **Note:** This library has not yet reached version 0.1.0. The API is unstable, features may be incomplete or change without notice, and it is not yet intended for general use.
