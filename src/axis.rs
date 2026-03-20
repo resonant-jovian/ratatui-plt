@@ -162,6 +162,23 @@ pub struct Axis {
     pub grid: bool,
     /// Whether the axis is visible.
     pub visible: bool,
+    /// Whether the axis direction is inverted (max at start, min at end).
+    pub inverted: bool,
+    /// Minor grid configuration.
+    pub minor_grid: bool,
+    /// Number of minor ticks between major ticks.
+    pub minor_tick_count: usize,
+}
+
+/// Configuration for major/minor grid lines.
+#[derive(Clone, Debug)]
+pub struct GridConfig {
+    /// Show major grid lines.
+    pub major: bool,
+    /// Show minor grid lines.
+    pub minor: bool,
+    /// Number of minor divisions between major ticks.
+    pub minor_count: usize,
 }
 
 impl std::fmt::Debug for Axis {
@@ -186,6 +203,9 @@ impl Default for Axis {
             formatter: Box::new(ScalarFormatter),
             grid: false,
             visible: true,
+            inverted: false,
+            minor_grid: false,
+            minor_tick_count: 4,
         }
     }
 }
@@ -244,9 +264,28 @@ impl Axis {
         self
     }
 
+    /// Invert the axis direction.
+    pub fn inverted(mut self, inverted: bool) -> Self {
+        self.inverted = inverted;
+        self
+    }
+
+    /// Enable or disable minor grid lines.
+    pub fn minor_grid(mut self, show: bool) -> Self {
+        self.minor_grid = show;
+        self
+    }
+
+    /// Set the number of minor tick subdivisions between major ticks.
+    pub fn minor_tick_count(mut self, count: usize) -> Self {
+        self.minor_tick_count = count;
+        self
+    }
+
     /// Resolve bounds: if Auto, use the provided data range with padding.
+    /// If inverted, swaps min and max.
     pub fn resolve_bounds(&self, data_min: f64, data_max: f64) -> (f64, f64) {
-        match &self.bounds {
+        let (lo, hi) = match &self.bounds {
             Bounds::Manual(min, max) => (*min, *max),
             Bounds::Auto => {
                 if data_min == data_max {
@@ -256,12 +295,34 @@ impl Axis {
                     (data_min - padding, data_max + padding)
                 }
             }
-        }
+        };
+        if self.inverted { (hi, lo) } else { (lo, hi) }
     }
 
     /// Compute tick positions for the given resolved bounds.
     pub fn tick_positions(&self, vmin: f64, vmax: f64) -> Vec<f64> {
-        self.locator.tick_values(vmin, vmax)
+        let (lo, hi) = if vmin < vmax { (vmin, vmax) } else { (vmax, vmin) };
+        self.locator.tick_values(lo, hi)
+    }
+
+    /// Compute minor tick positions between major ticks.
+    pub fn minor_tick_positions(&self, vmin: f64, vmax: f64) -> Vec<f64> {
+        let major = self.tick_positions(vmin, vmax);
+        if major.len() < 2 || self.minor_tick_count == 0 {
+            return Vec::new();
+        }
+        let mut minor = Vec::new();
+        for i in 0..major.len() - 1 {
+            let step = (major[i + 1] - major[i]) / (self.minor_tick_count + 1) as f64;
+            for j in 1..=self.minor_tick_count {
+                let v = major[i] + step * j as f64;
+                let (lo, hi) = if vmin < vmax { (vmin, vmax) } else { (vmax, vmin) };
+                if v > lo && v < hi {
+                    minor.push(v);
+                }
+            }
+        }
+        minor
     }
 
     /// Format a tick value.

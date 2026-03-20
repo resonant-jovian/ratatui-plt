@@ -232,11 +232,15 @@ impl Widget for &ScatterPlot {
             }
         }
 
-        // Draw scatter points
+        // Draw scatter points (skip NaN)
         let mut global_point_idx = 0usize;
         for s in &self.series {
             let marker = s.marker.unwrap_or(MarkerShape::Dot);
             for &(x, y) in &s.data {
+                if !x.is_finite() || !y.is_finite() {
+                    global_point_idx += 1;
+                    continue;
+                }
                 let sx = data_to_screen(x, x_lo, x_hi, px as f64, (px + aw - 1) as f64);
                 let sy = data_to_screen(y, y_lo, y_hi, (py + ah - 1) as f64, py as f64);
                 let xi = sx.round() as u16;

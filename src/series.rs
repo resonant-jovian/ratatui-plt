@@ -107,7 +107,7 @@ impl Series {
         self
     }
 
-    /// Compute the x-range of the data.
+    /// Compute the x-range of the data, skipping NaN values.
     pub fn x_bounds(&self) -> Option<(f64, f64)> {
         if self.data.is_empty() {
             return None;
@@ -115,6 +115,9 @@ impl Series {
         let mut min = f64::INFINITY;
         let mut max = f64::NEG_INFINITY;
         for &(x, _) in &self.data {
+            if !x.is_finite() {
+                continue;
+            }
             if x < min {
                 min = x;
             }
@@ -122,10 +125,10 @@ impl Series {
                 max = x;
             }
         }
-        Some((min, max))
+        if min.is_infinite() { None } else { Some((min, max)) }
     }
 
-    /// Compute the y-range of the data (including error bars if present).
+    /// Compute the y-range of the data (including error bars if present), skipping NaN values.
     pub fn y_bounds(&self) -> Option<(f64, f64)> {
         if self.data.is_empty() {
             return None;
@@ -133,6 +136,9 @@ impl Series {
         let mut min = f64::INFINITY;
         let mut max = f64::NEG_INFINITY;
         for (i, &(_, y)) in self.data.iter().enumerate() {
+            if !y.is_finite() {
+                continue;
+            }
             let lo = y - self.y_err_low.as_ref().map_or(0.0, |e| e[i]);
             let hi = y + self.y_err_high.as_ref().map_or(0.0, |e| e[i]);
             if lo < min {
@@ -142,8 +148,27 @@ impl Series {
                 max = hi;
             }
         }
-        Some((min, max))
+        if min.is_infinite() { None } else { Some((min, max)) }
     }
+
+    /// Return a filtered copy with NaN data points removed.
+    pub fn filter_nan(&self) -> Self {
+        let mut filtered = self.clone();
+        let valid: Vec<bool> = self.data.iter().map(|(x, y)| x.is_finite() && y.is_finite()).collect();
+        filtered.data = self.data.iter().zip(&valid).filter(|(_, &v)| v).map(|(d, _)| *d).collect();
+        if let Some(ref err) = self.y_err_low {
+            filtered.y_err_low = Some(err.iter().zip(&valid).filter(|(_, &v)| v).map(|(e, _)| *e).collect());
+        }
+        if let Some(ref err) = self.y_err_high {
+            filtered.y_err_high = Some(err.iter().zip(&valid).filter(|(_, &v)| v).map(|(e, _)| *e).collect());
+        }
+        filtered
+    }
+}
+
+/// Check if a data point has valid (non-NaN, finite) coordinates.
+pub fn is_valid_point(x: f64, y: f64) -> bool {
+    x.is_finite() && y.is_finite()
 }
 
 /// A 3D data series for surface, wireframe, and scatter3d widgets.

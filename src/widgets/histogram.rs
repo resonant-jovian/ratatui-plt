@@ -105,11 +105,11 @@ impl Histogram {
         self
     }
 
-    /// Compute bin edges and heights.
+    /// Compute bin edges and heights. NaN values are filtered out.
     fn compute_bins(&self) -> (Vec<f64>, Vec<f64>) {
         let (lo, hi) = self.range.unwrap_or_else(|| {
-            let min = self.data.iter().cloned().fold(f64::INFINITY, f64::min);
-            let max = self.data.iter().cloned().fold(f64::NEG_INFINITY, f64::max);
+            let min = self.data.iter().filter(|v| v.is_finite()).cloned().fold(f64::INFINITY, f64::min);
+            let max = self.data.iter().filter(|v| v.is_finite()).cloned().fold(f64::NEG_INFINITY, f64::max);
             if min == max {
                 (min - 1.0, max + 1.0)
             } else {
@@ -124,6 +124,9 @@ impl Histogram {
         let mut counts = vec![0.0f64; self.bins];
 
         for &v in &self.data {
+            if !v.is_finite() {
+                continue;
+            }
             if v >= lo && v <= hi {
                 let idx = ((v - lo) / bin_width).floor() as usize;
                 let idx = idx.min(self.bins - 1);

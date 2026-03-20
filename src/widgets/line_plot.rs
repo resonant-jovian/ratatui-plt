@@ -22,7 +22,7 @@ use ratatui::widgets::Widget;
 use crate::annotation::Annotation;
 use crate::axis::{AspectRatio, Axis};
 use crate::legend::{Legend, LegendPosition};
-use crate::series::Series;
+use crate::series::{is_valid_point, Series};
 use crate::style::DashPattern;
 use crate::transform::{apply_aspect_ratio, data_to_screen};
 
@@ -369,10 +369,15 @@ impl Widget for &LinePlot {
                 continue;
             }
 
-            // Draw lines between consecutive points
+            // Draw lines between consecutive points, breaking at NaN
             for i in 0..s.data.len() - 1 {
                 let (x0, y0) = s.data[i];
                 let (x1, y1) = s.data[i + 1];
+
+                // Skip line segments where either endpoint is NaN/infinite
+                if !is_valid_point(x0, y0) || !is_valid_point(x1, y1) {
+                    continue;
+                }
 
                 let sx0 = data_to_screen(x0, x_min, x_max, px as f64, (px + aw - 1) as f64);
                 let sy0 = data_to_screen(y0, y_min, y_max, (py + ah - 1) as f64, py as f64);
@@ -391,9 +396,12 @@ impl Widget for &LinePlot {
                 );
             }
 
-            // Draw markers
+            // Draw markers (skip NaN points)
             if let Some(marker) = s.marker {
                 for &(x, y) in &s.data {
+                    if !is_valid_point(x, y) {
+                        continue;
+                    }
                     let sx = data_to_screen(x, x_min, x_max, px as f64, (px + aw - 1) as f64);
                     let sy = data_to_screen(y, y_min, y_max, (py + ah - 1) as f64, py as f64);
                     let xi = sx.round() as u16;

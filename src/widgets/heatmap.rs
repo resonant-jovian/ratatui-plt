@@ -38,6 +38,8 @@ pub struct Heatmap {
     show_colorbar: bool,
     aspect_ratio: AspectRatio,
     show_values: bool,
+    /// Color used for NaN/invalid cells.
+    bad_color: Color,
 }
 
 impl Heatmap {
@@ -54,6 +56,7 @@ impl Heatmap {
             show_colorbar: true,
             aspect_ratio: AspectRatio::Auto,
             show_values: false,
+            bad_color: Color::DarkGray,
         }
     }
 
@@ -102,6 +105,12 @@ impl Heatmap {
     /// Show values in cells (only useful for small grids).
     pub fn show_values(mut self, show: bool) -> Self {
         self.show_values = show;
+        self
+    }
+
+    /// Set the color used for NaN/invalid cells.
+    pub fn bad_color(mut self, color: Color) -> Self {
+        self.bad_color = color;
         self
     }
 }
@@ -178,16 +187,24 @@ impl Widget for &Heatmap {
                 let top_data_row = ((1.0 - top_row_f) * nrows as f64).min((nrows - 1) as f64) as usize;
                 let top_data_col = (cx as f64 / aw as f64 * ncols as f64).min((ncols - 1) as f64) as usize;
                 let top_val = self.data.values[top_data_row][top_data_col];
-                let top_t = self.norm.normalize(top_val);
-                let top_color = self.colormap.color_at(top_t);
+                let top_color = if top_val.is_finite() {
+                    let top_t = self.norm.normalize(top_val);
+                    self.colormap.color_at(top_t)
+                } else {
+                    self.bad_color
+                };
 
                 // Bottom half-pixel
                 let bot_row_f = (cy as usize * 2 + 1) as f64 / effective_height as f64;
                 let bot_data_row = ((1.0 - bot_row_f) * nrows as f64).min((nrows - 1) as f64) as usize;
                 let bot_data_col = top_data_col;
                 let bot_val = self.data.values[bot_data_row][bot_data_col];
-                let bot_t = self.norm.normalize(bot_val);
-                let bot_color = self.colormap.color_at(bot_t);
+                let bot_color = if bot_val.is_finite() {
+                    let bot_t = self.norm.normalize(bot_val);
+                    self.colormap.color_at(bot_t)
+                } else {
+                    self.bad_color
+                };
 
                 // Use ▀ (upper half block): fg = top color, bg = bottom color
                 buf[(screen_x, screen_y)]

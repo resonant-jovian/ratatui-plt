@@ -284,6 +284,52 @@ impl TickFormatter for FuncFormatter {
     }
 }
 
+/// Locator for categorical axes: places ticks at integer positions 0, 1, 2, ...
+#[derive(Clone, Debug)]
+pub struct CategoricalLocator {
+    /// Category labels.
+    pub categories: Vec<String>,
+}
+
+impl CategoricalLocator {
+    pub fn new(categories: Vec<String>) -> Self {
+        Self { categories }
+    }
+}
+
+impl TickLocator for CategoricalLocator {
+    fn tick_values(&self, _vmin: f64, _vmax: f64) -> Vec<f64> {
+        (0..self.categories.len()).map(|i| i as f64).collect()
+    }
+
+    fn box_clone(&self) -> Box<dyn TickLocator> {
+        Box::new(self.clone())
+    }
+}
+
+/// Formatter for categorical axes: maps integer positions to category labels.
+#[derive(Clone, Debug)]
+pub struct CategoricalFormatter {
+    pub categories: Vec<String>,
+}
+
+impl CategoricalFormatter {
+    pub fn new(categories: Vec<String>) -> Self {
+        Self { categories }
+    }
+}
+
+impl TickFormatter for CategoricalFormatter {
+    fn format(&self, value: f64) -> String {
+        let idx = value.round() as usize;
+        self.categories.get(idx).cloned().unwrap_or_else(|| format!("{}", idx))
+    }
+
+    fn box_clone(&self) -> Box<dyn TickFormatter> {
+        Box::new(self.clone())
+    }
+}
+
 /// SI prefix formatter: k, M, G, T, m, µ, n, etc.
 #[derive(Clone, Debug)]
 pub struct SiFormatter;

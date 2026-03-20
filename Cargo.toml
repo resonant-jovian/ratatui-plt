@@ -8,10 +8,30 @@ repository = "https://github.com/resonant-jovian/ratatui-sim"
 keywords = ["ratatui", "tui", "plotting", "scientific", "visualization"]
 categories = ["command-line-interface", "visualization", "science"]
 
+[features]
+default = []
+async = ["dep:tokio"]
+chrono = ["dep:chrono"]
+serde = ["dep:serde"]
+
 [dependencies]
 ratatui = "0.30"
 palette = "0.7"
 ordered-float = "5"
+
+[dependencies.tokio]
+version = "1"
+features = ["sync", "time", "rt"]
+optional = true
+
+[dependencies.chrono]
+version = "0.4"
+optional = true
+
+[dependencies.serde]
+version = "1"
+features = ["derive"]
+optional = true
 
 [dev-dependencies]
 crossterm = "0.29"

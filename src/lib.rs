@@ -42,6 +42,7 @@
 
 pub mod annotation;
 pub mod axis;
+pub mod color_cycle;
 pub mod colormap;
 pub mod legend;
 pub mod macros;
@@ -49,7 +50,16 @@ pub mod mathtext;
 pub mod norm;
 pub mod prelude;
 pub mod series;
+pub mod spines;
 pub mod style;
+pub mod theme;
 pub mod ticker;
 pub mod transform;
 pub mod widgets;
+
+#[cfg(feature = "async")]
+pub mod async_data;
+#[cfg(feature = "async")]
+pub mod animation;
+#[cfg(feature = "async")]
+pub mod compute;

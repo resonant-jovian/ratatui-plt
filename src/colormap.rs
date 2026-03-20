@@ -378,6 +378,158 @@ impl Colormap for ListedColormap {
     }
 }
 
+/// A reversed version of any colormap.
+///
+/// Wraps an existing colormap and reverses the direction: `color_at(t)` returns
+/// the wrapped colormap's `color_at(1.0 - t)`.
+///
+/// # Example
+///
+/// ```
+/// use ratatui_sim::colormap::{Colormap, Viridis, Reversed};
+///
+/// let cmap = Reversed::new(Viridis);
+/// // cmap.color_at(0.0) == Viridis.color_at(1.0)
+/// ```
+#[derive(Clone, Debug)]
+pub struct Reversed<C: Colormap> {
+    inner: C,
+}
+
+impl<C: Colormap> Reversed<C> {
+    /// Create a reversed version of the given colormap.
+    pub fn new(inner: C) -> Self {
+        Self { inner }
+    }
+}
+
+impl<C: Colormap> Colormap for Reversed<C> {
+    fn color_at(&self, t: f64) -> Color {
+        self.inner.color_at(1.0 - t.clamp(0.0, 1.0))
+    }
+
+    fn name(&self) -> &str {
+        // Not ideal but avoids allocation in a trait method
+        self.inner.name()
+    }
+}
+
+// -- Additional sequential colormaps --
+
+/// Spring: magenta → yellow.
+#[derive(Clone, Debug)]
+pub struct Spring;
+
+impl Colormap for Spring {
+    fn color_at(&self, t: f64) -> Color {
+        let t = t.clamp(0.0, 1.0);
+        let r = 255;
+        let g = (t * 255.0).round() as u8;
+        let b = (255.0 - t * 255.0).round() as u8;
+        Color::Rgb(r, g, b)
+    }
+    fn name(&self) -> &str { "spring" }
+}
+
+/// Summer: green → yellow.
+#[derive(Clone, Debug)]
+pub struct Summer;
+
+impl Colormap for Summer {
+    fn color_at(&self, t: f64) -> Color {
+        let t = t.clamp(0.0, 1.0);
+        let r = (t * 255.0).round() as u8;
+        let g = (128.0 + t * 127.0).round() as u8;
+        let b = 102;
+        Color::Rgb(r, g, b)
+    }
+    fn name(&self) -> &str { "summer" }
+}
+
+/// Autumn: red → yellow.
+#[derive(Clone, Debug)]
+pub struct Autumn;
+
+impl Colormap for Autumn {
+    fn color_at(&self, t: f64) -> Color {
+        let t = t.clamp(0.0, 1.0);
+        let r = 255;
+        let g = (t * 255.0).round() as u8;
+        let b = 0;
+        Color::Rgb(r, g, b)
+    }
+    fn name(&self) -> &str { "autumn" }
+}
+
+/// Winter: blue → green.
+#[derive(Clone, Debug)]
+pub struct Winter;
+
+impl Colormap for Winter {
+    fn color_at(&self, t: f64) -> Color {
+        let t = t.clamp(0.0, 1.0);
+        let r = 0;
+        let g = (t * 255.0).round() as u8;
+        let b = (255.0 - t * 127.0).round() as u8;
+        Color::Rgb(r, g, b)
+    }
+    fn name(&self) -> &str { "winter" }
+}
+
+/// Twilight: cyclic colormap suitable for phase/angle data.
+#[derive(Clone, Debug)]
+pub struct Twilight;
+
+impl Colormap for Twilight {
+    fn color_at(&self, t: f64) -> Color {
+        lerp_color_stops(t, &[
+            (0.0, (226, 217, 226)),
+            (0.15, (166, 133, 193)),
+            (0.3, (81, 71, 153)),
+            (0.5, (18, 36, 61)),
+            (0.7, (69, 99, 68)),
+            (0.85, (171, 173, 117)),
+            (1.0, (226, 217, 226)),
+        ])
+    }
+    fn name(&self) -> &str { "twilight" }
+}
+
+/// HSV: cyclic hue-saturation-value rainbow.
+#[derive(Clone, Debug)]
+pub struct Hsv;
+
+impl Colormap for Hsv {
+    fn color_at(&self, t: f64) -> Color {
+        let t = t.clamp(0.0, 1.0);
+        let h = t * 360.0;
+        let s = 1.0_f64;
+        let v = 1.0_f64;
+        let c = v * s;
+        let x = c * (1.0 - ((h / 60.0) % 2.0 - 1.0).abs());
+        let m = v - c;
+        let (r1, g1, b1) = if h < 60.0 {
+            (c, x, 0.0)
+        } else if h < 120.0 {
+            (x, c, 0.0)
+        } else if h < 180.0 {
+            (0.0, c, x)
+        } else if h < 240.0 {
+            (0.0, x, c)
+        } else if h < 300.0 {
+            (x, 0.0, c)
+        } else {
+            (c, 0.0, x)
+        };
+        Color::Rgb(
+            ((r1 + m) * 255.0).round() as u8,
+            ((g1 + m) * 255.0).round() as u8,
+            ((b1 + m) * 255.0).round() as u8,
+        )
+    }
+    fn name(&self) -> &str { "hsv" }
+}
+
 /// Linearly interpolate between two Colors.
 fn lerp_colors(c0: Color, c1: Color, t: f64) -> Color {
     let (r0, g0, b0) = color_to_rgb(c0);
