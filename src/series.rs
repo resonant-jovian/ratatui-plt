@@ -12,7 +12,7 @@ use crate::style::{LineStyle, MarkerShape};
 /// # Example
 ///
 /// ```
-/// use ratatui_sim::series::Series;
+/// use ratatui_plt::series::Series;
 /// use ratatui::style::Color;
 ///
 /// let s = Series::new("Temperature")
@@ -125,7 +125,11 @@ impl Series {
                 max = x;
             }
         }
-        if min.is_infinite() { None } else { Some((min, max)) }
+        if min.is_infinite() {
+            None
+        } else {
+            Some((min, max))
+        }
     }
 
     /// Compute the y-range of the data (including error bars if present), skipping NaN values.
@@ -148,19 +152,45 @@ impl Series {
                 max = hi;
             }
         }
-        if min.is_infinite() { None } else { Some((min, max)) }
+        if min.is_infinite() {
+            None
+        } else {
+            Some((min, max))
+        }
     }
 
     /// Return a filtered copy with NaN data points removed.
     pub fn filter_nan(&self) -> Self {
         let mut filtered = self.clone();
-        let valid: Vec<bool> = self.data.iter().map(|(x, y)| x.is_finite() && y.is_finite()).collect();
-        filtered.data = self.data.iter().zip(&valid).filter(|(_, &v)| v).map(|(d, _)| *d).collect();
+        let valid: Vec<bool> = self
+            .data
+            .iter()
+            .map(|(x, y)| x.is_finite() && y.is_finite())
+            .collect();
+        filtered.data = self
+            .data
+            .iter()
+            .zip(&valid)
+            .filter(|(_, v)| **v)
+            .map(|(d, _)| *d)
+            .collect();
         if let Some(ref err) = self.y_err_low {
-            filtered.y_err_low = Some(err.iter().zip(&valid).filter(|(_, &v)| v).map(|(e, _)| *e).collect());
+            filtered.y_err_low = Some(
+                err.iter()
+                    .zip(&valid)
+                    .filter(|(_, v)| **v)
+                    .map(|(e, _)| *e)
+                    .collect(),
+            );
         }
         if let Some(ref err) = self.y_err_high {
-            filtered.y_err_high = Some(err.iter().zip(&valid).filter(|(_, &v)| v).map(|(e, _)| *e).collect());
+            filtered.y_err_high = Some(
+                err.iter()
+                    .zip(&valid)
+                    .filter(|(_, v)| **v)
+                    .map(|(e, _)| *e)
+                    .collect(),
+            );
         }
         filtered
     }
@@ -176,7 +206,7 @@ pub fn is_valid_point(x: f64, y: f64) -> bool {
 /// # Example
 ///
 /// ```
-/// use ratatui_sim::series::Series3D;
+/// use ratatui_plt::series::Series3D;
 ///
 /// let s = Series3D::new("Particles")
 ///     .data(vec![(1.0, 2.0, 3.0), (4.0, 5.0, 6.0)]);
@@ -230,7 +260,7 @@ impl Series3D {
 /// # Example
 ///
 /// ```
-/// use ratatui_sim::series::GridData;
+/// use ratatui_plt::series::GridData;
 ///
 /// let grid = GridData::new(
 ///     vec![0.0, 1.0, 2.0],        // x coordinates

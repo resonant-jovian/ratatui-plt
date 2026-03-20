@@ -4,12 +4,13 @@
 
 use ratatui::buffer::Buffer;
 use ratatui::layout::Rect;
-use ratatui::style::{Color, Style};
+use ratatui::style::Style;
 use ratatui::widgets::Widget;
 
 use crate::axis::Axis;
 use crate::colormap::{Colorbar, Colormap, Viridis};
 use crate::norm::{LinearNorm, Normalize};
+use crate::theme::Theme;
 use crate::transform::data_to_screen;
 
 /// A 2D histogram widget.
@@ -17,7 +18,7 @@ use crate::transform::data_to_screen;
 /// # Example
 ///
 /// ```
-/// use ratatui_sim::widgets::hist2d::Hist2D;
+/// use ratatui_plt::widgets::hist2d::Hist2D;
 ///
 /// let data: Vec<(f64, f64)> = (0..1000).map(|i| {
 ///     let x = (i as f64 * 0.01).sin();
@@ -36,6 +37,8 @@ pub struct Hist2D {
     y_axis: Axis,
     title: Option<String>,
     show_colorbar: bool,
+    /// Visual theme.
+    theme: Theme,
 }
 
 impl Hist2D {
@@ -50,6 +53,7 @@ impl Hist2D {
             y_axis: Axis::new(),
             title: None,
             show_colorbar: true,
+            theme: Theme::get_default(),
         }
     }
 
@@ -93,15 +97,29 @@ impl Hist2D {
         self
     }
 
+    /// Set the visual theme.
+    pub fn theme(mut self, theme: Theme) -> Self {
+        self.theme = theme;
+        self
+    }
+
     fn compute_bins(&self) -> (Vec<Vec<f64>>, f64, f64, f64, f64) {
         // Filter NaN
-        let valid: Vec<(f64, f64)> = self.data.iter()
+        let valid: Vec<(f64, f64)> = self
+            .data
+            .iter()
             .filter(|(x, y)| x.is_finite() && y.is_finite())
             .copied()
             .collect();
 
         if valid.is_empty() {
-            return (vec![vec![0.0; self.bins_x]; self.bins_y], 0.0, 1.0, 0.0, 1.0);
+            return (
+                vec![vec![0.0; self.bins_x]; self.bins_y],
+                0.0,
+                1.0,
+                0.0,
+                1.0,
+            );
         }
 
         let x_min = valid.iter().map(|p| p.0).fold(f64::INFINITY, f64::min);
@@ -109,8 +127,16 @@ impl Hist2D {
         let y_min = valid.iter().map(|p| p.1).fold(f64::INFINITY, f64::min);
         let y_max = valid.iter().map(|p| p.1).fold(f64::NEG_INFINITY, f64::max);
 
-        let x_range = if (x_max - x_min).abs() < 1e-15 { 1.0 } else { x_max - x_min };
-        let y_range = if (y_max - y_min).abs() < 1e-15 { 1.0 } else { y_max - y_min };
+        let x_range = if (x_max - x_min).abs() < 1e-15 {
+            1.0
+        } else {
+            x_max - x_min
+        };
+        let y_range = if (y_max - y_min).abs() < 1e-15 {
+            1.0
+        } else {
+            y_max - y_min
+        };
 
         let mut grid = vec![vec![0.0f64; self.bins_x]; self.bins_y];
 
@@ -139,7 +165,9 @@ impl Widget for &Hist2D {
 
         let px = area.x + y_label_width;
         let py = area.y + title_height;
-        let pw = area.width.saturating_sub(y_label_width + colorbar_width + 1);
+        let pw = area
+            .width
+            .saturating_sub(y_label_width + colorbar_width + 1);
         let ph = area.height.saturating_sub(title_height + tick_height);
 
         if pw < 2 || ph < 2 {
@@ -152,7 +180,7 @@ impl Widget for &Hist2D {
             for (i, ch) in title.chars().enumerate() {
                 let x = start + i as u16;
                 if x < area.x + area.width {
-                    buf[(x, area.y)].set_char(ch).set_fg(Color::White);
+                    buf[(x, area.y)].set_char(ch).set_fg(self.theme.foreground);
                 }
             }
         }
@@ -166,11 +194,43 @@ impl Widget for &Hist2D {
         }
 
         // Determine value range for normalization
-        let vmax = grid.iter().flat_map(|r| r.iter()).cloned().fold(0.0f64, f64::max);
+        let vmax = grid
+            .iter()
+            .flat_map(|r| r.iter())
+            .cloned()
+            .fold(0.0f64, f64::max);
         let norm: Box<dyn Normalize> = match &self.norm {
             Some(n) => n.box_clone(),
             None => Box::new(LinearNorm::new(0.0, vmax.max(1.0))),
         };
+
+        // Draw grid
+        let x_grid = self.x_axis.grid || self.theme.grid_visible;
+        let y_grid = self.y_axis.grid || self.theme.grid_visible;
+        if x_grid {
+            let gx_ticks = self.x_axis.tick_positions(x_min, x_max);
+            for &tv in &gx_ticks {
+                let sx = data_to_screen(tv, x_min, x_max, px as f64, (px + pw - 1) as f64);
+                let xi = sx.round() as u16;
+                if xi >= px && xi < px + pw {
+                    for y in py..py + ph {
+                        buf[(xi, y)].set_char('·').set_fg(self.theme.grid_color);
+                    }
+                }
+            }
+        }
+        if y_grid {
+            let gy_ticks = self.y_axis.tick_positions(y_min, y_max);
+            for &tv in &gy_ticks {
+                let sy = data_to_screen(tv, y_min, y_max, (py + ph - 1) as f64, py as f64);
+                let yi = sy.round() as u16;
+                if yi >= py && yi < py + ph {
+                    for x in px..px + pw {
+                        buf[(x, yi)].set_char('·').set_fg(self.theme.grid_color);
+                    }
+                }
+            }
+        }
 
         // Render using half-block characters
         let effective_height = ph as usize * 2;
@@ -185,7 +245,8 @@ impl Widget for &Hist2D {
                 // Top half
                 let top_row_f = (cy as usize * 2) as f64 / effective_height as f64;
                 let top_row = ((1.0 - top_row_f) * nrows as f64).min((nrows - 1) as f64) as usize;
-                let top_col = (cx as f64 / pw as f64 * ncols as f64).min((ncols - 1) as f64) as usize;
+                let top_col =
+                    (cx as f64 / pw as f64 * ncols as f64).min((ncols - 1) as f64) as usize;
                 let top_val = grid[top_row][top_col];
                 let top_t = norm.normalize(top_val);
                 let top_color = self.colormap.color_at(top_t);
@@ -215,7 +276,7 @@ impl Widget for &Hist2D {
                 for (j, ch) in label.chars().enumerate() {
                     let lx = start + j as u16;
                     if lx >= area.x && lx < area.x + area.width {
-                        buf[(lx, y)].set_char(ch).set_fg(Color::DarkGray);
+                        buf[(lx, y)].set_char(ch).set_fg(self.theme.axis_color);
                     }
                 }
             }
@@ -231,7 +292,7 @@ impl Widget for &Hist2D {
                 for (j, ch) in label.chars().enumerate() {
                     let lx = start + j as u16;
                     if lx >= area.x && lx < px {
-                        buf[(lx, yi)].set_char(ch).set_fg(Color::DarkGray);
+                        buf[(lx, yi)].set_char(ch).set_fg(self.theme.axis_color);
                     }
                 }
             }

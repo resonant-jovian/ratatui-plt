@@ -6,8 +6,8 @@
 //! # Example
 //!
 //! ```
-//! use ratatui_sim::prelude::*;
-//! use ratatui_sim::widgets::streamplot::StreamPlot;
+//! use ratatui_plt::prelude::*;
+//! use ratatui_plt::widgets::streamplot::StreamPlot;
 //!
 //! let field = VectorFieldData::from_fn(
 //!     (-2.0, 2.0), (-2.0, 2.0), 20, 20,
@@ -28,6 +28,7 @@ use crate::axis::Axis;
 use crate::colormap::{Colormap, Viridis};
 use crate::norm::{LinearNorm, Normalize};
 use crate::series::VectorFieldData;
+use crate::theme::Theme;
 use crate::transform::data_to_screen;
 
 /// A streamline plot widget for visualising vector fields.
@@ -54,6 +55,8 @@ pub struct StreamPlot {
     colormap: Box<dyn Colormap>,
     /// Arrow rendering scale (controls visual weight of arrow heads).
     arrow_scale: f64,
+    /// Visual theme.
+    theme: Theme,
 }
 
 impl StreamPlot {
@@ -69,6 +72,7 @@ impl StreamPlot {
             color_by_magnitude: false,
             colormap: Box::new(Viridis),
             arrow_scale: 1.0,
+            theme: Theme::get_default(),
         }
     }
 
@@ -117,6 +121,12 @@ impl StreamPlot {
     /// Set the arrow head visual scale factor.
     pub fn arrow_scale(mut self, scale: f64) -> Self {
         self.arrow_scale = scale;
+        self
+    }
+
+    /// Set the visual theme.
+    pub fn theme(mut self, theme: Theme) -> Self {
+        self.theme = theme;
         self
     }
 }
@@ -293,7 +303,7 @@ impl Widget for &StreamPlot {
             for (i, ch) in title.chars().enumerate() {
                 let x = start + i as u16;
                 if x < area.x + area.width {
-                    buf[(x, area.y)].set_char(ch).set_fg(Color::White);
+                    buf[(x, area.y)].set_char(ch).set_fg(self.theme.foreground);
                 }
             }
         }
@@ -320,11 +330,43 @@ impl Widget for &StreamPlot {
         // Draw axes
         for x in px..px + pw {
             if x < area.x + area.width {
-                buf[(x, py + ph)].set_char('─').set_fg(Color::DarkGray);
+                buf[(x, py + ph)]
+                    .set_char('─')
+                    .set_fg(self.theme.axis_color);
             }
         }
         for y in py..py + ph {
-            buf[(px.saturating_sub(1), y)].set_char('│').set_fg(Color::DarkGray);
+            buf[(px.saturating_sub(1), y)]
+                .set_char('│')
+                .set_fg(self.theme.axis_color);
+        }
+
+        // Draw grid
+        let x_grid = self.x_axis.grid || self.theme.grid_visible;
+        let y_grid = self.y_axis.grid || self.theme.grid_visible;
+        if x_grid {
+            let gx_ticks = self.x_axis.tick_positions(x_lo, x_hi);
+            for &tv in &gx_ticks {
+                let sx = data_to_screen(tv, x_lo, x_hi, px as f64, (px + pw - 1) as f64);
+                let xi = sx.round() as u16;
+                if xi >= px && xi < px + pw {
+                    for y in py..py + ph {
+                        buf[(xi, y)].set_char('·').set_fg(self.theme.grid_color);
+                    }
+                }
+            }
+        }
+        if y_grid {
+            let gy_ticks = self.y_axis.tick_positions(y_lo, y_hi);
+            for &tv in &gy_ticks {
+                let sy = data_to_screen(tv, y_lo, y_hi, (py + ph - 1) as f64, py as f64);
+                let yi = sy.round() as u16;
+                if yi >= py && yi < py + ph {
+                    for x in px..px + pw {
+                        buf[(x, yi)].set_char('·').set_fg(self.theme.grid_color);
+                    }
+                }
+            }
         }
 
         // Generate seed points on a grid
@@ -348,14 +390,12 @@ impl Widget for &StreamPlot {
                 let sy = y_lo + y_range * (si as f64 + 0.5) / n_seeds_y as f64;
 
                 // Trace forward
-                let forward = trace_streamline(
-                    &self.field, sx, sy, x_lo, x_hi, y_lo, y_hi, max_steps, dt,
-                );
+                let forward =
+                    trace_streamline(&self.field, sx, sy, x_lo, x_hi, y_lo, y_hi, max_steps, dt);
 
                 // Trace backward
-                let backward = trace_streamline(
-                    &self.field, sx, sy, x_lo, x_hi, y_lo, y_hi, max_steps, -dt,
-                );
+                let backward =
+                    trace_streamline(&self.field, sx, sy, x_lo, x_hi, y_lo, y_hi, max_steps, -dt);
 
                 // Combine: reverse of backward (excluding seed) + forward
                 let mut points: Vec<(f64, f64)> = Vec::new();
@@ -371,10 +411,8 @@ impl Widget for &StreamPlot {
                 // Render the streamline
                 let mut prev_screen: Option<(u16, u16)> = None;
                 for (idx, &(ptx, pty)) in points.iter().enumerate() {
-                    let scr_x =
-                        data_to_screen(ptx, x_lo, x_hi, px as f64, (px + pw - 1) as f64);
-                    let scr_y =
-                        data_to_screen(pty, y_lo, y_hi, (py + ph - 1) as f64, py as f64);
+                    let scr_x = data_to_screen(ptx, x_lo, x_hi, px as f64, (px + pw - 1) as f64);
+                    let scr_y = data_to_screen(pty, y_lo, y_hi, (py + ph - 1) as f64, py as f64);
                     let xi = scr_x.round() as u16;
                     let yi = scr_y.round() as u16;
 
@@ -443,7 +481,7 @@ impl Widget for &StreamPlot {
                 for (j, ch) in label.chars().enumerate() {
                     let lx = start + j as u16;
                     if lx >= area.x && lx < area.x + area.width {
-                        buf[(lx, y)].set_char(ch).set_fg(Color::DarkGray);
+                        buf[(lx, y)].set_char(ch).set_fg(self.theme.axis_color);
                     }
                 }
             }
@@ -464,7 +502,7 @@ impl Widget for &StreamPlot {
                 for (j, ch) in label.chars().enumerate() {
                     let lx = label_start + j as u16;
                     if lx >= area.x && lx < px.saturating_sub(1) {
-                        buf[(lx, yi)].set_char(ch).set_fg(Color::DarkGray);
+                        buf[(lx, yi)].set_char(ch).set_fg(self.theme.axis_color);
                     }
                 }
             }

@@ -6,6 +6,7 @@ use ratatui::style::Color;
 use ratatui::widgets::Widget;
 
 use crate::axis::Axis;
+use crate::theme::Theme;
 use crate::transform::data_to_screen;
 
 /// Histogram normalization mode.
@@ -24,7 +25,7 @@ pub enum HistNorm {
 /// # Example
 ///
 /// ```
-/// use ratatui_sim::widgets::histogram::Histogram;
+/// use ratatui_plt::widgets::histogram::Histogram;
 ///
 /// let hist = Histogram::new(vec![1.0, 1.5, 2.0, 2.5, 3.0, 3.5])
 ///     .bins(10)
@@ -41,6 +42,7 @@ pub struct Histogram {
     x_axis: Axis,
     y_axis: Axis,
     cumulative: bool,
+    theme: Theme,
 }
 
 impl Histogram {
@@ -56,6 +58,7 @@ impl Histogram {
             x_axis: Axis::new(),
             y_axis: Axis::new(),
             cumulative: false,
+            theme: Theme::get_default(),
         }
     }
 
@@ -105,11 +108,27 @@ impl Histogram {
         self
     }
 
+    /// Set the theme.
+    pub fn theme(mut self, theme: Theme) -> Self {
+        self.theme = theme;
+        self
+    }
+
     /// Compute bin edges and heights. NaN values are filtered out.
     fn compute_bins(&self) -> (Vec<f64>, Vec<f64>) {
         let (lo, hi) = self.range.unwrap_or_else(|| {
-            let min = self.data.iter().filter(|v| v.is_finite()).cloned().fold(f64::INFINITY, f64::min);
-            let max = self.data.iter().filter(|v| v.is_finite()).cloned().fold(f64::NEG_INFINITY, f64::max);
+            let min = self
+                .data
+                .iter()
+                .filter(|v| v.is_finite())
+                .cloned()
+                .fold(f64::INFINITY, f64::min);
+            let max = self
+                .data
+                .iter()
+                .filter(|v| v.is_finite())
+                .cloned()
+                .fold(f64::NEG_INFINITY, f64::max);
             if min == max {
                 (min - 1.0, max + 1.0)
             } else {
@@ -118,9 +137,7 @@ impl Histogram {
         });
 
         let bin_width = (hi - lo) / self.bins as f64;
-        let edges: Vec<f64> = (0..=self.bins)
-            .map(|i| lo + i as f64 * bin_width)
-            .collect();
+        let edges: Vec<f64> = (0..=self.bins).map(|i| lo + i as f64 * bin_width).collect();
         let mut counts = vec![0.0f64; self.bins];
 
         for &v in &self.data {
@@ -144,10 +161,7 @@ impl Histogram {
             HistNorm::Count => counts,
             HistNorm::Density => {
                 let total = self.data.len() as f64;
-                counts
-                    .iter()
-                    .map(|&c| c / (total * bin_width))
-                    .collect()
+                counts.iter().map(|&c| c / (total * bin_width)).collect()
             }
             HistNorm::Probability => {
                 let total = self.data.len() as f64;
@@ -184,7 +198,7 @@ impl Widget for &Histogram {
             for (i, ch) in title.chars().enumerate() {
                 let x = start + i as u16;
                 if x < area.x + area.width {
-                    buf[(x, area.y)].set_char(ch).set_fg(Color::White);
+                    buf[(x, area.y)].set_char(ch).set_fg(self.theme.foreground);
                 }
             }
         }
@@ -201,12 +215,42 @@ impl Widget for &Histogram {
 
         // Draw axes
         for x in px..px + pw {
-            buf[(x, py + ph)].set_char('─').set_fg(Color::DarkGray);
+            buf[(x, py + ph)]
+                .set_char('─')
+                .set_fg(self.theme.axis_color);
         }
         for y in py..py + ph {
             buf[(px.saturating_sub(1), y)]
                 .set_char('│')
-                .set_fg(Color::DarkGray);
+                .set_fg(self.theme.axis_color);
+        }
+
+        // Draw grid
+        let x_grid = self.x_axis.grid || self.theme.grid_visible;
+        let y_grid = self.y_axis.grid || self.theme.grid_visible;
+        if x_grid {
+            let gx_ticks = self.x_axis.tick_positions(x_lo, x_hi);
+            for &tv in &gx_ticks {
+                let sx = data_to_screen(tv, x_lo, x_hi, px as f64, (px + pw - 1) as f64);
+                let xi = sx.round() as u16;
+                if xi >= px && xi < px + pw {
+                    for y in py..py + ph {
+                        buf[(xi, y)].set_char('·').set_fg(self.theme.grid_color);
+                    }
+                }
+            }
+        }
+        if y_grid {
+            let gy_ticks = self.y_axis.tick_positions(0.0, y_hi);
+            for &tv in &gy_ticks {
+                let sy = data_to_screen(tv, 0.0, y_hi, (py + ph - 1) as f64, py as f64);
+                let yi = sy.round() as u16;
+                if yi >= py && yi < py + ph {
+                    for x in px..px + pw {
+                        buf[(x, yi)].set_char('·').set_fg(self.theme.grid_color);
+                    }
+                }
+            }
         }
 
         // Draw bars
@@ -229,6 +273,24 @@ impl Widget for &Histogram {
                     }
                 }
             }
+
+            // Bar outline
+            if heights[i] > 0.0 {
+                if y_top >= py && y_top < py + ph {
+                    for x in x_start..x_end {
+                        if x >= px && x < px + pw {
+                            buf[(x, y_top)].set_char('─').set_fg(self.theme.axis_color);
+                        }
+                    }
+                }
+                if x_start >= px && x_start < px + pw {
+                    for y in y_top..py + ph {
+                        if y >= py && y < py + ph {
+                            buf[(x_start, y)].set_char('│').set_fg(self.theme.axis_color);
+                        }
+                    }
+                }
+            }
         }
 
         // Draw tick labels
@@ -243,7 +305,7 @@ impl Widget for &Histogram {
                 for (j, ch) in label.chars().enumerate() {
                     let lx = start + j as u16;
                     if lx >= area.x && lx < area.x + area.width {
-                        buf[(lx, tick_y)].set_char(ch).set_fg(Color::DarkGray);
+                        buf[(lx, tick_y)].set_char(ch).set_fg(self.theme.axis_color);
                     }
                 }
             }
@@ -259,7 +321,7 @@ impl Widget for &Histogram {
                 for (j, ch) in label.chars().enumerate() {
                     let lx = start + j as u16;
                     if lx >= area.x && lx < px {
-                        buf[(lx, yi)].set_char(ch).set_fg(Color::DarkGray);
+                        buf[(lx, yi)].set_char(ch).set_fg(self.theme.axis_color);
                     }
                 }
             }

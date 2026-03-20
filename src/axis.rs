@@ -4,11 +4,12 @@
 //! and symmetric-log scales, auto-ticking, and aspect ratio control that
 //! compensates for terminal cell geometry.
 
-use crate::ticker::{LogLocator, MaxNLocator, TickFormatter, TickLocator, ScalarFormatter, LogFormatter};
+use crate::ticker::{
+    LogFormatter, LogLocator, MaxNLocator, ScalarFormatter, TickFormatter, TickLocator,
+};
 
 /// Axis scale types.
-#[derive(Clone, Debug)]
-#[derive(Default)]
+#[derive(Clone, Debug, Default)]
 pub enum Scale {
     /// Linear scale (default).
     #[default]
@@ -28,7 +29,6 @@ pub enum Scale {
     /// Power-law scale: y = x^gamma.
     Power(f64),
 }
-
 
 impl Scale {
     /// Transform a value according to this scale.
@@ -51,11 +51,9 @@ impl Scale {
                 if value.abs() <= *lin_thresh {
                     value * *lin_scale
                 } else if value > 0.0 {
-                    lin_thresh * lin_scale
-                        + (value / lin_thresh).ln() / log_base
+                    lin_thresh * lin_scale + (value / lin_thresh).ln() / log_base
                 } else {
-                    -(lin_thresh * lin_scale
-                        + (-value / lin_thresh).ln() / log_base)
+                    -(lin_thresh * lin_scale + (-value / lin_thresh).ln() / log_base)
                 }
             }
             Self::Power(gamma) => {
@@ -100,8 +98,7 @@ impl Scale {
 }
 
 /// Axis bounds specification.
-#[derive(Clone, Debug)]
-#[derive(Default)]
+#[derive(Clone, Debug, Default)]
 pub enum Bounds {
     /// Automatically determined from data.
     #[default]
@@ -110,13 +107,11 @@ pub enum Bounds {
     Manual(f64, f64),
 }
 
-
 /// Aspect ratio control for plots.
 ///
 /// Terminal cells are typically ~2:1 (height:width in pixels), so `Equal`
 /// automatically compensates to produce visually square data units.
-#[derive(Clone, Debug)]
-#[derive(Default)]
+#[derive(Clone, Debug, Default)]
 pub enum AspectRatio {
     /// Aspect ratio determined by available area (default).
     #[default]
@@ -128,7 +123,6 @@ pub enum AspectRatio {
     Fixed(f64),
 }
 
-
 /// Terminal cell aspect ratio (width / height in pixels).
 /// Most terminals have cells approximately twice as tall as wide.
 pub const TERMINAL_CELL_ASPECT: f64 = 0.5;
@@ -138,7 +132,7 @@ pub const TERMINAL_CELL_ASPECT: f64 = 0.5;
 /// # Example
 ///
 /// ```
-/// use ratatui_sim::axis::{Axis, Scale, Bounds};
+/// use ratatui_plt::axis::{Axis, Scale, Bounds};
 ///
 /// let x_axis = Axis::new()
 ///     .label("Time (s)")
@@ -301,7 +295,11 @@ impl Axis {
 
     /// Compute tick positions for the given resolved bounds.
     pub fn tick_positions(&self, vmin: f64, vmax: f64) -> Vec<f64> {
-        let (lo, hi) = if vmin < vmax { (vmin, vmax) } else { (vmax, vmin) };
+        let (lo, hi) = if vmin < vmax {
+            (vmin, vmax)
+        } else {
+            (vmax, vmin)
+        };
         self.locator.tick_values(lo, hi)
     }
 
@@ -316,7 +314,11 @@ impl Axis {
             let step = (major[i + 1] - major[i]) / (self.minor_tick_count + 1) as f64;
             for j in 1..=self.minor_tick_count {
                 let v = major[i] + step * j as f64;
-                let (lo, hi) = if vmin < vmax { (vmin, vmax) } else { (vmax, vmin) };
+                let (lo, hi) = if vmin < vmax {
+                    (vmin, vmax)
+                } else {
+                    (vmax, vmin)
+                };
                 if v > lo && v < hi {
                     minor.push(v);
                 }

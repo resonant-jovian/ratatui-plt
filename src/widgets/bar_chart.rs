@@ -5,7 +5,8 @@ use ratatui::layout::Rect;
 use ratatui::style::Color;
 use ratatui::widgets::Widget;
 
-use crate::ticker::{TickLocator, TickFormatter};
+use crate::theme::Theme;
+use crate::ticker::{TickFormatter, TickLocator};
 use crate::transform::data_to_screen;
 
 /// Bar chart orientation.
@@ -50,7 +51,7 @@ impl BarDataset {
 /// # Example
 ///
 /// ```
-/// use ratatui_sim::widgets::bar_chart::{BarChart, BarDataset, BarMode};
+/// use ratatui_plt::widgets::bar_chart::{BarChart, BarDataset, BarMode};
 /// use ratatui::style::Color;
 ///
 /// let chart = BarChart::new()
@@ -67,6 +68,7 @@ pub struct BarChart {
     orientation: Orientation,
     title: Option<String>,
     bar_gap: u16,
+    theme: Theme,
 }
 
 impl Default for BarChart {
@@ -78,6 +80,7 @@ impl Default for BarChart {
             orientation: Orientation::Vertical,
             title: None,
             bar_gap: 1,
+            theme: Theme::get_default(),
         }
     }
 }
@@ -116,11 +119,21 @@ impl BarChart {
         self.bar_gap = gap;
         self
     }
+
+    /// Set the theme.
+    pub fn theme(mut self, theme: Theme) -> Self {
+        self.theme = theme;
+        self
+    }
 }
 
 impl Widget for &BarChart {
     fn render(self, area: Rect, buf: &mut Buffer) {
-        if area.width < 4 || area.height < 4 || self.categories.is_empty() || self.datasets.is_empty() {
+        if area.width < 4
+            || area.height < 4
+            || self.categories.is_empty()
+            || self.datasets.is_empty()
+        {
             return;
         }
 
@@ -143,7 +156,7 @@ impl Widget for &BarChart {
             for (i, ch) in title.chars().enumerate() {
                 let x = start + i as u16;
                 if x < area.x + area.width {
-                    buf[(x, area.y)].set_char(ch).set_fg(Color::White);
+                    buf[(x, area.y)].set_char(ch).set_fg(self.theme.foreground);
                 }
             }
         }
@@ -172,10 +185,28 @@ impl Widget for &BarChart {
 
         // Draw axes
         for x in px..px + pw {
-            buf[(x, py + ph)].set_char('─').set_fg(Color::DarkGray);
+            buf[(x, py + ph)]
+                .set_char('─')
+                .set_fg(self.theme.axis_color);
         }
         for y in py..py + ph {
-            buf[(px.saturating_sub(1), y)].set_char('│').set_fg(Color::DarkGray);
+            buf[(px.saturating_sub(1), y)]
+                .set_char('│')
+                .set_fg(self.theme.axis_color);
+        }
+
+        // Draw grid
+        if self.theme.grid_visible {
+            let gy_ticks = crate::ticker::MaxNLocator::new(5).tick_values(0.0, y_hi);
+            for &tv in &gy_ticks {
+                let sy = data_to_screen(tv, 0.0, y_hi, (py + ph - 1) as f64, py as f64);
+                let yi = sy.round() as u16;
+                if yi >= py && yi < py + ph {
+                    for x in px..px + pw {
+                        buf[(x, yi)].set_char('·').set_fg(self.theme.grid_color);
+                    }
+                }
+            }
         }
 
         let n_cats = self.categories.len();
@@ -187,18 +218,51 @@ impl Widget for &BarChart {
 
             match self.mode {
                 BarMode::Grouped => {
-                    let bar_width = (group_width.saturating_sub(self.bar_gap * 2))
-                        / n_ds as u16;
+                    let bar_width = (group_width.saturating_sub(self.bar_gap * 2)) / n_ds as u16;
                     for (ds_i, ds) in self.datasets.iter().enumerate() {
                         let val = ds.values.get(cat_i).copied().unwrap_or(0.0);
                         let bar_x = group_x + self.bar_gap + ds_i as u16 * bar_width;
-                        let bar_top = data_to_screen(val, 0.0, y_hi, (py + ph - 1) as f64, py as f64)
-                            .round() as u16;
+                        let bar_top =
+                            data_to_screen(val, 0.0, y_hi, (py + ph - 1) as f64, py as f64).round()
+                                as u16;
 
                         for x in bar_x..bar_x + bar_width.max(1) {
                             for y in bar_top..py + ph {
                                 if x >= px && x < px + pw && y >= py && y < py + ph {
                                     buf[(x, y)].set_char('█').set_fg(ds.color);
+                                }
+                            }
+                        }
+
+                        // Bar outline
+                        if val > 0.0 {
+                            let bw = bar_width.max(1);
+                            if bar_top >= py && bar_top < py + ph {
+                                for x in bar_x..bar_x + bw {
+                                    if x >= px && x < px + pw {
+                                        buf[(x, bar_top)]
+                                            .set_char('─')
+                                            .set_fg(self.theme.axis_color);
+                                    }
+                                }
+                            }
+                            if bar_x >= px && bar_x < px + pw {
+                                for y in bar_top..py + ph {
+                                    if y >= py && y < py + ph {
+                                        buf[(bar_x, y)]
+                                            .set_char('│')
+                                            .set_fg(self.theme.axis_color);
+                                    }
+                                }
+                            }
+                            let bar_right_x = bar_x + bw;
+                            if bar_right_x >= px && bar_right_x < px + pw {
+                                for y in bar_top..py + ph {
+                                    if y >= py && y < py + ph {
+                                        buf[(bar_right_x, y)]
+                                            .set_char('│')
+                                            .set_fg(self.theme.axis_color);
+                                    }
                                 }
                             }
                         }
@@ -211,15 +275,33 @@ impl Widget for &BarChart {
 
                     for ds in &self.datasets {
                         let val = ds.values.get(cat_i).copied().unwrap_or(0.0);
-                        let y_bot = data_to_screen(bottom, 0.0, y_hi, (py + ph - 1) as f64, py as f64)
-                            .round() as u16;
-                        let y_top = data_to_screen(bottom + val, 0.0, y_hi, (py + ph - 1) as f64, py as f64)
-                            .round() as u16;
+                        let y_bot =
+                            data_to_screen(bottom, 0.0, y_hi, (py + ph - 1) as f64, py as f64)
+                                .round() as u16;
+                        let y_top = data_to_screen(
+                            bottom + val,
+                            0.0,
+                            y_hi,
+                            (py + ph - 1) as f64,
+                            py as f64,
+                        )
+                        .round() as u16;
 
                         for x in bar_x..bar_x + bar_width {
                             for y in y_top..y_bot {
                                 if x >= px && x < px + pw && y >= py && y < py + ph {
                                     buf[(x, y)].set_char('█').set_fg(ds.color);
+                                }
+                            }
+                        }
+
+                        // Segment outline
+                        if val > 0.0 && y_top >= py && y_top < py + ph {
+                            for x in bar_x..bar_x + bar_width {
+                                if x >= px && x < px + pw {
+                                    buf[(x, y_top)]
+                                        .set_char('─')
+                                        .set_fg(self.theme.axis_color);
                                 }
                             }
                         }
@@ -237,7 +319,9 @@ impl Widget for &BarChart {
                 for (j, ch) in cat.chars().enumerate() {
                     let lx = label_start + j as u16;
                     if lx >= area.x && lx < area.x + area.width {
-                        buf[(lx, label_y)].set_char(ch).set_fg(Color::DarkGray);
+                        buf[(lx, label_y)]
+                            .set_char(ch)
+                            .set_fg(self.theme.axis_color);
                     }
                 }
             }
@@ -254,7 +338,7 @@ impl Widget for &BarChart {
                 for (j, ch) in label.chars().enumerate() {
                     let lx = start + j as u16;
                     if lx >= area.x && lx < px {
-                        buf[(lx, yi)].set_char(ch).set_fg(Color::DarkGray);
+                        buf[(lx, yi)].set_char(ch).set_fg(self.theme.axis_color);
                     }
                 }
             }

@@ -9,6 +9,7 @@ use crate::axis::{AspectRatio, Axis};
 use crate::colormap::{Colormap, Viridis};
 use crate::norm::{LinearNorm, Normalize};
 use crate::series::VectorFieldData;
+use crate::theme::Theme;
 use crate::transform::{apply_aspect_ratio, data_to_screen};
 
 /// A 2D vector field (quiver) plot widget.
@@ -19,7 +20,7 @@ use crate::transform::{apply_aspect_ratio, data_to_screen};
 /// # Example
 ///
 /// ```
-/// use ratatui_sim::prelude::*;
+/// use ratatui_plt::prelude::*;
 ///
 /// let field = VectorFieldData::from_fn(
 ///     (-2.0, 2.0), (-2.0, 2.0), 10, 10,
@@ -38,6 +39,7 @@ pub struct VectorField {
     colormap: Box<dyn Colormap>,
     norm: Box<dyn Normalize>,
     arrow_scale: f64,
+    theme: Theme,
 }
 
 impl VectorField {
@@ -52,16 +54,35 @@ impl VectorField {
             color: Color::Cyan,
             color_by_magnitude: false,
             colormap: Box::new(Viridis),
-            norm: Box::new(LinearNorm::new(0.0, if max_mag == 0.0 { 1.0 } else { max_mag })),
+            norm: Box::new(LinearNorm::new(
+                0.0,
+                if max_mag == 0.0 { 1.0 } else { max_mag },
+            )),
             arrow_scale: 1.0,
+            theme: Theme::get_default(),
         }
     }
 
-    pub fn x_axis(mut self, axis: Axis) -> Self { self.x_axis = axis; self }
-    pub fn y_axis(mut self, axis: Axis) -> Self { self.y_axis = axis; self }
-    pub fn title(mut self, t: impl Into<String>) -> Self { self.title = Some(t.into()); self }
-    pub fn aspect_ratio(mut self, ar: AspectRatio) -> Self { self.aspect_ratio = ar; self }
-    pub fn color(mut self, c: Color) -> Self { self.color = c; self }
+    pub fn x_axis(mut self, axis: Axis) -> Self {
+        self.x_axis = axis;
+        self
+    }
+    pub fn y_axis(mut self, axis: Axis) -> Self {
+        self.y_axis = axis;
+        self
+    }
+    pub fn title(mut self, t: impl Into<String>) -> Self {
+        self.title = Some(t.into());
+        self
+    }
+    pub fn aspect_ratio(mut self, ar: AspectRatio) -> Self {
+        self.aspect_ratio = ar;
+        self
+    }
+    pub fn color(mut self, c: Color) -> Self {
+        self.color = c;
+        self
+    }
 
     /// Color arrows by their magnitude using the colormap.
     pub fn color_by_magnitude(mut self, enable: bool) -> Self {
@@ -77,6 +98,12 @@ impl VectorField {
     /// Scale factor for arrow length.
     pub fn arrow_scale(mut self, scale: f64) -> Self {
         self.arrow_scale = scale;
+        self
+    }
+
+    /// Set the theme.
+    pub fn theme(mut self, theme: Theme) -> Self {
+        self.theme = theme;
         self
     }
 }
@@ -125,7 +152,7 @@ impl Widget for &VectorField {
             for (i, ch) in title.chars().enumerate() {
                 let x = start + i as u16;
                 if x < area.x + area.width {
-                    buf[(x, area.y)].set_char(ch).set_fg(Color::White);
+                    buf[(x, area.y)].set_char(ch).set_fg(self.theme.foreground);
                 }
             }
         }
@@ -153,11 +180,43 @@ impl Widget for &VectorField {
         // Draw axes
         for x in px..px + aw {
             if x < area.x + area.width {
-                buf[(x, py + ah)].set_char('─').set_fg(Color::DarkGray);
+                buf[(x, py + ah)]
+                    .set_char('─')
+                    .set_fg(self.theme.axis_color);
             }
         }
         for y in py..py + ah {
-            buf[(px.saturating_sub(1), y)].set_char('│').set_fg(Color::DarkGray);
+            buf[(px.saturating_sub(1), y)]
+                .set_char('│')
+                .set_fg(self.theme.axis_color);
+        }
+
+        // Draw grid
+        let x_grid = self.x_axis.grid || self.theme.grid_visible;
+        let y_grid = self.y_axis.grid || self.theme.grid_visible;
+        if x_grid {
+            let gx_ticks = self.x_axis.tick_positions(x_lo, x_hi);
+            for &tv in &gx_ticks {
+                let sx = data_to_screen(tv, x_lo, x_hi, px as f64, (px + aw - 1) as f64);
+                let xi = sx.round() as u16;
+                if xi >= px && xi < px + aw {
+                    for y in py..py + ah {
+                        buf[(xi, y)].set_char('·').set_fg(self.theme.grid_color);
+                    }
+                }
+            }
+        }
+        if y_grid {
+            let gy_ticks = self.y_axis.tick_positions(y_lo, y_hi);
+            for &tv in &gy_ticks {
+                let sy = data_to_screen(tv, y_lo, y_hi, (py + ah - 1) as f64, py as f64);
+                let yi = sy.round() as u16;
+                if yi >= py && yi < py + ah {
+                    for x in px..px + aw {
+                        buf[(x, yi)].set_char('·').set_fg(self.theme.grid_color);
+                    }
+                }
+            }
         }
 
         // Draw arrows
@@ -194,7 +253,7 @@ impl Widget for &VectorField {
                 for (j, ch) in label.chars().enumerate() {
                     let lx = start + j as u16;
                     if lx >= area.x && lx < area.x + area.width {
-                        buf[(lx, y)].set_char(ch).set_fg(Color::DarkGray);
+                        buf[(lx, y)].set_char(ch).set_fg(self.theme.axis_color);
                     }
                 }
             }

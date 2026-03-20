@@ -6,15 +6,15 @@
 //! # Example
 //!
 //! ```
-//! use ratatui_sim::colormap::{Colormap, Viridis};
+//! use ratatui_plt::colormap::{Colormap, Viridis};
 //! use ratatui::style::Color;
 //!
 //! let cmap = Viridis;
 //! let color = cmap.color_at(0.5); // Mid-range viridis color
 //! ```
 
-use ratatui::layout::Rect;
 use ratatui::buffer::Buffer;
+use ratatui::layout::Rect;
 use ratatui::style::{Color, Style};
 use ratatui::widgets::Widget;
 
@@ -65,17 +65,20 @@ pub struct Viridis;
 
 impl Colormap for Viridis {
     fn color_at(&self, t: f64) -> Color {
-        lerp_color_stops(t, &[
-            (0.0, (68, 1, 84)),
-            (0.13, (72, 36, 117)),
-            (0.25, (56, 88, 140)),
-            (0.38, (39, 130, 142)),
-            (0.5, (31, 158, 137)),
-            (0.63, (53, 183, 121)),
-            (0.75, (110, 206, 88)),
-            (0.88, (181, 222, 43)),
-            (1.0, (253, 231, 37)),
-        ])
+        lerp_color_stops(
+            t,
+            &[
+                (0.0, (68, 1, 84)),
+                (0.13, (72, 36, 117)),
+                (0.25, (56, 88, 140)),
+                (0.38, (39, 130, 142)),
+                (0.5, (31, 158, 137)),
+                (0.63, (53, 183, 121)),
+                (0.75, (110, 206, 88)),
+                (0.88, (181, 222, 43)),
+                (1.0, (253, 231, 37)),
+            ],
+        )
     }
 
     fn name(&self) -> &str {
@@ -89,17 +92,20 @@ pub struct Plasma;
 
 impl Colormap for Plasma {
     fn color_at(&self, t: f64) -> Color {
-        lerp_color_stops(t, &[
-            (0.0, (13, 8, 135)),
-            (0.13, (75, 3, 161)),
-            (0.25, (126, 3, 168)),
-            (0.38, (168, 34, 150)),
-            (0.5, (203, 70, 121)),
-            (0.63, (229, 107, 93)),
-            (0.75, (248, 148, 65)),
-            (0.88, (253, 195, 40)),
-            (1.0, (240, 249, 33)),
-        ])
+        lerp_color_stops(
+            t,
+            &[
+                (0.0, (13, 8, 135)),
+                (0.13, (75, 3, 161)),
+                (0.25, (126, 3, 168)),
+                (0.38, (168, 34, 150)),
+                (0.5, (203, 70, 121)),
+                (0.63, (229, 107, 93)),
+                (0.75, (248, 148, 65)),
+                (0.88, (253, 195, 40)),
+                (1.0, (240, 249, 33)),
+            ],
+        )
     }
 
     fn name(&self) -> &str {
@@ -113,17 +119,20 @@ pub struct Inferno;
 
 impl Colormap for Inferno {
     fn color_at(&self, t: f64) -> Color {
-        lerp_color_stops(t, &[
-            (0.0, (0, 0, 4)),
-            (0.13, (31, 12, 72)),
-            (0.25, (85, 15, 109)),
-            (0.38, (136, 34, 106)),
-            (0.5, (186, 54, 85)),
-            (0.63, (227, 89, 51)),
-            (0.75, (249, 140, 10)),
-            (0.88, (249, 201, 50)),
-            (1.0, (252, 255, 164)),
-        ])
+        lerp_color_stops(
+            t,
+            &[
+                (0.0, (0, 0, 4)),
+                (0.13, (31, 12, 72)),
+                (0.25, (85, 15, 109)),
+                (0.38, (136, 34, 106)),
+                (0.5, (186, 54, 85)),
+                (0.63, (227, 89, 51)),
+                (0.75, (249, 140, 10)),
+                (0.88, (249, 201, 50)),
+                (1.0, (252, 255, 164)),
+            ],
+        )
     }
 
     fn name(&self) -> &str {
@@ -137,17 +146,20 @@ pub struct Magma;
 
 impl Colormap for Magma {
     fn color_at(&self, t: f64) -> Color {
-        lerp_color_stops(t, &[
-            (0.0, (0, 0, 4)),
-            (0.13, (28, 16, 68)),
-            (0.25, (79, 18, 123)),
-            (0.38, (129, 37, 129)),
-            (0.5, (181, 54, 122)),
-            (0.63, (229, 80, 100)),
-            (0.75, (251, 135, 97)),
-            (0.88, (254, 194, 140)),
-            (1.0, (252, 253, 191)),
-        ])
+        lerp_color_stops(
+            t,
+            &[
+                (0.0, (0, 0, 4)),
+                (0.13, (28, 16, 68)),
+                (0.25, (79, 18, 123)),
+                (0.38, (129, 37, 129)),
+                (0.5, (181, 54, 122)),
+                (0.63, (229, 80, 100)),
+                (0.75, (251, 135, 97)),
+                (0.88, (254, 194, 140)),
+                (1.0, (252, 253, 191)),
+            ],
+        )
     }
 
     fn name(&self) -> &str {
@@ -161,13 +173,16 @@ pub struct Cividis;
 
 impl Colormap for Cividis {
     fn color_at(&self, t: f64) -> Color {
-        lerp_color_stops(t, &[
-            (0.0, (0, 32, 77)),
-            (0.25, (57, 75, 107)),
-            (0.5, (124, 123, 120)),
-            (0.75, (194, 176, 120)),
-            (1.0, (255, 234, 70)),
-        ])
+        lerp_color_stops(
+            t,
+            &[
+                (0.0, (0, 32, 77)),
+                (0.25, (57, 75, 107)),
+                (0.5, (124, 123, 120)),
+                (0.75, (194, 176, 120)),
+                (1.0, (255, 234, 70)),
+            ],
+        )
     }
 
     fn name(&self) -> &str {
@@ -181,13 +196,16 @@ pub struct Coolwarm;
 
 impl Colormap for Coolwarm {
     fn color_at(&self, t: f64) -> Color {
-        lerp_color_stops(t, &[
-            (0.0, (59, 76, 192)),
-            (0.25, (124, 159, 237)),
-            (0.5, (221, 221, 221)),
-            (0.75, (230, 145, 113)),
-            (1.0, (180, 4, 38)),
-        ])
+        lerp_color_stops(
+            t,
+            &[
+                (0.0, (59, 76, 192)),
+                (0.25, (124, 159, 237)),
+                (0.5, (221, 221, 221)),
+                (0.75, (230, 145, 113)),
+                (1.0, (180, 4, 38)),
+            ],
+        )
     }
 
     fn name(&self) -> &str {
@@ -201,13 +219,16 @@ pub struct RdBu;
 
 impl Colormap for RdBu {
     fn color_at(&self, t: f64) -> Color {
-        lerp_color_stops(t, &[
-            (0.0, (103, 0, 31)),
-            (0.25, (214, 96, 77)),
-            (0.5, (247, 247, 247)),
-            (0.75, (67, 147, 195)),
-            (1.0, (5, 48, 97)),
-        ])
+        lerp_color_stops(
+            t,
+            &[
+                (0.0, (103, 0, 31)),
+                (0.25, (214, 96, 77)),
+                (0.5, (247, 247, 247)),
+                (0.75, (67, 147, 195)),
+                (1.0, (5, 48, 97)),
+            ],
+        )
     }
 
     fn name(&self) -> &str {
@@ -221,13 +242,16 @@ pub struct Seismic;
 
 impl Colormap for Seismic {
     fn color_at(&self, t: f64) -> Color {
-        lerp_color_stops(t, &[
-            (0.0, (0, 0, 76)),
-            (0.25, (0, 0, 255)),
-            (0.5, (255, 255, 255)),
-            (0.75, (255, 0, 0)),
-            (1.0, (128, 0, 0)),
-        ])
+        lerp_color_stops(
+            t,
+            &[
+                (0.0, (0, 0, 76)),
+                (0.25, (0, 0, 255)),
+                (0.5, (255, 255, 255)),
+                (0.75, (255, 0, 0)),
+                (1.0, (128, 0, 0)),
+            ],
+        )
     }
 
     fn name(&self) -> &str {
@@ -256,15 +280,18 @@ pub struct Jet;
 
 impl Colormap for Jet {
     fn color_at(&self, t: f64) -> Color {
-        lerp_color_stops(t, &[
-            (0.0, (0, 0, 127)),
-            (0.11, (0, 0, 255)),
-            (0.35, (0, 255, 255)),
-            (0.5, (0, 255, 0)),
-            (0.65, (255, 255, 0)),
-            (0.89, (255, 0, 0)),
-            (1.0, (127, 0, 0)),
-        ])
+        lerp_color_stops(
+            t,
+            &[
+                (0.0, (0, 0, 127)),
+                (0.11, (0, 0, 255)),
+                (0.35, (0, 255, 255)),
+                (0.5, (0, 255, 0)),
+                (0.65, (255, 255, 0)),
+                (0.89, (255, 0, 0)),
+                (1.0, (127, 0, 0)),
+            ],
+        )
     }
 
     fn name(&self) -> &str {
@@ -278,17 +305,20 @@ pub struct Turbo;
 
 impl Colormap for Turbo {
     fn color_at(&self, t: f64) -> Color {
-        lerp_color_stops(t, &[
-            (0.0, (48, 18, 59)),
-            (0.13, (67, 85, 221)),
-            (0.25, (29, 162, 254)),
-            (0.38, (11, 224, 198)),
-            (0.5, (80, 253, 107)),
-            (0.63, (183, 244, 37)),
-            (0.75, (246, 195, 28)),
-            (0.88, (249, 114, 10)),
-            (1.0, (122, 4, 3)),
-        ])
+        lerp_color_stops(
+            t,
+            &[
+                (0.0, (48, 18, 59)),
+                (0.13, (67, 85, 221)),
+                (0.25, (29, 162, 254)),
+                (0.38, (11, 224, 198)),
+                (0.5, (80, 253, 107)),
+                (0.63, (183, 244, 37)),
+                (0.75, (246, 195, 28)),
+                (0.88, (249, 114, 10)),
+                (1.0, (122, 4, 3)),
+            ],
+        )
     }
 
     fn name(&self) -> &str {
@@ -302,12 +332,15 @@ pub struct Hot;
 
 impl Colormap for Hot {
     fn color_at(&self, t: f64) -> Color {
-        lerp_color_stops(t, &[
-            (0.0, (0, 0, 0)),
-            (0.33, (230, 0, 0)),
-            (0.66, (255, 210, 0)),
-            (1.0, (255, 255, 255)),
-        ])
+        lerp_color_stops(
+            t,
+            &[
+                (0.0, (0, 0, 0)),
+                (0.33, (230, 0, 0)),
+                (0.66, (255, 210, 0)),
+                (1.0, (255, 255, 255)),
+            ],
+        )
     }
 
     fn name(&self) -> &str {
@@ -320,7 +353,7 @@ impl Colormap for Hot {
 /// # Example
 ///
 /// ```
-/// use ratatui_sim::colormap::{Colormap, ListedColormap};
+/// use ratatui_plt::colormap::{Colormap, ListedColormap};
 /// use ratatui::style::Color;
 ///
 /// let cmap = ListedColormap::new("custom", vec![
@@ -386,7 +419,7 @@ impl Colormap for ListedColormap {
 /// # Example
 ///
 /// ```
-/// use ratatui_sim::colormap::{Colormap, Viridis, Reversed};
+/// use ratatui_plt::colormap::{Colormap, Viridis, Reversed};
 ///
 /// let cmap = Reversed::new(Viridis);
 /// // cmap.color_at(0.0) == Viridis.color_at(1.0)
@@ -428,7 +461,9 @@ impl Colormap for Spring {
         let b = (255.0 - t * 255.0).round() as u8;
         Color::Rgb(r, g, b)
     }
-    fn name(&self) -> &str { "spring" }
+    fn name(&self) -> &str {
+        "spring"
+    }
 }
 
 /// Summer: green → yellow.
@@ -443,7 +478,9 @@ impl Colormap for Summer {
         let b = 102;
         Color::Rgb(r, g, b)
     }
-    fn name(&self) -> &str { "summer" }
+    fn name(&self) -> &str {
+        "summer"
+    }
 }
 
 /// Autumn: red → yellow.
@@ -458,7 +495,9 @@ impl Colormap for Autumn {
         let b = 0;
         Color::Rgb(r, g, b)
     }
-    fn name(&self) -> &str { "autumn" }
+    fn name(&self) -> &str {
+        "autumn"
+    }
 }
 
 /// Winter: blue → green.
@@ -473,7 +512,9 @@ impl Colormap for Winter {
         let b = (255.0 - t * 127.0).round() as u8;
         Color::Rgb(r, g, b)
     }
-    fn name(&self) -> &str { "winter" }
+    fn name(&self) -> &str {
+        "winter"
+    }
 }
 
 /// Twilight: cyclic colormap suitable for phase/angle data.
@@ -482,17 +523,22 @@ pub struct Twilight;
 
 impl Colormap for Twilight {
     fn color_at(&self, t: f64) -> Color {
-        lerp_color_stops(t, &[
-            (0.0, (226, 217, 226)),
-            (0.15, (166, 133, 193)),
-            (0.3, (81, 71, 153)),
-            (0.5, (18, 36, 61)),
-            (0.7, (69, 99, 68)),
-            (0.85, (171, 173, 117)),
-            (1.0, (226, 217, 226)),
-        ])
+        lerp_color_stops(
+            t,
+            &[
+                (0.0, (226, 217, 226)),
+                (0.15, (166, 133, 193)),
+                (0.3, (81, 71, 153)),
+                (0.5, (18, 36, 61)),
+                (0.7, (69, 99, 68)),
+                (0.85, (171, 173, 117)),
+                (1.0, (226, 217, 226)),
+            ],
+        )
     }
-    fn name(&self) -> &str { "twilight" }
+    fn name(&self) -> &str {
+        "twilight"
+    }
 }
 
 /// HSV: cyclic hue-saturation-value rainbow.
@@ -527,7 +573,9 @@ impl Colormap for Hsv {
             ((b1 + m) * 255.0).round() as u8,
         )
     }
-    fn name(&self) -> &str { "hsv" }
+    fn name(&self) -> &str {
+        "hsv"
+    }
 }
 
 /// Linearly interpolate between two Colors.
@@ -538,6 +586,17 @@ fn lerp_colors(c0: Color, c1: Color, t: f64) -> Color {
     let g = (g0 as f64 + t * (g1 as f64 - g0 as f64)).round() as u8;
     let b = (b0 as f64 + t * (b1 as f64 - b0 as f64)).round() as u8;
     Color::Rgb(r, g, b)
+}
+
+/// Scale an RGB color by a brightness factor (for lighting effects).
+pub fn scale_color(color: Color, factor: f64) -> Color {
+    let (r, g, b) = color_to_rgb(color);
+    let f = factor.clamp(0.0, 1.0);
+    Color::Rgb(
+        (r as f64 * f).round() as u8,
+        (g as f64 * f).round() as u8,
+        (b as f64 * f).round() as u8,
+    )
 }
 
 /// Extract RGB components from a Color (approximation for non-RGB colors).
@@ -580,6 +639,8 @@ pub struct Colorbar<'a> {
     n_ticks: usize,
     /// Width in characters.
     width: u16,
+    /// Color for tick labels.
+    label_color: Color,
 }
 
 impl<'a> Colorbar<'a> {
@@ -592,7 +653,14 @@ impl<'a> Colorbar<'a> {
             vmax,
             n_ticks: 5,
             width: 4,
+            label_color: Color::White,
         }
+    }
+
+    /// Set the label color.
+    pub fn label_color(mut self, color: Color) -> Self {
+        self.label_color = color;
+        self
     }
 
     /// Set a custom normalizer.
@@ -654,7 +722,9 @@ impl Widget for &Colorbar<'_> {
                     for (j, ch) in label.chars().enumerate() {
                         let x = label_x + j as u16;
                         if x < area.x + area.width {
-                            buf[(x, y)].set_char(ch).set_style(Style::default());
+                            buf[(x, y)]
+                                .set_char(ch)
+                                .set_style(Style::default().fg(self.label_color));
                         }
                     }
                 }

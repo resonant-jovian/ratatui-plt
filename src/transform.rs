@@ -10,7 +10,7 @@ use crate::axis::{AspectRatio, TERMINAL_CELL_ASPECT};
 /// # Example
 ///
 /// ```
-/// use ratatui_sim::transform::Camera3D;
+/// use ratatui_plt::transform::Camera3D;
 ///
 /// let cam = Camera3D::new()
 ///     .azimuth(45.0)
@@ -106,7 +106,7 @@ impl Camera3D {
 /// # Example
 ///
 /// ```
-/// use ratatui_sim::transform::Camera3DState;
+/// use ratatui_plt::transform::Camera3DState;
 ///
 /// let mut state = Camera3DState::default();
 /// state.rotate(5.0, 0.0);  // Rotate 5° horizontally

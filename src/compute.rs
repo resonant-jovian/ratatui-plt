@@ -15,7 +15,7 @@ use tokio::task::JoinHandle;
 /// # Example
 ///
 /// ```rust,no_run
-/// use ratatui_sim::compute::compute_kde_async;
+/// use ratatui_plt::compute::compute_kde_async;
 ///
 /// # async fn example() {
 /// let data = vec![1.0, 1.5, 2.0, 2.5, 3.0];
@@ -35,7 +35,7 @@ pub fn compute_kde_async(data: Vec<f64>, bandwidth: f64) -> JoinHandle<Vec<(f64,
 /// # Example
 ///
 /// ```rust,no_run
-/// use ratatui_sim::compute::compute_histogram_async;
+/// use ratatui_plt::compute::compute_histogram_async;
 ///
 /// # async fn example() {
 /// let data = vec![1.0, 1.5, 2.0, 2.5, 3.0, 3.5];
@@ -116,9 +116,7 @@ fn compute_histogram(data: &[f64], bins: usize) -> (Vec<f64>, Vec<f64>) {
     };
 
     let bin_width = (hi - lo) / bins as f64;
-    let edges: Vec<f64> = (0..=bins)
-        .map(|i| lo + i as f64 * bin_width)
-        .collect();
+    let edges: Vec<f64> = (0..=bins).map(|i| lo + i as f64 * bin_width).collect();
     let mut counts = vec![0.0_f64; bins];
 
     for &v in data {

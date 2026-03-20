@@ -6,8 +6,7 @@
 use ratatui::style::Color;
 
 /// Arrow style for annotations.
-#[derive(Clone, Debug)]
-#[derive(Default)]
+#[derive(Clone, Debug, Default)]
 pub enum ArrowStyle {
     /// Simple line: ─
     Simple,
@@ -18,13 +17,12 @@ pub enum ArrowStyle {
     None,
 }
 
-
 /// A text annotation placed on a plot.
 ///
 /// # Example
 ///
 /// ```
-/// use ratatui_sim::annotation::{Annotation, ArrowStyle};
+/// use ratatui_plt::annotation::{Annotation, ArrowStyle};
 /// use ratatui::style::Color;
 ///
 /// let ann = Annotation::new("Peak", 3.14, 1.0)

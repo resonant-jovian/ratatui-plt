@@ -9,6 +9,7 @@ use crate::colormap::{Colormap, Viridis};
 use crate::norm::{LinearNorm, Normalize};
 use crate::series::Series3D;
 use crate::style::MarkerShape;
+use crate::theme::Theme;
 use crate::transform::{Camera3D, Camera3DState, data_to_screen, depth_sort};
 
 /// A 3D scatter plot widget.
@@ -18,7 +19,7 @@ use crate::transform::{Camera3D, Camera3DState, data_to_screen, depth_sort};
 /// # Example
 ///
 /// ```
-/// use ratatui_sim::prelude::*;
+/// use ratatui_plt::prelude::*;
 ///
 /// let data = Series3D::new("particles")
 ///     .data(vec![(1.0, 2.0, 3.0), (4.0, 5.0, 6.0)]);
@@ -33,6 +34,7 @@ pub struct Scatter3D {
     marker: MarkerShape,
     color_by_value: bool,
     colormap: Box<dyn Colormap>,
+    theme: Theme,
 }
 
 impl Default for Scatter3D {
@@ -44,17 +46,32 @@ impl Default for Scatter3D {
             marker: MarkerShape::Dot,
             color_by_value: false,
             colormap: Box::new(Viridis),
+            theme: Theme::get_default(),
         }
     }
 }
 
 impl Scatter3D {
-    pub fn new() -> Self { Self::default() }
+    pub fn new() -> Self {
+        Self::default()
+    }
 
-    pub fn series(mut self, s: Series3D) -> Self { self.series.push(s); self }
-    pub fn camera(mut self, cam: Camera3D) -> Self { self.camera = cam; self }
-    pub fn title(mut self, t: impl Into<String>) -> Self { self.title = Some(t.into()); self }
-    pub fn marker(mut self, m: MarkerShape) -> Self { self.marker = m; self }
+    pub fn series(mut self, s: Series3D) -> Self {
+        self.series.push(s);
+        self
+    }
+    pub fn camera(mut self, cam: Camera3D) -> Self {
+        self.camera = cam;
+        self
+    }
+    pub fn title(mut self, t: impl Into<String>) -> Self {
+        self.title = Some(t.into());
+        self
+    }
+    pub fn marker(mut self, m: MarkerShape) -> Self {
+        self.marker = m;
+        self
+    }
 
     /// Color points by their z-value (or custom values) using the colormap.
     pub fn color_by_value(mut self, enable: bool) -> Self {
@@ -64,6 +81,11 @@ impl Scatter3D {
 
     pub fn colormap(mut self, cmap: impl Colormap + 'static) -> Self {
         self.colormap = Box::new(cmap);
+        self
+    }
+
+    pub fn theme(mut self, t: Theme) -> Self {
+        self.theme = t;
         self
     }
 
@@ -87,7 +109,7 @@ impl Scatter3D {
             for (i, ch) in title.chars().enumerate() {
                 let x = start + i as u16;
                 if x < area.x + area.width {
-                    buf[(x, area.y)].set_char(ch).set_fg(Color::White);
+                    buf[(x, area.y)].set_char(ch).set_fg(self.theme.foreground);
                 }
             }
         }
@@ -105,9 +127,12 @@ impl Scatter3D {
 
         for s in &self.series {
             for &(x, y, z) in &s.data {
-                x_min = x_min.min(x); x_max = x_max.max(x);
-                y_min = y_min.min(y); y_max = y_max.max(y);
-                z_min = z_min.min(z); z_max = z_max.max(z);
+                x_min = x_min.min(x);
+                x_max = x_max.max(x);
+                y_min = y_min.min(y);
+                y_max = y_max.max(y);
+                z_min = z_min.min(z);
+                z_max = z_max.max(z);
             }
         }
 
@@ -143,12 +168,25 @@ impl Scatter3D {
 
         // Screen bounds
         let sx_min = all_points.iter().map(|p| p.0).fold(f64::INFINITY, f64::min);
-        let sx_max = all_points.iter().map(|p| p.0).fold(f64::NEG_INFINITY, f64::max);
+        let sx_max = all_points
+            .iter()
+            .map(|p| p.0)
+            .fold(f64::NEG_INFINITY, f64::max);
         let sy_min = all_points.iter().map(|p| p.1).fold(f64::INFINITY, f64::min);
-        let sy_max = all_points.iter().map(|p| p.1).fold(f64::NEG_INFINITY, f64::max);
+        let sy_max = all_points
+            .iter()
+            .map(|p| p.1)
+            .fold(f64::NEG_INFINITY, f64::max);
         let depth_min = all_points.iter().map(|p| p.2).fold(f64::INFINITY, f64::min);
-        let depth_max = all_points.iter().map(|p| p.2).fold(f64::NEG_INFINITY, f64::max);
-        let depth_range = if depth_max == depth_min { 1.0 } else { depth_max - depth_min };
+        let depth_max = all_points
+            .iter()
+            .map(|p| p.2)
+            .fold(f64::NEG_INFINITY, f64::max);
+        let depth_range = if depth_max == depth_min {
+            1.0
+        } else {
+            depth_max - depth_min
+        };
 
         // Sort by depth (back to front)
         let depths: Vec<f64> = all_points.iter().map(|p| p.2).collect();
@@ -157,12 +195,15 @@ impl Scatter3D {
         for &idx in &sorted {
             let (sx, sy, depth, color) = all_points[idx];
 
-            let scx = data_to_screen(sx, sx_min, sx_max, px as f64, (px + pw - 1) as f64).round() as u16;
-            let scy = data_to_screen(sy, sy_min, sy_max, py as f64, (py + ph - 1) as f64).round() as u16;
+            let scx =
+                data_to_screen(sx, sx_min, sx_max, px as f64, (px + pw - 1) as f64).round() as u16;
+            let scy =
+                data_to_screen(sy, sy_min, sy_max, py as f64, (py + ph - 1) as f64).round() as u16;
 
             if scx >= px && scx < px + pw && scy >= py && scy < py + ph {
                 // Depth cuing: dim far points
-                let brightness: f64 = ((depth - depth_min) / depth_range * 0.7 + 0.3).clamp(0.3, 1.0);
+                let brightness: f64 =
+                    ((depth - depth_min) / depth_range * 0.7 + 0.3).clamp(0.3, 1.0);
                 let dimmed = dim_color(color, brightness);
                 buf[(scx, scy)].set_char(self.marker.char()).set_fg(dimmed);
             }
@@ -174,26 +215,34 @@ impl Scatter3D {
         let y_tip = camera.project(0.0, 0.5, 0.0);
         let z_tip = camera.project(0.0, 0.0, 0.3);
 
-        let _ox = data_to_screen(origin.0, sx_min, sx_max, px as f64, (px + pw - 1) as f64).round() as u16;
-        let _oy = data_to_screen(origin.1, sy_min, sy_max, py as f64, (py + ph - 1) as f64).round() as u16;
+        let _ox = data_to_screen(origin.0, sx_min, sx_max, px as f64, (px + pw - 1) as f64).round()
+            as u16;
+        let _oy = data_to_screen(origin.1, sy_min, sy_max, py as f64, (py + ph - 1) as f64).round()
+            as u16;
 
         // X axis label
-        let xx = data_to_screen(x_tip.0, sx_min, sx_max, px as f64, (px + pw - 1) as f64).round() as u16;
-        let xy = data_to_screen(x_tip.1, sy_min, sy_max, py as f64, (py + ph - 1) as f64).round() as u16;
+        let xx =
+            data_to_screen(x_tip.0, sx_min, sx_max, px as f64, (px + pw - 1) as f64).round() as u16;
+        let xy =
+            data_to_screen(x_tip.1, sy_min, sy_max, py as f64, (py + ph - 1) as f64).round() as u16;
         if xx >= px && xx < px + pw && xy >= py && xy < py + ph {
             buf[(xx, xy)].set_char('X').set_fg(Color::Red);
         }
 
         // Y axis label
-        let yx = data_to_screen(y_tip.0, sx_min, sx_max, px as f64, (px + pw - 1) as f64).round() as u16;
-        let yy = data_to_screen(y_tip.1, sy_min, sy_max, py as f64, (py + ph - 1) as f64).round() as u16;
+        let yx =
+            data_to_screen(y_tip.0, sx_min, sx_max, px as f64, (px + pw - 1) as f64).round() as u16;
+        let yy =
+            data_to_screen(y_tip.1, sy_min, sy_max, py as f64, (py + ph - 1) as f64).round() as u16;
         if yx >= px && yx < px + pw && yy >= py && yy < py + ph {
             buf[(yx, yy)].set_char('Y').set_fg(Color::Green);
         }
 
         // Z axis label
-        let zx = data_to_screen(z_tip.0, sx_min, sx_max, px as f64, (px + pw - 1) as f64).round() as u16;
-        let zy = data_to_screen(z_tip.1, sy_min, sy_max, py as f64, (py + ph - 1) as f64).round() as u16;
+        let zx =
+            data_to_screen(z_tip.0, sx_min, sx_max, px as f64, (px + pw - 1) as f64).round() as u16;
+        let zy =
+            data_to_screen(z_tip.1, sy_min, sy_max, py as f64, (py + ph - 1) as f64).round() as u16;
         if zx >= px && zx < px + pw && zy >= py && zy < py + ph {
             buf[(zx, zy)].set_char('Z').set_fg(Color::Blue);
         }

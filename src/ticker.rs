@@ -6,7 +6,7 @@
 //! # Example
 //!
 //! ```
-//! use ratatui_sim::ticker::{MaxNLocator, TickLocator};
+//! use ratatui_plt::ticker::{MaxNLocator, TickLocator};
 //!
 //! let locator = MaxNLocator::new(5);
 //! let ticks = locator.tick_values(0.0, 100.0);
@@ -322,7 +322,10 @@ impl CategoricalFormatter {
 impl TickFormatter for CategoricalFormatter {
     fn format(&self, value: f64) -> String {
         let idx = value.round() as usize;
-        self.categories.get(idx).cloned().unwrap_or_else(|| format!("{}", idx))
+        self.categories
+            .get(idx)
+            .cloned()
+            .unwrap_or_else(|| format!("{}", idx))
     }
 
     fn box_clone(&self) -> Box<dyn TickFormatter> {

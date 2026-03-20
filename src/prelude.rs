@@ -1,7 +1,7 @@
 //! Convenient re-exports for common usage.
 //!
 //! ```rust
-//! use ratatui_sim::prelude::*;
+//! use ratatui_plt::prelude::*;
 //! ```
 
 pub use ratatui::style::Color;

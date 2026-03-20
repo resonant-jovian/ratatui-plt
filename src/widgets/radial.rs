@@ -2,10 +2,10 @@
 
 use ratatui::buffer::Buffer;
 use ratatui::layout::Rect;
-use ratatui::style::Color;
 use ratatui::widgets::Widget;
 
 use crate::series::Series;
+use crate::theme::Theme;
 
 /// A radial (polar coordinate) plot widget.
 ///
@@ -15,7 +15,7 @@ use crate::series::Series;
 /// # Example
 ///
 /// ```
-/// use ratatui_sim::prelude::*;
+/// use ratatui_plt::prelude::*;
 ///
 /// // Cardioid: r = 1 + cos(θ)
 /// let data: Vec<(f64, f64)> = (0..360)
@@ -35,6 +35,7 @@ pub struct RadialPlot {
     n_rings: usize,
     n_spokes: usize,
     r_max: Option<f64>,
+    theme: Theme,
 }
 
 impl Default for RadialPlot {
@@ -45,19 +46,42 @@ impl Default for RadialPlot {
             n_rings: 4,
             n_spokes: 8,
             r_max: None,
+            theme: Theme::get_default(),
         }
     }
 }
 
 impl RadialPlot {
-    pub fn new() -> Self { Self::default() }
+    pub fn new() -> Self {
+        Self::default()
+    }
 
     /// Add a series. Data should be (theta, r) pairs where theta is in radians.
-    pub fn series(mut self, s: Series) -> Self { self.series.push(s); self }
-    pub fn title(mut self, t: impl Into<String>) -> Self { self.title = Some(t.into()); self }
-    pub fn n_rings(mut self, n: usize) -> Self { self.n_rings = n; self }
-    pub fn n_spokes(mut self, n: usize) -> Self { self.n_spokes = n; self }
-    pub fn r_max(mut self, r: f64) -> Self { self.r_max = Some(r); self }
+    pub fn series(mut self, s: Series) -> Self {
+        self.series.push(s);
+        self
+    }
+    pub fn title(mut self, t: impl Into<String>) -> Self {
+        self.title = Some(t.into());
+        self
+    }
+    pub fn n_rings(mut self, n: usize) -> Self {
+        self.n_rings = n;
+        self
+    }
+    pub fn n_spokes(mut self, n: usize) -> Self {
+        self.n_spokes = n;
+        self
+    }
+    pub fn r_max(mut self, r: f64) -> Self {
+        self.r_max = Some(r);
+        self
+    }
+    /// Set the theme.
+    pub fn theme(mut self, theme: Theme) -> Self {
+        self.theme = theme;
+        self
+    }
 }
 
 impl Widget for &RadialPlot {
@@ -76,7 +100,7 @@ impl Widget for &RadialPlot {
             for (i, ch) in title.chars().enumerate() {
                 let x = start + i as u16;
                 if x < area.x + area.width {
-                    buf[(x, area.y)].set_char(ch).set_fg(Color::White);
+                    buf[(x, area.y)].set_char(ch).set_fg(self.theme.foreground);
                 }
             }
         }
@@ -85,9 +109,15 @@ impl Widget for &RadialPlot {
         let cx = area.x + pw / 2;
         let cy = py + ph / 2;
 
-        // Radius in screen characters (account for cell aspect ratio ~2:1)
-        let r_screen_x = (pw / 2).saturating_sub(2) as f64;
-        let r_screen_y = (ph / 2).saturating_sub(1) as f64;
+        // Radius in screen characters, compensating for ~2:1 terminal cell aspect ratio.
+        // Use the smaller of the two radii (adjusted for cell aspect) so circles
+        // don't overflow the available space.
+        let cell_aspect = 0.5; // TERMINAL_CELL_ASPECT: cells are ~twice as tall as wide
+        let avail_x = (pw / 2).saturating_sub(2) as f64;
+        let avail_y = (ph / 2).saturating_sub(1) as f64;
+        let r_data = avail_y.min(avail_x * cell_aspect);
+        let r_screen_x = r_data / cell_aspect; // wider to compensate
+        let r_screen_y = r_data;
 
         // Maximum data radius
         let r_max = self.r_max.unwrap_or_else(|| {
@@ -113,7 +143,7 @@ impl Widget for &RadialPlot {
                 let sx = (cx as i16 + dx) as u16;
                 let sy = (cy as i16 + dy) as u16;
                 if sx >= area.x && sx < area.x + area.width && sy >= py && sy < py + ph {
-                    buf[(sx, sy)].set_char('·').set_fg(Color::DarkGray);
+                    buf[(sx, sy)].set_char('·').set_fg(self.theme.grid_color);
                 }
             }
 
@@ -125,7 +155,7 @@ impl Widget for &RadialPlot {
                 for (j, ch) in label.chars().enumerate() {
                     let x = lx + j as u16 + 1;
                     if x < area.x + area.width {
-                        buf[(x, ly)].set_char(ch).set_fg(Color::DarkGray);
+                        buf[(x, ly)].set_char(ch).set_fg(self.theme.grid_color);
                     }
                 }
             }
@@ -142,7 +172,7 @@ impl Widget for &RadialPlot {
                 let sx = (cx as f64 + dx * frac).round() as u16;
                 let sy = (cy as f64 + dy * frac).round() as u16;
                 if sx >= area.x && sx < area.x + area.width && sy >= py && sy < py + ph {
-                    buf[(sx, sy)].set_char('·').set_fg(Color::DarkGray);
+                    buf[(sx, sy)].set_char('·').set_fg(self.theme.grid_color);
                 }
             }
 
@@ -151,9 +181,15 @@ impl Widget for &RadialPlot {
             let label = format!("{}°", deg);
             let lx = (cx as f64 + (r_screen_x + 2.0) * theta.cos()).round() as u16;
             let ly = (cy as f64 + (r_screen_y + 1.0) * theta.sin()).round() as u16;
-            if lx >= area.x && lx + label.len() as u16 <= area.x + area.width && ly >= py && ly < py + ph {
+            if lx >= area.x
+                && lx + label.len() as u16 <= area.x + area.width
+                && ly >= py
+                && ly < py + ph
+            {
                 for (j, ch) in label.chars().enumerate() {
-                    buf[(lx + j as u16, ly)].set_char(ch).set_fg(Color::DarkGray);
+                    buf[(lx + j as u16, ly)]
+                        .set_char(ch)
+                        .set_fg(self.theme.grid_color);
                 }
             }
         }
@@ -172,19 +208,19 @@ impl Widget for &RadialPlot {
                 }
 
                 // Connect to previous point
-                if let Some((px, py_prev)) = prev {
-                    if sx != px || sy != py_prev {
-                        // Simple line between consecutive points
-                        let dx = sx as i32 - px as i32;
-                        let dy = sy as i32 - py_prev as i32;
-                        let steps = dx.abs().max(dy.abs());
-                        for step in 1..steps {
-                            let frac = step as f64 / steps as f64;
-                            let ix = (px as f64 + dx as f64 * frac).round() as u16;
-                            let iy = (py_prev as f64 + dy as f64 * frac).round() as u16;
-                            if ix >= area.x && ix < area.x + area.width && iy >= py && iy < py + ph {
-                                buf[(ix, iy)].set_char('·').set_fg(s.color);
-                            }
+                if let Some((px, py_prev)) = prev
+                    && (sx != px || sy != py_prev)
+                {
+                    // Simple line between consecutive points
+                    let dx = sx as i32 - px as i32;
+                    let dy = sy as i32 - py_prev as i32;
+                    let steps = dx.abs().max(dy.abs());
+                    for step in 1..steps {
+                        let frac = step as f64 / steps as f64;
+                        let ix = (px as f64 + dx as f64 * frac).round() as u16;
+                        let iy = (py_prev as f64 + dy as f64 * frac).round() as u16;
+                        if ix >= area.x && ix < area.x + area.width && iy >= py && iy < py + ph {
+                            buf[(ix, iy)].set_char('·').set_fg(s.color);
                         }
                     }
                 }

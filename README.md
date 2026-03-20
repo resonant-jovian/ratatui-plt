@@ -1,8 +1,8 @@
-# ratatui-sim
+# ratatui-plt
 
 **Scientific visualization widgets for [ratatui](https://ratatui.rs/) — matplotlib for the terminal.**
 
-`ratatui-sim` provides a comprehensive suite of configurable plot widgets, colormaps, axis systems, and layout tools designed for scientific computing and simulation monitoring. Built primarily for astrophysical applications (Vlasov-Poisson solvers, phase-space analysis), it works anywhere you need terminal-based scientific plots.
+`ratatui-plt` provides a comprehensive suite of configurable plot widgets, colormaps, axis systems, and layout tools designed for scientific computing and simulation monitoring. Built primarily for astrophysical applications (Vlasov-Poisson solvers, phase-space analysis), it works anywhere you need terminal-based scientific plots.
 
 ## Features
 
@@ -78,13 +78,13 @@ let cmap = colormap_custom!("diverging", 0.0 => Color::Blue, 0.5 => Color::White
 Add to your `Cargo.toml`:
 ```toml
 [dependencies]
-ratatui-sim = "0.1"
+ratatui-plt = "0.1"
 ratatui = "0.30"
 ```
 
 Basic line plot:
 ```rust
-use ratatui_sim::prelude::*;
+use ratatui_plt::prelude::*;
 
 let series = Series::new("sin(x)")
     .data((0..100).map(|i| {
@@ -105,7 +105,7 @@ frame.render_widget(&plot, area);
 
 Heatmap with forced aspect ratio:
 ```rust
-use ratatui_sim::prelude::*;
+use ratatui_plt::prelude::*;
 
 let data = GridData::from_fn((-2.0, 2.0), (-2.0, 2.0), 50, 50, |x, y| {
     (-(x * x + y * y)).exp()
@@ -121,7 +121,7 @@ frame.render_widget(&heatmap, area);
 
 Interactive 3D surface:
 ```rust
-use ratatui_sim::prelude::*;
+use ratatui_plt::prelude::*;
 
 let data = GridData::from_fn((-3.0, 3.0), (-3.0, 3.0), 30, 30, |x, y| {
     (x * x + y * y).sqrt().sin()

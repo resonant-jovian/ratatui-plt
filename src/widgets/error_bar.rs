@@ -6,6 +6,7 @@ use ratatui::style::Color;
 use ratatui::widgets::Widget;
 
 use crate::axis::Axis;
+use crate::theme::Theme;
 use crate::transform::data_to_screen;
 
 /// Error bar direction.
@@ -21,7 +22,7 @@ pub enum ErrorDirection {
 /// # Example
 ///
 /// ```
-/// use ratatui_sim::widgets::error_bar::ErrorBarPlot;
+/// use ratatui_plt::widgets::error_bar::ErrorBarPlot;
 ///
 /// let plot = ErrorBarPlot::new()
 ///     .data(vec![(1.0, 2.0)], vec![0.3], vec![0.5])
@@ -38,6 +39,7 @@ pub struct ErrorBarPlot {
     title: Option<String>,
     x_axis: Axis,
     y_axis: Axis,
+    theme: Theme,
 }
 
 impl Default for ErrorBarPlot {
@@ -53,6 +55,7 @@ impl Default for ErrorBarPlot {
             title: None,
             x_axis: Axis::new(),
             y_axis: Axis::new(),
+            theme: Theme::get_default(),
         }
     }
 }
@@ -104,6 +107,11 @@ impl ErrorBarPlot {
         self.y_axis = axis;
         self
     }
+
+    pub fn theme(mut self, t: Theme) -> Self {
+        self.theme = t;
+        self
+    }
 }
 
 impl Widget for &ErrorBarPlot {
@@ -130,7 +138,7 @@ impl Widget for &ErrorBarPlot {
             for (i, ch) in title.chars().enumerate() {
                 let x = start + i as u16;
                 if x < area.x + area.width {
-                    buf[(x, area.y)].set_char(ch).set_fg(Color::White);
+                    buf[(x, area.y)].set_char(ch).set_fg(self.theme.foreground);
                 }
             }
         }
@@ -156,10 +164,42 @@ impl Widget for &ErrorBarPlot {
 
         // Draw axes
         for x in px..px + pw {
-            buf[(x, py + ph)].set_char('─').set_fg(Color::DarkGray);
+            buf[(x, py + ph)]
+                .set_char('─')
+                .set_fg(self.theme.axis_color);
         }
         for y in py..py + ph {
-            buf[(px.saturating_sub(1), y)].set_char('│').set_fg(Color::DarkGray);
+            buf[(px.saturating_sub(1), y)]
+                .set_char('│')
+                .set_fg(self.theme.axis_color);
+        }
+
+        // Draw grid
+        let x_grid = self.x_axis.grid || self.theme.grid_visible;
+        let y_grid = self.y_axis.grid || self.theme.grid_visible;
+        if x_grid {
+            let gx_ticks = self.x_axis.tick_positions(x_lo, x_hi);
+            for &tv in &gx_ticks {
+                let sx = data_to_screen(tv, x_lo, x_hi, px as f64, (px + pw - 1) as f64);
+                let xi = sx.round() as u16;
+                if xi >= px && xi < px + pw {
+                    for y in py..py + ph {
+                        buf[(xi, y)].set_char('·').set_fg(self.theme.grid_color);
+                    }
+                }
+            }
+        }
+        if y_grid {
+            let gy_ticks = self.y_axis.tick_positions(y_lo, y_hi);
+            for &tv in &gy_ticks {
+                let sy = data_to_screen(tv, y_lo, y_hi, (py + ph - 1) as f64, py as f64);
+                let yi = sy.round() as u16;
+                if yi >= py && yi < py + ph {
+                    for x in px..px + pw {
+                        buf[(x, yi)].set_char('·').set_fg(self.theme.grid_color);
+                    }
+                }
+            }
         }
 
         // Draw error bars and points
@@ -170,7 +210,10 @@ impl Widget for &ErrorBarPlot {
             let yi = sy.round() as u16;
 
             // Vertical error bars
-            if matches!(self.direction, ErrorDirection::Vertical | ErrorDirection::Both) {
+            if matches!(
+                self.direction,
+                ErrorDirection::Vertical | ErrorDirection::Both
+            ) {
                 let elo = self.y_err_low.get(i).copied().unwrap_or(0.0);
                 let ehi = self.y_err_high.get(i).copied().unwrap_or(0.0);
                 let sy_lo = data_to_screen(y - elo, y_lo, y_hi, (py + ph - 1) as f64, py as f64);
@@ -194,7 +237,10 @@ impl Widget for &ErrorBarPlot {
             }
 
             // Horizontal error bars
-            if matches!(self.direction, ErrorDirection::Horizontal | ErrorDirection::Both) {
+            if matches!(
+                self.direction,
+                ErrorDirection::Horizontal | ErrorDirection::Both
+            ) {
                 let elo = self.x_err_low.get(i).copied().unwrap_or(0.0);
                 let ehi = self.x_err_high.get(i).copied().unwrap_or(0.0);
                 let sx_lo = data_to_screen(x - elo, x_lo, x_hi, px as f64, (px + pw - 1) as f64);

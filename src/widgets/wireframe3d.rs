@@ -6,6 +6,7 @@ use ratatui::style::Color;
 use ratatui::widgets::{StatefulWidget, Widget};
 
 use crate::series::GridData;
+use crate::theme::Theme;
 use crate::transform::{Camera3D, Camera3DState, data_to_screen};
 
 /// A 3D wireframe plot widget.
@@ -15,7 +16,7 @@ use crate::transform::{Camera3D, Camera3DState, data_to_screen};
 /// # Example
 ///
 /// ```
-/// use ratatui_sim::prelude::*;
+/// use ratatui_plt::prelude::*;
 ///
 /// let data = GridData::from_fn((-2.0, 2.0), (-2.0, 2.0), 20, 20, |x, y| {
 ///     (-(x*x + y*y)).exp()
@@ -27,6 +28,7 @@ pub struct Wireframe3D {
     camera: Camera3D,
     color: Color,
     title: Option<String>,
+    theme: Theme,
 }
 
 impl Wireframe3D {
@@ -36,12 +38,26 @@ impl Wireframe3D {
             camera: Camera3D::default(),
             color: Color::Cyan,
             title: None,
+            theme: Theme::get_default(),
         }
     }
 
-    pub fn camera(mut self, cam: Camera3D) -> Self { self.camera = cam; self }
-    pub fn color(mut self, c: Color) -> Self { self.color = c; self }
-    pub fn title(mut self, t: impl Into<String>) -> Self { self.title = Some(t.into()); self }
+    pub fn camera(mut self, cam: Camera3D) -> Self {
+        self.camera = cam;
+        self
+    }
+    pub fn color(mut self, c: Color) -> Self {
+        self.color = c;
+        self
+    }
+    pub fn title(mut self, t: impl Into<String>) -> Self {
+        self.title = Some(t.into());
+        self
+    }
+    pub fn theme(mut self, t: Theme) -> Self {
+        self.theme = t;
+        self
+    }
 
     fn render_with_camera(&self, camera: &Camera3D, area: Rect, buf: &mut Buffer) {
         if area.width < 4 || area.height < 4 {
@@ -63,7 +79,7 @@ impl Wireframe3D {
             for (i, ch) in title.chars().enumerate() {
                 let x = start + i as u16;
                 if x < area.x + area.width {
-                    buf[(x, area.y)].set_char(ch).set_fg(Color::White);
+                    buf[(x, area.y)].set_char(ch).set_fg(self.theme.foreground);
                 }
             }
         }
@@ -101,12 +117,18 @@ impl Wireframe3D {
         let sy_max = points.iter().map(|p| p.1).fold(f64::NEG_INFINITY, f64::max);
         let depth_min = points.iter().map(|p| p.2).fold(f64::INFINITY, f64::min);
         let depth_max = points.iter().map(|p| p.2).fold(f64::NEG_INFINITY, f64::max);
-        let depth_range = if depth_max == depth_min { 1.0 } else { depth_max - depth_min };
+        let depth_range = if depth_max == depth_min {
+            1.0
+        } else {
+            depth_max - depth_min
+        };
 
         // Collect line segments
         struct Segment {
-            sx0: u16, sy0: u16,
-            sx1: u16, sy1: u16,
+            sx0: u16,
+            sy0: u16,
+            sx1: u16,
+            sy1: u16,
             depth: f64,
         }
 
@@ -125,8 +147,10 @@ impl Wireframe3D {
                 let idx0 = j * ncols + i;
                 let idx1 = j * ncols + i + 1;
                 segments.push(Segment {
-                    sx0: map_x(points[idx0].0), sy0: map_y(points[idx0].1),
-                    sx1: map_x(points[idx1].0), sy1: map_y(points[idx1].1),
+                    sx0: map_x(points[idx0].0),
+                    sy0: map_y(points[idx0].1),
+                    sx1: map_x(points[idx1].0),
+                    sy1: map_y(points[idx1].1),
                     depth: (points[idx0].2 + points[idx1].2) / 2.0,
                 });
             }
@@ -137,19 +161,26 @@ impl Wireframe3D {
                 let idx0 = j * ncols + i;
                 let idx1 = (j + 1) * ncols + i;
                 segments.push(Segment {
-                    sx0: map_x(points[idx0].0), sy0: map_y(points[idx0].1),
-                    sx1: map_x(points[idx1].0), sy1: map_y(points[idx1].1),
+                    sx0: map_x(points[idx0].0),
+                    sy0: map_y(points[idx0].1),
+                    sx1: map_x(points[idx1].0),
+                    sy1: map_y(points[idx1].1),
                     depth: (points[idx0].2 + points[idx1].2) / 2.0,
                 });
             }
         }
 
         // Sort by depth (back to front)
-        segments.sort_by(|a, b| a.depth.partial_cmp(&b.depth).unwrap_or(std::cmp::Ordering::Equal));
+        segments.sort_by(|a, b| {
+            a.depth
+                .partial_cmp(&b.depth)
+                .unwrap_or(std::cmp::Ordering::Equal)
+        });
 
         // Draw segments with depth-cued brightness
         for seg in &segments {
-            let brightness = ((seg.depth - depth_min) / depth_range * 200.0 + 55.0).clamp(55.0, 255.0) as u8;
+            let brightness =
+                ((seg.depth - depth_min) / depth_range * 200.0 + 55.0).clamp(55.0, 255.0) as u8;
             let (r, g, b) = match self.color {
                 Color::Rgb(r, g, b) => (r, g, b),
                 Color::Cyan => (0, 255, 255),
@@ -166,13 +197,26 @@ impl Wireframe3D {
                 (b as f64 * brightness as f64 / 255.0) as u8,
             );
 
-            draw_line_simple(buf, seg.sx0, seg.sy0, seg.sx1, seg.sy1, color, [px, py, px + pw, py + ph]);
+            draw_line_simple(
+                buf,
+                seg.sx0,
+                seg.sy0,
+                seg.sx1,
+                seg.sy1,
+                color,
+                [px, py, px + pw, py + ph],
+            );
         }
     }
 }
 
 fn draw_line_simple(
-    buf: &mut Buffer, x0: u16, y0: u16, x1: u16, y1: u16, color: Color,
+    buf: &mut Buffer,
+    x0: u16,
+    y0: u16,
+    x1: u16,
+    y1: u16,
+    color: Color,
     clip: [u16; 4],
 ) {
     let [clip_x_min, clip_y_min, clip_x_max, clip_y_max] = clip;
@@ -192,10 +236,18 @@ fn draw_line_simple(
         if px >= clip_x_min && px < clip_x_max && py >= clip_y_min && py < clip_y_max {
             buf[(px, py)].set_char('·').set_fg(color);
         }
-        if ix == ix1 && iy == iy1 { break; }
+        if ix == ix1 && iy == iy1 {
+            break;
+        }
         let e2 = 2 * err;
-        if e2 >= dy { err += dy; ix += sx; }
-        if e2 <= dx { err += dx; iy += sy; }
+        if e2 >= dy {
+            err += dy;
+            ix += sx;
+        }
+        if e2 <= dx {
+            err += dx;
+            iy += sy;
+        }
     }
 }
 

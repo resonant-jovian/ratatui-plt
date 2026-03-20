@@ -6,7 +6,7 @@
 //! # Example
 //!
 //! ```
-//! use ratatui_sim::mathtext::render_mathtext;
+//! use ratatui_plt::mathtext::render_mathtext;
 //!
 //! assert_eq!(render_mathtext(r"\alpha"), "α");
 //! assert_eq!(render_mathtext("x^2"), "x²");
@@ -154,7 +154,7 @@ pub fn to_subscript(c: char) -> Option<char> {
 /// # Example
 ///
 /// ```
-/// use ratatui_sim::mathtext::scientific_notation;
+/// use ratatui_plt::mathtext::scientific_notation;
 ///
 /// assert_eq!(scientific_notation(1.5e-3), "1.5×10⁻³");
 /// assert_eq!(scientific_notation(2.0e6), "2×10⁶");

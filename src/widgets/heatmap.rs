@@ -11,6 +11,7 @@ use crate::axis::{AspectRatio, Axis};
 use crate::colormap::{Colorbar, Colormap, Viridis};
 use crate::norm::{LinearNorm, Normalize};
 use crate::series::GridData;
+use crate::theme::Theme;
 use crate::transform::apply_aspect_ratio;
 
 /// A 2D heatmap widget.
@@ -18,7 +19,7 @@ use crate::transform::apply_aspect_ratio;
 /// # Example
 ///
 /// ```
-/// use ratatui_sim::prelude::*;
+/// use ratatui_plt::prelude::*;
 ///
 /// let data = GridData::from_fn((-2.0, 2.0), (-2.0, 2.0), 50, 50, |x, y| {
 ///     (-(x * x + y * y)).exp()
@@ -40,6 +41,7 @@ pub struct Heatmap {
     show_values: bool,
     /// Color used for NaN/invalid cells.
     bad_color: Color,
+    theme: Theme,
 }
 
 impl Heatmap {
@@ -57,6 +59,7 @@ impl Heatmap {
             aspect_ratio: AspectRatio::Auto,
             show_values: false,
             bad_color: Color::DarkGray,
+            theme: Theme::get_default(),
         }
     }
 
@@ -113,6 +116,12 @@ impl Heatmap {
         self.bad_color = color;
         self
     }
+
+    /// Set the theme.
+    pub fn theme(mut self, theme: Theme) -> Self {
+        self.theme = theme;
+        self
+    }
 }
 
 impl Widget for &Heatmap {
@@ -128,7 +137,9 @@ impl Widget for &Heatmap {
 
         let plot_x = area.x + y_label_width;
         let plot_y = area.y + title_height;
-        let plot_width = area.width.saturating_sub(y_label_width + colorbar_width + 1);
+        let plot_width = area
+            .width
+            .saturating_sub(y_label_width + colorbar_width + 1);
         let plot_height = area.height.saturating_sub(title_height + tick_height);
 
         if plot_width < 2 || plot_height < 2 {
@@ -147,8 +158,13 @@ impl Widget for &Heatmap {
             1.0
         };
 
-        let (ax_off, ay_off, aw, ah) =
-            apply_aspect_ratio(&self.aspect_ratio, data_x_range, data_y_range, plot_width, plot_height);
+        let (ax_off, ay_off, aw, ah) = apply_aspect_ratio(
+            &self.aspect_ratio,
+            data_x_range,
+            data_y_range,
+            plot_width,
+            plot_height,
+        );
         let px = plot_x + ax_off;
         let py = plot_y + ay_off;
 
@@ -158,7 +174,7 @@ impl Widget for &Heatmap {
             for (i, ch) in title.chars().enumerate() {
                 let x = start + i as u16;
                 if x < area.x + area.width {
-                    buf[(x, area.y)].set_char(ch).set_fg(Color::White);
+                    buf[(x, area.y)].set_char(ch).set_fg(self.theme.foreground);
                 }
             }
         }
@@ -184,8 +200,10 @@ impl Widget for &Heatmap {
 
                 // Top half-pixel
                 let top_row_f = (cy as usize * 2) as f64 / effective_height as f64;
-                let top_data_row = ((1.0 - top_row_f) * nrows as f64).min((nrows - 1) as f64) as usize;
-                let top_data_col = (cx as f64 / aw as f64 * ncols as f64).min((ncols - 1) as f64) as usize;
+                let top_data_row =
+                    ((1.0 - top_row_f) * nrows as f64).min((nrows - 1) as f64) as usize;
+                let top_data_col =
+                    (cx as f64 / aw as f64 * ncols as f64).min((ncols - 1) as f64) as usize;
                 let top_val = self.data.values[top_data_row][top_data_col];
                 let top_color = if top_val.is_finite() {
                     let top_t = self.norm.normalize(top_val);
@@ -196,7 +214,8 @@ impl Widget for &Heatmap {
 
                 // Bottom half-pixel
                 let bot_row_f = (cy as usize * 2 + 1) as f64 / effective_height as f64;
-                let bot_data_row = ((1.0 - bot_row_f) * nrows as f64).min((nrows - 1) as f64) as usize;
+                let bot_data_row =
+                    ((1.0 - bot_row_f) * nrows as f64).min((nrows - 1) as f64) as usize;
                 let bot_data_col = top_data_col;
                 let bot_val = self.data.values[bot_data_row][bot_data_col];
                 let bot_color = if bot_val.is_finite() {
@@ -221,7 +240,8 @@ impl Widget for &Heatmap {
         let x_lo = *self.data.x.first().unwrap_or(&0.0);
         let x_hi = *self.data.x.last().unwrap_or(&1.0);
         for &tv in &x_ticks {
-            let sx = crate::transform::data_to_screen(tv, x_lo, x_hi, px as f64, (px + aw - 1) as f64);
+            let sx =
+                crate::transform::data_to_screen(tv, x_lo, x_hi, px as f64, (px + aw - 1) as f64);
             let label = self.x_axis.format_tick(tv);
             let xi = sx.round() as u16;
             let label_start = xi.saturating_sub(label.len() as u16 / 2);
@@ -230,7 +250,7 @@ impl Widget for &Heatmap {
                 for (j, ch) in label.chars().enumerate() {
                     let lx = label_start + j as u16;
                     if lx >= area.x && lx < area.x + area.width {
-                        buf[(lx, y)].set_char(ch).set_fg(Color::DarkGray);
+                        buf[(lx, y)].set_char(ch).set_fg(self.theme.axis_color);
                     }
                 }
             }
@@ -240,7 +260,8 @@ impl Widget for &Heatmap {
         let y_hi = *self.data.y.last().unwrap_or(&1.0);
         let y_ticks = self.y_axis.tick_positions(y_lo, y_hi);
         for &tv in &y_ticks {
-            let sy = crate::transform::data_to_screen(tv, y_lo, y_hi, (py + ah - 1) as f64, py as f64);
+            let sy =
+                crate::transform::data_to_screen(tv, y_lo, y_hi, (py + ah - 1) as f64, py as f64);
             let label = self.y_axis.format_tick(tv);
             let yi = sy.round() as u16;
             if yi >= py && yi < py + ah {
@@ -248,7 +269,7 @@ impl Widget for &Heatmap {
                 for (j, ch) in label.chars().enumerate() {
                     let lx = label_start + j as u16;
                     if lx >= area.x && lx < px {
-                        buf[(lx, yi)].set_char(ch).set_fg(Color::DarkGray);
+                        buf[(lx, yi)].set_char(ch).set_fg(self.theme.axis_color);
                     }
                 }
             }
@@ -257,7 +278,8 @@ impl Widget for &Heatmap {
         // Draw colorbar
         if self.show_colorbar {
             let (vmin, vmax) = self.data.value_bounds();
-            let cb = Colorbar::new(self.colormap.as_ref(), vmin, vmax);
+            let cb = Colorbar::new(self.colormap.as_ref(), vmin, vmax)
+                .label_color(self.theme.foreground);
             let cb_area = Rect::new(
                 px + aw + 2,
                 py,

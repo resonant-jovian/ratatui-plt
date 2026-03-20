@@ -7,7 +7,7 @@
 /// # Example
 ///
 /// ```
-/// use ratatui_sim::series;
+/// use ratatui_plt::series;
 /// use ratatui::style::Color;
 ///
 /// let s = series!("sin(x)", [(0.0, 0.0), (1.0, 0.84), (2.0, 0.91)]);
@@ -37,7 +37,7 @@ macro_rules! series {
 /// # Example
 ///
 /// ```
-/// use ratatui_sim::{plot, series};
+/// use ratatui_plt::{plot, series};
 /// use ratatui::style::Color;
 ///
 /// let s1 = series!("A", [(0.0, 0.0), (1.0, 1.0)]);
@@ -63,19 +63,15 @@ macro_rules! plot {
 /// # Example
 ///
 /// ```
-/// use ratatui_sim::{heatmap_widget, prelude::*};
+/// use ratatui_plt::{heatmap_widget, prelude::*};
 ///
 /// let data = GridData::from_fn((-1.0, 1.0), (-1.0, 1.0), 20, 20, |x, y| x * y);
 /// let h = heatmap_widget!(data);
 /// ```
 #[macro_export]
 macro_rules! heatmap_widget {
-    ($data:expr) => {{
-        $crate::widgets::heatmap::Heatmap::new($data)
-    }};
-    ($data:expr, $cmap:expr) => {{
-        $crate::widgets::heatmap::Heatmap::new($data).colormap($cmap)
-    }};
+    ($data:expr) => {{ $crate::widgets::heatmap::Heatmap::new($data) }};
+    ($data:expr, $cmap:expr) => {{ $crate::widgets::heatmap::Heatmap::new($data).colormap($cmap) }};
 }
 
 /// Create a [`MultiPanel`](crate::widgets::multi_panel::MultiPanel) subplot grid.
@@ -83,18 +79,14 @@ macro_rules! heatmap_widget {
 /// # Example
 ///
 /// ```
-/// use ratatui_sim::subplot;
+/// use ratatui_plt::subplot;
 ///
 /// let panel = subplot!(2, 2);
 /// ```
 #[macro_export]
 macro_rules! subplot {
-    ($rows:expr, $cols:expr) => {{
-        $crate::widgets::multi_panel::MultiPanel::new($rows, $cols)
-    }};
-    ($rows:expr, $cols:expr, gap = $gap:expr) => {{
-        $crate::widgets::multi_panel::MultiPanel::new($rows, $cols).gap($gap)
-    }};
+    ($rows:expr, $cols:expr) => {{ $crate::widgets::multi_panel::MultiPanel::new($rows, $cols) }};
+    ($rows:expr, $cols:expr, gap = $gap:expr) => {{ $crate::widgets::multi_panel::MultiPanel::new($rows, $cols).gap($gap) }};
 }
 
 /// Create a [`ListedColormap`](crate::colormap::ListedColormap) from color stops.
@@ -102,7 +94,7 @@ macro_rules! subplot {
 /// # Example
 ///
 /// ```
-/// use ratatui_sim::colormap_custom;
+/// use ratatui_plt::colormap_custom;
 /// use ratatui::style::Color;
 ///
 /// let cmap = colormap_custom!("diverging",

@@ -9,6 +9,7 @@ use ratatui::widgets::Widget;
 
 use crate::axis::Axis;
 use crate::series::Series;
+use crate::theme::Theme;
 use crate::transform::data_to_screen;
 
 /// A dual y-axis plot that overlays two sets of series with independent y scales.
@@ -16,8 +17,8 @@ use crate::transform::data_to_screen;
 /// # Example
 ///
 /// ```
-/// use ratatui_sim::prelude::*;
-/// use ratatui_sim::widgets::twin_axes::TwinAxes;
+/// use ratatui_plt::prelude::*;
+/// use ratatui_plt::widgets::twin_axes::TwinAxes;
 ///
 /// let plot = TwinAxes::new()
 ///     .primary(Series::new("Temperature").data(vec![(0.0, 20.0), (1.0, 25.0)]).color(Color::Red))
@@ -33,6 +34,7 @@ pub struct TwinAxes {
     primary_y_axis: Axis,
     secondary_y_axis: Axis,
     title: Option<String>,
+    theme: Theme,
 }
 
 impl Default for TwinAxes {
@@ -44,6 +46,7 @@ impl Default for TwinAxes {
             primary_y_axis: Axis::new(),
             secondary_y_axis: Axis::new(),
             title: None,
+            theme: Theme::get_default(),
         }
     }
 }
@@ -85,6 +88,11 @@ impl TwinAxes {
         self
     }
 
+    pub fn theme(mut self, t: Theme) -> Self {
+        self.theme = t;
+        self
+    }
+
     fn compute_bounds(series: &[Series]) -> (f64, f64, f64, f64) {
         let mut x_min = f64::INFINITY;
         let mut x_max = f64::NEG_INFINITY;
@@ -100,8 +108,14 @@ impl TwinAxes {
                 y_max = y_max.max(hi);
             }
         }
-        if x_min.is_infinite() { x_min = 0.0; x_max = 1.0; }
-        if y_min.is_infinite() { y_min = 0.0; y_max = 1.0; }
+        if x_min.is_infinite() {
+            x_min = 0.0;
+            x_max = 1.0;
+        }
+        if y_min.is_infinite() {
+            y_min = 0.0;
+            y_max = 1.0;
+        }
         (x_min, x_max, y_min, y_max)
     }
 }
@@ -119,7 +133,9 @@ impl Widget for &TwinAxes {
 
         let px = area.x + left_label_width;
         let py = area.y + title_height;
-        let pw = area.width.saturating_sub(left_label_width + right_label_width + 1);
+        let pw = area
+            .width
+            .saturating_sub(left_label_width + right_label_width + 1);
         let ph = area.height.saturating_sub(title_height + tick_height);
 
         if pw < 2 || ph < 2 {
@@ -132,7 +148,9 @@ impl Widget for &TwinAxes {
             for (i, ch) in title.chars().enumerate() {
                 let x = start + i as u16;
                 if x < area.x + area.width {
-                    buf[(x, area.y)].set_char(ch).set_style(Style::default().fg(Color::White));
+                    buf[(x, area.y)]
+                        .set_char(ch)
+                        .set_style(Style::default().fg(self.theme.foreground));
                 }
             }
         }
@@ -151,18 +169,52 @@ impl Widget for &TwinAxes {
         // Draw axes
         for x in px..px + pw {
             if x < area.x + area.width {
-                buf[(x, py + ph)].set_char('─').set_fg(Color::DarkGray);
+                buf[(x, py + ph)]
+                    .set_char('─')
+                    .set_fg(self.theme.axis_color);
             }
         }
         // Left y-axis
         for y in py..py + ph {
-            buf[(px.saturating_sub(1), y)].set_char('│').set_fg(Color::DarkGray);
+            buf[(px.saturating_sub(1), y)]
+                .set_char('│')
+                .set_fg(self.theme.axis_color);
         }
         // Right y-axis
         let right_x = px + pw;
         if right_x < area.x + area.width {
             for y in py..py + ph {
-                buf[(right_x, y)].set_char('│').set_fg(Color::DarkGray);
+                buf[(right_x, y)]
+                    .set_char('│')
+                    .set_fg(self.theme.axis_color);
+            }
+        }
+
+        // Draw grid
+        let x_grid = self.x_axis.grid || self.theme.grid_visible;
+        let y_grid = self.primary_y_axis.grid || self.theme.grid_visible;
+        if x_grid {
+            let gx_ticks = self.x_axis.tick_positions(x_lo, x_hi);
+            for &tv in &gx_ticks {
+                let sx = data_to_screen(tv, x_lo, x_hi, px as f64, (px + pw - 1) as f64);
+                let xi = sx.round() as u16;
+                if xi >= px && xi < px + pw {
+                    for y in py..py + ph {
+                        buf[(xi, y)].set_char('·').set_fg(self.theme.grid_color);
+                    }
+                }
+            }
+        }
+        if y_grid {
+            let gy_ticks = self.primary_y_axis.tick_positions(py_lo, py_hi);
+            for &tv in &gy_ticks {
+                let sy = data_to_screen(tv, py_lo, py_hi, (py + ph - 1) as f64, py as f64);
+                let yi = sy.round() as u16;
+                if yi >= py && yi < py + ph {
+                    for x in px..px + pw {
+                        buf[(x, yi)].set_char('·').set_fg(self.theme.grid_color);
+                    }
+                }
             }
         }
 
@@ -178,7 +230,7 @@ impl Widget for &TwinAxes {
                 for (j, ch) in label.chars().enumerate() {
                     let lx = label_start + j as u16;
                     if lx >= area.x && lx < area.x + area.width {
-                        buf[(lx, y)].set_char(ch).set_fg(Color::DarkGray);
+                        buf[(lx, y)].set_char(ch).set_fg(self.theme.axis_color);
                     }
                 }
             }
@@ -195,7 +247,10 @@ impl Widget for &TwinAxes {
                 for (j, ch) in label.chars().enumerate() {
                     let lx = label_start + j as u16 + 1;
                     if lx < px && lx >= area.x {
-                        let color = self.primary_series.first().map_or(Color::DarkGray, |s| s.color);
+                        let color = self
+                            .primary_series
+                            .first()
+                            .map_or(self.theme.axis_color, |s| s.color);
                         buf[(lx, yi)].set_char(ch).set_fg(color);
                     }
                 }
@@ -213,7 +268,10 @@ impl Widget for &TwinAxes {
                 for (j, ch) in label.chars().enumerate() {
                     let lx = start_x + j as u16;
                     if lx < area.x + area.width {
-                        let color = self.secondary_series.first().map_or(Color::DarkGray, |s| s.color);
+                        let color = self
+                            .secondary_series
+                            .first()
+                            .map_or(self.theme.axis_color, |s| s.color);
                         buf[(lx, yi)].set_char(ch).set_fg(color);
                     }
                 }
@@ -258,9 +316,15 @@ impl Widget for &TwinAxes {
 #[allow(clippy::too_many_arguments)]
 fn draw_simple_line(
     buf: &mut Buffer,
-    x0: f64, y0: f64, x1: f64, y1: f64,
+    x0: f64,
+    y0: f64,
+    x1: f64,
+    y1: f64,
     color: Color,
-    clip_x: u16, clip_y: u16, clip_w: u16, clip_h: u16,
+    clip_x: u16,
+    clip_y: u16,
+    clip_w: u16,
+    clip_h: u16,
 ) {
     let mut ix0 = x0.round() as i32;
     let mut iy0 = y0.round() as i32;

@@ -18,7 +18,7 @@ use crate::style::LineStyle;
 /// # Example
 ///
 /// ```rust,no_run
-/// use ratatui_sim::async_data::{async_series, AsyncSeries};
+/// use ratatui_plt::async_data::{async_series, AsyncSeries};
 ///
 /// # async fn example() {
 /// let (tx, rx) = async_series("temperature");

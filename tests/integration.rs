@@ -2,8 +2,8 @@ use ratatui::buffer::Buffer;
 use ratatui::layout::Rect;
 use ratatui::widgets::Widget;
 
-use ratatui_sim::prelude::*;
-use ratatui_sim::{series, plot};
+use ratatui_plt::prelude::*;
+use ratatui_plt::{plot, series};
 
 // Helper removed - render inline in each test
 
@@ -126,16 +126,13 @@ fn test_colormap_viridis() {
 
 #[test]
 fn test_listed_colormap() {
-    let cmap = ListedColormap::new("test", vec![
-        (0.0, Color::Red),
-        (1.0, Color::Blue),
-    ]);
+    let cmap = ListedColormap::new("test", vec![(0.0, Color::Red), (1.0, Color::Blue)]);
     assert_eq!(cmap.name(), "test");
 }
 
 #[test]
 fn test_mathtext() {
-    use ratatui_sim::mathtext::render_mathtext;
+    use ratatui_plt::mathtext::render_mathtext;
 
     assert_eq!(render_mathtext(r"\alpha"), "\u{03b1}");
     assert_eq!(render_mathtext("x^2"), "x\u{00b2}");
@@ -144,7 +141,7 @@ fn test_mathtext() {
 
 #[test]
 fn test_scientific_notation() {
-    use ratatui_sim::mathtext::scientific_notation;
+    use ratatui_plt::mathtext::scientific_notation;
 
     let s = scientific_notation(1.5e6);
     assert!(s.contains("10"));
@@ -241,7 +238,7 @@ fn test_surface3d_renders() {
 
 #[test]
 fn test_box_data_quartiles() {
-    use ratatui_sim::widgets::box_plot::BoxData;
+    use ratatui_plt::widgets::box_plot::BoxData;
 
     let d = BoxData::new("test", vec![1.0, 2.0, 3.0, 4.0, 5.0], Color::White);
     let (q1, median, q3) = d.quartiles();
@@ -252,12 +249,14 @@ fn test_box_data_quartiles() {
 
 #[test]
 fn test_aspect_ratio_equal() {
-    use ratatui_sim::transform::apply_aspect_ratio;
+    use ratatui_plt::transform::apply_aspect_ratio;
 
     let (_x_off, _y_off, w, _h) = apply_aspect_ratio(
         &AspectRatio::Equal,
-        10.0, 10.0, // square data
-        80, 40,      // wide terminal area
+        10.0,
+        10.0, // square data
+        80,
+        40, // wide terminal area
     );
     // With Equal aspect + 2:1 cell ratio, the effective result should differ from input
     // The function constrains one dimension to maintain aspect ratio
@@ -283,7 +282,7 @@ fn test_plot_macro() {
 
 #[test]
 fn test_depth_sort() {
-    use ratatui_sim::transform::depth_sort;
+    use ratatui_plt::transform::depth_sort;
 
     let depths = vec![3.0, 1.0, 2.0];
     let sorted = depth_sort(&depths);

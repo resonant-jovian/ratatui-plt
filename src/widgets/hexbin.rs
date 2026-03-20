@@ -2,12 +2,14 @@
 
 use ratatui::buffer::Buffer;
 use ratatui::layout::Rect;
-use ratatui::style::{Color, Style};
+use ratatui::style::Style;
 use ratatui::widgets::Widget;
 
 use crate::axis::Axis;
 use crate::colormap::{Colormap, Viridis};
 use crate::norm::{LinearNorm, Normalize};
+use crate::theme::Theme;
+use crate::transform::data_to_screen;
 
 /// Aggregation function for hexbin.
 #[derive(Clone, Debug)]
@@ -27,7 +29,7 @@ pub enum HexAggregation {
 /// # Example
 ///
 /// ```
-/// use ratatui_sim::widgets::hexbin::HexbinPlot;
+/// use ratatui_plt::widgets::hexbin::HexbinPlot;
 ///
 /// let data: Vec<(f64, f64)> = (0..1000)
 ///     .map(|i| (i as f64 * 0.01, (i as f64 * 0.1).sin()))
@@ -43,6 +45,7 @@ pub struct HexbinPlot {
     title: Option<String>,
     x_axis: Axis,
     y_axis: Axis,
+    theme: Theme,
 }
 
 impl HexbinPlot {
@@ -56,6 +59,7 @@ impl HexbinPlot {
             title: None,
             x_axis: Axis::new(),
             y_axis: Axis::new(),
+            theme: Theme::get_default(),
         }
     }
 
@@ -84,8 +88,19 @@ impl HexbinPlot {
         self
     }
 
-    pub fn x_axis(mut self, axis: Axis) -> Self { self.x_axis = axis; self }
-    pub fn y_axis(mut self, axis: Axis) -> Self { self.y_axis = axis; self }
+    pub fn x_axis(mut self, axis: Axis) -> Self {
+        self.x_axis = axis;
+        self
+    }
+    pub fn y_axis(mut self, axis: Axis) -> Self {
+        self.y_axis = axis;
+        self
+    }
+
+    pub fn theme(mut self, t: Theme) -> Self {
+        self.theme = t;
+        self
+    }
 }
 
 impl Widget for &HexbinPlot {
@@ -112,24 +127,62 @@ impl Widget for &HexbinPlot {
             for (i, ch) in title.chars().enumerate() {
                 let x = start + i as u16;
                 if x < area.x + area.width {
-                    buf[(x, area.y)].set_char(ch).set_fg(Color::White);
+                    buf[(x, area.y)].set_char(ch).set_fg(self.theme.foreground);
                 }
             }
         }
 
         // Compute bounds
         let x_min = self.data.iter().map(|p| p.0).fold(f64::INFINITY, f64::min);
-        let x_max = self.data.iter().map(|p| p.0).fold(f64::NEG_INFINITY, f64::max);
+        let x_max = self
+            .data
+            .iter()
+            .map(|p| p.0)
+            .fold(f64::NEG_INFINITY, f64::max);
         let y_min = self.data.iter().map(|p| p.1).fold(f64::INFINITY, f64::min);
-        let y_max = self.data.iter().map(|p| p.1).fold(f64::NEG_INFINITY, f64::max);
+        let y_max = self
+            .data
+            .iter()
+            .map(|p| p.1)
+            .fold(f64::NEG_INFINITY, f64::max);
 
         let (x_lo, x_hi) = self.x_axis.resolve_bounds(x_min, x_max);
         let (y_lo, y_hi) = self.y_axis.resolve_bounds(y_min, y_max);
 
+        // Draw grid
+        let x_grid = self.x_axis.grid || self.theme.grid_visible;
+        let y_grid = self.y_axis.grid || self.theme.grid_visible;
+        if x_grid {
+            let gx_ticks = self.x_axis.tick_positions(x_lo, x_hi);
+            for &tv in &gx_ticks {
+                let sx = data_to_screen(tv, x_lo, x_hi, px as f64, (px + pw - 1) as f64);
+                let xi = sx.round() as u16;
+                if xi >= px && xi < px + pw {
+                    for y in py..py + ph {
+                        buf[(xi, y)].set_char('·').set_fg(self.theme.grid_color);
+                    }
+                }
+            }
+        }
+        if y_grid {
+            let gy_ticks = self.y_axis.tick_positions(y_lo, y_hi);
+            for &tv in &gy_ticks {
+                let sy = data_to_screen(tv, y_lo, y_hi, (py + ph - 1) as f64, py as f64);
+                let yi = sy.round() as u16;
+                if yi >= py && yi < py + ph {
+                    for x in px..px + pw {
+                        buf[(x, yi)].set_char('·').set_fg(self.theme.grid_color);
+                    }
+                }
+            }
+        }
+
         // Simple grid-based hexagonal binning approximation
         // Use rectangular bins as an approximation that works well in terminal cells
         let n_cols = self.gridsize;
-        let n_rows = (self.gridsize as f64 * ph as f64 / pw as f64).round().max(3.0) as usize;
+        let n_rows = (self.gridsize as f64 * ph as f64 / pw as f64)
+            .round()
+            .max(3.0) as usize;
 
         let bin_w = (x_hi - x_lo) / n_cols as f64;
         let bin_h = (y_hi - y_lo) / n_rows as f64;
@@ -153,18 +206,16 @@ impl Widget for &HexbinPlot {
         let values: Vec<Vec<f64>> = match self.aggregation {
             HexAggregation::Count => counts.clone(),
             HexAggregation::Sum => weights_sum.clone(),
-            HexAggregation::Mean => {
-                counts
-                    .iter()
-                    .zip(weights_sum.iter())
-                    .map(|(cr, wr)| {
-                        cr.iter()
-                            .zip(wr.iter())
-                            .map(|(&c, &w)| if c > 0.0 { w / c } else { 0.0 })
-                            .collect()
-                    })
-                    .collect()
-            }
+            HexAggregation::Mean => counts
+                .iter()
+                .zip(weights_sum.iter())
+                .map(|(cr, wr)| {
+                    cr.iter()
+                        .zip(wr.iter())
+                        .map(|(&c, &w)| if c > 0.0 { w / c } else { 0.0 })
+                        .collect()
+                })
+                .collect(),
         };
 
         let val_max = values
@@ -206,10 +257,14 @@ impl Widget for &HexbinPlot {
 
         // Draw axes
         for x in px..px + pw {
-            buf[(x, py + ph)].set_char('─').set_fg(Color::DarkGray);
+            buf[(x, py + ph)]
+                .set_char('─')
+                .set_fg(self.theme.axis_color);
         }
         for y in py..py + ph {
-            buf[(px.saturating_sub(1), y)].set_char('│').set_fg(Color::DarkGray);
+            buf[(px.saturating_sub(1), y)]
+                .set_char('│')
+                .set_fg(self.theme.axis_color);
         }
     }
 }

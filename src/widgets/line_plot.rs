@@ -3,7 +3,7 @@
 //! # Example
 //!
 //! ```
-//! use ratatui_sim::prelude::*;
+//! use ratatui_plt::prelude::*;
 //!
 //! let plot = LinePlot::new()
 //!     .series(Series::new("sin").data(
@@ -22,8 +22,9 @@ use ratatui::widgets::Widget;
 use crate::annotation::Annotation;
 use crate::axis::{AspectRatio, Axis};
 use crate::legend::{Legend, LegendPosition};
-use crate::series::{is_valid_point, Series};
+use crate::series::{Series, is_valid_point};
 use crate::style::DashPattern;
+use crate::theme::Theme;
 use crate::transform::{apply_aspect_ratio, data_to_screen};
 
 /// Line plot step mode.
@@ -51,6 +52,7 @@ pub struct LinePlot {
     legend_position: LegendPosition,
     step_mode: StepMode,
     annotations: Vec<Annotation>,
+    theme: Theme,
 }
 
 impl Default for LinePlot {
@@ -65,6 +67,7 @@ impl Default for LinePlot {
             legend_position: LegendPosition::TopRight,
             step_mode: StepMode::None,
             annotations: Vec::new(),
+            theme: Theme::get_default(),
         }
     }
 }
@@ -134,6 +137,12 @@ impl LinePlot {
         self.annotations.push(ann);
         self
     }
+
+    /// Set the theme.
+    pub fn theme(mut self, theme: Theme) -> Self {
+        self.theme = theme;
+        self
+    }
 }
 
 impl Widget for &LinePlot {
@@ -151,7 +160,9 @@ impl Widget for &LinePlot {
         let plot_x = area.x + y_label_width;
         let plot_y = area.y + title_height;
         let plot_width = area.width.saturating_sub(y_label_width + 1);
-        let plot_height = area.height.saturating_sub(title_height + tick_height + x_label_height);
+        let plot_height = area
+            .height
+            .saturating_sub(title_height + tick_height + x_label_height);
 
         if plot_width < 2 || plot_height < 2 {
             return;
@@ -183,7 +194,7 @@ impl Widget for &LinePlot {
                 if x < area.x + area.width {
                     buf[(x, area.y)]
                         .set_char(ch)
-                        .set_style(Style::default().fg(Color::White));
+                        .set_style(Style::default().fg(self.theme.foreground));
                 }
             }
         }
@@ -191,36 +202,40 @@ impl Widget for &LinePlot {
         // Draw axes border
         for x in px..px + aw {
             if x < area.x + area.width {
-                buf[(x, py + ah)].set_char('─').set_fg(Color::DarkGray);
+                buf[(x, py + ah)]
+                    .set_char('─')
+                    .set_fg(self.theme.axis_color);
             }
         }
         for y in py..py + ah {
             buf[(px.saturating_sub(1), y)]
                 .set_char('│')
-                .set_fg(Color::DarkGray);
+                .set_fg(self.theme.axis_color);
         }
 
         // Draw grid lines
-        if self.x_axis.grid {
+        let x_grid = self.x_axis.grid || self.theme.grid_visible;
+        let y_grid = self.y_axis.grid || self.theme.grid_visible;
+        if x_grid {
             let x_ticks = self.x_axis.tick_positions(x_min, x_max);
             for &tv in &x_ticks {
                 let sx = data_to_screen(tv, x_min, x_max, px as f64, (px + aw - 1) as f64);
                 let xi = sx.round() as u16;
                 if xi >= px && xi < px + aw {
                     for y in py..py + ah {
-                        buf[(xi, y)].set_char('·').set_fg(Color::DarkGray);
+                        buf[(xi, y)].set_char('·').set_fg(self.theme.grid_color);
                     }
                 }
             }
         }
-        if self.y_axis.grid {
+        if y_grid {
             let y_ticks = self.y_axis.tick_positions(y_min, y_max);
             for &tv in &y_ticks {
                 let sy = data_to_screen(tv, y_min, y_max, (py + ah - 1) as f64, py as f64);
                 let yi = sy.round() as u16;
                 if yi >= py && yi < py + ah {
                     for x in px..px + aw {
-                        buf[(x, yi)].set_char('·').set_fg(Color::DarkGray);
+                        buf[(x, yi)].set_char('·').set_fg(self.theme.grid_color);
                     }
                 }
             }
@@ -238,7 +253,7 @@ impl Widget for &LinePlot {
                 for (j, ch) in label.chars().enumerate() {
                     let lx = label_start + j as u16;
                     if lx >= area.x && lx < area.x + area.width {
-                        buf[(lx, y)].set_char(ch).set_fg(Color::DarkGray);
+                        buf[(lx, y)].set_char(ch).set_fg(self.theme.axis_color);
                     }
                 }
             }
@@ -255,7 +270,7 @@ impl Widget for &LinePlot {
                 for (j, ch) in label.chars().enumerate() {
                     let lx = label_start + j as u16 + 1;
                     if lx < px && lx >= area.x {
-                        buf[(lx, yi)].set_char(ch).set_fg(Color::DarkGray);
+                        buf[(lx, yi)].set_char(ch).set_fg(self.theme.axis_color);
                     }
                 }
             }
@@ -268,7 +283,7 @@ impl Widget for &LinePlot {
             for (i, ch) in label.chars().enumerate() {
                 let x = start + i as u16;
                 if x < area.x + area.width && y < area.y + area.height {
-                    buf[(x, y)].set_char(ch).set_fg(Color::White);
+                    buf[(x, y)].set_char(ch).set_fg(self.theme.foreground);
                 }
             }
         }
@@ -280,7 +295,7 @@ impl Widget for &LinePlot {
             for (i, ch) in label.chars().enumerate() {
                 let y = start_y + i as u16;
                 if y < py + ah {
-                    buf[(x, y)].set_char(ch).set_fg(Color::White);
+                    buf[(x, y)].set_char(ch).set_fg(self.theme.foreground);
                 }
             }
         }
@@ -296,10 +311,8 @@ impl Widget for &LinePlot {
                     data_to_screen(baseline, y_min, y_max, (py + ah - 1) as f64, py as f64);
 
                 for point in &s.data {
-                    let sx =
-                        data_to_screen(point.0, x_min, x_max, px as f64, (px + aw - 1) as f64);
-                    let sy =
-                        data_to_screen(point.1, y_min, y_max, (py + ah - 1) as f64, py as f64);
+                    let sx = data_to_screen(point.0, x_min, x_max, px as f64, (px + aw - 1) as f64);
+                    let sy = data_to_screen(point.1, y_min, y_max, (py + ah - 1) as f64, py as f64);
                     let xi = sx.round() as u16;
                     let y_top = sy.round().min(baseline_screen.round()) as u16;
                     let y_bot = sy.round().max(baseline_screen.round()) as u16;
@@ -328,10 +341,8 @@ impl Widget for &LinePlot {
                     let lo = y - s.y_err_low.as_ref().map_or(0.0, |e| e[i]);
                     let hi = y + s.y_err_high.as_ref().map_or(0.0, |e| e[i]);
 
-                    let sy_lo =
-                        data_to_screen(lo, y_min, y_max, (py + ah - 1) as f64, py as f64);
-                    let sy_hi =
-                        data_to_screen(hi, y_min, y_max, (py + ah - 1) as f64, py as f64);
+                    let sy_lo = data_to_screen(lo, y_min, y_max, (py + ah - 1) as f64, py as f64);
+                    let sy_hi = data_to_screen(hi, y_min, y_max, (py + ah - 1) as f64, py as f64);
 
                     let y_top = sy_hi.round() as u16;
                     let y_bot = sy_lo.round() as u16;
@@ -392,7 +403,12 @@ impl Widget for &LinePlot {
                     sy1,
                     s.color,
                     &s.line_style.pattern,
-                    &ClipRect { x_min: px, y_min: py, x_max: px + aw, y_max: py + ah },
+                    &ClipRect {
+                        x_min: px,
+                        y_min: py,
+                        x_max: px + aw,
+                        y_max: py + ah,
+                    },
                 );
             }
 
@@ -416,8 +432,7 @@ impl Widget for &LinePlot {
         // Draw annotations
         for ann in &self.annotations {
             let sx = data_to_screen(ann.text_x, x_min, x_max, px as f64, (px + aw - 1) as f64);
-            let sy =
-                data_to_screen(ann.text_y, y_min, y_max, (py + ah - 1) as f64, py as f64);
+            let sy = data_to_screen(ann.text_y, y_min, y_max, (py + ah - 1) as f64, py as f64);
             let xi = sx.round() as u16;
             let yi = sy.round() as u16;
             if yi >= py && yi < py + ah {
@@ -432,7 +447,9 @@ impl Widget for &LinePlot {
 
         // Draw legend
         if self.show_legend && !self.series.is_empty() {
-            let legend = Legend::from_series(&self.series).position(self.legend_position.clone());
+            let legend = Legend::from_series(&self.series)
+                .position(self.legend_position.clone())
+                .theme(self.theme.clone());
             let legend_area = Rect::new(px, py, aw, ah);
             (&legend).render(legend_area, buf);
         }
@@ -506,6 +523,11 @@ fn draw_line(
     let mut step = 0u32;
 
     loop {
+        // Compute step direction for local character selection
+        let e2 = 2 * err;
+        let stepped_x = e2 >= dy;
+        let stepped_y = e2 <= dx;
+
         let draw = match pattern {
             DashPattern::Solid => true,
             DashPattern::Dashed => (step / 3).is_multiple_of(2),
@@ -520,14 +542,12 @@ fn draw_line(
             let px = ix0 as u16;
             let py = iy0 as u16;
             if px >= clip.x_min && px < clip.x_max && py >= clip.y_min && py < clip.y_max {
-                let ch = if dx > dy.abs() * 2 {
-                    '─'
-                } else if dy.abs() > dx * 2 {
-                    '│'
-                } else if (sx > 0 && sy > 0) || (sx < 0 && sy < 0) {
-                    '╲'
-                } else {
-                    '╱'
+                let ch = match (stepped_x, stepped_y) {
+                    (true, false) => '─',
+                    (false, true) => '│',
+                    (true, true) if (sx > 0) == (sy > 0) => '╲',
+                    (true, true) => '╱',
+                    _ => '·',
                 };
                 buf[(px, py)].set_char(ch).set_fg(color);
             }
@@ -536,12 +556,11 @@ fn draw_line(
         if ix0 == ix1 && iy0 == iy1 {
             break;
         }
-        let e2 = 2 * err;
-        if e2 >= dy {
+        if stepped_x {
             err += dy;
             ix0 += sx;
         }
-        if e2 <= dx {
+        if stepped_y {
             err += dx;
             iy0 += sy;
         }

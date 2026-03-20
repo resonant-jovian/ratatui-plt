@@ -6,7 +6,7 @@
 //! # Example
 //!
 //! ```
-//! use ratatui_sim::theme::Theme;
+//! use ratatui_plt::theme::Theme;
 //!
 //! // Use the dark theme (good for most terminals)
 //! let theme = Theme::dark();
@@ -56,7 +56,7 @@ impl Theme {
             grid_color: Color::DarkGray,
             axis_color: Color::DarkGray,
             color_cycle: ColorCycle::default(),
-            grid_visible: false,
+            grid_visible: true,
             grid_pattern: DashPattern::Dotted,
             bold_title: true,
         }
@@ -67,10 +67,10 @@ impl Theme {
         Self {
             background: Color::Reset,
             foreground: Color::Black,
-            grid_color: Color::Gray,
+            grid_color: Color::Rgb(200, 200, 200),
             axis_color: Color::Gray,
             color_cycle: ColorCycle::default(),
-            grid_visible: false,
+            grid_visible: true,
             grid_pattern: DashPattern::Dotted,
             bold_title: true,
         }
@@ -117,16 +117,16 @@ impl Theme {
             grid_color: Color::Rgb(7, 54, 66),
             axis_color: Color::Rgb(88, 110, 117),
             color_cycle: ColorCycle::new(vec![
-                Color::Rgb(38, 139, 210),   // blue
-                Color::Rgb(211, 54, 130),   // magenta
-                Color::Rgb(133, 153, 0),    // green
-                Color::Rgb(203, 75, 22),    // orange
-                Color::Rgb(108, 113, 196),  // violet
-                Color::Rgb(42, 161, 152),   // cyan
-                Color::Rgb(181, 137, 0),    // yellow
-                Color::Rgb(220, 50, 47),    // red
+                Color::Rgb(38, 139, 210),  // blue
+                Color::Rgb(211, 54, 130),  // magenta
+                Color::Rgb(133, 153, 0),   // green
+                Color::Rgb(203, 75, 22),   // orange
+                Color::Rgb(108, 113, 196), // violet
+                Color::Rgb(42, 161, 152),  // cyan
+                Color::Rgb(181, 137, 0),   // yellow
+                Color::Rgb(220, 50, 47),   // red
             ]),
-            grid_visible: false,
+            grid_visible: true,
             grid_pattern: DashPattern::Dotted,
             bold_title: true,
         }
