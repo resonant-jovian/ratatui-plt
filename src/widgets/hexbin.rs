@@ -7,11 +7,13 @@ use ratatui::layout::Rect;
 use ratatui::style::Style;
 use ratatui::widgets::Widget;
 
+use crate::annotation::Annotation;
 use crate::axis::Axis;
 use crate::colormap::{Colormap, Viridis};
+use crate::frame::{PlotFrame, ReferenceLine};
 use crate::norm::{LinearNorm, Normalize};
+use crate::spines::Spines;
 use crate::theme::Theme;
-use crate::transform::data_to_screen;
 
 /// Aggregation function for hexbin.
 #[derive(Clone, Debug)]
@@ -48,6 +50,9 @@ pub struct HexbinPlot {
     x_axis: Axis,
     y_axis: Axis,
     theme: Theme,
+    spines: Spines,
+    reference_lines: Vec<ReferenceLine>,
+    annotations: Vec<Annotation>,
 }
 
 impl HexbinPlot {
@@ -62,6 +67,9 @@ impl HexbinPlot {
             x_axis: Axis::new(),
             y_axis: Axis::new(),
             theme: Theme::get_default(),
+            spines: Spines::default(),
+            reference_lines: Vec::new(),
+            annotations: Vec::new(),
         }
     }
 
@@ -103,6 +111,30 @@ impl HexbinPlot {
         self.theme = t;
         self
     }
+
+    /// Set spine visibility.
+    pub fn spines(mut self, spines: Spines) -> Self {
+        self.spines = spines;
+        self
+    }
+
+    /// Add a reference line.
+    pub fn reference_line(mut self, line: ReferenceLine) -> Self {
+        self.reference_lines.push(line);
+        self
+    }
+
+    /// Set all reference lines.
+    pub fn reference_lines(mut self, lines: Vec<ReferenceLine>) -> Self {
+        self.reference_lines = lines;
+        self
+    }
+
+    /// Add an annotation.
+    pub fn annotation(mut self, ann: Annotation) -> Self {
+        self.annotations.push(ann);
+        self
+    }
 }
 
 fn axial_round(q: f64, r: f64) -> (i32, i32) {
@@ -131,29 +163,6 @@ impl Widget for &HexbinPlot {
             return;
         }
 
-        let title_height: u16 = if self.title.is_some() { 1 } else { 0 };
-        let y_label_width: u16 = 8;
-        let tick_height: u16 = 1;
-
-        let px = area.x + y_label_width;
-        let py = area.y + title_height;
-        let pw = area.width.saturating_sub(y_label_width + 1);
-        let ph = area.height.saturating_sub(title_height + tick_height);
-
-        if pw < 2 || ph < 2 {
-            return;
-        }
-
-        if let Some(ref title) = self.title {
-            let start = area.x + (area.width.saturating_sub(title.len() as u16)) / 2;
-            for (i, ch) in title.chars().enumerate() {
-                let x = start + i as u16;
-                if x < area.x + area.width {
-                    buf[(x, area.y)].set_char(ch).set_fg(self.theme.foreground);
-                }
-            }
-        }
-
         // Compute bounds
         let x_min = self.data.iter().map(|p| p.0).fold(f64::INFINITY, f64::min);
         let x_max = self
@@ -171,33 +180,20 @@ impl Widget for &HexbinPlot {
         let (x_lo, x_hi) = self.x_axis.resolve_bounds(x_min, x_max);
         let (y_lo, y_hi) = self.y_axis.resolve_bounds(y_min, y_max);
 
-        // Draw grid
-        let x_grid = self.x_axis.grid || self.theme.grid_visible;
-        let y_grid = self.y_axis.grid || self.theme.grid_visible;
-        if x_grid {
-            let gx_ticks = self.x_axis.tick_positions(x_lo, x_hi);
-            for &tv in &gx_ticks {
-                let sx = data_to_screen(tv, x_lo, x_hi, px as f64, (px + pw - 1) as f64);
-                let xi = sx.round() as u16;
-                if xi >= px && xi < px + pw {
-                    for y in py..py + ph {
-                        buf[(xi, y)].set_char('·').set_fg(self.theme.grid_color);
-                    }
-                }
-            }
-        }
-        if y_grid {
-            let gy_ticks = self.y_axis.tick_positions(y_lo, y_hi);
-            for &tv in &gy_ticks {
-                let sy = data_to_screen(tv, y_lo, y_hi, (py + ph - 1) as f64, py as f64);
-                let yi = sy.round() as u16;
-                if yi >= py && yi < py + ph {
-                    for x in px..px + pw {
-                        buf[(x, yi)].set_char('·').set_fg(self.theme.grid_color);
-                    }
-                }
-            }
-        }
+        // Create and render the plot frame (title, axes, grid, ticks, labels, spines, ref lines)
+        let frame = PlotFrame::new(&self.x_axis, &self.y_axis, &self.theme)
+            .title(self.title.as_deref())
+            .spines(self.spines.clone())
+            .reference_lines(&self.reference_lines);
+
+        let Some(pa) = frame.render(area, buf, x_lo, x_hi, y_lo, y_hi) else {
+            return;
+        };
+
+        let px = pa.x;
+        let py = pa.y;
+        let pw = pa.width;
+        let ph = pa.height;
 
         // Hexagonal binning using axial coordinates
         let sqrt3 = 3.0_f64.sqrt();
@@ -238,7 +234,7 @@ impl Widget for &HexbinPlot {
             for cx in 0..pw {
                 let screen_x = px + cx;
                 let screen_y = py + cy;
-                if screen_x >= area.x + area.width || screen_y >= area.y + area.height {
+                if !pa.in_area(screen_x, screen_y) {
                     continue;
                 }
 
@@ -264,16 +260,7 @@ impl Widget for &HexbinPlot {
             }
         }
 
-        // Draw axes
-        for x in px..px + pw {
-            buf[(x, py + ph)]
-                .set_char('─')
-                .set_fg(self.theme.axis_color);
-        }
-        for y in py..py + ph {
-            buf[(px.saturating_sub(1), y)]
-                .set_char('│')
-                .set_fg(self.theme.axis_color);
-        }
+        // Draw annotations
+        PlotFrame::draw_annotations(&pa, &self.annotations, buf);
     }
 }

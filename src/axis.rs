@@ -28,6 +28,19 @@ pub enum Scale {
     },
     /// Power-law scale: y = x^gamma.
     Power(f64),
+    /// Logit scale for probability data in (0, 1). Critical for ROC curves.
+    /// Transform: log(p / (1 - p)).
+    Logit,
+    /// Inverse hyperbolic sine scale. Smoother than SymLog near zero.
+    /// Transform: asinh(x / linear_width) where linear_width controls the
+    /// transition between linear and logarithmic behavior.
+    Asinh { linear_width: f64 },
+    /// User-defined scale with custom forward and inverse transforms.
+    /// The closures must be inverses of each other.
+    Func {
+        forward: fn(f64) -> f64,
+        inverse: fn(f64) -> f64,
+    },
 }
 
 impl Scale {
@@ -63,6 +76,12 @@ impl Scale {
                     -((-value).powf(*gamma))
                 }
             }
+            Self::Logit => {
+                let v = value.clamp(1e-10, 1.0 - 1e-10);
+                (v / (1.0 - v)).ln()
+            }
+            Self::Asinh { linear_width } => (value / linear_width).asinh(),
+            Self::Func { forward, .. } => forward(value),
         }
     }
 
@@ -93,11 +112,18 @@ impl Scale {
                     -((-value).powf(1.0 / gamma))
                 }
             }
+            Self::Logit => {
+                let e = value.exp();
+                e / (1.0 + e)
+            }
+            Self::Asinh { linear_width } => value.sinh() * linear_width,
+            Self::Func { inverse, .. } => inverse(value),
         }
     }
 }
 
 /// Axis bounds specification.
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[derive(Clone, Debug, Default)]
 pub enum Bounds {
     /// Automatically determined from data.
@@ -111,6 +137,7 @@ pub enum Bounds {
 ///
 /// Terminal cells are typically ~2:1 (height:width in pixels), so `Equal`
 /// automatically compensates to produce visually square data units.
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[derive(Clone, Debug, Default)]
 pub enum AspectRatio {
     /// Aspect ratio determined by available area (default).

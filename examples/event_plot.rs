@@ -46,7 +46,13 @@ fn main() -> color_eyre::Result<()> {
     enable_raw_mode()?;
     let mut terminal = Terminal::new(CrosstermBackend::new(io::stdout()))?;
 
-    let colors = [Color::Cyan, Color::Yellow, Color::Magenta, Color::Green, Color::Red];
+    let colors = [
+        Color::Cyan,
+        Color::Yellow,
+        Color::Magenta,
+        Color::Green,
+        Color::Red,
+    ];
     let groups: Vec<EventGroup> = (0..5)
         .map(|i| {
             let spikes = lcg_events(42 + i * 17, 10 + (i as usize) * 2, 200.0);

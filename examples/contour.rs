@@ -1,4 +1,7 @@
-//! Contour plot example: 2D potential field from two Gaussian peaks with filled contours.
+//! Contour plot example: 2D potential field with labeled contour lines.
+//!
+//! Demonstrates show_labels=true for inline contour level labels and
+//! annotations at the peak locations.
 
 use std::io;
 
@@ -42,12 +45,23 @@ fn main() -> color_eyre::Result<()> {
 
     let plot = ContourPlot::new(data)
         .levels(12)
-        .filled(true)
+        .filled(false)
         .colormap(Viridis)
-        .title("2D Potential Field (two Gaussian peaks)")
-        .x_axis(Axis::new().label("x"))
-        .y_axis(Axis::new().label("y"))
-        .aspect_ratio(AspectRatio::Equal);
+        .show_labels(true)
+        .title("Labeled Contours: Two Gaussian Peaks (q to quit)")
+        .x_axis(Axis::new().label("x").grid(true))
+        .y_axis(Axis::new().label("y").grid(true))
+        .aspect_ratio(AspectRatio::Equal)
+        .annotation(
+            Annotation::new("Peak 1", 1.5, 1.8)
+                .arrow_to(1.5, 1.0)
+                .color(Color::White),
+        )
+        .annotation(
+            Annotation::new("Peak 2", -1.0, -0.5)
+                .arrow_to(-1.0, -1.5)
+                .color(Color::White),
+        );
 
     loop {
         terminal.draw(|frame| {

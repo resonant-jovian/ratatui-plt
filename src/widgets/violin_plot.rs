@@ -5,9 +5,27 @@ use ratatui::layout::Rect;
 use ratatui::style::{Color, Style};
 use ratatui::widgets::Widget;
 
+use crate::annotation::Annotation;
 use crate::axis::Axis;
+use crate::frame::{PlotFrame, ReferenceLine};
+use crate::spines::Spines;
 use crate::theme::Theme;
+use crate::ticker::NullLocator;
 use crate::transform::data_to_screen;
+
+/// Controls what is rendered inside each violin body.
+#[derive(Clone, Debug, Default)]
+pub enum ViolinInner {
+    /// Show a mini box plot (IQR box + median line). This is the default.
+    #[default]
+    Box,
+    /// Show horizontal lines at Q1, median, and Q3.
+    Quartile,
+    /// Show individual data points as dots along the center.
+    Point,
+    /// Show thin vertical sticks for each data value.
+    Stick,
+}
 
 /// A single violin dataset.
 #[derive(Clone, Debug)]
@@ -147,8 +165,16 @@ pub struct ViolinPlot {
     y_axis: Axis,
     title: Option<String>,
     show_box: bool,
+    /// What to render inside each violin body.
+    show_inner: ViolinInner,
+    /// When true with exactly 2 datasets, draw left-half for the first and
+    /// right-half for the second at each position (split violin).
+    split: bool,
     /// Visual theme.
     theme: Theme,
+    spines: Spines,
+    reference_lines: Vec<ReferenceLine>,
+    annotations: Vec<Annotation>,
 }
 
 impl Default for ViolinPlot {
@@ -159,7 +185,12 @@ impl Default for ViolinPlot {
             y_axis: Axis::new(),
             title: None,
             show_box: true,
+            show_inner: ViolinInner::default(),
+            split: false,
             theme: Theme::get_default(),
+            spines: Spines::default(),
+            reference_lines: Vec::new(),
+            annotations: Vec::new(),
         }
     }
 }
@@ -194,41 +225,65 @@ impl ViolinPlot {
         self
     }
 
+    /// Set what to render inside each violin body.
+    pub fn show_inner(mut self, inner: ViolinInner) -> Self {
+        self.show_inner = inner;
+        self
+    }
+
+    /// Enable split violin mode.
+    ///
+    /// When `true` and there are exactly 2 datasets, the first dataset is
+    /// drawn as the left half and the second as the right half at each
+    /// position, enabling direct side-by-side comparison.
+    pub fn split(mut self, split: bool) -> Self {
+        self.split = split;
+        self
+    }
+
     /// Set the visual theme.
     pub fn theme(mut self, theme: Theme) -> Self {
         self.theme = theme;
         self
     }
+
+    /// Set spine visibility.
+    pub fn spines(mut self, spines: Spines) -> Self {
+        self.spines = spines;
+        self
+    }
+
+    /// Add a reference line.
+    pub fn reference_line(mut self, line: ReferenceLine) -> Self {
+        self.reference_lines.push(line);
+        self
+    }
+
+    /// Set all reference lines.
+    pub fn reference_lines(mut self, lines: Vec<ReferenceLine>) -> Self {
+        self.reference_lines = lines;
+        self
+    }
+
+    /// Add an annotation.
+    pub fn annotation(mut self, ann: Annotation) -> Self {
+        self.annotations.push(ann);
+        self
+    }
+}
+
+/// Side selector for split violin drawing.
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum ViolinSide {
+    Both,
+    Left,
+    Right,
 }
 
 impl Widget for &ViolinPlot {
     fn render(self, area: Rect, buf: &mut Buffer) {
         if area.width < 4 || area.height < 4 || self.datasets.is_empty() {
             return;
-        }
-
-        let title_height: u16 = if self.title.is_some() { 1 } else { 0 };
-        let y_label_width: u16 = 8;
-        let cat_height: u16 = 1;
-
-        let px = area.x + y_label_width;
-        let py = area.y + title_height;
-        let pw = area.width.saturating_sub(y_label_width + 1);
-        let ph = area.height.saturating_sub(title_height + cat_height);
-
-        if pw < 2 || ph < 2 {
-            return;
-        }
-
-        // Draw title
-        if let Some(ref title) = self.title {
-            let start = area.x + (area.width.saturating_sub(title.len() as u16)) / 2;
-            for (i, ch) in title.chars().enumerate() {
-                let x = start + i as u16;
-                if x < area.x + area.width {
-                    buf[(x, area.y)].set_char(ch).set_fg(self.theme.foreground);
-                }
-            }
         }
 
         // Compute global y range from all datasets (finite values only)
@@ -247,41 +302,49 @@ impl Widget for &ViolinPlot {
         }
         let (y_lo, y_hi) = self.y_axis.resolve_bounds(y_min, y_max);
 
-        // Draw y-axis line
-        for y in py..py + ph {
-            buf[(px.saturating_sub(1), y)]
-                .set_char('│')
-                .set_fg(self.theme.axis_color);
-        }
+        // Use NullLocator for x-axis to suppress x tick labels (categories drawn manually)
+        let x_axis = Axis::new().locator(NullLocator);
 
-        // Draw grid (y-axis only; x-axis is categorical)
-        let y_grid = self.y_axis.grid || self.theme.grid_visible;
-        if y_grid {
-            let gy_ticks = self.y_axis.tick_positions(y_lo, y_hi);
-            for &tv in &gy_ticks {
-                let sy = data_to_screen(tv, y_lo, y_hi, (py + ph - 1) as f64, py as f64);
-                let yi = sy.round() as u16;
-                if yi >= py && yi < py + ph {
-                    for x in px..px + pw {
-                        buf[(x, yi)].set_char('·').set_fg(self.theme.grid_color);
-                    }
-                }
-            }
-        }
+        // In split mode with 2 datasets, we render them at 1 position instead of 2.
+        let use_split = self.split && self.datasets.len() == 2;
+        let n_slots = if use_split { 1 } else { self.datasets.len() };
+        let x_lo = 0.0;
+        let x_hi = n_slots as f64;
 
-        let n = self.datasets.len();
-        let slot_width = pw / n as u16;
+        // Create and render the plot frame
+        let frame = PlotFrame::new(&x_axis, &self.y_axis, &self.theme)
+            .title(self.title.as_deref())
+            .spines(self.spines.clone())
+            .reference_lines(&self.reference_lines);
+
+        let Some(pa) = frame.render(area, buf, x_lo, x_hi, y_lo, y_hi) else {
+            return;
+        };
+
+        let slot_width = pa.width / n_slots as u16;
 
         // Number of KDE evaluation points (one per screen row, doubled for half-block resolution)
-        let n_eval = (ph as usize * 2).max(10);
+        let n_eval = (pa.height as usize * 2).max(10);
 
-        for (i, d) in self.datasets.iter().enumerate() {
+        // Build the list of draw jobs: (dataset_index, slot_index, side)
+        let jobs: Vec<(usize, usize, ViolinSide)> = if use_split {
+            vec![(0, 0, ViolinSide::Left), (1, 0, ViolinSide::Right)]
+        } else {
+            self.datasets
+                .iter()
+                .enumerate()
+                .map(|(i, _)| (i, i, ViolinSide::Both))
+                .collect()
+        };
+
+        for &(di, slot, side) in &jobs {
+            let d = &self.datasets[di];
             let sorted = d.finite_sorted();
             if sorted.is_empty() {
                 continue;
             }
 
-            let center_x = px + (i as u16 * slot_width) + slot_width / 2;
+            let center_x = pa.x + (slot as u16 * slot_width) + slot_width / 2;
 
             // Build evaluation grid spanning the y range
             let eval_points: Vec<f64> = (0..n_eval)
@@ -300,21 +363,16 @@ impl Widget for &ViolinPlot {
             let max_half_width = (slot_width / 2).saturating_sub(1).max(1) as f64;
 
             // Render the violin shape using half-block characters.
-            // We process pairs of eval_points to produce half-block rows.
-            // Each screen row covers two eval indices (top half, bottom half).
-            // We iterate screen rows from top (high y) to bottom (low y).
-            for row in 0..ph {
-                let screen_y = py + row;
+            for row in 0..pa.height {
+                let screen_y = pa.y + row;
                 if screen_y >= area.y + area.height {
                     break;
                 }
 
                 // Map screen row to eval index. Top of screen = high y, bottom = low y.
-                // top half-pixel
                 let top_eval_idx_f = (1.0 - (row as f64 * 2.0) / (n_eval as f64 - 1.0).max(1.0))
                     * (n_eval - 1) as f64;
                 let top_idx = (top_eval_idx_f.round() as usize).min(n_eval - 1);
-                // bottom half-pixel
                 let bot_eval_idx_f = (1.0
                     - (row as f64 * 2.0 + 1.0) / (n_eval as f64 - 1.0).max(1.0))
                     * (n_eval - 1) as f64;
@@ -323,8 +381,6 @@ impl Widget for &ViolinPlot {
                 let top_width = (kde_values[top_idx] / kde_max * max_half_width).round() as u16;
                 let bot_width = (kde_values[bot_idx] / kde_max * max_half_width).round() as u16;
 
-                // Draw mirrored filled violin using half-block chars
-                // For each column offset from center, determine if top/bottom halves are filled
                 let max_w = top_width.max(bot_width);
                 for dx in 0..=max_w {
                     let top_filled = dx <= top_width && top_width > 0;
@@ -337,90 +393,142 @@ impl Widget for &ViolinPlot {
                         (false, false) => continue,
                     };
 
-                    // Draw on both sides (mirrored)
-                    let positions = if dx == 0 {
-                        vec![center_x]
-                    } else {
-                        let mut p = Vec::new();
-                        if center_x + dx < px + pw {
-                            p.push(center_x + dx);
+                    // Collect screen x positions depending on side
+                    let positions = match side {
+                        ViolinSide::Both => {
+                            if dx == 0 {
+                                vec![center_x]
+                            } else {
+                                let mut p = Vec::new();
+                                if center_x + dx < pa.x + pa.width {
+                                    p.push(center_x + dx);
+                                }
+                                if center_x >= dx + pa.x {
+                                    p.push(center_x - dx);
+                                }
+                                p
+                            }
                         }
-                        if center_x >= dx + px {
-                            p.push(center_x - dx);
+                        ViolinSide::Left => {
+                            // Draw only to the left of center (and center itself for dx=0)
+                            if center_x >= dx + pa.x {
+                                vec![center_x - dx]
+                            } else {
+                                vec![]
+                            }
                         }
-                        p
+                        ViolinSide::Right => {
+                            // Draw only to the right of center (and center itself for dx=0)
+                            if center_x + dx < pa.x + pa.width {
+                                vec![center_x + dx]
+                            } else {
+                                vec![]
+                            }
+                        }
                     };
 
                     for &sx in &positions {
-                        if sx >= px && sx < px + pw {
-                            let style = match (top_filled, bot_filled) {
-                                (true, true) => Style::default().fg(d.color),
-                                (true, false) => Style::default().fg(d.color),
-                                (false, true) => Style::default().fg(d.color),
-                                _ => Style::default(),
-                            };
-                            buf[(sx, screen_y)].set_char(ch).set_style(style);
+                        if pa.contains(sx, screen_y) {
+                            buf[(sx, screen_y)]
+                                .set_char(ch)
+                                .set_style(Style::default().fg(d.color));
                         }
                     }
                 }
             }
 
-            // Optional inner box plot overlay
-            if self.show_box {
+            // Draw inner decoration based on show_inner (respecting show_box for compat)
+            let draw_inner = self.show_box;
+            if draw_inner {
                 let (q1, median, q3) = ViolinData::quartiles(&sorted);
-
                 let sy_q1 =
-                    data_to_screen(q1, y_lo, y_hi, (py + ph - 1) as f64, py as f64).round() as u16;
-                let sy_median = data_to_screen(median, y_lo, y_hi, (py + ph - 1) as f64, py as f64)
-                    .round() as u16;
+                    data_to_screen(q1, y_lo, y_hi, (pa.y + pa.height - 1) as f64, pa.y as f64)
+                        .round() as u16;
+                let sy_median = data_to_screen(
+                    median,
+                    y_lo,
+                    y_hi,
+                    (pa.y + pa.height - 1) as f64,
+                    pa.y as f64,
+                )
+                .round() as u16;
                 let sy_q3 =
-                    data_to_screen(q3, y_lo, y_hi, (py + ph - 1) as f64, py as f64).round() as u16;
+                    data_to_screen(q3, y_lo, y_hi, (pa.y + pa.height - 1) as f64, pa.y as f64)
+                        .round() as u16;
 
-                // Draw thin box from Q1 to Q3 (single character wide at center)
-                let box_half = 1u16;
-                for y in sy_q3..=sy_q1 {
-                    if y >= py && y < py + ph {
-                        for dx in 0..=box_half {
-                            let positions: Vec<u16> = if dx == 0 {
-                                vec![center_x]
-                            } else {
-                                let mut p = Vec::new();
-                                if center_x + dx < px + pw {
-                                    p.push(center_x + dx);
+                match &self.show_inner {
+                    ViolinInner::Box => {
+                        // Draw thin box from Q1 to Q3
+                        let box_half = 1u16;
+                        for y in sy_q3..=sy_q1 {
+                            if y >= pa.y && y < pa.y + pa.height {
+                                for dx in 0..=box_half {
+                                    let positions = inner_positions(center_x, dx, side, &pa);
+                                    for sx in positions {
+                                        buf[(sx, y)].set_char('│').set_fg(self.theme.foreground);
+                                    }
                                 }
-                                if center_x >= dx + px {
-                                    p.push(center_x - dx);
-                                }
-                                p
-                            };
-                            for &sx in &positions {
-                                if sx >= px && sx < px + pw {
-                                    buf[(sx, y)].set_char('│').set_fg(self.theme.foreground);
+                            }
+                        }
+                        // Median line
+                        if sy_median >= pa.y && sy_median < pa.y + pa.height {
+                            for dx in 0..=box_half {
+                                let positions = inner_positions(center_x, dx, side, &pa);
+                                for sx in positions {
+                                    buf[(sx, sy_median)]
+                                        .set_char('━')
+                                        .set_fg(self.theme.foreground);
                                 }
                             }
                         }
                     }
-                }
-
-                // Median line
-                for dx in 0..=box_half {
-                    if sy_median >= py && sy_median < py + ph {
-                        let positions: Vec<u16> = if dx == 0 {
-                            vec![center_x]
-                        } else {
-                            let mut p = Vec::new();
-                            if center_x + dx < px + pw {
-                                p.push(center_x + dx);
+                    ViolinInner::Quartile => {
+                        // Draw horizontal lines at Q1, median, and Q3
+                        let half = 2u16.min((slot_width / 4).max(1));
+                        for &sy in &[sy_q1, sy_median, sy_q3] {
+                            if sy >= pa.y && sy < pa.y + pa.height {
+                                for dx in 0..=half {
+                                    let positions = inner_positions(center_x, dx, side, &pa);
+                                    for sx in positions {
+                                        let ch = if sy == sy_median { '━' } else { '─' };
+                                        buf[(sx, sy)].set_char(ch).set_fg(self.theme.foreground);
+                                    }
+                                }
                             }
-                            if center_x >= dx + px {
-                                p.push(center_x - dx);
+                        }
+                    }
+                    ViolinInner::Point => {
+                        // Show individual data points as dots at the center column
+                        for &v in &sorted {
+                            let sy = data_to_screen(
+                                v,
+                                y_lo,
+                                y_hi,
+                                (pa.y + pa.height - 1) as f64,
+                                pa.y as f64,
+                            )
+                            .round() as u16;
+                            if pa.contains(center_x, sy) {
+                                buf[(center_x, sy)]
+                                    .set_char('•')
+                                    .set_fg(self.theme.foreground);
                             }
-                            p
-                        };
-                        for &sx in &positions {
-                            if sx >= px && sx < px + pw {
-                                buf[(sx, sy_median)]
-                                    .set_char('━')
+                        }
+                    }
+                    ViolinInner::Stick => {
+                        // Show thin vertical sticks for each data value
+                        for &v in &sorted {
+                            let sy = data_to_screen(
+                                v,
+                                y_lo,
+                                y_hi,
+                                (pa.y + pa.height - 1) as f64,
+                                pa.y as f64,
+                            )
+                            .round() as u16;
+                            if pa.contains(center_x, sy) {
+                                buf[(center_x, sy)]
+                                    .set_char('│')
                                     .set_fg(self.theme.foreground);
                             }
                         }
@@ -431,7 +539,7 @@ impl Widget for &ViolinPlot {
             // Category label
             let label = &d.label;
             let label_start = center_x.saturating_sub(label.len() as u16 / 2);
-            let label_y = py + ph;
+            let label_y = pa.y + pa.height;
             if label_y < area.y + area.height {
                 for (j, ch) in label.chars().enumerate() {
                     let lx = label_start + j as u16;
@@ -444,20 +552,45 @@ impl Widget for &ViolinPlot {
             }
         }
 
-        // Y axis ticks
-        let y_ticks = self.y_axis.tick_positions(y_lo, y_hi);
-        for &tv in &y_ticks {
-            let sy = data_to_screen(tv, y_lo, y_hi, (py + ph - 1) as f64, py as f64);
-            let label = self.y_axis.format_tick(tv);
-            let yi = sy.round() as u16;
-            if yi >= py && yi < py + ph {
-                let start = px.saturating_sub(label.len() as u16 + 1);
-                for (j, ch) in label.chars().enumerate() {
-                    let lx = start + j as u16;
-                    if lx >= area.x && lx < px {
-                        buf[(lx, yi)].set_char(ch).set_fg(self.theme.axis_color);
-                    }
+        // Draw annotations
+        PlotFrame::draw_annotations(&pa, &self.annotations, buf);
+    }
+}
+
+/// Helper: compute screen x positions for inner decoration, respecting split side.
+fn inner_positions(
+    center_x: u16,
+    dx: u16,
+    side: ViolinSide,
+    pa: &crate::frame::PlotArea,
+) -> Vec<u16> {
+    match side {
+        ViolinSide::Both => {
+            if dx == 0 {
+                vec![center_x]
+            } else {
+                let mut p = Vec::new();
+                if center_x + dx < pa.x + pa.width {
+                    p.push(center_x + dx);
                 }
+                if center_x >= dx + pa.x {
+                    p.push(center_x - dx);
+                }
+                p
+            }
+        }
+        ViolinSide::Left => {
+            if center_x >= dx + pa.x {
+                vec![center_x - dx]
+            } else {
+                vec![]
+            }
+        }
+        ViolinSide::Right => {
+            if center_x + dx < pa.x + pa.width {
+                vec![center_x + dx]
+            } else {
+                vec![]
             }
         }
     }

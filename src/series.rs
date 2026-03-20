@@ -40,6 +40,7 @@ pub struct Series {
 }
 
 /// Where to fill from a series.
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[derive(Clone, Debug)]
 pub enum FillTo {
     /// Fill down to y = value.
@@ -269,6 +270,7 @@ impl Series3D {
 ///          vec![4.0, 5.0, 6.0]],  // row 1
 /// );
 /// ```
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[derive(Clone, Debug)]
 pub struct GridData {
     /// X-axis coordinate values (length = ncols).
@@ -339,6 +341,7 @@ impl GridData {
 /// Vector field data for quiver plots.
 ///
 /// Each entry is (x, y, dx, dy) representing a vector (dx, dy) at position (x, y).
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[derive(Clone, Debug)]
 pub struct VectorFieldData {
     /// Vector entries: (x, y, dx, dy).
@@ -348,6 +351,7 @@ pub struct VectorFieldData {
 }
 
 /// Metadata for regular-grid vector fields enabling fast bilinear interpolation.
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[derive(Clone, Debug)]
 pub struct GridMeta {
     /// Number of columns.
@@ -363,7 +367,10 @@ pub struct GridMeta {
 impl VectorFieldData {
     /// Create vector field data from a list of (x, y, dx, dy) tuples.
     pub fn new(vectors: Vec<(f64, f64, f64, f64)>) -> Self {
-        Self { vectors, grid: None }
+        Self {
+            vectors,
+            grid: None,
+        }
     }
 
     /// Create from a function (dx, dy) = f(x, y) sampled on a grid.
@@ -385,7 +392,12 @@ impl VectorFieldData {
         }
         Self {
             vectors,
-            grid: Some(GridMeta { nx, ny, x_range, y_range }),
+            grid: Some(GridMeta {
+                nx,
+                ny,
+                x_range,
+                y_range,
+            }),
         }
     }
 
@@ -441,14 +453,20 @@ impl VectorFieldData {
         }
         let (mut ws, mut dxs, mut dys) = (0.0, 0.0, 0.0);
         for &(dsq, idx) in &best {
-            if dsq == f64::INFINITY { break; }
+            if dsq == f64::INFINITY {
+                break;
+            }
             let w = 1.0 / (dsq + 1e-10);
             let (_, _, fdx, fdy) = self.vectors[idx];
             dxs += w * fdx;
             dys += w * fdy;
             ws += w;
         }
-        if ws > 0.0 { (dxs / ws, dys / ws) } else { (0.0, 0.0) }
+        if ws > 0.0 {
+            (dxs / ws, dys / ws)
+        } else {
+            (0.0, 0.0)
+        }
     }
 
     /// Get the maximum vector magnitude.

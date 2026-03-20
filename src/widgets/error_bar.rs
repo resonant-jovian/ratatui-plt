@@ -5,9 +5,12 @@ use ratatui::layout::Rect;
 use ratatui::style::Color;
 use ratatui::widgets::Widget;
 
+use crate::annotation::Annotation;
 use crate::axis::Axis;
+use crate::frame::{PlotFrame, ReferenceLine};
+use crate::legend::{Legend, LegendEntry, LegendPosition};
+use crate::spines::Spines;
 use crate::theme::Theme;
-use crate::transform::data_to_screen;
 
 /// Error bar direction.
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -36,10 +39,16 @@ pub struct ErrorBarPlot {
     x_err_high: Vec<f64>,
     direction: ErrorDirection,
     color: Color,
+    name: Option<String>,
     title: Option<String>,
     x_axis: Axis,
     y_axis: Axis,
     theme: Theme,
+    spines: Spines,
+    reference_lines: Vec<ReferenceLine>,
+    annotations: Vec<Annotation>,
+    show_legend: bool,
+    legend_position: LegendPosition,
 }
 
 impl Default for ErrorBarPlot {
@@ -52,10 +61,16 @@ impl Default for ErrorBarPlot {
             x_err_high: Vec::new(),
             direction: ErrorDirection::Vertical,
             color: Color::White,
+            name: None,
             title: None,
             x_axis: Axis::new(),
             y_axis: Axis::new(),
             theme: Theme::get_default(),
+            spines: Spines::default(),
+            reference_lines: Vec::new(),
+            annotations: Vec::new(),
+            show_legend: true,
+            legend_position: LegendPosition::TopRight,
         }
     }
 }
@@ -112,35 +127,54 @@ impl ErrorBarPlot {
         self.theme = t;
         self
     }
+
+    /// Set spine visibility.
+    pub fn spines(mut self, spines: Spines) -> Self {
+        self.spines = spines;
+        self
+    }
+
+    /// Add a reference line.
+    pub fn reference_line(mut self, line: ReferenceLine) -> Self {
+        self.reference_lines.push(line);
+        self
+    }
+
+    /// Set all reference lines.
+    pub fn reference_lines(mut self, lines: Vec<ReferenceLine>) -> Self {
+        self.reference_lines = lines;
+        self
+    }
+
+    /// Add an annotation.
+    pub fn annotation(mut self, ann: Annotation) -> Self {
+        self.annotations.push(ann);
+        self
+    }
+
+    /// Set the series name (used for legend display).
+    pub fn name(mut self, name: impl Into<String>) -> Self {
+        self.name = Some(name.into());
+        self
+    }
+
+    /// Show or hide the legend.
+    pub fn show_legend(mut self, show: bool) -> Self {
+        self.show_legend = show;
+        self
+    }
+
+    /// Set the legend position.
+    pub fn legend_position(mut self, pos: LegendPosition) -> Self {
+        self.legend_position = pos;
+        self
+    }
 }
 
 impl Widget for &ErrorBarPlot {
     fn render(self, area: Rect, buf: &mut Buffer) {
         if area.width < 4 || area.height < 4 || self.points.is_empty() {
             return;
-        }
-
-        let title_height: u16 = if self.title.is_some() { 1 } else { 0 };
-        let y_label_width: u16 = 8;
-        let tick_height: u16 = 1;
-
-        let px = area.x + y_label_width;
-        let py = area.y + title_height;
-        let pw = area.width.saturating_sub(y_label_width + 1);
-        let ph = area.height.saturating_sub(title_height + tick_height);
-
-        if pw < 2 || ph < 2 {
-            return;
-        }
-
-        if let Some(ref title) = self.title {
-            let start = area.x + (area.width.saturating_sub(title.len() as u16)) / 2;
-            for (i, ch) in title.chars().enumerate() {
-                let x = start + i as u16;
-                if x < area.x + area.width {
-                    buf[(x, area.y)].set_char(ch).set_fg(self.theme.foreground);
-                }
-            }
         }
 
         // Compute bounds
@@ -162,50 +196,20 @@ impl Widget for &ErrorBarPlot {
         let (x_lo, x_hi) = self.x_axis.resolve_bounds(x_min, x_max);
         let (y_lo, y_hi) = self.y_axis.resolve_bounds(y_min, y_max);
 
-        // Draw axes
-        for x in px..px + pw {
-            buf[(x, py + ph)]
-                .set_char('─')
-                .set_fg(self.theme.axis_color);
-        }
-        for y in py..py + ph {
-            buf[(px.saturating_sub(1), y)]
-                .set_char('│')
-                .set_fg(self.theme.axis_color);
-        }
+        // Create and render the plot frame (title, axes, grid, ticks, labels, spines, ref lines)
+        let frame = PlotFrame::new(&self.x_axis, &self.y_axis, &self.theme)
+            .title(self.title.as_deref())
+            .spines(self.spines.clone())
+            .reference_lines(&self.reference_lines);
 
-        // Draw grid
-        let x_grid = self.x_axis.grid || self.theme.grid_visible;
-        let y_grid = self.y_axis.grid || self.theme.grid_visible;
-        if x_grid {
-            let gx_ticks = self.x_axis.tick_positions(x_lo, x_hi);
-            for &tv in &gx_ticks {
-                let sx = data_to_screen(tv, x_lo, x_hi, px as f64, (px + pw - 1) as f64);
-                let xi = sx.round() as u16;
-                if xi >= px && xi < px + pw {
-                    for y in py..py + ph {
-                        buf[(xi, y)].set_char('·').set_fg(self.theme.grid_color);
-                    }
-                }
-            }
-        }
-        if y_grid {
-            let gy_ticks = self.y_axis.tick_positions(y_lo, y_hi);
-            for &tv in &gy_ticks {
-                let sy = data_to_screen(tv, y_lo, y_hi, (py + ph - 1) as f64, py as f64);
-                let yi = sy.round() as u16;
-                if yi >= py && yi < py + ph {
-                    for x in px..px + pw {
-                        buf[(x, yi)].set_char('·').set_fg(self.theme.grid_color);
-                    }
-                }
-            }
-        }
+        let Some(pa) = frame.render(area, buf, x_lo, x_hi, y_lo, y_hi) else {
+            return;
+        };
 
         // Draw error bars and points
         for (i, &(x, y)) in self.points.iter().enumerate() {
-            let sx = data_to_screen(x, x_lo, x_hi, px as f64, (px + pw - 1) as f64);
-            let sy = data_to_screen(y, y_lo, y_hi, (py + ph - 1) as f64, py as f64);
+            let sx = pa.screen_x(x);
+            let sy = pa.screen_y(y);
             let xi = sx.round() as u16;
             let yi = sy.round() as u16;
 
@@ -216,21 +220,21 @@ impl Widget for &ErrorBarPlot {
             ) {
                 let elo = self.y_err_low.get(i).copied().unwrap_or(0.0);
                 let ehi = self.y_err_high.get(i).copied().unwrap_or(0.0);
-                let sy_lo = data_to_screen(y - elo, y_lo, y_hi, (py + ph - 1) as f64, py as f64);
-                let sy_hi = data_to_screen(y + ehi, y_lo, y_hi, (py + ph - 1) as f64, py as f64);
+                let sy_lo = pa.screen_y(y - elo);
+                let sy_hi = pa.screen_y(y + ehi);
                 let y_top = sy_hi.round() as u16;
                 let y_bot = sy_lo.round() as u16;
 
-                if xi >= px && xi < px + pw {
+                if xi >= pa.x && xi < pa.x + pa.width {
                     for ey in y_top..=y_bot {
-                        if ey >= py && ey < py + ph {
+                        if ey >= pa.y && ey < pa.y + pa.height {
                             buf[(xi, ey)].set_char('│').set_fg(self.color);
                         }
                     }
-                    if y_top >= py && y_top < py + ph {
+                    if y_top >= pa.y && y_top < pa.y + pa.height {
                         buf[(xi, y_top)].set_char('┬').set_fg(self.color);
                     }
-                    if y_bot >= py && y_bot < py + ph {
+                    if y_bot >= pa.y && y_bot < pa.y + pa.height {
                         buf[(xi, y_bot)].set_char('┴').set_fg(self.color);
                     }
                 }
@@ -243,30 +247,47 @@ impl Widget for &ErrorBarPlot {
             ) {
                 let elo = self.x_err_low.get(i).copied().unwrap_or(0.0);
                 let ehi = self.x_err_high.get(i).copied().unwrap_or(0.0);
-                let sx_lo = data_to_screen(x - elo, x_lo, x_hi, px as f64, (px + pw - 1) as f64);
-                let sx_hi = data_to_screen(x + ehi, x_lo, x_hi, px as f64, (px + pw - 1) as f64);
+                let sx_lo = pa.screen_x(x - elo);
+                let sx_hi = pa.screen_x(x + ehi);
                 let x_left = sx_lo.round() as u16;
                 let x_right = sx_hi.round() as u16;
 
-                if yi >= py && yi < py + ph {
+                if yi >= pa.y && yi < pa.y + pa.height {
                     for ex in x_left..=x_right {
-                        if ex >= px && ex < px + pw {
+                        if ex >= pa.x && ex < pa.x + pa.width {
                             buf[(ex, yi)].set_char('─').set_fg(self.color);
                         }
                     }
-                    if x_left >= px && x_left < px + pw {
+                    if x_left >= pa.x && x_left < pa.x + pa.width {
                         buf[(x_left, yi)].set_char('├').set_fg(self.color);
                     }
-                    if x_right >= px && x_right < px + pw {
+                    if x_right >= pa.x && x_right < pa.x + pa.width {
                         buf[(x_right, yi)].set_char('┤').set_fg(self.color);
                     }
                 }
             }
 
             // Draw center point
-            if xi >= px && xi < px + pw && yi >= py && yi < py + ph {
+            if pa.contains(xi, yi) {
                 buf[(xi, yi)].set_char('●').set_fg(self.color);
             }
+        }
+
+        // Draw annotations
+        PlotFrame::draw_annotations(&pa, &self.annotations, buf);
+
+        // Draw legend
+        if self.show_legend && self.name.is_some() {
+            let entries = vec![LegendEntry {
+                name: self.name.clone().unwrap(),
+                color: self.color,
+                marker: Some('●'),
+            }];
+            let legend = Legend::new(entries)
+                .position(self.legend_position.clone())
+                .theme(self.theme.clone());
+            let legend_area = Rect::new(pa.x, pa.y, pa.width, pa.height);
+            (&legend).render(legend_area, buf);
         }
     }
 }

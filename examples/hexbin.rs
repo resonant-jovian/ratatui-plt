@@ -37,9 +37,9 @@ fn main() -> color_eyre::Result<()> {
     let mut data = Vec::with_capacity(100000);
 
     let clusters: [(f64, f64, f64, usize); 3] = [
-        (0.0, 0.0, 1.0, 50000),   // Dense core at origin
-        (3.0, 3.0, 0.8, 30000),   // Tight secondary cluster
-        (-2.0, 2.0, 1.5, 20000),  // Diffuse spread
+        (0.0, 0.0, 1.0, 50000),  // Dense core at origin
+        (3.0, 3.0, 0.8, 30000),  // Tight secondary cluster
+        (-2.0, 2.0, 1.5, 20000), // Diffuse spread
     ];
 
     for &(cx, cy, sigma, count) in &clusters {

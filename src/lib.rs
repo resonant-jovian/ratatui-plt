@@ -44,6 +44,8 @@ pub mod annotation;
 pub mod axis;
 pub mod color_cycle;
 pub mod colormap;
+pub mod export;
+pub mod frame;
 pub mod legend;
 pub mod macros;
 pub mod mathtext;
@@ -56,6 +58,9 @@ pub mod theme;
 pub mod ticker;
 pub mod transform;
 pub mod widgets;
+
+#[cfg(feature = "chrono")]
+pub mod date_axis;
 
 #[cfg(feature = "async")]
 pub mod animation;

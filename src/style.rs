@@ -5,6 +5,7 @@
 use ratatui::style::Color;
 
 /// Line drawing style.
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[derive(Clone, Debug)]
 pub struct LineStyle {
     /// Dash pattern.
@@ -55,6 +56,7 @@ impl LineStyle {
 }
 
 /// Dash pattern for lines.
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum DashPattern {
     /// Continuous line: ────
@@ -68,6 +70,7 @@ pub enum DashPattern {
 }
 
 /// Line thickness.
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Thickness {
     /// Thin line (single-width characters).
@@ -79,6 +82,7 @@ pub enum Thickness {
 }
 
 /// Marker shapes for data points.
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum MarkerShape {
     /// Single dot: ·
@@ -143,6 +147,7 @@ impl Default for FillStyle {
 }
 
 /// Fill density for region fills, approximating opacity in terminal.
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum FillDensity {
     /// Light fill: ░

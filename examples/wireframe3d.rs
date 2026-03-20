@@ -33,7 +33,7 @@ fn main() -> color_eyre::Result<()> {
     let mut terminal = Terminal::new(CrosstermBackend::new(io::stdout()))?;
 
     // Gaussian bump: exp(-(x^2 + y^2))
-    let data = GridData::from_fn((-3.0, 3.0), (-3.0, 3.0), 80, 80, |x, y| {
+    let data = GridData::from_fn((-3.0, 3.0), (-3.0, 3.0), 40, 40, |x, y| {
         (-(x * x + y * y)).exp()
     });
 

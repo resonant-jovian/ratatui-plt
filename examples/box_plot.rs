@@ -1,3 +1,8 @@
+//! Box plot example: distribution comparison with notched boxes and mean markers.
+//!
+//! Demonstrates show_means=true (diamond markers at mean values) and
+//! notch=true (narrowed boxes at the median region indicating confidence).
+
 use std::io;
 
 use crossterm::{
@@ -59,13 +64,22 @@ fn main() -> color_eyre::Result<()> {
         generate_data(999, 500, 6.0, 1.5),
         Color::Magenta,
     );
+    let group_d = BoxData::new(
+        "Treatment C",
+        generate_data(7777, 500, 8.0, 2.5),
+        Color::Green,
+    );
 
     let plot = BoxPlot::new()
         .box_data(group_a)
         .box_data(group_b)
         .box_data(group_c)
-        .title("Distribution Comparison (q to quit)")
-        .y_axis(Axis::new().label("Value"));
+        .box_data(group_d)
+        .title("Notched Box Plot with Means (q to quit)")
+        .y_axis(Axis::new().label("Value").grid(true))
+        .show_means(true)
+        .notch(true)
+        .reference_line(ReferenceLine::hline_dashed(6.5, Color::DarkGray));
 
     loop {
         terminal.draw(|frame| {

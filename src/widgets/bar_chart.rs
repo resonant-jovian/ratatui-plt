@@ -5,8 +5,13 @@ use ratatui::layout::Rect;
 use ratatui::style::Color;
 use ratatui::widgets::Widget;
 
+use crate::annotation::Annotation;
+use crate::axis::Axis;
+use crate::frame::{PlotFrame, ReferenceLine};
+use crate::legend::{Legend, LegendEntry, LegendPosition};
+use crate::spines::Spines;
 use crate::theme::Theme;
-use crate::ticker::{TickFormatter, TickLocator};
+use crate::ticker::NullLocator;
 use crate::transform::data_to_screen;
 
 /// Bar chart orientation.
@@ -69,6 +74,11 @@ pub struct BarChart {
     title: Option<String>,
     bar_gap: u16,
     theme: Theme,
+    spines: Spines,
+    reference_lines: Vec<ReferenceLine>,
+    annotations: Vec<Annotation>,
+    show_legend: bool,
+    legend_position: LegendPosition,
 }
 
 impl Default for BarChart {
@@ -81,6 +91,11 @@ impl Default for BarChart {
             title: None,
             bar_gap: 1,
             theme: Theme::get_default(),
+            spines: Spines::default(),
+            reference_lines: Vec::new(),
+            annotations: Vec::new(),
+            show_legend: true,
+            legend_position: LegendPosition::TopRight,
         }
     }
 }
@@ -125,6 +140,42 @@ impl BarChart {
         self.theme = theme;
         self
     }
+
+    /// Set spine visibility.
+    pub fn spines(mut self, spines: Spines) -> Self {
+        self.spines = spines;
+        self
+    }
+
+    /// Add a reference line.
+    pub fn reference_line(mut self, line: ReferenceLine) -> Self {
+        self.reference_lines.push(line);
+        self
+    }
+
+    /// Set all reference lines.
+    pub fn reference_lines(mut self, lines: Vec<ReferenceLine>) -> Self {
+        self.reference_lines = lines;
+        self
+    }
+
+    /// Add an annotation.
+    pub fn annotation(mut self, ann: Annotation) -> Self {
+        self.annotations.push(ann);
+        self
+    }
+
+    /// Show or hide the legend.
+    pub fn show_legend(mut self, show: bool) -> Self {
+        self.show_legend = show;
+        self
+    }
+
+    /// Set the legend position.
+    pub fn legend_position(mut self, pos: LegendPosition) -> Self {
+        self.legend_position = pos;
+        self
+    }
 }
 
 impl Widget for &BarChart {
@@ -135,30 +186,6 @@ impl Widget for &BarChart {
             || self.datasets.is_empty()
         {
             return;
-        }
-
-        let title_height: u16 = if self.title.is_some() { 1 } else { 0 };
-        let y_label_width: u16 = 8;
-        let cat_height: u16 = 1;
-
-        let px = area.x + y_label_width;
-        let py = area.y + title_height;
-        let pw = area.width.saturating_sub(y_label_width + 1);
-        let ph = area.height.saturating_sub(title_height + cat_height);
-
-        if pw < 2 || ph < 2 {
-            return;
-        }
-
-        // Draw title
-        if let Some(ref title) = self.title {
-            let start = area.x + (area.width.saturating_sub(title.len() as u16)) / 2;
-            for (i, ch) in title.chars().enumerate() {
-                let x = start + i as u16;
-                if x < area.x + area.width {
-                    buf[(x, area.y)].set_char(ch).set_fg(self.theme.foreground);
-                }
-            }
         }
 
         // Compute max value
@@ -183,38 +210,29 @@ impl Widget for &BarChart {
         };
         let y_hi = if max_val == 0.0 { 1.0 } else { max_val * 1.1 };
 
-        // Draw axes
-        for x in px..px + pw {
-            buf[(x, py + ph)]
-                .set_char('─')
-                .set_fg(self.theme.axis_color);
-        }
-        for y in py..py + ph {
-            buf[(px.saturating_sub(1), y)]
-                .set_char('│')
-                .set_fg(self.theme.axis_color);
-        }
-
-        // Draw grid
-        if self.theme.grid_visible {
-            let gy_ticks = crate::ticker::MaxNLocator::new(5).tick_values(0.0, y_hi);
-            for &tv in &gy_ticks {
-                let sy = data_to_screen(tv, 0.0, y_hi, (py + ph - 1) as f64, py as f64);
-                let yi = sy.round() as u16;
-                if yi >= py && yi < py + ph {
-                    for x in px..px + pw {
-                        buf[(x, yi)].set_char('·').set_fg(self.theme.grid_color);
-                    }
-                }
-            }
-        }
-
+        // Use NullLocator for x-axis to suppress x tick labels (categories drawn manually)
+        let x_axis = Axis::new().locator(NullLocator);
+        let y_axis = Axis::new();
         let n_cats = self.categories.len();
+        let x_lo = 0.0;
+        let x_hi = n_cats as f64;
+
+        // Create and render the plot frame (title, axes, grid, ticks, labels, spines, ref lines)
+        let frame = PlotFrame::new(&x_axis, &y_axis, &self.theme)
+            .title(self.title.as_deref())
+            .spines(self.spines.clone())
+            .reference_lines(&self.reference_lines);
+
+        let Some(pa) = frame.render(area, buf, x_lo, x_hi, 0.0, y_hi) else {
+            return;
+        };
+
+        // Draw bars
         let n_ds = self.datasets.len();
-        let group_width = pw / n_cats as u16;
+        let group_width = pa.width / n_cats as u16;
 
         for (cat_i, _cat) in self.categories.iter().enumerate() {
-            let group_x = px + cat_i as u16 * group_width;
+            let group_x = pa.x + cat_i as u16 * group_width;
 
             match self.mode {
                 BarMode::Grouped => {
@@ -222,18 +240,22 @@ impl Widget for &BarChart {
                     for (ds_i, ds) in self.datasets.iter().enumerate() {
                         let val = ds.values.get(cat_i).copied().unwrap_or(0.0);
                         let bar_x = group_x + self.bar_gap + ds_i as u16 * bar_width;
-                        let bar_top =
-                            data_to_screen(val, 0.0, y_hi, (py + ph - 1) as f64, py as f64).round()
-                                as u16;
+                        let bar_top = data_to_screen(
+                            val,
+                            0.0,
+                            y_hi,
+                            (pa.y + pa.height - 1) as f64,
+                            pa.y as f64,
+                        )
+                        .round() as u16;
 
                         for x in bar_x..bar_x + bar_width.max(1) {
-                            for y in bar_top..py + ph {
-                                if x >= px && x < px + pw && y >= py && y < py + ph {
+                            for y in bar_top..pa.y + pa.height {
+                                if pa.contains(x, y) {
                                     buf[(x, y)].set_char('█').set_fg(ds.color);
                                 }
                             }
                         }
-
                     }
                 }
                 BarMode::Stacked => {
@@ -243,21 +265,26 @@ impl Widget for &BarChart {
 
                     for ds in &self.datasets {
                         let val = ds.values.get(cat_i).copied().unwrap_or(0.0);
-                        let y_bot =
-                            data_to_screen(bottom, 0.0, y_hi, (py + ph - 1) as f64, py as f64)
-                                .round() as u16;
+                        let y_bot = data_to_screen(
+                            bottom,
+                            0.0,
+                            y_hi,
+                            (pa.y + pa.height - 1) as f64,
+                            pa.y as f64,
+                        )
+                        .round() as u16;
                         let y_top = data_to_screen(
                             bottom + val,
                             0.0,
                             y_hi,
-                            (py + ph - 1) as f64,
-                            py as f64,
+                            (pa.y + pa.height - 1) as f64,
+                            pa.y as f64,
                         )
                         .round() as u16;
 
                         for x in bar_x..bar_x + bar_width {
                             for y in y_top..y_bot {
-                                if x >= px && x < px + pw && y >= py && y < py + ph {
+                                if pa.contains(x, y) {
                                     buf[(x, y)].set_char('█').set_fg(ds.color);
                                 }
                             }
@@ -272,7 +299,7 @@ impl Widget for &BarChart {
             let cat = &self.categories[cat_i];
             let label_x = group_x + group_width / 2;
             let label_start = label_x.saturating_sub(cat.len() as u16 / 2);
-            let label_y = py + ph;
+            let label_y = pa.y + pa.height;
             if label_y < area.y + area.height {
                 for (j, ch) in cat.chars().enumerate() {
                     let lx = label_start + j as u16;
@@ -285,21 +312,25 @@ impl Widget for &BarChart {
             }
         }
 
-        // Y axis tick labels
-        let y_ticks = crate::ticker::MaxNLocator::new(5).tick_values(0.0, y_hi);
-        for &tv in &y_ticks {
-            let sy = data_to_screen(tv, 0.0, y_hi, (py + ph - 1) as f64, py as f64);
-            let label = crate::ticker::ScalarFormatter.format(tv);
-            let yi = sy.round() as u16;
-            if yi >= py && yi < py + ph {
-                let start = px.saturating_sub(label.len() as u16 + 1);
-                for (j, ch) in label.chars().enumerate() {
-                    let lx = start + j as u16;
-                    if lx >= area.x && lx < px {
-                        buf[(lx, yi)].set_char(ch).set_fg(self.theme.axis_color);
-                    }
-                }
-            }
+        // Draw annotations
+        PlotFrame::draw_annotations(&pa, &self.annotations, buf);
+
+        // Draw legend
+        if self.show_legend && !self.datasets.is_empty() {
+            let entries: Vec<LegendEntry> = self
+                .datasets
+                .iter()
+                .map(|ds| LegendEntry {
+                    name: ds.name.clone(),
+                    color: ds.color,
+                    marker: Some('█'),
+                })
+                .collect();
+            let legend = Legend::new(entries)
+                .position(self.legend_position.clone())
+                .theme(self.theme.clone());
+            let legend_area = Rect::new(pa.x, pa.y, pa.width, pa.height);
+            (&legend).render(legend_area, buf);
         }
     }
 }

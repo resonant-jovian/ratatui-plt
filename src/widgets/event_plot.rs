@@ -21,8 +21,12 @@ use ratatui::layout::Rect;
 use ratatui::style::Color;
 use ratatui::widgets::Widget;
 
+use crate::annotation::Annotation;
 use crate::axis::Axis;
+use crate::frame::{PlotFrame, ReferenceLine};
+use crate::spines::Spines;
 use crate::theme::Theme;
+use crate::ticker::NullLocator;
 use crate::transform::data_to_screen;
 
 /// Orientation for the event plot.
@@ -90,6 +94,12 @@ pub struct EventPlot {
     y_axis: Axis,
     /// Visual theme.
     theme: Theme,
+    /// Spine visibility control.
+    spines: Spines,
+    /// Reference lines drawn across the plot area.
+    reference_lines: Vec<ReferenceLine>,
+    /// Annotations drawn within the plot area.
+    annotations: Vec<Annotation>,
 }
 
 impl Default for EventPlot {
@@ -101,6 +111,9 @@ impl Default for EventPlot {
             x_axis: Axis::new(),
             y_axis: Axis::new(),
             theme: Theme::get_default(),
+            spines: Spines::default(),
+            reference_lines: Vec::new(),
+            annotations: Vec::new(),
         }
     }
 }
@@ -152,6 +165,30 @@ impl EventPlot {
         self.theme = theme;
         self
     }
+
+    /// Set spine visibility.
+    pub fn spines(mut self, spines: Spines) -> Self {
+        self.spines = spines;
+        self
+    }
+
+    /// Add a reference line.
+    pub fn reference_line(mut self, line: ReferenceLine) -> Self {
+        self.reference_lines.push(line);
+        self
+    }
+
+    /// Set all reference lines.
+    pub fn reference_lines(mut self, lines: Vec<ReferenceLine>) -> Self {
+        self.reference_lines = lines;
+        self
+    }
+
+    /// Add an annotation.
+    pub fn annotation(mut self, ann: Annotation) -> Self {
+        self.annotations.push(ann);
+        self
+    }
 }
 
 impl Widget for &EventPlot {
@@ -160,25 +197,12 @@ impl Widget for &EventPlot {
             return;
         }
 
-        let title_height: u16 = if self.title.is_some() { 1 } else { 0 };
-
-        // Draw title
-        if let Some(ref title) = self.title {
-            let start = area.x + (area.width.saturating_sub(title.len() as u16)) / 2;
-            for (i, ch) in title.chars().enumerate() {
-                let x = start + i as u16;
-                if x < area.x + area.width {
-                    buf[(x, area.y)].set_char(ch).set_fg(self.theme.foreground);
-                }
-            }
-        }
-
         match self.orientation {
             Orientation::Horizontal => {
-                self.render_horizontal(area, buf, title_height);
+                self.render_horizontal(area, buf);
             }
             Orientation::Vertical => {
-                self.render_vertical(area, buf, title_height);
+                self.render_vertical(area, buf);
             }
         }
     }
@@ -186,26 +210,7 @@ impl Widget for &EventPlot {
 
 impl EventPlot {
     /// Render in horizontal orientation: groups as horizontal lines, events as vertical ticks.
-    fn render_horizontal(&self, area: Rect, buf: &mut Buffer, title_height: u16) {
-        let label_width: u16 = self
-            .events
-            .iter()
-            .map(|g| g.label.len() as u16)
-            .max()
-            .unwrap_or(0)
-            .min(12)
-            + 1;
-        let tick_height: u16 = 1;
-
-        let px = area.x + label_width;
-        let py = area.y + title_height;
-        let pw = area.width.saturating_sub(label_width + 1);
-        let ph = area.height.saturating_sub(title_height + tick_height);
-
-        if pw < 2 || ph < 2 {
-            return;
-        }
-
+    fn render_horizontal(&self, area: Rect, buf: &mut Buffer) {
         // Compute data bounds from all event positions
         let mut d_min = f64::INFINITY;
         let mut d_max = f64::NEG_INFINITY;
@@ -224,63 +229,56 @@ impl EventPlot {
         let (x_lo, x_hi) = self.x_axis.resolve_bounds(d_min, d_max);
 
         let n_groups = self.events.len();
-        // Each group gets an equal vertical band
-        let lane_height = ph as f64 / n_groups as f64;
+        let y_lo = 0.0;
+        let y_hi = n_groups as f64;
 
-        // Draw X-axis line
-        for x in px..px + pw {
-            if x < area.x + area.width {
-                buf[(x, py + ph)]
-                    .set_char('─')
-                    .set_fg(self.theme.axis_color);
-            }
-        }
+        // Compute label width for y_label_width (group labels go in the y-axis margin)
+        let label_width: u16 = self
+            .events
+            .iter()
+            .map(|g| g.label.len() as u16)
+            .max()
+            .unwrap_or(0)
+            .min(12)
+            + 1;
 
-        // Draw Y-axis line
-        for y in py..py + ph {
-            let x = px.saturating_sub(1);
-            if x >= area.x {
-                buf[(x, y)].set_char('│').set_fg(self.theme.axis_color);
-            }
-        }
+        // Use NullLocator for y-axis (categorical lanes, labels drawn manually)
+        let y_axis = Axis::new().locator(NullLocator);
 
-        // Draw grid (x-axis only; y-axis is categorical lanes)
-        let x_grid = self.x_axis.grid || self.theme.grid_visible;
-        if x_grid {
-            let gx_ticks = self.x_axis.tick_positions(x_lo, x_hi);
-            for &tv in &gx_ticks {
-                let sx = data_to_screen(tv, x_lo, x_hi, px as f64, (px + pw - 1) as f64);
-                let xi = sx.round() as u16;
-                if xi >= px && xi < px + pw {
-                    for y in py..py + ph {
-                        buf[(xi, y)].set_char('·').set_fg(self.theme.grid_color);
-                    }
-                }
-            }
-        }
+        let frame = PlotFrame::new(&self.x_axis, &y_axis, &self.theme)
+            .title(self.title.as_deref())
+            .spines(self.spines.clone())
+            .y_label_width(label_width)
+            .reference_lines(&self.reference_lines);
+
+        let Some(pa) = frame.render(area, buf, x_lo, x_hi, y_lo, y_hi) else {
+            return;
+        };
+
+        let lane_height = pa.height as f64 / n_groups as f64;
 
         // Draw each group
         for (gi, group) in self.events.iter().enumerate() {
-            let lane_center_y = py as f64 + (gi as f64 + 0.5) * lane_height;
+            let lane_center_y = pa.y as f64 + (gi as f64 + 0.5) * lane_height;
             let lane_y = lane_center_y.round() as u16;
 
-            // Draw the group label
+            // Draw the group label in the y-axis margin
             let label = if group.label.len() > label_width as usize - 1 {
                 &group.label[..label_width as usize - 1]
             } else {
                 &group.label
             };
-            let label_start = px.saturating_sub(label_width);
-            if lane_y >= py && lane_y < py + ph {
+            let label_start = pa.x.saturating_sub(label_width);
+            if lane_y >= pa.y && lane_y < pa.y + pa.height {
                 for (j, ch) in label.chars().enumerate() {
                     let lx = label_start + j as u16;
-                    if lx >= area.x && lx < px.saturating_sub(1) {
+                    if lx >= area.x && lx < pa.x.saturating_sub(1) {
                         buf[(lx, lane_y)].set_char(ch).set_fg(group.color);
                     }
                 }
 
                 // Draw the horizontal baseline for this group
-                for x in px..px + pw {
+                for x in pa.x..pa.x + pa.width {
                     if x < area.x + area.width {
                         buf[(x, lane_y)].set_char('·').set_fg(self.theme.grid_color);
                     }
@@ -291,56 +289,29 @@ impl EventPlot {
             let tick_half = (lane_height / 3.0).max(1.0).round() as u16;
             let valid = group.valid_positions();
             for &pos in &valid {
-                let sx = data_to_screen(pos, x_lo, x_hi, px as f64, (px + pw - 1) as f64);
+                let sx = data_to_screen(pos, x_lo, x_hi, pa.x as f64, (pa.x + pa.width - 1) as f64);
                 let xi = sx.round() as u16;
-                if xi < px || xi >= px + pw {
+                if xi < pa.x || xi >= pa.x + pa.width {
                     continue;
                 }
 
                 // Draw a short vertical tick centred on the lane
                 let y_top = lane_y.saturating_sub(tick_half);
-                let y_bot = (lane_y + tick_half).min(py + ph - 1);
+                let y_bot = (lane_y + tick_half).min(pa.y + pa.height - 1);
                 for ty in y_top..=y_bot {
-                    if ty >= py && ty < py + ph && xi < area.x + area.width {
+                    if ty >= pa.y && ty < pa.y + pa.height && xi < area.x + area.width {
                         buf[(xi, ty)].set_char('│').set_fg(group.color);
                     }
                 }
             }
         }
 
-        // X-axis tick labels
-        let x_ticks = self.x_axis.tick_positions(x_lo, x_hi);
-        for &tv in &x_ticks {
-            let sx = data_to_screen(tv, x_lo, x_hi, px as f64, (px + pw - 1) as f64);
-            let label = self.x_axis.format_tick(tv);
-            let xi = sx.round() as u16;
-            let start = xi.saturating_sub(label.len() as u16 / 2);
-            let y = py + ph;
-            if y < area.y + area.height {
-                for (j, ch) in label.chars().enumerate() {
-                    let lx = start + j as u16;
-                    if lx >= area.x && lx < area.x + area.width {
-                        buf[(lx, y)].set_char(ch).set_fg(self.theme.axis_color);
-                    }
-                }
-            }
-        }
+        // Draw annotations
+        PlotFrame::draw_annotations(&pa, &self.annotations, buf);
     }
 
     /// Render in vertical orientation: groups as vertical lines, events as horizontal ticks.
-    fn render_vertical(&self, area: Rect, buf: &mut Buffer, title_height: u16) {
-        let label_height: u16 = 1;
-        let y_label_width: u16 = 8;
-
-        let px = area.x + y_label_width;
-        let py = area.y + title_height;
-        let pw = area.width.saturating_sub(y_label_width + 1);
-        let ph = area.height.saturating_sub(title_height + label_height);
-
-        if pw < 2 || ph < 2 {
-            return;
-        }
-
+    fn render_vertical(&self, area: Rect, buf: &mut Buffer) {
         // Compute data bounds from all event positions
         let mut d_min = f64::INFINITY;
         let mut d_max = f64::NEG_INFINITY;
@@ -359,65 +330,48 @@ impl EventPlot {
         let (y_lo, y_hi) = self.y_axis.resolve_bounds(d_min, d_max);
 
         let n_groups = self.events.len();
-        let lane_width = pw as f64 / n_groups as f64;
+        let x_lo = 0.0;
+        let x_hi = n_groups as f64;
 
-        // Draw Y-axis line
-        for y in py..py + ph {
-            let x = px.saturating_sub(1);
-            if x >= area.x {
-                buf[(x, y)].set_char('│').set_fg(self.theme.axis_color);
-            }
-        }
+        // Use NullLocator for x-axis (categorical lanes, labels drawn manually)
+        let x_axis = Axis::new().locator(NullLocator);
 
-        // Draw X-axis line at bottom
-        for x in px..px + pw {
-            if x < area.x + area.width {
-                buf[(x, py + ph)]
-                    .set_char('─')
-                    .set_fg(self.theme.axis_color);
-            }
-        }
+        let frame = PlotFrame::new(&x_axis, &self.y_axis, &self.theme)
+            .title(self.title.as_deref())
+            .spines(self.spines.clone())
+            .reference_lines(&self.reference_lines);
 
-        // Draw grid (y-axis only; x-axis is categorical lanes)
-        let y_grid = self.y_axis.grid || self.theme.grid_visible;
-        if y_grid {
-            let gy_ticks = self.y_axis.tick_positions(y_lo, y_hi);
-            for &tv in &gy_ticks {
-                let sy = data_to_screen(tv, y_lo, y_hi, (py + ph - 1) as f64, py as f64);
-                let yi = sy.round() as u16;
-                if yi >= py && yi < py + ph {
-                    for x in px..px + pw {
-                        buf[(x, yi)].set_char('·').set_fg(self.theme.grid_color);
-                    }
-                }
-            }
-        }
+        let Some(pa) = frame.render(area, buf, x_lo, x_hi, y_lo, y_hi) else {
+            return;
+        };
+
+        let lane_width = pa.width as f64 / n_groups as f64;
 
         // Draw each group
         for (gi, group) in self.events.iter().enumerate() {
-            let lane_center_x = px as f64 + (gi as f64 + 0.5) * lane_width;
+            let lane_center_x = pa.x as f64 + (gi as f64 + 0.5) * lane_width;
             let lane_x = lane_center_x.round() as u16;
 
-            // Draw the group label below
+            // Draw the group label below the plot area (in the x-axis tick row)
             let label = if group.label.len() > lane_width as usize {
                 &group.label[..lane_width as usize]
             } else {
                 &group.label
             };
-            let label_y = py + ph;
+            let label_y = pa.y + pa.height;
             if label_y < area.y + area.height {
                 let label_start = lane_x.saturating_sub(label.len() as u16 / 2);
                 for (j, ch) in label.chars().enumerate() {
                     let lx = label_start + j as u16;
-                    if lx >= px && lx < px + pw {
+                    if lx >= pa.x && lx < pa.x + pa.width {
                         buf[(lx, label_y)].set_char(ch).set_fg(group.color);
                     }
                 }
             }
 
             // Draw the vertical baseline for this group
-            if lane_x >= px && lane_x < px + pw {
-                for y in py..py + ph {
+            if lane_x >= pa.x && lane_x < pa.x + pa.width {
+                for y in pa.y..pa.y + pa.height {
                     buf[(lane_x, y)].set_char('·').set_fg(self.theme.grid_color);
                 }
             }
@@ -426,42 +380,25 @@ impl EventPlot {
             let tick_half = (lane_width / 3.0).max(1.0).round() as u16;
             let valid = group.valid_positions();
             for &pos in &valid {
-                let sy = data_to_screen(pos, y_lo, y_hi, (py + ph - 1) as f64, py as f64);
+                let sy =
+                    data_to_screen(pos, y_lo, y_hi, (pa.y + pa.height - 1) as f64, pa.y as f64);
                 let yi = sy.round() as u16;
-                if yi < py || yi >= py + ph {
+                if yi < pa.y || yi >= pa.y + pa.height {
                     continue;
                 }
 
                 // Draw a short horizontal tick centred on the lane
                 let x_left = lane_x.saturating_sub(tick_half);
-                let x_right = (lane_x + tick_half).min(px + pw - 1);
+                let x_right = (lane_x + tick_half).min(pa.x + pa.width - 1);
                 for tx in x_left..=x_right {
-                    if tx >= px && tx < px + pw && yi < area.y + area.height {
+                    if tx >= pa.x && tx < pa.x + pa.width && yi < area.y + area.height {
                         buf[(tx, yi)].set_char('─').set_fg(group.color);
                     }
                 }
             }
         }
 
-        // Y-axis tick labels
-        let y_ticks = self.y_axis.tick_positions(y_lo, y_hi);
-        for &tv in &y_ticks {
-            let sy = data_to_screen(tv, y_lo, y_hi, (py + ph - 1) as f64, py as f64);
-            let label = self.y_axis.format_tick(tv);
-            let yi = sy.round() as u16;
-            if yi >= py && yi < py + ph {
-                let label_start = if label.len() < y_label_width as usize {
-                    px.saturating_sub(y_label_width) + (y_label_width - label.len() as u16)
-                } else {
-                    px.saturating_sub(y_label_width)
-                };
-                for (j, ch) in label.chars().enumerate() {
-                    let lx = label_start + j as u16;
-                    if lx >= area.x && lx < px.saturating_sub(1) {
-                        buf[(lx, yi)].set_char(ch).set_fg(self.theme.axis_color);
-                    }
-                }
-            }
-        }
+        // Draw annotations
+        PlotFrame::draw_annotations(&pa, &self.annotations, buf);
     }
 }

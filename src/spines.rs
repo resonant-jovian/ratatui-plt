@@ -13,6 +13,7 @@
 /// // Hide the top and right spines for a cleaner look
 /// let spines = Spines::new().top(false).right(false);
 /// ```
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[derive(Clone, Debug)]
 pub struct Spines {
     pub top: bool,

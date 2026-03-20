@@ -162,7 +162,9 @@ impl Widget for &Legend {
                 buf[(r.x, r.y)].set_char('┌').set_fg(bc);
                 buf[(r.x + r.width - 1, r.y)].set_char('┐').set_fg(bc);
                 buf[(r.x, r.y + r.height - 1)].set_char('└').set_fg(bc);
-                buf[(r.x + r.width - 1, r.y + r.height - 1)].set_char('┘').set_fg(bc);
+                buf[(r.x + r.width - 1, r.y + r.height - 1)]
+                    .set_char('┘')
+                    .set_fg(bc);
                 for x in r.x + 1..r.x + r.width - 1 {
                     buf[(x, r.y)].set_char('─').set_fg(bc);
                     buf[(x, r.y + r.height - 1)].set_char('─').set_fg(bc);

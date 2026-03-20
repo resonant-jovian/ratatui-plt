@@ -7,12 +7,14 @@ use ratatui::layout::Rect;
 use ratatui::style::{Color, Style};
 use ratatui::widgets::Widget;
 
+use crate::annotation::Annotation;
 use crate::axis::{AspectRatio, Axis};
 use crate::colormap::{Colorbar, Colormap, Viridis};
+use crate::frame::{PlotFrame, ReferenceLine};
 use crate::norm::{LinearNorm, Normalize};
 use crate::series::GridData;
+use crate::spines::Spines;
 use crate::theme::Theme;
-use crate::transform::apply_aspect_ratio;
 
 /// A 2D heatmap widget.
 ///
@@ -41,7 +43,13 @@ pub struct Heatmap {
     show_values: bool,
     /// Color used for NaN/invalid cells.
     bad_color: Color,
+    /// Optional boolean mask. When set, cells where `mask[row][col]` is `true`
+    /// are rendered using [`bad_color`] (useful for triangular correlation matrices).
+    mask: Option<Vec<Vec<bool>>>,
     theme: Theme,
+    spines: Spines,
+    reference_lines: Vec<ReferenceLine>,
+    annotations: Vec<Annotation>,
 }
 
 impl Heatmap {
@@ -59,7 +67,11 @@ impl Heatmap {
             aspect_ratio: AspectRatio::Auto,
             show_values: false,
             bad_color: Color::DarkGray,
+            mask: None,
             theme: Theme::get_default(),
+            spines: Spines::default(),
+            reference_lines: Vec::new(),
+            annotations: Vec::new(),
         }
     }
 
@@ -117,73 +129,78 @@ impl Heatmap {
         self
     }
 
+    /// Set a boolean mask. Cells where `mask[row][col]` is `true` are
+    /// rendered as [`bad_color`] instead of the data value. This is useful
+    /// for triangular correlation matrices where the upper or lower triangle
+    /// should be hidden.
+    pub fn mask(mut self, mask: Vec<Vec<bool>>) -> Self {
+        self.mask = Some(mask);
+        self
+    }
+
     /// Set the theme.
     pub fn theme(mut self, theme: Theme) -> Self {
         self.theme = theme;
+        self
+    }
+
+    /// Set spine visibility.
+    pub fn spines(mut self, spines: Spines) -> Self {
+        self.spines = spines;
+        self
+    }
+
+    /// Add a reference line.
+    pub fn reference_line(mut self, line: ReferenceLine) -> Self {
+        self.reference_lines.push(line);
+        self
+    }
+
+    /// Set all reference lines.
+    pub fn reference_lines(mut self, lines: Vec<ReferenceLine>) -> Self {
+        self.reference_lines = lines;
+        self
+    }
+
+    /// Add an annotation.
+    pub fn annotation(mut self, ann: Annotation) -> Self {
+        self.annotations.push(ann);
         self
     }
 }
 
 impl Widget for &Heatmap {
     fn render(self, area: Rect, buf: &mut Buffer) {
-        if area.width < 4 || area.height < 3 {
-            return;
-        }
-
-        let title_height: u16 = if self.title.is_some() { 1 } else { 0 };
-        let colorbar_width: u16 = if self.show_colorbar { 10 } else { 0 };
-        let y_label_width: u16 = 7;
-        let tick_height: u16 = 1;
-
-        let plot_x = area.x + y_label_width;
-        let plot_y = area.y + title_height;
-        let plot_width = area
-            .width
-            .saturating_sub(y_label_width + colorbar_width + 1);
-        let plot_height = area.height.saturating_sub(title_height + tick_height);
-
-        if plot_width < 2 || plot_height < 2 {
-            return;
-        }
-
-        // Apply aspect ratio
-        let data_x_range = if self.data.x.len() >= 2 {
-            self.data.x.last().unwrap() - self.data.x.first().unwrap()
-        } else {
-            1.0
-        };
-        let data_y_range = if self.data.y.len() >= 2 {
-            self.data.y.last().unwrap() - self.data.y.first().unwrap()
-        } else {
-            1.0
-        };
-
-        let (ax_off, ay_off, aw, ah) = apply_aspect_ratio(
-            &self.aspect_ratio,
-            data_x_range,
-            data_y_range,
-            plot_width,
-            plot_height,
-        );
-        let px = plot_x + ax_off;
-        let py = plot_y + ay_off;
-
-        // Draw title
-        if let Some(ref title) = self.title {
-            let start = area.x + (area.width.saturating_sub(title.len() as u16)) / 2;
-            for (i, ch) in title.chars().enumerate() {
-                let x = start + i as u16;
-                if x < area.x + area.width {
-                    buf[(x, area.y)].set_char(ch).set_fg(self.theme.foreground);
-                }
-            }
-        }
-
         let nrows = self.data.nrows();
         let ncols = self.data.ncols();
         if nrows == 0 || ncols == 0 {
             return;
         }
+
+        let x_lo = *self.data.x.first().unwrap_or(&0.0);
+        let x_hi = *self.data.x.last().unwrap_or(&1.0);
+        let y_lo = *self.data.y.first().unwrap_or(&0.0);
+        let y_hi = *self.data.y.last().unwrap_or(&1.0);
+
+        let colorbar_width: u16 = if self.show_colorbar { 10 } else { 0 };
+
+        // Create and render the plot frame (title, axes, grid, ticks, labels, spines, ref lines)
+        let frame = PlotFrame::new(&self.x_axis, &self.y_axis, &self.theme)
+            .title(self.title.as_deref())
+            .aspect_ratio(self.aspect_ratio.clone())
+            .spines(self.spines.clone())
+            .colorbar_width(colorbar_width)
+            .y_label_width(7)
+            .reference_lines(&self.reference_lines);
+
+        let Some(pa) = frame.render(area, buf, x_lo, x_hi, y_lo, y_hi) else {
+            return;
+        };
+
+        let px = pa.x;
+        let py = pa.y;
+        let aw = pa.width;
+        let ah = pa.height;
 
         // Use half-block rendering: each character cell encodes two vertical pixels
         // ▀ = top half, ▄ = bottom half, █ = both same color
@@ -205,11 +222,16 @@ impl Widget for &Heatmap {
                 let top_data_col =
                     (cx as f64 / aw as f64 * ncols as f64).min((ncols - 1) as f64) as usize;
                 let top_val = self.data.values[top_data_row][top_data_col];
-                let top_color = if top_val.is_finite() {
+                let top_masked = self.mask.as_ref().is_some_and(|m| {
+                    top_data_row < m.len()
+                        && top_data_col < m[top_data_row].len()
+                        && m[top_data_row][top_data_col]
+                });
+                let top_color = if top_masked || !top_val.is_finite() {
+                    self.bad_color
+                } else {
                     let top_t = self.norm.normalize(top_val);
                     self.colormap.color_at(top_t)
-                } else {
-                    self.bad_color
                 };
 
                 // Bottom half-pixel
@@ -218,11 +240,16 @@ impl Widget for &Heatmap {
                     ((1.0 - bot_row_f) * nrows as f64).min((nrows - 1) as f64) as usize;
                 let bot_data_col = top_data_col;
                 let bot_val = self.data.values[bot_data_row][bot_data_col];
-                let bot_color = if bot_val.is_finite() {
+                let bot_masked = self.mask.as_ref().is_some_and(|m| {
+                    bot_data_row < m.len()
+                        && bot_data_col < m[bot_data_row].len()
+                        && m[bot_data_row][bot_data_col]
+                });
+                let bot_color = if bot_masked || !bot_val.is_finite() {
+                    self.bad_color
+                } else {
                     let bot_t = self.norm.normalize(bot_val);
                     self.colormap.color_at(bot_t)
-                } else {
-                    self.bad_color
                 };
 
                 // Use ▀ (upper half block): fg = top color, bg = bottom color
@@ -232,48 +259,69 @@ impl Widget for &Heatmap {
             }
         }
 
-        // Draw axis tick labels
-        let x_ticks = self.x_axis.tick_positions(
-            *self.data.x.first().unwrap_or(&0.0),
-            *self.data.x.last().unwrap_or(&1.0),
-        );
-        let x_lo = *self.data.x.first().unwrap_or(&0.0);
-        let x_hi = *self.data.x.last().unwrap_or(&1.0);
-        for &tv in &x_ticks {
-            let sx =
-                crate::transform::data_to_screen(tv, x_lo, x_hi, px as f64, (px + aw - 1) as f64);
-            let label = self.x_axis.format_tick(tv);
-            let xi = sx.round() as u16;
-            let label_start = xi.saturating_sub(label.len() as u16 / 2);
-            let y = py + ah;
-            if y < area.y + area.height {
-                for (j, ch) in label.chars().enumerate() {
-                    let lx = label_start + j as u16;
-                    if lx >= area.x && lx < area.x + area.width {
-                        buf[(lx, y)].set_char(ch).set_fg(self.theme.axis_color);
+        // Draw cell values if enabled and cells are wide enough
+        if self.show_values {
+            let cell_width = aw as f64 / ncols as f64;
+            let cell_height = ah as f64 / nrows as f64;
+
+            if cell_width >= 4.0 {
+                for row in 0..nrows {
+                    for col in 0..ncols {
+                        let val = self.data.values[row][col];
+                        if !val.is_finite() {
+                            continue;
+                        }
+                        // Skip masked cells
+                        let is_masked = self
+                            .mask
+                            .as_ref()
+                            .is_some_and(|m| row < m.len() && col < m[row].len() && m[row][col]);
+                        if is_masked {
+                            continue;
+                        }
+
+                        let label = format!("{:.1}", val);
+
+                        // Compute center screen position for this cell
+                        // Row 0 is at the top of data but bottom of screen (y inverted)
+                        let center_x = px as f64 + (col as f64 + 0.5) * cell_width;
+                        let center_y = py as f64 + ((nrows - 1 - row) as f64 + 0.5) * cell_height;
+
+                        let xi = center_x.round() as u16;
+                        let yi = center_y.round() as u16;
+
+                        // Determine contrasting text color based on cell luminance
+                        let t = self.norm.normalize(val);
+                        let fg_color = match self.colormap.color_at(t) {
+                            Color::Rgb(r, g, b) => {
+                                let luminance =
+                                    (r as u32 * 299 + g as u32 * 587 + b as u32 * 114) / 1000;
+                                if luminance > 128 {
+                                    Color::Black
+                                } else {
+                                    Color::White
+                                }
+                            }
+                            _ => Color::White,
+                        };
+
+                        // Center the label horizontally within the cell
+                        let label_start = xi.saturating_sub(label.len() as u16 / 2);
+                        if yi >= py && yi < py + ah {
+                            for (j, ch) in label.chars().enumerate() {
+                                let lx = label_start + j as u16;
+                                if lx >= px && lx < px + aw {
+                                    buf[(lx, yi)].set_char(ch).set_fg(fg_color);
+                                }
+                            }
+                        }
                     }
                 }
             }
         }
 
-        let y_lo = *self.data.y.first().unwrap_or(&0.0);
-        let y_hi = *self.data.y.last().unwrap_or(&1.0);
-        let y_ticks = self.y_axis.tick_positions(y_lo, y_hi);
-        for &tv in &y_ticks {
-            let sy =
-                crate::transform::data_to_screen(tv, y_lo, y_hi, (py + ah - 1) as f64, py as f64);
-            let label = self.y_axis.format_tick(tv);
-            let yi = sy.round() as u16;
-            if yi >= py && yi < py + ah {
-                let label_start = px.saturating_sub(label.len() as u16 + 1);
-                for (j, ch) in label.chars().enumerate() {
-                    let lx = label_start + j as u16;
-                    if lx >= area.x && lx < px {
-                        buf[(lx, yi)].set_char(ch).set_fg(self.theme.axis_color);
-                    }
-                }
-            }
-        }
+        // Draw annotations
+        PlotFrame::draw_annotations(&pa, &self.annotations, buf);
 
         // Draw colorbar
         if self.show_colorbar {

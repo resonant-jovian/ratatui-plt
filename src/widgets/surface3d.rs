@@ -235,11 +235,26 @@ impl Surface3D {
             // Expand quad slightly to eliminate gaps between adjacent faces
             let centroid_x = screen_quad.iter().map(|c| c.0).sum::<i32>() / 4;
             let centroid_y = screen_quad.iter().map(|c| c.1).sum::<i32>() / 4;
-            let expanded_quad: Vec<(i32, i32)> = screen_quad.iter().map(|&(x, y)| {
-                let dx = if x > centroid_x { 1 } else if x < centroid_x { -1 } else { 0 };
-                let dy = if y > centroid_y { 1 } else if y < centroid_y { -1 } else { 0 };
-                (x + dx, y + dy)
-            }).collect();
+            let expanded_quad: Vec<(i32, i32)> = screen_quad
+                .iter()
+                .map(|&(x, y)| {
+                    let dx = if x > centroid_x {
+                        1
+                    } else if x < centroid_x {
+                        -1
+                    } else {
+                        0
+                    };
+                    let dy = if y > centroid_y {
+                        1
+                    } else if y < centroid_y {
+                        -1
+                    } else {
+                        0
+                    };
+                    (x + dx, y + dy)
+                })
+                .collect();
 
             // Bounding box of the expanded quad
             let bb_min_x = expanded_quad.iter().map(|c| c.0).min().unwrap();
@@ -283,7 +298,6 @@ impl Surface3D {
                 }
             }
         }
-
     }
 }
 
