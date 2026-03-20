@@ -1,5 +1,7 @@
 //! Hexagonal binning plot for large datasets.
 
+use std::collections::HashMap;
+
 use ratatui::buffer::Buffer;
 use ratatui::layout::Rect;
 use ratatui::style::Style;
@@ -103,6 +105,26 @@ impl HexbinPlot {
     }
 }
 
+fn axial_round(q: f64, r: f64) -> (i32, i32) {
+    let s = -q - r;
+    let (rq, rr, rs) = (q.round(), r.round(), s.round());
+    let (dq, dr, ds) = ((rq - q).abs(), (rr - r).abs(), (rs - s).abs());
+    if dq > dr && dq > ds {
+        ((-rr - rs) as i32, rr as i32)
+    } else if dr > ds {
+        (rq as i32, (-rq - rs) as i32)
+    } else {
+        (rq as i32, rr as i32)
+    }
+}
+
+fn pixel_to_hex(dx: f64, dy: f64, s: f64) -> (i32, i32) {
+    let sqrt3 = 3.0_f64.sqrt();
+    let q_frac = (sqrt3 / 3.0 * dx - 1.0 / 3.0 * dy) / s;
+    let r_frac = (2.0 / 3.0 * dy) / s;
+    axial_round(q_frac, r_frac)
+}
+
 impl Widget for &HexbinPlot {
     fn render(self, area: Rect, buf: &mut Buffer) {
         if area.width < 4 || area.height < 4 || self.data.is_empty() {
@@ -177,81 +199,68 @@ impl Widget for &HexbinPlot {
             }
         }
 
-        // Simple grid-based hexagonal binning approximation
-        // Use rectangular bins as an approximation that works well in terminal cells
-        let n_cols = self.gridsize;
-        let n_rows = (self.gridsize as f64 * ph as f64 / pw as f64)
-            .round()
-            .max(3.0) as usize;
+        // Hexagonal binning using axial coordinates
+        let sqrt3 = 3.0_f64.sqrt();
+        let hex_w = (x_hi - x_lo) / self.gridsize as f64;
+        let s = hex_w / sqrt3;
 
-        let bin_w = (x_hi - x_lo) / n_cols as f64;
-        let bin_h = (y_hi - y_lo) / n_rows as f64;
-
-        // Accumulate into bins
-        let mut counts = vec![vec![0.0f64; n_cols]; n_rows];
-        let mut weights_sum = vec![vec![0.0f64; n_cols]; n_rows];
+        let mut counts: HashMap<(i32, i32), f64> = HashMap::new();
+        let mut weight_sums: HashMap<(i32, i32), f64> = HashMap::new();
 
         for (idx, &(x, y)) in self.data.iter().enumerate() {
-            let col = ((x - x_lo) / bin_w).floor() as usize;
-            let row = ((y - y_lo) / bin_h).floor() as usize;
-            let col = col.min(n_cols - 1);
-            let row = row.min(n_rows - 1);
-            counts[row][col] += 1.0;
+            let key = pixel_to_hex(x - x_lo, y - y_lo, s);
+            *counts.entry(key).or_insert(0.0) += 1.0;
             if let Some(ref w) = self.weights {
-                weights_sum[row][col] += w.get(idx).copied().unwrap_or(1.0);
+                *weight_sums.entry(key).or_insert(0.0) += w.get(idx).copied().unwrap_or(1.0);
             }
         }
 
         // Compute display values
-        let values: Vec<Vec<f64>> = match self.aggregation {
+        let values: HashMap<(i32, i32), f64> = match self.aggregation {
             HexAggregation::Count => counts.clone(),
-            HexAggregation::Sum => weights_sum.clone(),
+            HexAggregation::Sum => weight_sums.clone(),
             HexAggregation::Mean => counts
                 .iter()
-                .zip(weights_sum.iter())
-                .map(|(cr, wr)| {
-                    cr.iter()
-                        .zip(wr.iter())
-                        .map(|(&c, &w)| if c > 0.0 { w / c } else { 0.0 })
-                        .collect()
+                .map(|(k, &c)| {
+                    let w = weight_sums.get(k).copied().unwrap_or(0.0);
+                    (*k, if c > 0.0 { w / c } else { 0.0 })
                 })
                 .collect(),
         };
 
-        let val_max = values
-            .iter()
-            .flat_map(|r| r.iter())
-            .cloned()
-            .fold(0.0f64, f64::max);
+        let val_max = values.values().cloned().fold(0.0_f64, f64::max);
         let norm = LinearNorm::new(0.0, if val_max == 0.0 { 1.0 } else { val_max });
 
-        // Render bins
-        let cell_w = pw as f64 / n_cols as f64;
-        let cell_h = ph as f64 / n_rows as f64;
+        // Half-block rasterization
+        let effective_height = ph as usize * 2;
 
-        for (row, row_values) in values.iter().enumerate().take(n_rows) {
-            for (col, &val) in row_values.iter().enumerate().take(n_cols) {
-                if val == 0.0 {
+        for cy in 0..ph {
+            for cx in 0..pw {
+                let screen_x = px + cx;
+                let screen_y = py + cy;
+                if screen_x >= area.x + area.width || screen_y >= area.y + area.height {
                     continue;
                 }
-                let t = norm.normalize(val);
-                let color = self.colormap.color_at(t);
 
-                let sx_start = (px as f64 + col as f64 * cell_w).round() as u16;
-                let sx_end = (px as f64 + (col + 1) as f64 * cell_w).round() as u16;
-                let sy_start = (py as f64 + (n_rows - 1 - row) as f64 * cell_h).round() as u16;
-                let sy_end = (py as f64 + (n_rows - row) as f64 * cell_h).round() as u16;
+                let data_x = x_lo + (cx as f64 / pw as f64) * (x_hi - x_lo);
 
-                // Use hexagonal-ish character ⬢ for hex bins
-                for sy in sy_start..sy_end {
-                    for sx in sx_start..sx_end {
-                        if sx >= px && sx < px + pw && sy >= py && sy < py + ph {
-                            buf[(sx, sy)]
-                                .set_char('⬢')
-                                .set_style(Style::default().fg(color));
-                        }
-                    }
-                }
+                // Top half-pixel
+                let top_frac_y = (cy as usize * 2) as f64 / effective_height as f64;
+                let top_data_y = y_hi - top_frac_y * (y_hi - y_lo);
+                let top_key = pixel_to_hex(data_x - x_lo, top_data_y - y_lo, s);
+                let top_val = values.get(&top_key).copied().unwrap_or(0.0);
+                let top_color = self.colormap.color_at(norm.normalize(top_val));
+
+                // Bottom half-pixel
+                let bot_frac_y = (cy as usize * 2 + 1) as f64 / effective_height as f64;
+                let bot_data_y = y_hi - bot_frac_y * (y_hi - y_lo);
+                let bot_key = pixel_to_hex(data_x - x_lo, bot_data_y - y_lo, s);
+                let bot_val = values.get(&bot_key).copied().unwrap_or(0.0);
+                let bot_color = self.colormap.color_at(norm.normalize(bot_val));
+
+                buf[(screen_x, screen_y)]
+                    .set_char('▀')
+                    .set_style(Style::default().fg(top_color).bg(bot_color));
             }
         }
 
