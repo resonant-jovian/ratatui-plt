@@ -32,24 +32,30 @@ fn main() -> color_eyre::Result<()> {
     enable_raw_mode()?;
     let mut terminal = Terminal::new(CrosstermBackend::new(io::stdout()))?;
 
-    // Generate 5000 points from 2 clusters
+    // Generate 10000 points from 3 Gaussian clusters using Box-Muller transform
     let mut rng = rand::rng();
-    let mut data = Vec::with_capacity(5000);
-    for _ in 0..3000 {
-        let x: f64 = rng.random::<f64>() * 4.0 - 2.0;
-        let y: f64 = rng.random::<f64>() * 4.0 - 2.0;
-        data.push((x, y));
-    }
-    for _ in 0..2000 {
-        let x: f64 = rng.random::<f64>() * 8.0 - 3.0;
-        let y: f64 = rng.random::<f64>() * 8.0 - 3.0;
-        data.push((x, y));
+    let mut data = Vec::with_capacity(10000);
+
+    let clusters: [(f64, f64, f64, usize); 3] = [
+        (0.0, 0.0, 1.0, 5000),   // Dense core at origin
+        (3.0, 3.0, 0.8, 3000),   // Tight secondary cluster
+        (-2.0, 2.0, 1.5, 2000),  // Diffuse spread
+    ];
+
+    for &(cx, cy, sigma, count) in &clusters {
+        for _ in 0..count {
+            let u1: f64 = rng.random::<f64>().max(1e-10);
+            let u2: f64 = rng.random::<f64>();
+            let z0 = (-2.0 * u1.ln()).sqrt() * (2.0 * std::f64::consts::PI * u2).cos();
+            let z1 = (-2.0 * u1.ln()).sqrt() * (2.0 * std::f64::consts::PI * u2).sin();
+            data.push((cx + z0 * sigma, cy + z1 * sigma));
+        }
     }
 
     let plot = HexbinPlot::new(data)
-        .gridsize(12)
+        .gridsize(15)
         .colormap(Plasma)
-        .title("Two-Cluster Hexbin Density (q to quit)")
+        .title("Gaussian Cluster Hexbin Density (q to quit)")
         .x_axis(Axis::new().label("x"))
         .y_axis(Axis::new().label("y"));
 

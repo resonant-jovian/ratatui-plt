@@ -115,6 +115,17 @@ impl Wireframe3D {
         let sx_max = points.iter().map(|p| p.0).fold(f64::NEG_INFINITY, f64::max);
         let sy_min = points.iter().map(|p| p.1).fold(f64::INFINITY, f64::min);
         let sy_max = points.iter().map(|p| p.1).fold(f64::NEG_INFINITY, f64::max);
+
+        // Apply zoom to viewport
+        let zoom = 5.0 / camera.distance;
+        let (sx_min, sx_max, sy_min, sy_max) = {
+            let cx = (sx_min + sx_max) / 2.0;
+            let cy = (sy_min + sy_max) / 2.0;
+            let hx = (sx_max - sx_min) / 2.0 / zoom;
+            let hy = (sy_max - sy_min) / 2.0 / zoom;
+            (cx - hx, cx + hx, cy - hy, cy + hy)
+        };
+
         let depth_min = points.iter().map(|p| p.2).fold(f64::INFINITY, f64::min);
         let depth_max = points.iter().map(|p| p.2).fold(f64::NEG_INFINITY, f64::max);
         let depth_range = if depth_max == depth_min {

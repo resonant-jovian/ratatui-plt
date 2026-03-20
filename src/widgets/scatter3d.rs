@@ -177,6 +177,17 @@ impl Scatter3D {
             .iter()
             .map(|p| p.1)
             .fold(f64::NEG_INFINITY, f64::max);
+
+        // Apply zoom to viewport
+        let zoom = 5.0 / camera.distance;
+        let (sx_min, sx_max, sy_min, sy_max) = {
+            let cx = (sx_min + sx_max) / 2.0;
+            let cy = (sy_min + sy_max) / 2.0;
+            let hx = (sx_max - sx_min) / 2.0 / zoom;
+            let hy = (sy_max - sy_min) / 2.0 / zoom;
+            (cx - hx, cx + hx, cy - hy, cy + hy)
+        };
+
         let depth_min = all_points.iter().map(|p| p.2).fold(f64::INFINITY, f64::min);
         let depth_max = all_points
             .iter()

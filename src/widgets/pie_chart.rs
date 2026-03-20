@@ -184,7 +184,11 @@ impl Widget for &PieChart {
 
         // Radius (account for terminal cells being ~2x tall as wide)
         let r_screen_x = ((pw as f64 / 2.0) - label_margin as f64 - 1.0).max(2.0);
-        let r_screen_y = ((ph as f64 / 2.0) - 1.0).max(2.0);
+        let r_screen_y = if self.show_labels || self.show_percentages {
+            ((ph as f64 / 2.3) - 1.0).max(2.0)
+        } else {
+            ((ph as f64 / 2.0) - 1.0).max(2.0)
+        };
 
         let inner_ratio = self.donut_ratio.unwrap_or(0.0);
 

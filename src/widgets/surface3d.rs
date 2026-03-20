@@ -163,6 +163,19 @@ impl Surface3D {
             sy_max = sy_max.max(sy);
         }
 
+        // Apply zoom to viewport
+        let zoom = 5.0 / camera.distance;
+        {
+            let cx = (sx_min + sx_max) / 2.0;
+            let cy = (sy_min + sy_max) / 2.0;
+            let hx = (sx_max - sx_min) / 2.0 / zoom;
+            let hy = (sy_max - sy_min) / 2.0 / zoom;
+            sx_min = cx - hx;
+            sx_max = cx + hx;
+            sy_min = cy - hy;
+            sy_max = cy + hy;
+        }
+
         // Collect quad faces with average depth for sorting
         let mut faces: Vec<(usize, usize, f64)> = Vec::new(); // (row, col, avg_depth)
         for j in 0..nrows - 1 {
