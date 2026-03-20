@@ -2,7 +2,7 @@
 
 use ratatui::buffer::Buffer;
 use ratatui::layout::Rect;
-use ratatui::style::{Color, Style};
+use ratatui::style::Color;
 use ratatui::widgets::Widget;
 
 use crate::axis::{AspectRatio, Axis};
@@ -185,7 +185,7 @@ impl Widget for &ContourPlot {
         // Draw grid
         let x_grid = self.x_axis.grid || self.theme.grid_visible;
         let y_grid = self.y_axis.grid || self.theme.grid_visible;
-        if x_grid {
+        if x_grid && !self.filled {
             let gx_ticks = self.x_axis.tick_positions(x_lo, x_hi);
             for &tv in &gx_ticks {
                 let sx = data_to_screen(tv, x_lo, x_hi, px as f64, (px + aw - 1) as f64);
@@ -197,7 +197,7 @@ impl Widget for &ContourPlot {
                 }
             }
         }
-        if y_grid {
+        if y_grid && !self.filled {
             let gy_ticks = self.y_axis.tick_positions(y_lo, y_hi);
             for &tv in &gy_ticks {
                 let sy = data_to_screen(tv, y_lo, y_hi, (py + ah - 1) as f64, py as f64);
@@ -210,38 +210,48 @@ impl Widget for &ContourPlot {
             }
         }
 
-        // Filled contours: color each cell by value band
+        // Filled contours: half-block rendering with bilinear interpolation
         if self.filled {
+            let virt_h = ah as f64 * 2.0;
             for cy in 0..ah {
                 for cx in 0..aw {
-                    let data_x = x_lo + (cx as f64 / aw as f64) * (x_hi - x_lo);
-                    let data_y = y_hi - (cy as f64 / ah as f64) * (y_hi - y_lo);
+                    let data_x =
+                        x_lo + (cx as f64 / (aw - 1).max(1) as f64) * (x_hi - x_lo);
 
-                    let col = ((data_x - x_lo) / (x_hi - x_lo) * (ncols - 1) as f64)
-                        .round()
-                        .clamp(0.0, (ncols - 1) as f64) as usize;
-                    let row = ((data_y - y_lo) / (y_hi - y_lo) * (nrows - 1) as f64)
-                        .round()
-                        .clamp(0.0, (nrows - 1) as f64) as usize;
+                    let sample_color = |vy: f64| -> Color {
+                        let data_y =
+                            y_hi - (vy / (virt_h - 1.0).max(1.0)) * (y_hi - y_lo);
+                        let gx = ((data_x - x_lo) / (x_hi - x_lo) * (ncols - 1) as f64)
+                            .clamp(0.0, (ncols - 1) as f64);
+                        let gy = ((data_y - y_lo) / (y_hi - y_lo) * (nrows - 1) as f64)
+                            .clamp(0.0, (nrows - 1) as f64);
+                        let ix = (gx.floor() as usize).min(ncols - 2);
+                        let iy = (gy.floor() as usize).min(nrows - 2);
+                        let fx = gx - ix as f64;
+                        let fy = gy - iy as f64;
+                        let val = self.data.values[iy][ix] * (1.0 - fx) * (1.0 - fy)
+                            + self.data.values[iy][ix + 1] * fx * (1.0 - fy)
+                            + self.data.values[iy + 1][ix] * (1.0 - fx) * fy
+                            + self.data.values[iy + 1][ix + 1] * fx * fy;
+                        let band = levels.partition_point(|&l| l <= val);
+                        let t = band as f64 / levels.len() as f64;
+                        self.colormap.color_at(t)
+                    };
 
-                    let val = self.data.values[row][col];
-                    let band = levels.partition_point(|&l| l <= val);
-                    let t = band as f64 / levels.len() as f64;
-                    let color = self.colormap.color_at(t);
+                    let top = sample_color(cy as f64 * 2.0);
+                    let bot = sample_color(cy as f64 * 2.0 + 1.0);
 
                     let sx = px + cx;
                     let sy = py + cy;
                     if sx < area.x + area.width && sy < area.y + area.height {
-                        buf[(sx, sy)]
-                            .set_char('█')
-                            .set_style(Style::default().fg(color));
+                        buf[(sx, sy)].set_char('▀').set_fg(top).set_bg(bot);
                     }
                 }
             }
         }
 
-        // Draw contour lines
-        {
+        // Draw contour lines (skip when filled — bands already show levels)
+        if !self.filled {
         // Edge naming: top=v00-v10, right=v10-v11, bottom=v01-v11, left=v00-v01
         // Corners: v00=top-left(j,i), v10=top-right(j,i+1), v01=bottom-left(j+1,i), v11=bottom-right(j+1,i+1)
         for &level in &levels {
