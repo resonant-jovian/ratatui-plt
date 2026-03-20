@@ -34,9 +34,9 @@ fn main() -> color_eyre::Result<()> {
     // Temperature and humidity over 24 hours (inversely correlated)
     let temp = Series::new("Temperature")
         .data(
-            (0..=24)
+            (0..=240)
                 .map(|h| {
-                    let t = h as f64;
+                    let t = h as f64 * 0.1;
                     let temp = 15.0 + 10.0 * ((t - 14.0) * std::f64::consts::PI / 12.0).sin();
                     (t, temp)
                 })
@@ -46,9 +46,9 @@ fn main() -> color_eyre::Result<()> {
 
     let humidity = Series::new("Humidity")
         .data(
-            (0..=24)
+            (0..=240)
                 .map(|h| {
-                    let t = h as f64;
+                    let t = h as f64 * 0.1;
                     let hum = 70.0 - 20.0 * ((t - 14.0) * std::f64::consts::PI / 12.0).sin();
                     (t, hum)
                 })

@@ -131,62 +131,11 @@ impl StreamPlot {
     }
 }
 
-/// Interpolate the vector field at an arbitrary (x, y) position using
-/// inverse-distance weighted interpolation of nearby grid vectors.
+/// Interpolate the vector field at an arbitrary (x, y) position.
+/// Delegates to `VectorFieldData::interpolate` which uses O(1) bilinear
+/// lookup for grid-based fields.
 fn interpolate_field(field: &VectorFieldData, x: f64, y: f64) -> (f64, f64) {
-    if field.vectors.is_empty() {
-        return (0.0, 0.0);
-    }
-
-    let mut weight_sum = 0.0f64;
-    let mut dx_sum = 0.0f64;
-    let mut dy_sum = 0.0f64;
-
-    // Find the closest vectors and do inverse-distance weighting.
-    // For performance, we limit to vectors within a reasonable neighbourhood.
-    // First pass: find a rough distance scale from the grid spacing.
-    let mut min_dist_sq = f64::INFINITY;
-    let mut closest_idx = 0;
-    for (i, &(vx, vy, _, _)) in field.vectors.iter().enumerate() {
-        let dsq = (vx - x) * (vx - x) + (vy - y) * (vy - y);
-        if dsq < min_dist_sq {
-            min_dist_sq = dsq;
-            closest_idx = i;
-        }
-    }
-
-    // If we are very close to a grid point, just return its value
-    if min_dist_sq < 1e-12 {
-        let (_, _, dx, dy) = field.vectors[closest_idx];
-        return (dx, dy);
-    }
-
-    // Use inverse-distance weighting with the 4 nearest neighbours
-    let mut dists: Vec<(f64, usize)> = field
-        .vectors
-        .iter()
-        .enumerate()
-        .map(|(i, &(vx, vy, _, _))| {
-            let dsq = (vx - x) * (vx - x) + (vy - y) * (vy - y);
-            (dsq, i)
-        })
-        .collect();
-    dists.sort_by(|a, b| a.0.partial_cmp(&b.0).unwrap_or(std::cmp::Ordering::Equal));
-
-    let n_neighbours = dists.len().min(4);
-    for &(dsq, idx) in &dists[..n_neighbours] {
-        let w = 1.0 / (dsq + 1e-10);
-        let (_, _, fdx, fdy) = field.vectors[idx];
-        dx_sum += w * fdx;
-        dy_sum += w * fdy;
-        weight_sum += w;
-    }
-
-    if weight_sum > 0.0 {
-        (dx_sum / weight_sum, dy_sum / weight_sum)
-    } else {
-        (0.0, 0.0)
-    }
+    field.interpolate(x, y)
 }
 
 /// Integrate a single streamline using 4th-order Runge-Kutta.

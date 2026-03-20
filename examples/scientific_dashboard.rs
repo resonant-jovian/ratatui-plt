@@ -52,7 +52,7 @@ fn main() -> color_eyre::Result<()> {
         .show_legend(true);
 
     // --- Density heatmap data ---
-    let density = GridData::from_fn((-3.0, 3.0), (-3.0, 3.0), 100, 100, |x, y| {
+    let density = GridData::from_fn((-3.0, 3.0), (-3.0, 3.0), 300, 300, |x, y| {
         let r2 = x * x + y * y;
         (-r2 / 2.0).exp() + 0.3 * (-(((x - 1.0).powi(2) + (y - 1.0).powi(2)) / 0.5)).exp()
     });
@@ -65,7 +65,7 @@ fn main() -> color_eyre::Result<()> {
 
     // --- Velocity distribution histogram data ---
     // Generate a deterministic pseudo-Gaussian-like distribution using simple arithmetic
-    let velocity_data: Vec<f64> = (0..500)
+    let velocity_data: Vec<f64> = (0..5000)
         .map(|i| {
             // Sum of several deterministic oscillations to approximate a bell curve
             let x = i as f64;

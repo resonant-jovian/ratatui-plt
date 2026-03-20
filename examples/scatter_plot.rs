@@ -36,7 +36,7 @@ fn main() -> color_eyre::Result<()> {
 
     // Generate random point cloud
     let mut rng = rand::rng();
-    let n = 300;
+    let n = 3000;
     let mut points = Vec::with_capacity(n);
     let mut color_vals = Vec::with_capacity(n);
 

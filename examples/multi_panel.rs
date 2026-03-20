@@ -33,7 +33,7 @@ fn main() -> color_eyre::Result<()> {
     let mut terminal = Terminal::new(CrosstermBackend::new(io::stdout()))?;
 
     // Panel (0,0): Heatmap with gradient
-    let heatmap_data = GridData::from_fn((-3.0, 3.0), (-3.0, 3.0), 120, 120, |x, y| {
+    let heatmap_data = GridData::from_fn((-3.0, 3.0), (-3.0, 3.0), 360, 360, |x, y| {
         (-(x * x + y * y) / 4.0).exp()
     });
     let heatmap = Heatmap::new(heatmap_data)

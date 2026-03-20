@@ -48,15 +48,15 @@ fn main() -> color_eyre::Result<()> {
     enable_raw_mode()?;
     let mut terminal = Terminal::new(CrosstermBackend::new(io::stdout()))?;
 
-    let group_a = BoxData::new("Control", generate_data(42, 50, 5.0, 2.0), Color::Cyan);
+    let group_a = BoxData::new("Control", generate_data(42, 500, 5.0, 2.0), Color::Cyan);
     let group_b = BoxData::new(
         "Treatment A",
-        generate_data(123, 50, 7.5, 3.0),
+        generate_data(123, 500, 7.5, 3.0),
         Color::Yellow,
     );
     let group_c = BoxData::new(
         "Treatment B",
-        generate_data(999, 50, 6.0, 1.5),
+        generate_data(999, 500, 6.0, 1.5),
         Color::Magenta,
     );
 

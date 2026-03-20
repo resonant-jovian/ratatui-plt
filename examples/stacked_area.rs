@@ -31,7 +31,7 @@ fn main() -> color_eyre::Result<()> {
     enable_raw_mode()?;
     let mut terminal = Terminal::new(CrosstermBackend::new(io::stdout()))?;
 
-    let n = 50;
+    let n = 500;
     let solar = Series::new("Solar")
         .data(
             (0..n)

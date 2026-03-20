@@ -37,7 +37,7 @@ fn main() -> color_eyre::Result<()> {
     // Generate ~500 samples from a pseudo-normal distribution:
     // sum of 12 uniform [0,1) randoms minus 6 gives approx N(0,1)
     let mut rng = rand::rng();
-    let samples: Vec<f64> = (0..500)
+    let samples: Vec<f64> = (0..5000)
         .map(|_| {
             let sum: f64 = (0..12).map(|_| rng.random::<f64>()).sum();
             sum - 6.0
@@ -47,7 +47,7 @@ fn main() -> color_eyre::Result<()> {
     let hist = Histogram::new(samples)
         .bins(30)
         .color(Color::Cyan)
-        .title("Pseudo-Normal Distribution (n=500, sum of 12 uniforms)")
+        .title("Pseudo-Normal Distribution (n=5000, sum of 12 uniforms)")
         .x_axis(Axis::new().label("value"))
         .y_axis(Axis::new().label("count"));
 

@@ -35,7 +35,7 @@ fn main() -> color_eyre::Result<()> {
 
     // 15 discrete events at pseudo-random positions with varying heights.
     // Uses a simple deterministic pattern so no extra RNG crate is needed.
-    let events: Vec<(f64, f64)> = (0..15)
+    let events: Vec<(f64, f64)> = (0..150)
         .map(|i| {
             let x = i as f64 * 1.3 + 0.5;
             // Heights from a mix of sin + sawtooth for variety
@@ -48,7 +48,7 @@ fn main() -> color_eyre::Result<()> {
         .baseline(0.0)
         .color(Color::Cyan)
         .marker(MarkerShape::FilledCircle)
-        .title("Discrete Event Sequence (15 events)")
+        .title("Discrete Event Sequence (150 events)")
         .x_axis(Axis::new().label("time"))
         .y_axis(Axis::new().label("amplitude"));
 

@@ -32,17 +32,17 @@ fn main() -> color_eyre::Result<()> {
     let mut terminal = Terminal::new(CrosstermBackend::new(io::stdout()))?;
 
     // Cardioid: r = 1 + cos(theta)
-    let cardioid: Vec<(f64, f64)> = (0..=360)
+    let cardioid: Vec<(f64, f64)> = (0..=3600)
         .map(|i| {
-            let theta = i as f64 * std::f64::consts::PI / 180.0;
+            let theta = i as f64 * std::f64::consts::PI / 1800.0;
             (theta, 1.0 + theta.cos())
         })
         .collect();
 
     // Rose curve: r = cos(2*theta)
-    let rose: Vec<(f64, f64)> = (0..=360)
+    let rose: Vec<(f64, f64)> = (0..=3600)
         .map(|i| {
-            let theta = i as f64 * std::f64::consts::PI / 180.0;
+            let theta = i as f64 * std::f64::consts::PI / 1800.0;
             (theta, (2.0 * theta).cos().abs())
         })
         .collect();

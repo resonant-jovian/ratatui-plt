@@ -32,7 +32,7 @@ fn main() -> color_eyre::Result<()> {
     let mut terminal = Terminal::new(CrosstermBackend::new(io::stdout()))?;
 
     // Circular flow field: (-y, x)
-    let field = VectorFieldData::from_fn((-3.0, 3.0), (-3.0, 3.0), 15, 15, |x, y| (-y, x));
+    let field = VectorFieldData::from_fn((-3.0, 3.0), (-3.0, 3.0), 45, 45, |x, y| (-y, x));
 
     let plot = VectorField::new(field)
         .title("Circular Flow Field (-y, x) - q to quit")

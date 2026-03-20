@@ -34,7 +34,7 @@ fn main() -> color_eyre::Result<()> {
 
     // Generate 5000 correlated points
     let mut rng = rand::rng();
-    let data: Vec<(f64, f64)> = (0..5000)
+    let data: Vec<(f64, f64)> = (0..50000)
         .map(|_| {
             let x: f64 = rng.random::<f64>() * 6.0 - 3.0;
             let y: f64 = x * 0.8 + rng.random::<f64>() * 1.2 - 0.6;

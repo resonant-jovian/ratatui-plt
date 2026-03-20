@@ -34,12 +34,12 @@ fn main() -> color_eyre::Result<()> {
 
     // Generate 10000 points from 3 Gaussian clusters using Box-Muller transform
     let mut rng = rand::rng();
-    let mut data = Vec::with_capacity(10000);
+    let mut data = Vec::with_capacity(100000);
 
     let clusters: [(f64, f64, f64, usize); 3] = [
-        (0.0, 0.0, 1.0, 5000),   // Dense core at origin
-        (3.0, 3.0, 0.8, 3000),   // Tight secondary cluster
-        (-2.0, 2.0, 1.5, 2000),  // Diffuse spread
+        (0.0, 0.0, 1.0, 50000),   // Dense core at origin
+        (3.0, 3.0, 0.8, 30000),   // Tight secondary cluster
+        (-2.0, 2.0, 1.5, 20000),  // Diffuse spread
     ];
 
     for &(cx, cy, sigma, count) in &clusters {
@@ -53,7 +53,7 @@ fn main() -> color_eyre::Result<()> {
     }
 
     let plot = HexbinPlot::new(data)
-        .gridsize(15)
+        .gridsize(80)
         .colormap(Plasma)
         .title("Gaussian Cluster Hexbin Density (q to quit)")
         .x_axis(Axis::new().label("x"))

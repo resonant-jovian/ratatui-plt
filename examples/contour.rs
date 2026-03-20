@@ -34,7 +34,7 @@ fn main() -> color_eyre::Result<()> {
     let mut terminal = Terminal::new(CrosstermBackend::new(io::stdout()))?;
 
     // Two-peak Gaussian potential field
-    let data = GridData::from_fn((-4.0, 4.0), (-4.0, 4.0), 120, 120, |x, y| {
+    let data = GridData::from_fn((-4.0, 4.0), (-4.0, 4.0), 360, 360, |x, y| {
         let peak1 = (-((x - 1.5).powi(2) + (y - 1.0).powi(2)) / 1.5).exp();
         let peak2 = 0.8 * (-((x + 1.0).powi(2) + (y + 1.5).powi(2)) / 2.0).exp();
         peak1 + peak2
