@@ -49,7 +49,7 @@ fn main() -> color_eyre::Result<()> {
     let colors = [Color::Cyan, Color::Yellow, Color::Magenta, Color::Green, Color::Red];
     let groups: Vec<EventGroup> = (0..5)
         .map(|i| {
-            let spikes = lcg_events(42 + i * 17, 15 + (i as usize) * 3, 100.0);
+            let spikes = lcg_events(42 + i * 17, 10 + (i as usize) * 2, 200.0);
             EventGroup::new(format!("Neuron {}", i + 1), spikes).color(colors[i as usize])
         })
         .collect();

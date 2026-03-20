@@ -32,20 +32,19 @@ fn main() -> color_eyre::Result<()> {
     let mut terminal = Terminal::new(CrosstermBackend::new(io::stdout()))?;
 
     let chart = PieChart::new()
-        .slice(PieSlice::new("Python", 28.1).color(Color::Cyan).explode(0.05))
-        .slice(PieSlice::new("JavaScript", 17.4).color(Color::Yellow))
+        .slice(PieSlice::new("Python", 28.1).color(Color::Cyan))
+        .slice(PieSlice::new("JS", 17.4).color(Color::Yellow))
         .slice(PieSlice::new("Java", 15.8).color(Color::Red))
         .slice(PieSlice::new("C/C++", 12.3).color(Color::Green))
         .slice(PieSlice::new("C#", 7.5).color(Color::Magenta))
         .slice(PieSlice::new("Other", 18.9).color(Color::Gray))
         .donut_ratio(0.35)
         .show_labels(true)
-        .show_percentages(true)
         .title("Programming Language Market Share (q to quit)");
 
     loop {
         terminal.draw(|frame| {
-            frame.render_widget(&chart, square_area(frame.area()));
+            frame.render_widget(&chart, frame.area());
         })?;
 
         if let Event::Key(key) = event::read()?

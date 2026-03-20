@@ -238,23 +238,83 @@ fn trace_streamline(
     points
 }
 
-/// Choose a line-drawing character for connecting consecutive points.
-fn line_char(dx: f64, dy: f64) -> char {
-    if dx.abs() < 1e-10 && dy.abs() < 1e-10 {
-        return '·';
+struct ClipRect {
+    x_min: u16,
+    y_min: u16,
+    x_max: u16,
+    y_max: u16,
+}
+
+const BRAILLE_BITS: [[u8; 4]; 2] = [
+    [0x01, 0x02, 0x04, 0x40],
+    [0x08, 0x10, 0x20, 0x80],
+];
+const BRAILLE_BASE: u32 = 0x2800;
+
+fn write_braille(buf: &mut Buffer, x: u16, y: u16, bits: u8, color: Color) {
+    let existing = {
+        let ch = buf[(x, y)].symbol().chars().next().unwrap_or(' ');
+        let code = ch as u32;
+        if (BRAILLE_BASE..=0x28FF).contains(&code) {
+            (code - BRAILLE_BASE) as u8
+        } else {
+            0
+        }
+    };
+    let combined = existing | bits;
+    if let Some(ch) = char::from_u32(BRAILLE_BASE + combined as u32) {
+        buf[(x, y)].set_char(ch).set_fg(color);
     }
-    let angle = dy.atan2(dx);
-    let octant = ((angle + std::f64::consts::PI) / (std::f64::consts::PI / 4.0)).round() as i32 % 8;
-    match octant {
-        0 => '─',
-        1 => '╲',
-        2 => '│',
-        3 => '╱',
-        4 => '─',
-        5 => '╲',
-        6 => '│',
-        7 => '╱',
-        _ => '─',
+}
+
+fn draw_braille_line(
+    buf: &mut Buffer,
+    x0: f64,
+    y0: f64,
+    x1: f64,
+    y1: f64,
+    color: Color,
+    clip: &ClipRect,
+) {
+    let mut ix0 = (x0 * 2.0).round() as i32;
+    let mut iy0 = (y0 * 4.0).round() as i32;
+    let ix1 = (x1 * 2.0).round() as i32;
+    let iy1 = (y1 * 4.0).round() as i32;
+
+    let dx = (ix1 - ix0).abs();
+    let dy = -(iy1 - iy0).abs();
+    let sx = if ix0 < ix1 { 1 } else { -1 };
+    let sy = if iy0 < iy1 { 1 } else { -1 };
+    let mut err = dx + dy;
+
+    loop {
+        if ix0 >= 0 && iy0 >= 0 {
+            let cell_x = (ix0 / 2) as u16;
+            let cell_y = (iy0 / 4) as u16;
+            if cell_x >= clip.x_min
+                && cell_x < clip.x_max
+                && cell_y >= clip.y_min
+                && cell_y < clip.y_max
+            {
+                let dot_col = (ix0 % 2) as usize;
+                let dot_row = (iy0 % 4) as usize;
+                let bit = BRAILLE_BITS[dot_col][dot_row];
+                write_braille(buf, cell_x, cell_y, bit, color);
+            }
+        }
+
+        if ix0 == ix1 && iy0 == iy1 {
+            break;
+        }
+        let e2 = 2 * err;
+        if e2 >= dy {
+            err += dy;
+            ix0 += sx;
+        }
+        if e2 <= dx {
+            err += dx;
+            iy0 += sy;
+        }
     }
 }
 
@@ -408,8 +468,9 @@ impl Widget for &StreamPlot {
                     continue;
                 }
 
-                // Render the streamline
-                let mut prev_screen: Option<(u16, u16)> = None;
+                // Render the streamline using braille sub-pixel lines
+                let clip = ClipRect { x_min: px, y_min: py, x_max: px + pw, y_max: py + ph };
+                let mut prev_screen: Option<(f64, f64)> = None;
                 for (idx, &(ptx, pty)) in points.iter().enumerate() {
                     let scr_x = data_to_screen(ptx, x_lo, x_hi, px as f64, (px + pw - 1) as f64);
                     let scr_y = data_to_screen(pty, y_lo, y_hi, (py + ph - 1) as f64, py as f64);
@@ -431,40 +492,19 @@ impl Widget for &StreamPlot {
                         self.color
                     };
 
-                    // Choose character: arrow at intervals, line character otherwise
-                    let ch = if idx % arrow_interval == arrow_interval / 2 && idx > 0 {
-                        // Arrow head based on local velocity direction
-                        let (fdx, fdy) = interpolate_field(&self.field, ptx, pty);
-                        arrow_char(fdx, -fdy) // Negate dy for screen coords
-                    } else if let Some((px_prev, py_prev)) = prev_screen {
-                        let sdx = xi as f64 - px_prev as f64;
-                        let sdy = yi as f64 - py_prev as f64;
-                        line_char(sdx, sdy)
-                    } else {
-                        '·'
-                    };
-
-                    buf[(xi, yi)].set_char(ch).set_fg(color);
-
-                    // Fill in gaps between consecutive screen points with Bresenham-like steps
-                    if let Some((px_prev, py_prev)) = prev_screen {
-                        let sdx = xi as i32 - px_prev as i32;
-                        let sdy = yi as i32 - py_prev as i32;
-                        let steps = sdx.abs().max(sdy.abs());
-                        if steps > 1 {
-                            for s in 1..steps {
-                                let frac = s as f64 / steps as f64;
-                                let ix = (px_prev as f64 + sdx as f64 * frac).round() as u16;
-                                let iy = (py_prev as f64 + sdy as f64 * frac).round() as u16;
-                                if ix >= px && ix < px + pw && iy >= py && iy < py + ph {
-                                    let fill_ch = line_char(sdx as f64, sdy as f64);
-                                    buf[(ix, iy)].set_char(fill_ch).set_fg(color);
-                                }
-                            }
-                        }
+                    // Draw braille line from previous point
+                    if let Some((prev_x, prev_y)) = prev_screen {
+                        draw_braille_line(buf, prev_x, prev_y, scr_x, scr_y, color, &clip);
                     }
 
-                    prev_screen = Some((xi, yi));
+                    // Arrow head at intervals (cell resolution, drawn on top)
+                    if idx % arrow_interval == arrow_interval / 2 && idx > 0 {
+                        let (fdx, fdy) = interpolate_field(&self.field, ptx, pty);
+                        let ch = arrow_char(fdx, -fdy);
+                        buf[(xi, yi)].set_char(ch).set_fg(color);
+                    }
+
+                    prev_screen = Some((scr_x, scr_y));
                 }
             }
         }

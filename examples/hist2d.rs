@@ -32,19 +32,19 @@ fn main() -> color_eyre::Result<()> {
     enable_raw_mode()?;
     let mut terminal = Terminal::new(CrosstermBackend::new(io::stdout()))?;
 
-    // Generate 2000 correlated points
+    // Generate 5000 correlated points
     let mut rng = rand::rng();
-    let data: Vec<(f64, f64)> = (0..2000)
+    let data: Vec<(f64, f64)> = (0..5000)
         .map(|_| {
             let x: f64 = rng.random::<f64>() * 6.0 - 3.0;
-            let y: f64 = x * 0.7 + rng.random::<f64>() * 2.0 - 1.0;
+            let y: f64 = x * 0.8 + rng.random::<f64>() * 1.2 - 0.6;
             (x, y)
         })
         .collect();
 
     let plot = Hist2D::new(data)
-        .bins_x(25)
-        .bins_y(25)
+        .bins_x(40)
+        .bins_y(40)
         .colormap(Inferno)
         .show_colorbar(true)
         .title("Correlated 2D Histogram (q to quit)")

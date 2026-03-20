@@ -290,7 +290,7 @@ impl Widget for &TwinAxes {
                 let sy0 = data_to_screen(y0, py_lo, py_hi, (py + ph - 1) as f64, py as f64);
                 let sx1 = data_to_screen(x1, x_lo, x_hi, px as f64, (px + pw - 1) as f64);
                 let sy1 = data_to_screen(y1, py_lo, py_hi, (py + ph - 1) as f64, py as f64);
-                draw_simple_line(buf, sx0, sy0, sx1, sy1, s.color, px, py, pw, ph);
+                draw_braille_line(buf, sx0, sy0, sx1, sy1, s.color, &ClipRect { x_min: px, y_min: py, x_max: px + pw, y_max: py + ph });
             }
         }
 
@@ -306,30 +306,54 @@ impl Widget for &TwinAxes {
                 let sy0 = data_to_screen(y0, sy_lo, sy_hi, (py + ph - 1) as f64, py as f64);
                 let sx1 = data_to_screen(x1, x_lo, x_hi, px as f64, (px + pw - 1) as f64);
                 let sy1 = data_to_screen(y1, sy_lo, sy_hi, (py + ph - 1) as f64, py as f64);
-                draw_simple_line(buf, sx0, sy0, sx1, sy1, s.color, px, py, pw, ph);
+                draw_braille_line(buf, sx0, sy0, sx1, sy1, s.color, &ClipRect { x_min: px, y_min: py, x_max: px + pw, y_max: py + ph });
             }
         }
     }
 }
 
-/// Simple Bresenham line drawing within a clipping rectangle.
-#[allow(clippy::too_many_arguments)]
-fn draw_simple_line(
+struct ClipRect {
+    x_min: u16,
+    y_min: u16,
+    x_max: u16,
+    y_max: u16,
+}
+
+const BRAILLE_BITS: [[u8; 4]; 2] = [
+    [0x01, 0x02, 0x04, 0x40],
+    [0x08, 0x10, 0x20, 0x80],
+];
+const BRAILLE_BASE: u32 = 0x2800;
+
+fn write_braille(buf: &mut Buffer, x: u16, y: u16, bits: u8, color: Color) {
+    let existing = {
+        let ch = buf[(x, y)].symbol().chars().next().unwrap_or(' ');
+        let code = ch as u32;
+        if (BRAILLE_BASE..=0x28FF).contains(&code) {
+            (code - BRAILLE_BASE) as u8
+        } else {
+            0
+        }
+    };
+    let combined = existing | bits;
+    if let Some(ch) = char::from_u32(BRAILLE_BASE + combined as u32) {
+        buf[(x, y)].set_char(ch).set_fg(color);
+    }
+}
+
+fn draw_braille_line(
     buf: &mut Buffer,
     x0: f64,
     y0: f64,
     x1: f64,
     y1: f64,
     color: Color,
-    clip_x: u16,
-    clip_y: u16,
-    clip_w: u16,
-    clip_h: u16,
+    clip: &ClipRect,
 ) {
-    let mut ix0 = x0.round() as i32;
-    let mut iy0 = y0.round() as i32;
-    let ix1 = x1.round() as i32;
-    let iy1 = y1.round() as i32;
+    let mut ix0 = (x0 * 2.0).round() as i32;
+    let mut iy0 = (y0 * 4.0).round() as i32;
+    let ix1 = (x1 * 2.0).round() as i32;
+    let iy1 = (y1 * 4.0).round() as i32;
 
     let dx = (ix1 - ix0).abs();
     let dy = -(iy1 - iy0).abs();
@@ -338,19 +362,19 @@ fn draw_simple_line(
     let mut err = dx + dy;
 
     loop {
-        let px = ix0 as u16;
-        let py = iy0 as u16;
-        if px >= clip_x && px < clip_x + clip_w && py >= clip_y && py < clip_y + clip_h {
-            let ch = if dx > dy.unsigned_abs() as i32 * 2 {
-                '─'
-            } else if dy.unsigned_abs() as i32 > dx * 2 {
-                '│'
-            } else if (sx > 0 && sy > 0) || (sx < 0 && sy < 0) {
-                '╲'
-            } else {
-                '╱'
-            };
-            buf[(px, py)].set_char(ch).set_fg(color);
+        if ix0 >= 0 && iy0 >= 0 {
+            let cell_x = (ix0 / 2) as u16;
+            let cell_y = (iy0 / 4) as u16;
+            if cell_x >= clip.x_min
+                && cell_x < clip.x_max
+                && cell_y >= clip.y_min
+                && cell_y < clip.y_max
+            {
+                let dot_col = (ix0 % 2) as usize;
+                let dot_row = (iy0 % 4) as usize;
+                let bit = BRAILLE_BITS[dot_col][dot_row];
+                write_braille(buf, cell_x, cell_y, bit, color);
+            }
         }
 
         if ix0 == ix1 && iy0 == iy1 {

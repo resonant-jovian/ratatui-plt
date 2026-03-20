@@ -125,20 +125,20 @@ impl Wireframe3D {
 
         // Collect line segments
         struct Segment {
-            sx0: u16,
-            sy0: u16,
-            sx1: u16,
-            sy1: u16,
+            sx0: f64,
+            sy0: f64,
+            sx1: f64,
+            sy1: f64,
             depth: f64,
         }
 
         let mut segments: Vec<Segment> = Vec::new();
 
-        let map_x = |sx: f64| -> u16 {
-            data_to_screen(sx, sx_min, sx_max, px as f64, (px + pw - 1) as f64).round() as u16
+        let map_x = |sx: f64| -> f64 {
+            data_to_screen(sx, sx_min, sx_max, px as f64, (px + pw - 1) as f64)
         };
-        let map_y = |sy: f64| -> u16 {
-            data_to_screen(sy, sy_min, sy_max, py as f64, (py + ph - 1) as f64).round() as u16
+        let map_y = |sy: f64| -> f64 {
+            data_to_screen(sy, sy_min, sy_max, py as f64, (py + ph - 1) as f64)
         };
 
         // Row lines
@@ -178,6 +178,7 @@ impl Wireframe3D {
         });
 
         // Draw segments with depth-cued brightness
+        let clip = ClipRect { x_min: px, y_min: py, x_max: px + pw, y_max: py + ph };
         for seg in &segments {
             let brightness =
                 ((seg.depth - depth_min) / depth_range * 200.0 + 55.0).clamp(55.0, 255.0) as u8;
@@ -197,56 +198,87 @@ impl Wireframe3D {
                 (b as f64 * brightness as f64 / 255.0) as u8,
             );
 
-            draw_line_simple(
-                buf,
-                seg.sx0,
-                seg.sy0,
-                seg.sx1,
-                seg.sy1,
-                color,
-                [px, py, px + pw, py + ph],
-            );
+            draw_braille_line(buf, seg.sx0, seg.sy0, seg.sx1, seg.sy1, color, &clip);
         }
     }
 }
 
-fn draw_line_simple(
+struct ClipRect {
+    x_min: u16,
+    y_min: u16,
+    x_max: u16,
+    y_max: u16,
+}
+
+const BRAILLE_BITS: [[u8; 4]; 2] = [
+    [0x01, 0x02, 0x04, 0x40],
+    [0x08, 0x10, 0x20, 0x80],
+];
+const BRAILLE_BASE: u32 = 0x2800;
+
+fn write_braille(buf: &mut Buffer, x: u16, y: u16, bits: u8, color: Color) {
+    let existing = {
+        let ch = buf[(x, y)].symbol().chars().next().unwrap_or(' ');
+        let code = ch as u32;
+        if (BRAILLE_BASE..=0x28FF).contains(&code) {
+            (code - BRAILLE_BASE) as u8
+        } else {
+            0
+        }
+    };
+    let combined = existing | bits;
+    if let Some(ch) = char::from_u32(BRAILLE_BASE + combined as u32) {
+        buf[(x, y)].set_char(ch).set_fg(color);
+    }
+}
+
+fn draw_braille_line(
     buf: &mut Buffer,
-    x0: u16,
-    y0: u16,
-    x1: u16,
-    y1: u16,
+    x0: f64,
+    y0: f64,
+    x1: f64,
+    y1: f64,
     color: Color,
-    clip: [u16; 4],
+    clip: &ClipRect,
 ) {
-    let [clip_x_min, clip_y_min, clip_x_max, clip_y_max] = clip;
-    let mut ix = x0 as i32;
-    let mut iy = y0 as i32;
-    let ix1 = x1 as i32;
-    let iy1 = y1 as i32;
-    let dx = (ix1 - ix).abs();
-    let dy = -(iy1 - iy).abs();
-    let sx = if ix < ix1 { 1 } else { -1 };
-    let sy = if iy < iy1 { 1 } else { -1 };
+    let mut ix0 = (x0 * 2.0).round() as i32;
+    let mut iy0 = (y0 * 4.0).round() as i32;
+    let ix1 = (x1 * 2.0).round() as i32;
+    let iy1 = (y1 * 4.0).round() as i32;
+
+    let dx = (ix1 - ix0).abs();
+    let dy = -(iy1 - iy0).abs();
+    let sx = if ix0 < ix1 { 1 } else { -1 };
+    let sy = if iy0 < iy1 { 1 } else { -1 };
     let mut err = dx + dy;
 
     loop {
-        let px = ix as u16;
-        let py = iy as u16;
-        if px >= clip_x_min && px < clip_x_max && py >= clip_y_min && py < clip_y_max {
-            buf[(px, py)].set_char('·').set_fg(color);
+        if ix0 >= 0 && iy0 >= 0 {
+            let cell_x = (ix0 / 2) as u16;
+            let cell_y = (iy0 / 4) as u16;
+            if cell_x >= clip.x_min
+                && cell_x < clip.x_max
+                && cell_y >= clip.y_min
+                && cell_y < clip.y_max
+            {
+                let dot_col = (ix0 % 2) as usize;
+                let dot_row = (iy0 % 4) as usize;
+                let bit = BRAILLE_BITS[dot_col][dot_row];
+                write_braille(buf, cell_x, cell_y, bit, color);
+            }
         }
-        if ix == ix1 && iy == iy1 {
+
+        if ix0 == ix1 && iy0 == iy1 {
             break;
         }
         let e2 = 2 * err;
         if e2 >= dy {
             err += dy;
-            ix += sx;
+            ix0 += sx;
         }
         if e2 <= dx {
             err += dx;
-            iy += sy;
+            iy0 += sy;
         }
     }
 }

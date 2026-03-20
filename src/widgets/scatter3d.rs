@@ -209,42 +209,44 @@ impl Scatter3D {
             }
         }
 
-        // Draw simple 3D axis indicators
+        // Draw 3D axis lines and labels
+        let clip = ClipRect { x_min: px, y_min: py, x_max: px + pw, y_max: py + ph };
         let origin = camera.project(0.0, 0.0, 0.0);
         let x_tip = camera.project(0.5, 0.0, 0.0);
         let y_tip = camera.project(0.0, 0.5, 0.0);
         let z_tip = camera.project(0.0, 0.0, 0.3);
 
-        let _ox = data_to_screen(origin.0, sx_min, sx_max, px as f64, (px + pw - 1) as f64).round()
-            as u16;
-        let _oy = data_to_screen(origin.1, sy_min, sy_max, py as f64, (py + ph - 1) as f64).round()
-            as u16;
+        let ox = data_to_screen(origin.0, sx_min, sx_max, px as f64, (px + pw - 1) as f64);
+        let oy = data_to_screen(origin.1, sy_min, sy_max, py as f64, (py + ph - 1) as f64);
 
-        // X axis label
-        let xx =
-            data_to_screen(x_tip.0, sx_min, sx_max, px as f64, (px + pw - 1) as f64).round() as u16;
-        let xy =
-            data_to_screen(x_tip.1, sy_min, sy_max, py as f64, (py + ph - 1) as f64).round() as u16;
-        if xx >= px && xx < px + pw && xy >= py && xy < py + ph {
-            buf[(xx, xy)].set_char('X').set_fg(Color::Red);
+        // X axis line and label
+        let xx = data_to_screen(x_tip.0, sx_min, sx_max, px as f64, (px + pw - 1) as f64);
+        let xy = data_to_screen(x_tip.1, sy_min, sy_max, py as f64, (py + ph - 1) as f64);
+        draw_braille_line(buf, ox, oy, xx, xy, Color::Red, &clip);
+        let xxi = xx.round() as u16;
+        let xyi = xy.round() as u16;
+        if xxi >= px && xxi < px + pw && xyi >= py && xyi < py + ph {
+            buf[(xxi, xyi)].set_char('X').set_fg(Color::Red);
         }
 
-        // Y axis label
-        let yx =
-            data_to_screen(y_tip.0, sx_min, sx_max, px as f64, (px + pw - 1) as f64).round() as u16;
-        let yy =
-            data_to_screen(y_tip.1, sy_min, sy_max, py as f64, (py + ph - 1) as f64).round() as u16;
-        if yx >= px && yx < px + pw && yy >= py && yy < py + ph {
-            buf[(yx, yy)].set_char('Y').set_fg(Color::Green);
+        // Y axis line and label
+        let yx = data_to_screen(y_tip.0, sx_min, sx_max, px as f64, (px + pw - 1) as f64);
+        let yy = data_to_screen(y_tip.1, sy_min, sy_max, py as f64, (py + ph - 1) as f64);
+        draw_braille_line(buf, ox, oy, yx, yy, Color::Green, &clip);
+        let yxi = yx.round() as u16;
+        let yyi = yy.round() as u16;
+        if yxi >= px && yxi < px + pw && yyi >= py && yyi < py + ph {
+            buf[(yxi, yyi)].set_char('Y').set_fg(Color::Green);
         }
 
-        // Z axis label
-        let zx =
-            data_to_screen(z_tip.0, sx_min, sx_max, px as f64, (px + pw - 1) as f64).round() as u16;
-        let zy =
-            data_to_screen(z_tip.1, sy_min, sy_max, py as f64, (py + ph - 1) as f64).round() as u16;
-        if zx >= px && zx < px + pw && zy >= py && zy < py + ph {
-            buf[(zx, zy)].set_char('Z').set_fg(Color::Blue);
+        // Z axis line and label
+        let zx = data_to_screen(z_tip.0, sx_min, sx_max, px as f64, (px + pw - 1) as f64);
+        let zy = data_to_screen(z_tip.1, sy_min, sy_max, py as f64, (py + ph - 1) as f64);
+        draw_braille_line(buf, ox, oy, zx, zy, Color::Blue, &clip);
+        let zxi = zx.round() as u16;
+        let zyi = zy.round() as u16;
+        if zxi >= px && zxi < px + pw && zyi >= py && zyi < py + ph {
+            buf[(zxi, zyi)].set_char('Z').set_fg(Color::Blue);
         }
     }
 }
@@ -257,6 +259,86 @@ fn dim_color(color: Color, brightness: f64) -> Color {
             (b as f64 * brightness) as u8,
         ),
         _ => color,
+    }
+}
+
+struct ClipRect {
+    x_min: u16,
+    y_min: u16,
+    x_max: u16,
+    y_max: u16,
+}
+
+const BRAILLE_BITS: [[u8; 4]; 2] = [
+    [0x01, 0x02, 0x04, 0x40],
+    [0x08, 0x10, 0x20, 0x80],
+];
+const BRAILLE_BASE: u32 = 0x2800;
+
+fn write_braille(buf: &mut Buffer, x: u16, y: u16, bits: u8, color: Color) {
+    let existing = {
+        let ch = buf[(x, y)].symbol().chars().next().unwrap_or(' ');
+        let code = ch as u32;
+        if (BRAILLE_BASE..=0x28FF).contains(&code) {
+            (code - BRAILLE_BASE) as u8
+        } else {
+            0
+        }
+    };
+    let combined = existing | bits;
+    if let Some(ch) = char::from_u32(BRAILLE_BASE + combined as u32) {
+        buf[(x, y)].set_char(ch).set_fg(color);
+    }
+}
+
+fn draw_braille_line(
+    buf: &mut Buffer,
+    x0: f64,
+    y0: f64,
+    x1: f64,
+    y1: f64,
+    color: Color,
+    clip: &ClipRect,
+) {
+    let mut ix0 = (x0 * 2.0).round() as i32;
+    let mut iy0 = (y0 * 4.0).round() as i32;
+    let ix1 = (x1 * 2.0).round() as i32;
+    let iy1 = (y1 * 4.0).round() as i32;
+
+    let dx = (ix1 - ix0).abs();
+    let dy = -(iy1 - iy0).abs();
+    let sx = if ix0 < ix1 { 1 } else { -1 };
+    let sy = if iy0 < iy1 { 1 } else { -1 };
+    let mut err = dx + dy;
+
+    loop {
+        if ix0 >= 0 && iy0 >= 0 {
+            let cell_x = (ix0 / 2) as u16;
+            let cell_y = (iy0 / 4) as u16;
+            if cell_x >= clip.x_min
+                && cell_x < clip.x_max
+                && cell_y >= clip.y_min
+                && cell_y < clip.y_max
+            {
+                let dot_col = (ix0 % 2) as usize;
+                let dot_row = (iy0 % 4) as usize;
+                let bit = BRAILLE_BITS[dot_col][dot_row];
+                write_braille(buf, cell_x, cell_y, bit, color);
+            }
+        }
+
+        if ix0 == ix1 && iy0 == iy1 {
+            break;
+        }
+        let e2 = 2 * err;
+        if e2 >= dy {
+            err += dy;
+            ix0 += sx;
+        }
+        if e2 <= dx {
+            err += dx;
+            iy0 += sy;
+        }
     }
 }
 

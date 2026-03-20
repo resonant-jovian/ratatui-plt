@@ -36,18 +36,18 @@ fn main() -> color_eyre::Result<()> {
     let mut rng = rand::rng();
     let mut data = Vec::with_capacity(5000);
     for _ in 0..3000 {
-        let x: f64 = rng.random::<f64>() * 4.0 - 1.0;
-        let y: f64 = rng.random::<f64>() * 4.0 - 1.0;
+        let x: f64 = rng.random::<f64>() * 4.0 - 2.0;
+        let y: f64 = rng.random::<f64>() * 4.0 - 2.0;
         data.push((x, y));
     }
     for _ in 0..2000 {
-        let x: f64 = rng.random::<f64>() * 3.0 + 3.0;
-        let y: f64 = rng.random::<f64>() * 3.0 + 3.0;
+        let x: f64 = rng.random::<f64>() * 8.0 - 3.0;
+        let y: f64 = rng.random::<f64>() * 8.0 - 3.0;
         data.push((x, y));
     }
 
     let plot = HexbinPlot::new(data)
-        .gridsize(20)
+        .gridsize(12)
         .colormap(Plasma)
         .title("Two-Cluster Hexbin Density (q to quit)")
         .x_axis(Axis::new().label("x"))

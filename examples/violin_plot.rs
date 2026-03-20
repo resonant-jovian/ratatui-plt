@@ -64,6 +64,7 @@ fn main() -> color_eyre::Result<()> {
         .dataset(bimodal)
         .dataset(skewed)
         .dataset(wide)
+        .show_box(false)
         .title("Distribution Shapes (q to quit)")
         .y_axis(Axis::new().label("Value"));
 
