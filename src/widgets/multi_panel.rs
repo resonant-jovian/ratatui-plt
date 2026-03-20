@@ -97,6 +97,8 @@ pub struct MultiPanel {
     /// Mosaic panel metadata (populated by `from_mosaic`).
     mosaic_panels: Vec<MosaicPanel>,
     theme: Theme,
+    /// When enabled, panels are aligned so axes match across the grid.
+    pub constrained_layout: bool,
 }
 
 impl MultiPanel {
@@ -119,6 +121,7 @@ impl MultiPanel {
             span_panels: Vec::new(),
             mosaic_panels: Vec::new(),
             theme: Theme::get_default(),
+            constrained_layout: false,
         }
     }
 
@@ -339,6 +342,12 @@ impl MultiPanel {
     /// Set the theme.
     pub fn theme(mut self, theme: Theme) -> Self {
         self.theme = theme;
+        self
+    }
+
+    /// Enable or disable constrained layout (aligns axes across panels).
+    pub fn constrained_layout(mut self, enabled: bool) -> Self {
+        self.constrained_layout = enabled;
         self
     }
 

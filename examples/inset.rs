@@ -1,0 +1,104 @@
+//! Inset axes example: a zoomed view embedded inside a main plot.
+//!
+//! Shows a full-range sine wave with an inset zoomed into the peak region.
+
+use std::io;
+
+use crossterm::{
+    ExecutableCommand,
+    event::{self, Event, KeyCode, KeyEventKind},
+    terminal::{EnterAlternateScreen, LeaveAlternateScreen, disable_raw_mode, enable_raw_mode},
+};
+use ratatui::prelude::*;
+use ratatui_plt::prelude::*;
+
+fn parse_theme() -> Theme {
+    match std::env::args().nth(1).as_deref() {
+        Some("light") => Theme::light(),
+        Some("minimal") => Theme::minimal(),
+        Some("publication") => Theme::publication(),
+        Some("solarized") => Theme::solarized(),
+        Some("dark") | None => Theme::dark(),
+        Some(other) => {
+            eprintln!(
+                "Unknown theme '{other}'. Available: dark, light, minimal, publication, solarized"
+            );
+            std::process::exit(1);
+        }
+    }
+}
+
+fn main() -> color_eyre::Result<()> {
+    color_eyre::install()?;
+    Theme::set_default(parse_theme());
+    io::stdout().execute(EnterAlternateScreen)?;
+    enable_raw_mode()?;
+    let mut terminal = Terminal::new(CrosstermBackend::new(io::stdout()))?;
+
+    let n = 500;
+    let data: Vec<(f64, f64)> = (0..n)
+        .map(|i| {
+            let x = i as f64 * 0.04;
+            (x, x.sin() * (-x * 0.1).exp())
+        })
+        .collect();
+
+    // Main plot: full range
+    let main_series = Series::new("Damped sine")
+        .data(data.clone())
+        .color(Color::Cyan);
+
+    let main_plot = LinePlot::new()
+        .series(main_series)
+        .title("Damped Sine with Inset Zoom (q to quit)")
+        .x_axis(Axis::new().label("x").grid(true))
+        .y_axis(Axis::new().label("y").grid(true))
+        .reference_line(ReferenceLine::hline_dashed(0.0, Color::DarkGray))
+        .reference_line(ReferenceLine::vspan(1.0, 3.0, Color::Rgb(40, 40, 60)));
+
+    // Inset: zoomed into x=[1,3] region around the first peak
+    let inset_data: Vec<(f64, f64)> = data
+        .iter()
+        .filter(|&&(x, _)| x >= 1.0 && x <= 3.0)
+        .copied()
+        .collect();
+
+    let inset_series = Series::new("Zoom").data(inset_data).color(Color::Yellow);
+
+    let inset_plot = LinePlot::new()
+        .series(inset_series)
+        .title("Zoom: x=[1,3]")
+        .x_axis(Axis::new().bounds(Bounds::Manual(1.0, 3.0)).grid(true))
+        .y_axis(Axis::new().grid(true))
+        .show_legend(false);
+
+    let inset = InsetAxes::new(0.55, 0.08, 0.42, 0.45)
+        .border(true)
+        .border_color(Color::Yellow);
+
+    loop {
+        terminal.draw(|frame| {
+            let area = frame.area();
+
+            // Render main plot
+            frame.render_widget(&main_plot, area);
+
+            // Render inset on top
+            let buf = frame.buffer_mut();
+            inset.render_with(area, buf, |inset_area, buf| {
+                (&inset_plot).render(inset_area, buf);
+            });
+        })?;
+
+        if let Event::Key(key) = event::read()?
+            && key.kind == KeyEventKind::Press
+            && (key.code == KeyCode::Char('q') || key.code == KeyCode::Esc)
+        {
+            break;
+        }
+    }
+
+    disable_raw_mode()?;
+    io::stdout().execute(LeaveAlternateScreen)?;
+    Ok(())
+}

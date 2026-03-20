@@ -67,6 +67,9 @@ pub enum DashPattern {
     Dotted,
     /// Dash-dot: ── · ── ·
     DashDot,
+    /// Custom on/off lengths (in sub-pixel steps).
+    /// E.g. `vec![6, 3]` means 6 on, 3 off, repeating.
+    Custom(Vec<u16>),
 }
 
 /// Line thickness.
@@ -128,6 +131,102 @@ impl MarkerShape {
     }
 }
 
+/// Hatch pattern for filled regions (bars, histograms, etc.).
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum HatchPattern {
+    /// No hatch.
+    None,
+    /// Forward diagonal: /
+    Forward,
+    /// Backward diagonal: \
+    Backward,
+    /// Vertical lines: |
+    Vertical,
+    /// Horizontal lines: -
+    Horizontal,
+    /// Cross: +
+    Cross,
+    /// Diagonal cross: x
+    DiagonalCross,
+    /// Dots: ·
+    Dots,
+    /// Custom character pattern.
+    Custom(char),
+}
+
+impl HatchPattern {
+    /// Return the hatch character to draw at the given row/col position,
+    /// or `None` if this cell should be skipped.
+    pub fn char_at(&self, row: u16, col: u16) -> Option<char> {
+        match self {
+            Self::None => Option::None,
+            Self::Forward => {
+                if (row + col).is_multiple_of(3) {
+                    Some('╱')
+                } else {
+                    Option::None
+                }
+            }
+            Self::Backward => {
+                if (row + 2u16.wrapping_mul(col)).is_multiple_of(3) {
+                    Some('╲')
+                } else {
+                    Option::None
+                }
+            }
+            Self::Vertical => {
+                if col.is_multiple_of(3) {
+                    Some('│')
+                } else {
+                    Option::None
+                }
+            }
+            Self::Horizontal => {
+                if row.is_multiple_of(2) {
+                    Some('─')
+                } else {
+                    Option::None
+                }
+            }
+            Self::Cross => {
+                if col.is_multiple_of(3) || row.is_multiple_of(2) {
+                    if col.is_multiple_of(3) && row.is_multiple_of(2) {
+                        Some('┼')
+                    } else if col.is_multiple_of(3) {
+                        Some('│')
+                    } else {
+                        Some('─')
+                    }
+                } else {
+                    Option::None
+                }
+            }
+            Self::DiagonalCross => {
+                if (row + col).is_multiple_of(3) || (row + 2u16.wrapping_mul(col)).is_multiple_of(3)
+                {
+                    Some('×')
+                } else {
+                    Option::None
+                }
+            }
+            Self::Dots => {
+                if (row + col).is_multiple_of(2) {
+                    Some('·')
+                } else {
+                    Option::None
+                }
+            }
+            Self::Custom(ch) => {
+                if (row + col).is_multiple_of(2) {
+                    Some(*ch)
+                } else {
+                    Option::None
+                }
+            }
+        }
+    }
+}
+
 /// Fill style for regions between curves or under curves.
 #[derive(Clone, Debug)]
 pub struct FillStyle {
@@ -135,6 +234,8 @@ pub struct FillStyle {
     pub color: Color,
     /// Opacity approximation (uses different fill characters).
     pub density: FillDensity,
+    /// Optional hatch pattern overlay.
+    pub hatch: Option<HatchPattern>,
 }
 
 impl Default for FillStyle {
@@ -142,6 +243,7 @@ impl Default for FillStyle {
         Self {
             color: Color::White,
             density: FillDensity::Medium,
+            hatch: None,
         }
     }
 }

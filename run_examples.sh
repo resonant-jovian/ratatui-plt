@@ -10,6 +10,7 @@ for ex in \
     box_plot \
     boxen \
     candlestick \
+    collections \
     contour \
     contour3d \
     crosshair \
@@ -21,14 +22,18 @@ for ex in \
     hexbin \
     hist2d \
     histogram \
+    inset \
     line_plot \
     multi_panel \
+    network \
     parallel_coords \
     pcolormesh \
+    picking \
     pie_chart \
     quiver3d \
     radial \
     rug \
+    sankey \
     scatter3d \
     scatter_plot \
     scientific_dashboard \
@@ -37,8 +42,14 @@ for ex in \
     stem_plot \
     streamplot \
     strip \
+    sunburst \
     surface3d \
     swarm \
+    ternary \
+    theme_config \
+    treemap \
+    tricolor \
+    triplot \
     twin_axes \
     vector_field \
     violin_plot \

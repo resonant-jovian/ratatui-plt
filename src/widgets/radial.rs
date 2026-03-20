@@ -7,6 +7,30 @@ use ratatui::widgets::Widget;
 use crate::series::Series;
 use crate::theme::Theme;
 
+/// Theta direction for polar plots.
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub enum ThetaDirection {
+    /// Angles increase counter-clockwise (default, mathematical convention).
+    #[default]
+    CounterClockwise,
+    /// Angles increase clockwise (compass convention).
+    Clockwise,
+}
+
+/// Type of polar plot rendering.
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub enum PolarPlotType {
+    /// Connected line segments (default).
+    #[default]
+    Line,
+    /// Markers only, no connecting lines.
+    Scatter,
+    /// Wedge/bar segments from origin.
+    Bar,
+    /// Filled region between data and r_min.
+    FillBetween,
+}
+
 /// A radial (polar coordinate) plot widget.
 ///
 /// Displays data in polar coordinates with circular grid lines and angular tick marks.
@@ -35,6 +59,14 @@ pub struct RadialPlot {
     n_rings: usize,
     n_spokes: usize,
     r_max: Option<f64>,
+    /// Minimum radial value (default: 0.0).
+    r_min: Option<f64>,
+    /// Direction of increasing theta.
+    theta_direction: ThetaDirection,
+    /// Offset for theta=0 position in radians (default: 0 = right/east).
+    theta_offset: f64,
+    /// Type of polar plot rendering.
+    plot_type: PolarPlotType,
     theme: Theme,
 }
 
@@ -46,6 +78,10 @@ impl Default for RadialPlot {
             n_rings: 4,
             n_spokes: 8,
             r_max: None,
+            r_min: None,
+            theta_direction: ThetaDirection::default(),
+            theta_offset: 0.0,
+            plot_type: PolarPlotType::default(),
             theme: Theme::get_default(),
         }
     }
@@ -75,6 +111,26 @@ impl RadialPlot {
     }
     pub fn r_max(mut self, r: f64) -> Self {
         self.r_max = Some(r);
+        self
+    }
+    /// Set the minimum radial value.
+    pub fn r_min(mut self, r: f64) -> Self {
+        self.r_min = Some(r);
+        self
+    }
+    /// Set the direction of increasing theta.
+    pub fn theta_direction(mut self, dir: ThetaDirection) -> Self {
+        self.theta_direction = dir;
+        self
+    }
+    /// Set the theta=0 offset in radians.
+    pub fn theta_offset(mut self, offset: f64) -> Self {
+        self.theta_offset = offset;
+        self
+    }
+    /// Set the polar plot type.
+    pub fn plot_type(mut self, pt: PolarPlotType) -> Self {
+        self.plot_type = pt;
         self
     }
     /// Set the theme.
@@ -119,14 +175,24 @@ impl Widget for &RadialPlot {
         let r_screen_x = r_data / cell_aspect; // wider to compensate
         let r_screen_y = r_data;
 
-        // Maximum data radius
+        // Data radius range
+        let r_min = self.r_min.unwrap_or(0.0);
         let r_max = self.r_max.unwrap_or_else(|| {
             self.series
                 .iter()
                 .flat_map(|s| s.data.iter().map(|&(_, r)| r))
                 .fold(0.0f64, f64::max)
         });
-        let r_max = if r_max == 0.0 { 1.0 } else { r_max };
+        let r_max = if r_max == r_min { r_min + 1.0 } else { r_max };
+
+        // Helper: transform theta based on direction and offset
+        let transform_theta = |theta: f64| -> f64 {
+            let t = theta + self.theta_offset;
+            match self.theta_direction {
+                ThetaDirection::CounterClockwise => t,
+                ThetaDirection::Clockwise => -t,
+            }
+        };
 
         // Draw concentric rings
         for ring in 1..=self.n_rings {
@@ -198,29 +264,72 @@ impl Widget for &RadialPlot {
         for s in &self.series {
             let mut prev: Option<(u16, u16)> = None;
             for &(theta, r) in &s.data {
-                let r_frac = (r / r_max).clamp(0.0, 1.0);
-                let sx = (cx as f64 + r_frac * r_screen_x * theta.cos()).round() as u16;
-                let sy = (cy as f64 + r_frac * r_screen_y * theta.sin()).round() as u16;
+                let t = transform_theta(theta);
+                let r_frac = ((r - r_min) / (r_max - r_min)).clamp(0.0, 1.0);
+                let sx = (cx as f64 + r_frac * r_screen_x * t.cos()).round() as u16;
+                let sy = (cy as f64 + r_frac * r_screen_y * t.sin()).round() as u16;
 
-                if sx >= area.x && sx < area.x + area.width && sy >= py && sy < py + ph {
-                    let ch = s.marker.map_or('●', |m| m.char());
-                    buf[(sx, sy)].set_char(ch).set_fg(s.color);
-                }
-
-                // Connect to previous point
-                if let Some((px, py_prev)) = prev
-                    && (sx != px || sy != py_prev)
-                {
-                    // Simple line between consecutive points
-                    let dx = sx as i32 - px as i32;
-                    let dy = sy as i32 - py_prev as i32;
-                    let steps = dx.abs().max(dy.abs());
-                    for step in 1..steps {
-                        let frac = step as f64 / steps as f64;
-                        let ix = (px as f64 + dx as f64 * frac).round() as u16;
-                        let iy = (py_prev as f64 + dy as f64 * frac).round() as u16;
-                        if ix >= area.x && ix < area.x + area.width && iy >= py && iy < py + ph {
-                            buf[(ix, iy)].set_char('·').set_fg(s.color);
+                match self.plot_type {
+                    PolarPlotType::Scatter => {
+                        // Only markers, no lines
+                        if sx >= area.x && sx < area.x + area.width && sy >= py && sy < py + ph {
+                            let ch = s.marker.map_or('●', |m| m.char());
+                            buf[(sx, sy)].set_char(ch).set_fg(s.color);
+                        }
+                    }
+                    PolarPlotType::Bar => {
+                        // Radial bar from origin to data point
+                        let steps = r_frac * r_screen_y;
+                        let n_steps = steps.round().max(1.0) as usize;
+                        for step in 0..=n_steps {
+                            let frac = step as f64 / n_steps as f64 * r_frac;
+                            let bx = (cx as f64 + frac * r_screen_x * t.cos()).round() as u16;
+                            let by = (cy as f64 + frac * r_screen_y * t.sin()).round() as u16;
+                            if bx >= area.x && bx < area.x + area.width && by >= py && by < py + ph
+                            {
+                                buf[(bx, by)].set_char('█').set_fg(s.color);
+                            }
+                        }
+                    }
+                    PolarPlotType::FillBetween => {
+                        // Fill from r_min to r
+                        let steps = r_frac * r_screen_y;
+                        let n_steps = steps.round().max(1.0) as usize;
+                        for step in 0..=n_steps {
+                            let frac = step as f64 / n_steps as f64 * r_frac;
+                            let bx = (cx as f64 + frac * r_screen_x * t.cos()).round() as u16;
+                            let by = (cy as f64 + frac * r_screen_y * t.sin()).round() as u16;
+                            if bx >= area.x && bx < area.x + area.width && by >= py && by < py + ph
+                            {
+                                buf[(bx, by)].set_char('░').set_fg(s.color);
+                            }
+                        }
+                    }
+                    PolarPlotType::Line => {
+                        // Marker at data point
+                        if sx >= area.x && sx < area.x + area.width && sy >= py && sy < py + ph {
+                            let ch = s.marker.map_or('●', |m| m.char());
+                            buf[(sx, sy)].set_char(ch).set_fg(s.color);
+                        }
+                        // Connect to previous point
+                        if let Some((px, py_prev)) = prev
+                            && (sx != px || sy != py_prev)
+                        {
+                            let dx = sx as i32 - px as i32;
+                            let dy = sy as i32 - py_prev as i32;
+                            let steps = dx.abs().max(dy.abs());
+                            for step in 1..steps {
+                                let frac = step as f64 / steps as f64;
+                                let ix = (px as f64 + dx as f64 * frac).round() as u16;
+                                let iy = (py_prev as f64 + dy as f64 * frac).round() as u16;
+                                if ix >= area.x
+                                    && ix < area.x + area.width
+                                    && iy >= py
+                                    && iy < py + ph
+                                {
+                                    buf[(ix, iy)].set_char('·').set_fg(s.color);
+                                }
+                            }
                         }
                     }
                 }

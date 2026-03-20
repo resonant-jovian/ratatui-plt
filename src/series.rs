@@ -202,6 +202,29 @@ pub fn is_valid_point(x: f64, y: f64) -> bool {
     x.is_finite() && y.is_finite()
 }
 
+/// Split data at NaN/infinite gaps, returning contiguous valid segments.
+///
+/// Useful for line plots that should show gaps where data is missing rather
+/// than connecting through NaN values.
+pub fn split_at_nan(data: &[(f64, f64)]) -> Vec<&[(f64, f64)]> {
+    let mut segments = Vec::new();
+    let mut start = None;
+    for (i, &(x, y)) in data.iter().enumerate() {
+        if is_valid_point(x, y) {
+            if start.is_none() {
+                start = Some(i);
+            }
+        } else if let Some(s) = start {
+            segments.push(&data[s..i]);
+            start = None;
+        }
+    }
+    if let Some(s) = start {
+        segments.push(&data[s..]);
+    }
+    segments
+}
+
 /// A 3D data series for surface, wireframe, and scatter3d widgets.
 ///
 /// # Example

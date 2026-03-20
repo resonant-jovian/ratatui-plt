@@ -14,6 +14,8 @@ default = []
 async = ["dep:tokio"]
 chrono = ["dep:chrono"]
 serde = ["dep:serde"]
+fft = ["dep:rustfft"]
+triangulation = ["dep:delaunator"]
 
 [dependencies]
 ratatui = "0.30"
@@ -32,6 +34,14 @@ optional = true
 [dependencies.serde]
 version = "1"
 features = ["derive"]
+optional = true
+
+[dependencies.rustfft]
+version = "6"
+optional = true
+
+[dependencies.delaunator]
+version = "0.2"
 optional = true
 
 [dev-dependencies]

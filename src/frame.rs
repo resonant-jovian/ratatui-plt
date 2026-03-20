@@ -442,7 +442,9 @@ impl<'a> PlotFrame<'a> {
                 let xi = sx.round() as u16;
                 if xi >= px && xi < px + aw {
                     for y in py..py + ah {
-                        buf[(xi, y)].set_char('⋅').set_fg(self.theme.grid_color);
+                        buf[(xi, y)]
+                            .set_char('⋅')
+                            .set_fg(self.theme.minor_grid_color);
                     }
                 }
             }
@@ -454,7 +456,9 @@ impl<'a> PlotFrame<'a> {
                 let yi = sy.round() as u16;
                 if yi >= py && yi < py + ah {
                     for x in px..px + aw {
-                        buf[(x, yi)].set_char('⋅').set_fg(self.theme.grid_color);
+                        buf[(x, yi)]
+                            .set_char('⋅')
+                            .set_fg(self.theme.minor_grid_color);
                     }
                 }
             }

@@ -1,3 +1,8 @@
+//! Radial (polar) plot example: four plot types and directional control.
+//!
+//! Shows a 2x2 grid with Line, Scatter, Bar, and FillBetween polar plot types.
+//! Demonstrates theta_direction (clockwise compass style), theta_offset, and r_min.
+
 use std::io;
 
 use crossterm::{
@@ -31,41 +36,113 @@ fn main() -> color_eyre::Result<()> {
     enable_raw_mode()?;
     let mut terminal = Terminal::new(CrosstermBackend::new(io::stdout()))?;
 
-    // Cardioid: r = 1 + cos(theta)
-    let cardioid: Vec<(f64, f64)> = (0..=3600)
+    let n = 3600;
+
+    // Cardioid: r = 1 + cos(theta) — Line mode (default CCW)
+    let cardioid: Vec<(f64, f64)> = (0..=n)
         .map(|i| {
-            let theta = i as f64 * std::f64::consts::PI / 1800.0;
+            let theta = i as f64 * std::f64::consts::TAU / n as f64;
             (theta, 1.0 + theta.cos())
         })
         .collect();
 
-    // Rose curve: r = cos(2*theta)
-    let rose: Vec<(f64, f64)> = (0..=3600)
-        .map(|i| {
-            let theta = i as f64 * std::f64::consts::PI / 1800.0;
-            (theta, (2.0 * theta).cos().abs())
-        })
-        .collect();
-
-    let plot = RadialPlot::new()
+    let plot_line = RadialPlot::new()
         .series(
             Series::new("Cardioid: r=1+cos(\u{03b8})")
                 .data(cardioid)
                 .color(Color::Cyan),
         )
-        .series(
-            Series::new("Rose: r=|cos(2\u{03b8})|")
-                .data(rose)
-                .color(Color::Yellow),
-        )
-        .title("Polar Coordinate Plot (q to quit)")
+        .title("Line (CCW)")
+        .plot_type(PolarPlotType::Line)
         .n_rings(4)
         .n_spokes(8)
         .r_max(2.5);
 
+    // Rose curve: scatter points — Clockwise with North=0
+    let rose: Vec<(f64, f64)> = (0..360)
+        .map(|i| {
+            let theta = i as f64 * std::f64::consts::TAU / 360.0;
+            (theta, (3.0 * theta).cos().abs())
+        })
+        .collect();
+
+    let plot_scatter = RadialPlot::new()
+        .series(
+            Series::new("Rose: r=|cos(3\u{03b8})|")
+                .data(rose)
+                .color(Color::Yellow)
+                .marker(MarkerShape::Diamond),
+        )
+        .title("Scatter (CW, N=0)")
+        .plot_type(PolarPlotType::Scatter)
+        .theta_direction(ThetaDirection::Clockwise)
+        .theta_offset(std::f64::consts::FRAC_PI_2) // North at top
+        .n_rings(3)
+        .n_spokes(12);
+
+    // Wind rose style — Bar mode
+    let wind_data: Vec<(f64, f64)> = (0..16)
+        .map(|i| {
+            let theta = i as f64 * std::f64::consts::TAU / 16.0;
+            let r = 3.0 + 2.0 * (theta * 2.0).cos() + 1.5 * (theta * 3.0).sin();
+            (theta, r)
+        })
+        .collect();
+
+    let plot_bar = RadialPlot::new()
+        .series(
+            Series::new("Wind speed")
+                .data(wind_data)
+                .color(Color::Green),
+        )
+        .title("Bar (CW compass)")
+        .plot_type(PolarPlotType::Bar)
+        .theta_direction(ThetaDirection::Clockwise)
+        .theta_offset(std::f64::consts::FRAC_PI_2)
+        .n_rings(3)
+        .n_spokes(8);
+
+    // Filled area — with r_min offset
+    let fill_data: Vec<(f64, f64)> = (0..=n)
+        .map(|i| {
+            let theta = i as f64 * std::f64::consts::TAU / n as f64;
+            (theta, 1.0 + 0.3 * (5.0 * theta).sin())
+        })
+        .collect();
+
+    let plot_fill = RadialPlot::new()
+        .series(
+            Series::new("r=1+0.3sin(5\u{03b8})")
+                .data(fill_data)
+                .color(Color::Magenta),
+        )
+        .title("FillBetween (r_min=0.5)")
+        .plot_type(PolarPlotType::FillBetween)
+        .r_min(0.5)
+        .n_rings(4)
+        .n_spokes(8)
+        .r_max(1.5);
+
     loop {
         terminal.draw(|frame| {
-            frame.render_widget(&plot, square_area(frame.area()));
+            let area = frame.area();
+            let rows = Layout::default()
+                .direction(Direction::Vertical)
+                .constraints([Constraint::Percentage(50), Constraint::Percentage(50)])
+                .split(area);
+            let top = Layout::default()
+                .direction(Direction::Horizontal)
+                .constraints([Constraint::Percentage(50), Constraint::Percentage(50)])
+                .split(rows[0]);
+            let bot = Layout::default()
+                .direction(Direction::Horizontal)
+                .constraints([Constraint::Percentage(50), Constraint::Percentage(50)])
+                .split(rows[1]);
+
+            frame.render_widget(&plot_line, top[0]);
+            frame.render_widget(&plot_scatter, top[1]);
+            frame.render_widget(&plot_bar, bot[0]);
+            frame.render_widget(&plot_fill, bot[1]);
         })?;
 
         if let Event::Key(key) = event::read()?

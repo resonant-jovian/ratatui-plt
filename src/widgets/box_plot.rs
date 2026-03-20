@@ -126,6 +126,10 @@ pub struct BoxPlot {
     show_outliers: bool,
     show_means: bool,
     notch: bool,
+    /// Enable bootstrap confidence interval for the median.
+    bootstrap_ci: bool,
+    /// Number of bootstrap resamples (default: 1000).
+    bootstrap_n: usize,
     theme: Theme,
     spines: Spines,
     reference_lines: Vec<ReferenceLine>,
@@ -141,6 +145,8 @@ impl Default for BoxPlot {
             show_outliers: true,
             show_means: false,
             notch: false,
+            bootstrap_ci: false,
+            bootstrap_n: 1000,
             theme: Theme::get_default(),
             spines: Spines::default(),
             reference_lines: Vec::new(),
@@ -219,6 +225,71 @@ impl BoxPlot {
         self.annotations.push(ann);
         self
     }
+
+    /// Enable bootstrap confidence interval for the median.
+    ///
+    /// When enabled, the box is rendered with a notch at the median whose
+    /// extent is determined by bootstrap resampling rather than the
+    /// 1.57*IQR/sqrt(n) approximation.
+    pub fn bootstrap_ci(mut self, enabled: bool) -> Self {
+        self.bootstrap_ci = enabled;
+        self
+    }
+
+    /// Set the number of bootstrap resamples (default: 1000).
+    pub fn bootstrap_n(mut self, n: usize) -> Self {
+        self.bootstrap_n = n.max(10);
+        self
+    }
+}
+
+/// Simple LCG pseudo-random number generator (no external dependency).
+struct SimpleRng {
+    state: u64,
+}
+
+impl SimpleRng {
+    fn new(seed: u64) -> Self {
+        Self {
+            state: seed.wrapping_add(1),
+        }
+    }
+    fn next_u64(&mut self) -> u64 {
+        // LCG parameters from Numerical Recipes
+        self.state = self
+            .state
+            .wrapping_mul(6364136223846793005)
+            .wrapping_add(1442695040888963407);
+        self.state
+    }
+    fn next_usize(&mut self, bound: usize) -> usize {
+        (self.next_u64() % bound as u64) as usize
+    }
+}
+
+/// Compute the bootstrap 95% confidence interval for the median.
+fn bootstrap_median_ci(data: &[f64], n_resamples: usize) -> (f64, f64) {
+    if data.len() < 2 {
+        let m = if data.is_empty() { 0.0 } else { data[0] };
+        return (m, m);
+    }
+    let n = data.len();
+    let mut rng = SimpleRng::new(n as u64 ^ 0xDEADBEEF);
+    let mut medians = Vec::with_capacity(n_resamples);
+
+    for _ in 0..n_resamples {
+        let mut sample = Vec::with_capacity(n);
+        for _ in 0..n {
+            sample.push(data[rng.next_usize(n)]);
+        }
+        sample.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
+        medians.push(percentile(&sample, 50.0));
+    }
+
+    medians.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
+    let lo = percentile(&medians, 2.5);
+    let hi = percentile(&medians, 97.5);
+    (lo, hi)
 }
 
 impl Widget for &BoxPlot {
@@ -293,13 +364,20 @@ impl Widget for &BoxPlot {
             )
             .round() as u16;
 
-            // Notch calculation: notch extends median +/- 1.57*IQR/sqrt(n)
+            // Notch calculation: bootstrap CI or 1.57*IQR/sqrt(n)
             let (notch_lo_y, notch_hi_y, notch_left, notch_right) =
-                if self.notch && d.values.len() > 1 {
-                    let iqr = q3 - q1;
-                    let notch_extent = 1.57 * iqr / (d.values.len() as f64).sqrt();
-                    let notch_lo = (median - notch_extent).max(q1);
-                    let notch_hi = (median + notch_extent).min(q3);
+                if (self.notch || self.bootstrap_ci) && d.values.len() > 1 {
+                    let (notch_lo, notch_hi) = if self.bootstrap_ci {
+                        let (ci_lo, ci_hi) = bootstrap_median_ci(&d.values, self.bootstrap_n);
+                        (ci_lo.max(q1), ci_hi.min(q3))
+                    } else {
+                        let iqr = q3 - q1;
+                        let notch_extent = 1.57 * iqr / (d.values.len() as f64).sqrt();
+                        (
+                            (median - notch_extent).max(q1),
+                            (median + notch_extent).min(q3),
+                        )
+                    };
                     let sy_notch_lo = data_to_screen(
                         notch_lo,
                         y_lo,
@@ -339,7 +417,7 @@ impl Widget for &BoxPlot {
                 }
             }
 
-            if self.notch {
+            if self.notch || self.bootstrap_ci {
                 // Box sides with notch: narrower in the notch region
                 for y in sy_q3..=sy_q1 {
                     let (left_x, right_x) = if y >= notch_hi_y && y <= notch_lo_y {
@@ -395,8 +473,9 @@ impl Widget for &BoxPlot {
             }
 
             // Median line
-            let median_left = if self.notch { notch_left } else { box_left };
-            let median_right = if self.notch { notch_right } else { box_right };
+            let use_notch = self.notch || self.bootstrap_ci;
+            let median_left = if use_notch { notch_left } else { box_left };
+            let median_right = if use_notch { notch_right } else { box_right };
             for x in median_left..=median_right {
                 if pa.contains(x, sy_median) {
                     buf[(x, sy_median)].set_char('━').set_fg(d.color);

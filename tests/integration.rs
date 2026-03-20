@@ -1966,3 +1966,369 @@ fn test_violin_plot_split_mode_renders() {
     let mut buf = Buffer::empty(area);
     (&plot).render(area, &mut buf);
 }
+
+// ========================================================================
+// Gap Analysis Implementation Tests
+// ========================================================================
+
+#[test]
+fn test_minor_grid_color_theme() {
+    let theme = Theme::dark();
+    assert!(matches!(theme.minor_grid_color, Color::Rgb(40, 40, 40)));
+}
+
+#[test]
+fn test_tick_direction_and_params() {
+    use ratatui_plt::axis::TickDirection;
+    let axis = Axis::new()
+        .tick_direction(TickDirection::InOut)
+        .tick_size(2)
+        .tick_padding(2)
+        .label_rotation(LabelRotation::Vertical);
+    assert_eq!(axis.tick_direction, TickDirection::InOut);
+    assert_eq!(axis.tick_size, 2);
+    assert_eq!(axis.tick_padding, 2);
+    assert_eq!(axis.label_rotation, LabelRotation::Vertical);
+}
+
+#[test]
+fn test_custom_dash_pattern_renders() {
+    let s = Series::new("custom_dash")
+        .data(vec![(0.0, 0.0), (1.0, 1.0), (2.0, 0.5)])
+        .color(Color::Cyan)
+        .line_style(LineStyle {
+            pattern: DashPattern::Custom(vec![6, 3]),
+            thickness: ratatui_plt::style::Thickness::Normal,
+        });
+    let plot = LinePlot::new().series(s);
+    let area = Rect::new(0, 0, 40, 20);
+    let mut buf = Buffer::empty(area);
+    (&plot).render(area, &mut buf);
+}
+
+#[test]
+fn test_hatch_pattern_char_at() {
+    let fwd = HatchPattern::Forward;
+    let has_some = (0..10u16)
+        .flat_map(|r| (0..10u16).map(move |c| (r, c)))
+        .any(|(r, c)| fwd.char_at(r, c).is_some());
+    assert!(has_some);
+    assert!(HatchPattern::None.char_at(0, 0).is_none());
+}
+
+#[test]
+fn test_multi_column_legend_size() {
+    use ratatui_plt::legend::LegendEntry;
+    let entries = vec![
+        LegendEntry {
+            name: "AAAA".into(),
+            color: Color::Red,
+            marker: None,
+        },
+        LegendEntry {
+            name: "BBBB".into(),
+            color: Color::Blue,
+            marker: None,
+        },
+        LegendEntry {
+            name: "CCCC".into(),
+            color: Color::Green,
+            marker: None,
+        },
+        LegendEntry {
+            name: "DDDD".into(),
+            color: Color::Yellow,
+            marker: None,
+        },
+    ];
+    let l1 = ratatui_plt::legend::Legend::new(entries.clone()).columns(1);
+    let l2 = ratatui_plt::legend::Legend::new(entries).columns(2);
+    let (w1, h1) = l1.size();
+    let (w2, h2) = l2.size();
+    assert!(w2 > w1);
+    assert!(h2 < h1);
+}
+
+#[test]
+fn test_colorbar_extend_renders() {
+    use ratatui_plt::colormap::{Colorbar, ColorbarExtend, Viridis};
+    let cb = Colorbar::new(&Viridis, 0.0, 10.0).extend(ColorbarExtend::Both);
+    let area = Rect::new(0, 0, 12, 20);
+    let mut buf = Buffer::empty(area);
+    (&cb).render(area, &mut buf);
+}
+
+#[test]
+fn test_colormap_resample() {
+    use ratatui_plt::colormap::{Colormap, Viridis, resample};
+    let r = resample(&Viridis, 10);
+    assert_eq!(r.name(), "viridis_resampled");
+    assert_eq!(Viridis.color_at(0.0), r.color_at(0.0));
+}
+
+#[test]
+fn test_split_at_nan() {
+    let data = vec![
+        (0.0, 0.0),
+        (1.0, 1.0),
+        (f64::NAN, 0.0),
+        (3.0, 3.0),
+        (4.0, 4.0),
+    ];
+    let segs = split_at_nan(&data);
+    assert_eq!(segs.len(), 2);
+    assert_eq!(segs[0].len(), 2);
+    assert_eq!(segs[1].len(), 2);
+}
+
+#[test]
+fn test_collections_api() {
+    let lc = LineCollection::new()
+        .segment((0.0, 0.0), (1.0, 1.0), Color::Red)
+        .segment((1.0, 0.0), (0.0, 1.0), Color::Blue);
+    assert_eq!(lc.segments.len(), 2);
+    let pc =
+        PathCollection::new().path(vec![(0.0, 0.0), (1.0, 1.0), (2.0, 0.0)], Color::Green, true);
+    assert_eq!(pc.paths.len(), 1);
+}
+
+#[test]
+fn test_sankey_diagram_renders() {
+    let d = SankeyDiagram::new()
+        .node(SankeyNode {
+            label: "A".into(),
+            color: Color::Red,
+        })
+        .node(SankeyNode {
+            label: "B".into(),
+            color: Color::Blue,
+        })
+        .node(SankeyNode {
+            label: "C".into(),
+            color: Color::Green,
+        })
+        .flow(SankeyFlow {
+            source: 0,
+            target: 2,
+            value: 5.0,
+            color: None,
+        })
+        .flow(SankeyFlow {
+            source: 1,
+            target: 2,
+            value: 3.0,
+            color: None,
+        })
+        .title("Sankey");
+    let area = Rect::new(0, 0, 60, 20);
+    let mut buf = Buffer::empty(area);
+    (&d).render(area, &mut buf);
+}
+
+#[test]
+fn test_treemap_renders() {
+    let root = TreemapNode {
+        label: "R".into(),
+        value: 100.0,
+        color: None,
+        children: vec![
+            TreemapNode {
+                label: "A".into(),
+                value: 60.0,
+                color: Some(Color::Red),
+                children: vec![],
+            },
+            TreemapNode {
+                label: "B".into(),
+                value: 40.0,
+                color: Some(Color::Blue),
+                children: vec![],
+            },
+        ],
+    };
+    let tm = Treemap::new(root).title("TM");
+    let area = Rect::new(0, 0, 40, 20);
+    let mut buf = Buffer::empty(area);
+    (&tm).render(area, &mut buf);
+}
+
+#[test]
+fn test_sunburst_renders() {
+    let root = SunburstNode {
+        label: "R".into(),
+        value: 100.0,
+        color: None,
+        children: vec![
+            SunburstNode {
+                label: "A".into(),
+                value: 60.0,
+                color: Some(Color::Cyan),
+                children: vec![],
+            },
+            SunburstNode {
+                label: "B".into(),
+                value: 40.0,
+                color: Some(Color::Yellow),
+                children: vec![],
+            },
+        ],
+    };
+    let sb = Sunburst::new(root).title("SB");
+    let area = Rect::new(0, 0, 40, 20);
+    let mut buf = Buffer::empty(area);
+    (&sb).render(area, &mut buf);
+}
+
+#[test]
+fn test_ternary_plot_renders() {
+    let data = TernaryData {
+        label: "Mix".into(),
+        points: vec![(0.5, 0.3, 0.2), (0.1, 0.8, 0.1)],
+        color: Color::Cyan,
+        marker: MarkerShape::FilledCircle,
+    };
+    let plot = TernaryPlot::new().dataset(data).title("Tern");
+    let area = Rect::new(0, 0, 50, 25);
+    let mut buf = Buffer::empty(area);
+    (&plot).render(area, &mut buf);
+}
+
+#[test]
+fn test_network_plot_renders() {
+    let plot = NetworkPlot::new()
+        .node(GraphNode {
+            label: "A".into(),
+            color: Color::Cyan,
+            position: None,
+            marker: MarkerShape::FilledCircle,
+        })
+        .node(GraphNode {
+            label: "B".into(),
+            color: Color::Yellow,
+            position: None,
+            marker: MarkerShape::FilledCircle,
+        })
+        .edge(GraphEdge {
+            source: 0,
+            target: 1,
+            weight: 1.0,
+            color: None,
+        })
+        .layout(GraphLayout::Circular)
+        .title("Net");
+    let area = Rect::new(0, 0, 40, 20);
+    let mut buf = Buffer::empty(area);
+    (&plot).render(area, &mut buf);
+}
+
+#[test]
+fn test_triangulation_and_triplot() {
+    use ratatui_plt::triangulation::Triangulation;
+    let tri =
+        Triangulation::from_explicit(vec![(0.0, 0.0), (1.0, 0.0), (0.5, 0.87)], vec![(0, 1, 2)]);
+    assert_eq!(tri.edges().len(), 3);
+    let plot = TriPlot::new(tri).title("Tri");
+    let area = Rect::new(0, 0, 40, 20);
+    let mut buf = Buffer::empty(area);
+    (&plot).render(area, &mut buf);
+}
+
+#[test]
+fn test_inset_axes_rect() {
+    let inset = InsetAxes::new(0.5, 0.1, 0.4, 0.3);
+    let parent = Rect::new(0, 0, 100, 50);
+    let r = inset.rect(parent);
+    assert_eq!(r.x, 50);
+    assert_eq!(r.y, 5);
+}
+
+#[test]
+fn test_pick_nearest() {
+    let pa = PlotArea {
+        x: 0,
+        y: 0,
+        width: 100,
+        height: 50,
+        x_lo: 0.0,
+        x_hi: 10.0,
+        y_lo: 0.0,
+        y_hi: 10.0,
+        area: Rect::new(0, 0, 100, 50),
+    };
+    let s1 = Series::new("a")
+        .data(vec![(2.0, 3.0), (5.0, 5.0)])
+        .color(Color::Red);
+    let result = pick_nearest(
+        pa.screen_x(5.0).round() as u16,
+        pa.screen_y(5.0).round() as u16,
+        &[s1],
+        &pa,
+    );
+    assert!(result.is_some());
+    assert_eq!(result.unwrap().point_index, 1);
+}
+
+#[test]
+fn test_brush_state() {
+    let mut brush = BrushState::new();
+    brush.set_selection(1.0, 1.0, 5.0, 5.0);
+    assert!(brush.contains(3.0, 3.0));
+    assert!(!brush.contains(0.0, 0.0));
+    let data = vec![(0.0, 0.0), (3.0, 3.0), (6.0, 6.0)];
+    brush.update_indices(&[&data]);
+    assert_eq!(brush.selected_indices[0], vec![1]);
+}
+
+#[test]
+fn test_theme_guard_restores() {
+    let orig = Theme::get_default();
+    {
+        let _g = Theme::solarized().activate();
+        assert!(matches!(
+            Theme::get_default().background,
+            Color::Rgb(0, 43, 54)
+        ));
+    }
+    assert_eq!(
+        format!("{:?}", orig.background),
+        format!("{:?}", Theme::get_default().background)
+    );
+}
+
+#[test]
+fn test_plot_config_activate() {
+    let mut cfg = PlotConfig::default();
+    cfg.grid_visible = true;
+    let _g = cfg.activate();
+    assert!(PlotConfig::get_default().grid_visible);
+}
+
+#[test]
+fn test_radial_plot_enhancements() {
+    let data: Vec<(f64, f64)> = (0..36)
+        .map(|i| (i as f64 * std::f64::consts::TAU / 36.0, 1.0))
+        .collect();
+    let s = Series::new("c").data(data).color(Color::Magenta);
+    let plot = RadialPlot::new()
+        .series(s)
+        .theta_direction(ThetaDirection::Clockwise)
+        .plot_type(PolarPlotType::Scatter)
+        .title("Enhanced Polar");
+    let area = Rect::new(0, 0, 40, 20);
+    let mut buf = Buffer::empty(area);
+    (&plot).render(area, &mut buf);
+}
+
+#[test]
+fn test_box_plot_bootstrap_ci() {
+    let data: Vec<f64> = (0..50).map(|i| i as f64 * 0.2).collect();
+    let g = BoxData::new("Bootstrap", data, Color::Cyan);
+    let plot = BoxPlot::new()
+        .box_data(g)
+        .bootstrap_ci(true)
+        .bootstrap_n(100)
+        .title("CI");
+    let area = Rect::new(0, 0, 40, 20);
+    let mut buf = Buffer::empty(area);
+    (&plot).render(area, &mut buf);
+}

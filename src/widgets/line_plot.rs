@@ -544,6 +544,30 @@ fn draw_line(
                 let cycle = step % 14;
                 cycle < 8 || (10..12).contains(&cycle)
             }
+            DashPattern::Custom(segs) => {
+                if segs.is_empty() {
+                    true
+                } else {
+                    let total: u32 = segs.iter().map(|&s| s as u32).sum();
+                    if total == 0 {
+                        true
+                    } else {
+                        let pos = step % total;
+                        let mut accum = 0u32;
+                        let mut on = true;
+                        let mut result = true;
+                        for &seg in segs {
+                            accum += seg as u32;
+                            if pos < accum {
+                                result = on;
+                                break;
+                            }
+                            on = !on;
+                        }
+                        result
+                    }
+                }
+            }
         };
 
         if draw && ix0 >= 0 && iy0 >= 0 {

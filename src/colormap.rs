@@ -1113,6 +1113,32 @@ pub fn get_colormap(name: &str) -> Option<Box<dyn Colormap>> {
     }
 }
 
+/// Controls how out-of-range values are displayed on the colorbar.
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub enum ColorbarExtend {
+    /// No extensions at either end.
+    #[default]
+    Neither,
+    /// Triangular extension at the minimum end.
+    Min,
+    /// Triangular extension at the maximum end.
+    Max,
+    /// Triangular extensions at both ends.
+    Both,
+}
+
+/// Resample a colormap at `n` evenly-spaced points, producing a [`ListedColormap`].
+pub fn resample(cmap: &dyn Colormap, n: usize) -> ListedColormap {
+    let n = n.max(2);
+    let stops: Vec<(f64, Color)> = (0..n)
+        .map(|i| {
+            let t = i as f64 / (n - 1) as f64;
+            (t, cmap.color_at(t))
+        })
+        .collect();
+    ListedColormap::new(format!("{}_resampled", cmap.name()), stops)
+}
+
 /// Colorbar widget: displays a vertical color gradient with value labels.
 ///
 /// Rendered alongside heatmaps and contour plots to show the value→color mapping.
@@ -1131,6 +1157,8 @@ pub struct Colorbar<'a> {
     width: u16,
     /// Color for tick labels.
     label_color: Color,
+    /// How to display out-of-range values.
+    extend: ColorbarExtend,
 }
 
 impl<'a> Colorbar<'a> {
@@ -1144,12 +1172,19 @@ impl<'a> Colorbar<'a> {
             n_ticks: 5,
             width: 4,
             label_color: Color::White,
+            extend: ColorbarExtend::Neither,
         }
     }
 
     /// Set the label color.
     pub fn label_color(mut self, color: Color) -> Self {
         self.label_color = color;
+        self
+    }
+
+    /// Set extension mode for out-of-range values.
+    pub fn extend(mut self, extend: ColorbarExtend) -> Self {
+        self.extend = extend;
         self
     }
 
@@ -1181,16 +1216,41 @@ impl Widget for &Colorbar<'_> {
         let bar_width = self.width.min(area.width.saturating_sub(6));
         let label_x = area.x + bar_width + 1;
 
-        // Draw color gradient (bottom = vmin, top = vmax)
-        for row in 0..area.height {
-            let t = 1.0 - row as f64 / (area.height.saturating_sub(1)) as f64;
+        // Reserve rows for extend triangles
+        let top_ext = matches!(self.extend, ColorbarExtend::Max | ColorbarExtend::Both) as u16;
+        let bot_ext = matches!(self.extend, ColorbarExtend::Min | ColorbarExtend::Both) as u16;
+        let grad_start = area.y + top_ext;
+        let grad_height = area.height.saturating_sub(top_ext + bot_ext);
+
+        // Draw extend triangle at top (max)
+        if top_ext > 0 {
+            let color = self.cmap.color_at(1.0);
+            let mid = area.x + bar_width / 2;
+            if mid < area.x + area.width {
+                buf[(mid, area.y)].set_char('▲').set_fg(color);
+            }
+        }
+
+        // Draw color gradient
+        for row in 0..grad_height {
+            let t = 1.0 - row as f64 / grad_height.saturating_sub(1).max(1) as f64;
             let color = self.cmap.color_at(t);
             for col in 0..bar_width {
                 let x = area.x + col;
-                let y = area.y + row;
+                let y = grad_start + row;
                 if x < area.x + area.width && y < area.y + area.height {
                     buf[(x, y)].set_char('█').set_fg(color);
                 }
+            }
+        }
+
+        // Draw extend triangle at bottom (min)
+        if bot_ext > 0 {
+            let color = self.cmap.color_at(0.0);
+            let mid = area.x + bar_width / 2;
+            let y = grad_start + grad_height;
+            if mid < area.x + area.width && y < area.y + area.height {
+                buf[(mid, y)].set_char('▼').set_fg(color);
             }
         }
 
@@ -1199,7 +1259,7 @@ impl Widget for &Colorbar<'_> {
             let label_width = (area.width - bar_width - 1) as usize;
             for i in 0..self.n_ticks {
                 let t = i as f64 / (self.n_ticks - 1).max(1) as f64;
-                let row = ((1.0 - t) * (area.height.saturating_sub(1)) as f64).round() as u16;
+                let row = ((1.0 - t) * grad_height.saturating_sub(1).max(1) as f64).round() as u16;
                 let value = self.vmin + t * (self.vmax - self.vmin);
                 let label = format!("{:.2}", value);
                 let label = if label.len() > label_width {
@@ -1207,7 +1267,7 @@ impl Widget for &Colorbar<'_> {
                 } else {
                     &label
                 };
-                let y = area.y + row;
+                let y = grad_start + row;
                 if y < area.y + area.height {
                     for (j, ch) in label.chars().enumerate() {
                         let x = label_x + j as u16;

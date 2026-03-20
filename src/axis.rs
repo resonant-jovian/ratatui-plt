@@ -154,6 +154,30 @@ pub enum AspectRatio {
 /// Most terminals have cells approximately twice as tall as wide.
 pub const TERMINAL_CELL_ASPECT: f64 = 0.5;
 
+/// Direction tick marks are drawn relative to the axis spine.
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub enum TickDirection {
+    /// Tick marks extend inward from the spine.
+    In,
+    /// Tick marks extend outward from the spine (default).
+    #[default]
+    Out,
+    /// Tick marks extend both in and out.
+    InOut,
+}
+
+/// Orientation for tick labels.
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub enum LabelRotation {
+    /// Labels are drawn horizontally (default).
+    #[default]
+    Horizontal,
+    /// Labels are drawn vertically (one character per row).
+    Vertical,
+}
+
 /// Axis configuration.
 ///
 /// # Example
@@ -189,6 +213,14 @@ pub struct Axis {
     pub minor_grid: bool,
     /// Number of minor ticks between major ticks.
     pub minor_tick_count: usize,
+    /// Direction tick marks extend from the axis spine.
+    pub tick_direction: TickDirection,
+    /// Length of tick marks in characters.
+    pub tick_size: u16,
+    /// Padding between tick marks and tick labels in characters.
+    pub tick_padding: u16,
+    /// Rotation for tick labels.
+    pub label_rotation: LabelRotation,
 }
 
 /// Configuration for major/minor grid lines.
@@ -227,6 +259,10 @@ impl Default for Axis {
             inverted: false,
             minor_grid: false,
             minor_tick_count: 4,
+            tick_direction: TickDirection::default(),
+            tick_size: 1,
+            tick_padding: 1,
+            label_rotation: LabelRotation::default(),
         }
     }
 }
@@ -300,6 +336,30 @@ impl Axis {
     /// Set the number of minor tick subdivisions between major ticks.
     pub fn minor_tick_count(mut self, count: usize) -> Self {
         self.minor_tick_count = count;
+        self
+    }
+
+    /// Set the tick mark direction.
+    pub fn tick_direction(mut self, dir: TickDirection) -> Self {
+        self.tick_direction = dir;
+        self
+    }
+
+    /// Set the tick mark length in characters.
+    pub fn tick_size(mut self, size: u16) -> Self {
+        self.tick_size = size;
+        self
+    }
+
+    /// Set the padding between tick marks and labels.
+    pub fn tick_padding(mut self, padding: u16) -> Self {
+        self.tick_padding = padding;
+        self
+    }
+
+    /// Set the tick label rotation.
+    pub fn label_rotation(mut self, rotation: LabelRotation) -> Self {
+        self.label_rotation = rotation;
         self
     }
 

@@ -83,6 +83,22 @@ fn main() -> color_eyre::Result<()> {
         .color(Color::Magenta)
         .marker(MarkerShape::Triangle);
 
+    // Custom dash pattern: x^0.5 with a long-short-short dash
+    let sqrt_data: Vec<(f64, f64)> = (0..n)
+        .map(|i| {
+            let x = i as f64 * 0.05;
+            (x, x.sqrt())
+        })
+        .collect();
+
+    let sqrt_series = Series::new("\u{221a}x [custom dash]")
+        .data(sqrt_data)
+        .color(Color::Green)
+        .line_style(LineStyle {
+            pattern: DashPattern::Custom(vec![10, 4, 3, 4]),
+            thickness: ratatui_plt::style::Thickness::Normal,
+        });
+
     // Find the first sin peak for annotation (near x = PI/2)
     let peak_x = std::f64::consts::FRAC_PI_2;
     let peak_y = 1.0;
@@ -91,7 +107,8 @@ fn main() -> color_eyre::Result<()> {
         .series(sin_series)
         .series(cos_series.clone())
         .series(tan_series.clone())
-        .title("Step Modes & Annotations (q to quit)")
+        .series(sqrt_series)
+        .title("Step Modes, Custom Dash & Annotations (q to quit)")
         .x_axis(Axis::new().label("x").grid(true))
         .y_axis(Axis::new().label("y").grid(true))
         .show_legend(true)

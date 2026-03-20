@@ -68,6 +68,8 @@ pub struct Legend {
     pub border: bool,
     /// Theme for styling.
     pub theme: Theme,
+    /// Number of columns for multi-column layout (default: 1).
+    pub columns: usize,
 }
 
 impl Legend {
@@ -78,6 +80,7 @@ impl Legend {
             position: LegendPosition::default(),
             border: true,
             theme: Theme::get_default(),
+            columns: 1,
         }
     }
 
@@ -105,15 +108,23 @@ impl Legend {
         self
     }
 
+    /// Set the number of columns for multi-column layout.
+    pub fn columns(mut self, cols: usize) -> Self {
+        self.columns = cols.max(1);
+        self
+    }
+
     /// Compute the required size (width, height) for this legend.
     pub fn size(&self) -> (u16, u16) {
         if self.entries.is_empty() {
             return (0, 0);
         }
+        let cols = self.columns.max(1);
+        let rows = self.entries.len().div_ceil(cols);
         let max_name_len = self.entries.iter().map(|e| e.name.len()).max().unwrap_or(0);
-        let width = max_name_len as u16 + 4; // "● Name" + padding
-        let height = self.entries.len() as u16 + if self.border { 2 } else { 0 };
-        let width = width + if self.border { 2 } else { 0 };
+        let col_width = max_name_len as u16 + 4; // "● Name" + padding
+        let width = col_width * cols as u16 + if self.border { 2 } else { 0 };
+        let height = rows as u16 + if self.border { 2 } else { 0 };
         (width, height)
     }
 
@@ -176,28 +187,38 @@ impl Widget for &Legend {
             }
         }
 
-        // Draw entries
+        // Draw entries (multi-column aware)
         let start_y = rect.y + if self.border { 1 } else { 0 };
         let start_x = rect.x + if self.border { 1 } else { 0 };
         let inner_width = rect.width.saturating_sub(if self.border { 2 } else { 0 });
+        let cols = self.columns.max(1);
+        let rows = self.entries.len().div_ceil(cols);
+        let col_width = if cols > 1 {
+            inner_width / cols as u16
+        } else {
+            inner_width
+        };
 
         for (i, entry) in self.entries.iter().enumerate() {
-            let y = start_y + i as u16;
+            let col = i / rows;
+            let row = i % rows;
+            let y = start_y + row as u16;
+            let x_off = start_x + col as u16 * col_width;
             if y >= rect.y + rect.height - if self.border { 1 } else { 0 } {
-                break;
+                continue;
             }
 
             // Draw marker/color indicator
             let marker_char = entry.marker.unwrap_or('━');
-            if start_x < area.x + area.width {
-                buf[(start_x, y)].set_char(marker_char).set_fg(entry.color);
+            if x_off < area.x + area.width {
+                buf[(x_off, y)].set_char(marker_char).set_fg(entry.color);
             }
 
             // Draw name
-            let name_x = start_x + 2;
+            let name_x = x_off + 2;
             for (j, ch) in entry.name.chars().enumerate() {
                 let x = name_x + j as u16;
-                if x < start_x + inner_width && x < area.x + area.width {
+                if x < x_off + col_width && x < area.x + area.width {
                     buf[(x, y)]
                         .set_char(ch)
                         .set_style(Style::default().fg(self.theme.foreground));
