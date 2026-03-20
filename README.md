@@ -4,6 +4,8 @@
 
 `ratatui-plt` provides a comprehensive suite of configurable plot widgets, colormaps, axis systems, and layout tools designed for scientific computing and simulation monitoring. Built primarily for astrophysical applications (Vlasov-Poisson solvers, phase-space analysis), it works anywhere you need terminal-based scientific plots.
 
+> **Note:** This library has not yet reached version 0.1.0. The API is unstable, features may be incomplete or change without notice, and it is not yet intended for general use.
+
 ## Features
 
 ### 2D Plot Widgets
