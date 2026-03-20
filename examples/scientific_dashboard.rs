@@ -60,7 +60,8 @@ fn main() -> color_eyre::Result<()> {
     let heatmap = Heatmap::new(density)
         .colormap(Inferno)
         .title("Density Field")
-        .show_colorbar(true);
+        .show_colorbar(true)
+        .aspect_ratio(AspectRatio::Equal);
 
     // --- Velocity distribution histogram data ---
     // Generate a deterministic pseudo-Gaussian-like distribution using simple arithmetic

@@ -48,7 +48,7 @@ fn main() -> color_eyre::Result<()> {
 
     loop {
         terminal.draw(|frame| {
-            frame.render_widget(&heatmap, square_area(frame.area()));
+            frame.render_widget(&heatmap, frame.area());
         })?;
 
         if let Event::Key(key) = event::read()?

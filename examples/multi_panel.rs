@@ -39,7 +39,8 @@ fn main() -> color_eyre::Result<()> {
     let heatmap = Heatmap::new(heatmap_data)
         .colormap(Viridis)
         .title("Gaussian Heatmap")
-        .show_colorbar(false);
+        .show_colorbar(false)
+        .aspect_ratio(AspectRatio::Equal);
 
     // Panel (0,1): Scatter plot with point cloud
     let scatter_points: Vec<(f64, f64)> = (0..200)
@@ -57,7 +58,8 @@ fn main() -> color_eyre::Result<()> {
                 .marker(MarkerShape::FilledCircle),
         )
         .title("Spiral Scatter")
-        .show_legend(false);
+        .show_legend(false)
+        .aspect_ratio(AspectRatio::Equal);
 
     // Panel (1,0): Bar chart
     let bar_chart = BarChart::new()

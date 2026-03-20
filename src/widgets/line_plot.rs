@@ -498,8 +498,33 @@ struct ClipRect {
     y_max: u16,
 }
 
+/// Braille sub-pixel bit layout for each column/row within a cell.
+/// Braille characters (U+2800..=U+28FF) encode 8 dots in a 2x4 grid.
+const BRAILLE_BITS: [[u8; 4]; 2] = [
+    [0x01, 0x02, 0x04, 0x40], // column 0: rows 0-3
+    [0x08, 0x10, 0x20, 0x80], // column 1: rows 0-3
+];
+const BRAILLE_BASE: u32 = 0x2800;
+
+/// OR a braille dot into the buffer cell, preserving existing dots.
+fn write_braille(buf: &mut Buffer, x: u16, y: u16, bits: u8, color: Color) {
+    let existing = {
+        let ch = buf[(x, y)].symbol().chars().next().unwrap_or(' ');
+        let code = ch as u32;
+        if (BRAILLE_BASE..=0x28FF).contains(&code) {
+            (code - BRAILLE_BASE) as u8
+        } else {
+            0
+        }
+    };
+    let combined = existing | bits;
+    if let Some(ch) = char::from_u32(BRAILLE_BASE + combined as u32) {
+        buf[(x, y)].set_char(ch).set_fg(color);
+    }
+}
+
 #[allow(clippy::too_many_arguments)]
-/// Draw a line between two screen points using Bresenham's algorithm.
+/// Draw a line between two screen points using Bresenham's at braille sub-pixel resolution (2x4 per cell).
 fn draw_line(
     buf: &mut Buffer,
     x0: f64,
@@ -510,10 +535,11 @@ fn draw_line(
     pattern: &DashPattern,
     clip: &ClipRect,
 ) {
-    let mut ix0 = x0.round() as i32;
-    let mut iy0 = y0.round() as i32;
-    let ix1 = x1.round() as i32;
-    let iy1 = y1.round() as i32;
+    // Scale to braille sub-pixel coordinates (2x horizontal, 4x vertical)
+    let mut ix0 = (x0 * 2.0).round() as i32;
+    let mut iy0 = (y0 * 4.0).round() as i32;
+    let ix1 = (x1 * 2.0).round() as i32;
+    let iy1 = (y1 * 4.0).round() as i32;
 
     let dx = (ix1 - ix0).abs();
     let dy = -(iy1 - iy0).abs();
@@ -523,29 +549,35 @@ fn draw_line(
     let mut step = 0u32;
 
     loop {
-        let e2 = 2 * err;
-
         let draw = match pattern {
             DashPattern::Solid => true,
-            DashPattern::Dashed => (step / 3).is_multiple_of(2),
-            DashPattern::Dotted => step.is_multiple_of(2),
+            DashPattern::Dashed => (step / 8).is_multiple_of(2),
+            DashPattern::Dotted => (step / 3).is_multiple_of(2),
             DashPattern::DashDot => {
-                let cycle = step % 5;
-                cycle < 3 || cycle == 4
+                let cycle = step % 14;
+                cycle < 8 || (10..12).contains(&cycle)
             }
         };
 
-        if draw {
-            let px = ix0 as u16;
-            let py = iy0 as u16;
-            if px >= clip.x_min && px < clip.x_max && py >= clip.y_min && py < clip.y_max {
-                buf[(px, py)].set_char('·').set_fg(color);
+        if draw && ix0 >= 0 && iy0 >= 0 {
+            let cell_x = (ix0 / 2) as u16;
+            let cell_y = (iy0 / 4) as u16;
+            if cell_x >= clip.x_min
+                && cell_x < clip.x_max
+                && cell_y >= clip.y_min
+                && cell_y < clip.y_max
+            {
+                let dot_col = (ix0 % 2) as usize;
+                let dot_row = (iy0 % 4) as usize;
+                let bit = BRAILLE_BITS[dot_col][dot_row];
+                write_braille(buf, cell_x, cell_y, bit, color);
             }
         }
 
         if ix0 == ix1 && iy0 == iy1 {
             break;
         }
+        let e2 = 2 * err;
         if e2 >= dy {
             err += dy;
             ix0 += sx;

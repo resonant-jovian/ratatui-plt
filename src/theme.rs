@@ -67,8 +67,8 @@ impl Theme {
         Self {
             background: Color::Reset,
             foreground: Color::Black,
-            grid_color: Color::Rgb(200, 200, 200),
-            axis_color: Color::Gray,
+            grid_color: Color::Rgb(160, 160, 160),
+            axis_color: Color::Rgb(80, 80, 80),
             color_cycle: ColorCycle::default(),
             grid_visible: true,
             grid_pattern: DashPattern::Dotted,
@@ -81,8 +81,8 @@ impl Theme {
         Self {
             background: Color::Reset,
             foreground: Color::White,
-            grid_color: Color::DarkGray,
-            axis_color: Color::DarkGray,
+            grid_color: Color::Rgb(80, 80, 80),
+            axis_color: Color::Rgb(120, 120, 120),
             color_cycle: ColorCycle::default(),
             grid_visible: false,
             grid_pattern: DashPattern::Dotted,
@@ -95,7 +95,7 @@ impl Theme {
         Self {
             background: Color::Reset,
             foreground: Color::White,
-            grid_color: Color::DarkGray,
+            grid_color: Color::Rgb(80, 80, 80),
             axis_color: Color::White,
             color_cycle: ColorCycle::new(vec![
                 Color::White,
