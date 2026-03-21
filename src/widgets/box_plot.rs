@@ -412,6 +412,15 @@ impl Widget for &BoxPlot {
                     (sy_median, sy_median, box_left, box_right)
                 };
 
+            // Clear box interior (remove grid dots so boxes look clean)
+            for y in sy_q3..=sy_q1 {
+                for x in box_left..box_right {
+                    if pa.contains(x, y) {
+                        buf[(x, y)].set_char(' ');
+                    }
+                }
+            }
+
             // Draw box (Q1 to Q3), with notch if enabled
             // Top edge (Q3) with corners
             if pa.contains(box_left, sy_q3) {

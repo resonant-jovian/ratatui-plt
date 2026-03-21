@@ -247,7 +247,8 @@ impl Widget for &BandPlot {
                             if pa.contains(screen_x, y) {
                                 buf[(screen_x, y)]
                                     .set_char(band.alpha_char)
-                                    .set_fg(band.color);
+                                    .set_fg(band.color)
+                                    .set_bg(band.color);
                             }
                         }
                     }

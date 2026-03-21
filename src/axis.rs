@@ -150,9 +150,63 @@ pub enum AspectRatio {
     Fixed(f64),
 }
 
-/// Terminal cell aspect ratio (width / height in pixels).
-/// Most terminals have cells approximately twice as tall as wide.
-pub const TERMINAL_CELL_ASPECT: f64 = 0.5;
+/// Default terminal cell aspect ratio (width / height in pixels).
+/// Most monospace fonts at typical sizes have cells ~2.2x taller than wide.
+const DEFAULT_CELL_ASPECT: f64 = 0.45;
+
+std::thread_local! {
+    static CELL_ASPECT: std::cell::Cell<f64> = const { std::cell::Cell::new(0.0) };
+}
+
+/// Get the terminal cell aspect ratio (width / height).
+///
+/// Returns the value set by [`set_cell_aspect`], or auto-detected from the
+/// `RATATUI_PLT_CELL_ASPECT` environment variable, or the default (0.5).
+pub fn terminal_cell_aspect() -> f64 {
+    CELL_ASPECT.with(|c| {
+        let v = c.get();
+        if v > 0.0 {
+            return v;
+        }
+        // Try env var
+        let detected = std::env::var("RATATUI_PLT_CELL_ASPECT")
+            .ok()
+            .and_then(|s| s.parse::<f64>().ok())
+            .filter(|&v| v > 0.0 && v < 2.0)
+            .unwrap_or(DEFAULT_CELL_ASPECT);
+        c.set(detected);
+        detected
+    })
+}
+
+/// Set the terminal cell aspect ratio (width / height).
+///
+/// Call this at startup after detecting your terminal's actual cell size.
+/// For example, with crossterm:
+///
+/// ```no_run
+/// # fn example() {
+/// if let Ok(size) = crossterm::terminal::window_size() {
+///     if size.width > 0 && size.height > 0 && size.columns > 0 && size.rows > 0 {
+///         let cell_w = size.width as f64 / size.columns as f64;
+///         let cell_h = size.height as f64 / size.rows as f64;
+///         ratatui_plt::axis::set_cell_aspect(cell_w / cell_h);
+///     }
+/// }
+/// # }
+/// ```
+pub fn set_cell_aspect(ratio: f64) {
+    if ratio > 0.0 && ratio < 2.0 {
+        CELL_ASPECT.with(|c| c.set(ratio));
+    } else {
+        eprintln!(
+            "ratatui-plt: invalid cell aspect ratio {ratio:.3}, using default {DEFAULT_CELL_ASPECT}"
+        );
+    }
+}
+
+/// Legacy constant — use [`terminal_cell_aspect()`] instead.
+pub const TERMINAL_CELL_ASPECT: f64 = 0.45;
 
 /// Direction tick marks are drawn relative to the axis spine.
 #[derive(Clone, Debug, Default, PartialEq, Eq)]

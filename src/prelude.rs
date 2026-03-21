@@ -7,7 +7,10 @@
 pub use ratatui::style::Color;
 
 pub use crate::annotation::{Annotation, enclosed_number};
-pub use crate::axis::{AspectRatio, Axis, Bounds, GridConfig, LabelRotation, Scale, TickDirection};
+pub use crate::axis::{
+    AspectRatio, Axis, Bounds, GridConfig, LabelRotation, Scale, TickDirection,
+    set_cell_aspect, terminal_cell_aspect,
+};
 pub use crate::brushing::{BrushState, SharedBrush, shared_brush};
 pub use crate::collections::{LineCollection, PathCollection};
 pub use crate::color_cycle::ColorCycle;

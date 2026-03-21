@@ -276,7 +276,10 @@ impl Widget for &StairsPlot {
                     for x in x_start..x_end {
                         for y in y_top..=y_bot {
                             if pa.contains(x, y) {
-                                buf[(x, y)].set_char('░').set_fg(ds.color);
+                                buf[(x, y)]
+                                    .set_char('░')
+                                    .set_fg(ds.color)
+                                    .set_bg(ds.color);
                             }
                         }
                     }

@@ -170,11 +170,14 @@ impl Widget for &Legend {
             return;
         }
 
-        // Clear background
+        // Clear background with theme background color (opaque, not transparent)
+        let bg = self.theme.background;
         for y in rect.y..rect.y + rect.height {
             for x in rect.x..rect.x + rect.width {
                 if x < area.x + area.width && y < area.y + area.height {
-                    buf[(x, y)].set_char(' ').set_style(Style::default());
+                    buf[(x, y)]
+                        .set_char(' ')
+                        .set_style(Style::default().bg(bg));
                 }
             }
         }
@@ -373,11 +376,14 @@ impl Widget for &InteractiveLegend {
             return;
         }
 
-        // Clear background
+        // Clear background with theme background color (opaque, not transparent)
+        let bg = self.theme.background;
         for y in rect.y..rect.y + rect.height {
             for x in rect.x..rect.x + rect.width {
                 if x < area.x + area.width && y < area.y + area.height {
-                    buf[(x, y)].set_char(' ').set_style(Style::default());
+                    buf[(x, y)]
+                        .set_char(' ')
+                        .set_style(Style::default().bg(bg));
                 }
             }
         }

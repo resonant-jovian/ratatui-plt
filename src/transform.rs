@@ -3,7 +3,7 @@
 //! Provides utilities for mapping data coordinates to screen coordinates,
 //! 3D→2D projection (isometric and perspective), and interactive camera state.
 
-use crate::axis::{AspectRatio, TERMINAL_CELL_ASPECT};
+use crate::axis::{AspectRatio, terminal_cell_aspect};
 
 /// 3D camera configuration (immutable, for static views).
 ///
@@ -221,17 +221,17 @@ fn compute_aspect_area(
     let data_ratio = (data_x_range / data_y_range) * data_aspect;
 
     // Screen aspect ratio (accounting for terminal cells being ~2:1)
-    let screen_ratio = (area_width as f64 * TERMINAL_CELL_ASPECT) / area_height as f64;
+    let screen_ratio = (area_width as f64 * terminal_cell_aspect()) / area_height as f64;
 
     if screen_ratio > data_ratio {
         // Too wide: shrink width
-        let new_width = ((area_height as f64 * data_ratio / TERMINAL_CELL_ASPECT).round() as u16)
+        let new_width = ((area_height as f64 * data_ratio / terminal_cell_aspect()).round() as u16)
             .min(area_width);
         let x_offset = (area_width - new_width) / 2;
         (x_offset, 0, new_width, area_height)
     } else {
         // Too tall: shrink height
-        let new_height = ((area_width as f64 * TERMINAL_CELL_ASPECT / data_ratio).round() as u16)
+        let new_height = ((area_width as f64 * terminal_cell_aspect() / data_ratio).round() as u16)
             .min(area_height);
         let y_offset = (area_height - new_height) / 2;
         (0, y_offset, area_width, new_height)

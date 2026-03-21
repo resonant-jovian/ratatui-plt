@@ -186,7 +186,6 @@ impl Widget for &LinePlot {
         let (mut x_lo, mut x_hi) = self.x_axis.resolve_bounds(data_x_min, data_x_max);
         let (mut y_lo, mut y_hi) = self.y_axis.resolve_bounds(data_y_min, data_y_max);
 
-        // Apply shared view overrides if linked
         if let Some(ref sv) = self.shared_view {
             let state = sv.borrow();
             if let Some((lo, hi)) = state.x_bounds {
@@ -240,7 +239,10 @@ impl Widget for &LinePlot {
                     if xi >= pa.x && xi < pa.x + pa.width {
                         for y in y_top..=y_bot {
                             if pa.contains(xi, y) {
-                                buf[(xi, y)].set_char('░').set_fg(s.color);
+                                buf[(xi, y)]
+                                    .set_char('░')
+                                    .set_fg(s.color)
+                                    .set_bg(s.color);
                             }
                         }
                     }
@@ -540,20 +542,31 @@ const BRAILLE_BITS: [[u8; 4]; 2] = [
 ];
 const BRAILLE_BASE: u32 = 0x2800;
 
-/// OR a braille dot into the buffer cell, preserving existing dots.
+/// OR a braille dot into the buffer cell, preserving existing dots and background color.
 fn write_braille(buf: &mut Buffer, x: u16, y: u16, bits: u8, color: Color) {
-    let existing = {
-        let ch = buf[(x, y)].symbol().chars().next().unwrap_or(' ');
+    let (existing_bits, existing_bg) = {
+        let cell = &buf[(x, y)];
+        let ch = cell.symbol().chars().next().unwrap_or(' ');
+        let bg = cell.bg;
         let code = ch as u32;
-        if (BRAILLE_BASE..=0x28FF).contains(&code) {
+        if code == 0x2580 || code == 0x2584 {
+            return;
+        }
+        let bits = if (BRAILLE_BASE..=0x28FF).contains(&code) {
             (code - BRAILLE_BASE) as u8
         } else {
             0
-        }
+        };
+        (bits, bg)
     };
-    let combined = existing | bits;
+    let combined = existing_bits | bits;
     if let Some(ch) = char::from_u32(BRAILLE_BASE + combined as u32) {
-        buf[(x, y)].set_char(ch).set_fg(color);
+        let fg = if crate::drawing::colors_match(color, existing_bg) {
+            crate::drawing::contrasting_color(color)
+        } else {
+            color
+        };
+        buf[(x, y)].set_char(ch).set_fg(fg).set_bg(existing_bg);
     }
 }
 

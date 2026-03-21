@@ -169,7 +169,7 @@ impl Widget for &RadialPlot {
         // Radius in screen characters, compensating for ~2:1 terminal cell aspect ratio.
         // Use the smaller of the two radii (adjusted for cell aspect) so circles
         // don't overflow the available space.
-        let cell_aspect = 0.5; // TERMINAL_CELL_ASPECT: cells are ~twice as tall as wide
+        let cell_aspect = crate::axis::terminal_cell_aspect();
         let avail_x = (pw / 2).saturating_sub(2) as f64;
         let avail_y = (ph / 2).saturating_sub(1) as f64;
         let r_data = avail_y.min(avail_x * cell_aspect);
@@ -350,7 +350,10 @@ impl Widget for &RadialPlot {
                             let by = (cy as f64 + frac * r_screen_y * t.sin()).round() as u16;
                             if bx >= area.x && bx < area.x + area.width && by >= py && by < py + ph
                             {
-                                buf[(bx, by)].set_char('░').set_fg(s.color);
+                                buf[(bx, by)]
+                                    .set_char('░')
+                                    .set_fg(s.color)
+                                    .set_bg(s.color);
                             }
                         }
                     }

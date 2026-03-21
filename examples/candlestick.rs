@@ -99,10 +99,12 @@ fn main() -> color_eyre::Result<()> {
         let close = open + move1;
 
         // High is above both open and close; low is below both
+        // Wicks extend 1-3x the body size for visible shadow lines
         let body_hi = open.max(close);
         let body_lo = open.min(close);
-        let high = body_hi + move2.abs() * 0.8;
-        let low = body_lo - move3.abs() * 0.8;
+        let body_range = (body_hi - body_lo).max(0.3);
+        let high = body_hi + move2.abs() * body_range * 1.5 + 0.3;
+        let low = body_lo - move3.abs() * body_range * 1.5 - 0.3;
 
         candles.push(Candle::new(session, open, high, low, close));
         price = close;

@@ -421,44 +421,8 @@ impl Widget for &BoxenPlot {
                     }
                 }
 
-                // Compute depth-based color: deeper levels get more saturated/darker
-                let depth_color = depth_gradient_color(group.color, level_idx, k);
-
-                // Draw box outline: top edge with corners
-                if pa.contains(box_left, top) {
-                    buf[(box_left, top)].set_char('┌').set_fg(depth_color);
-                }
-                for x in (box_left + 1)..box_right.saturating_sub(1) {
-                    if pa.contains(x, top) {
-                        buf[(x, top)].set_char('─').set_fg(depth_color);
-                    }
-                }
-                if box_right > box_left + 1 && pa.contains(box_right - 1, top) {
-                    buf[(box_right - 1, top)].set_char('┐').set_fg(depth_color);
-                }
-                // Bottom edge with corners
-                if pa.contains(box_left, bottom) {
-                    buf[(box_left, bottom)].set_char('└').set_fg(depth_color);
-                }
-                for x in (box_left + 1)..box_right.saturating_sub(1) {
-                    if pa.contains(x, bottom) {
-                        buf[(x, bottom)].set_char('─').set_fg(depth_color);
-                    }
-                }
-                if box_right > box_left + 1 && pa.contains(box_right - 1, bottom) {
-                    buf[(box_right - 1, bottom)]
-                        .set_char('┘')
-                        .set_fg(depth_color);
-                }
-                // Side edges — skip corner rows
-                for y in (top + 1)..bottom {
-                    if pa.contains(box_left, y) {
-                        buf[(box_left, y)].set_char('│').set_fg(depth_color);
-                    }
-                    if box_right > 0 && pa.contains(box_right - 1, y) {
-                        buf[(box_right - 1, y)].set_char('│').set_fg(depth_color);
-                    }
-                }
+                // No outlines — the filled rectangles with depth gradient
+                // provide enough visual distinction between levels.
             }
 
             // Draw median line on top

@@ -18,19 +18,10 @@ pub const BRAILLE_BITS: [[u8; 4]; 2] = [
 pub const BRAILLE_BASE: u32 = 0x2800;
 
 /// Horizontal fill levels using left-side eighth blocks.
-/// Index 0 = empty, index 8 = full block.
-/// Characters: ▏▎▍▌▋▊▉█
 #[cfg(feature = "unicode-extended")]
 pub const HORIZONTAL_FILL_LEVELS: [char; 9] = [
-    ' ',        // 0/8
-    '\u{258F}', // ▏ LEFT ONE EIGHTH BLOCK
-    '\u{258E}', // ▎ LEFT ONE QUARTER BLOCK
-    '\u{258D}', // ▍ LEFT THREE EIGHTHS BLOCK
-    '\u{258C}', // ▌ LEFT HALF BLOCK
-    '\u{258B}', // ▋ LEFT FIVE EIGHTHS BLOCK
-    '\u{258A}', // ▊ LEFT THREE QUARTERS BLOCK
-    '\u{2589}', // ▉ LEFT SEVEN EIGHTHS BLOCK
-    '\u{2588}', // █ FULL BLOCK
+    ' ', '\u{258F}', '\u{258E}', '\u{258D}', '\u{258C}',
+    '\u{258B}', '\u{258A}', '\u{2589}', '\u{2588}',
 ];
 
 /// Convenience: map a 0.0..=1.0 fraction to a horizontal fill character.
@@ -41,19 +32,10 @@ pub fn horizontal_fill_char(fraction: f64) -> char {
 }
 
 /// Vertical fill levels using lower eighth blocks.
-/// Index 0 = empty, index 8 = full block.
-/// Characters: ▁▂▃▄▅▆▇█
 #[cfg(feature = "unicode-extended")]
 pub const VERTICAL_FILL_LEVELS: [char; 9] = [
-    ' ',        // 0/8
-    '\u{2581}', // ▁ LOWER ONE EIGHTH BLOCK
-    '\u{2582}', // ▂ LOWER ONE QUARTER BLOCK
-    '\u{2583}', // ▃ LOWER THREE EIGHTHS BLOCK
-    '\u{2584}', // ▄ LOWER HALF BLOCK
-    '\u{2585}', // ▅ LOWER FIVE EIGHTHS BLOCK
-    '\u{2586}', // ▆ LOWER THREE QUARTERS BLOCK
-    '\u{2587}', // ▇ LOWER SEVEN EIGHTHS BLOCK
-    '\u{2588}', // █ FULL BLOCK
+    ' ', '\u{2581}', '\u{2582}', '\u{2583}', '\u{2584}',
+    '\u{2585}', '\u{2586}', '\u{2587}', '\u{2588}',
 ];
 
 /// Convenience: map a 0.0..=1.0 fraction to a vertical fill character.
@@ -64,8 +46,6 @@ pub fn vertical_fill_char(fraction: f64) -> char {
 }
 
 /// Sextant block lookup: maps a 6-bit pattern (2x3 grid) to a Unicode sextant character.
-/// Bit layout: bit 0 = top-left, bit 1 = top-right, bit 2 = mid-left, bit 3 = mid-right,
-/// bit 4 = bottom-left, bit 5 = bottom-right.
 #[cfg(feature = "unicode-extended")]
 pub fn sextant_char(bits: u8) -> char {
     const TABLE: [char; 64] = [
@@ -90,44 +70,78 @@ pub fn sextant_char(bits: u8) -> char {
 }
 
 /// Quadrant block lookup: maps a 4-bit pattern (2x2 grid) to a quadrant block character.
-/// Bit layout: bit 0 = top-left, bit 1 = top-right, bit 2 = bottom-left, bit 3 = bottom-right.
 #[cfg(feature = "unicode-extended")]
 pub fn quadrant_char(bits: u8) -> char {
     const TABLE: [char; 16] = [
-        ' ',        // 0b0000
-        '\u{2598}', // ▘ 0b0001 QUADRANT UPPER LEFT
-        '\u{259D}', // ▝ 0b0010 QUADRANT UPPER RIGHT
-        '\u{2580}', // ▀ 0b0011 UPPER HALF BLOCK
-        '\u{2596}', // ▖ 0b0100 QUADRANT LOWER LEFT
-        '\u{258C}', // ▌ 0b0101 LEFT HALF BLOCK
-        '\u{259E}', // ▞ 0b0110 QUADRANT UPPER RIGHT AND LOWER LEFT
-        '\u{259B}', // ▛ 0b0111 QUADRANT UPPER LEFT AND UPPER RIGHT AND LOWER LEFT
-        '\u{2597}', // ▗ 0b1000 QUADRANT LOWER RIGHT
-        '\u{259A}', // ▚ 0b1001 QUADRANT UPPER LEFT AND LOWER RIGHT
-        '\u{2590}', // ▐ 0b1010 RIGHT HALF BLOCK
-        '\u{259C}', // ▜ 0b1011 QUADRANT UPPER LEFT AND UPPER RIGHT AND LOWER RIGHT
-        '\u{2584}', // ▄ 0b1100 LOWER HALF BLOCK
-        '\u{2599}', // ▙ 0b1101 QUADRANT UPPER LEFT AND LOWER LEFT AND LOWER RIGHT
-        '\u{259F}', // ▟ 0b1110 QUADRANT UPPER RIGHT AND LOWER LEFT AND LOWER RIGHT
-        '\u{2588}', // █ 0b1111 FULL BLOCK
+        ' ',        '\u{2598}', '\u{259D}', '\u{2580}',
+        '\u{2596}', '\u{258C}', '\u{259E}', '\u{259B}',
+        '\u{2597}', '\u{259A}', '\u{2590}', '\u{259C}',
+        '\u{2584}', '\u{2599}', '\u{259F}', '\u{2588}',
     ];
     TABLE[(bits & 0x0F) as usize]
 }
 
-/// OR a braille dot into the buffer cell, preserving existing dots.
+/// Check if two colors are effectively the same (for contrast detection).
+pub fn colors_match(a: Color, b: Color) -> bool {
+    match (a, b) {
+        (Color::Rgb(r1, g1, b1), Color::Rgb(r2, g2, b2)) => {
+            r1 == r2 && g1 == g2 && b1 == b2
+        }
+        (Color::Reset, Color::Reset) => true,
+        _ => a == b,
+    }
+}
+
+/// Return a contrasting color (white for dark colors, black for light).
+pub fn contrasting_color(c: Color) -> Color {
+    match c {
+        Color::Rgb(r, g, b) => {
+            // Perceived brightness: 0.299R + 0.587G + 0.114B
+            let brightness = 0.299 * r as f64 + 0.587 * g as f64 + 0.114 * b as f64;
+            if brightness > 128.0 {
+                Color::Black
+            } else {
+                Color::White
+            }
+        }
+        Color::Black => Color::White,
+        Color::White => Color::Black,
+        _ => Color::White,
+    }
+}
+
+/// OR a braille dot into the buffer cell, preserving existing dots and background color.
+///
+/// Half-block characters (`'▀'` U+2580, `'▄'` U+2584) used by filled surfaces and
+/// contours are never overwritten — filled faces have higher visual priority than
+/// wireframe edges.
 pub fn write_braille(buf: &mut Buffer, x: u16, y: u16, bits: u8, color: Color) {
-    let existing = {
-        let ch = buf[(x, y)].symbol().chars().next().unwrap_or(' ');
+    let (existing_bits, existing_bg) = {
+        let cell = &buf[(x, y)];
+        let ch = cell.symbol().chars().next().unwrap_or(' ');
+        let bg = cell.bg;
         let code = ch as u32;
-        if (BRAILLE_BASE..=0x28FF).contains(&code) {
+        // Skip cells with half-block characters (filled faces in 3D / contour rendering)
+        if code == 0x2580 || code == 0x2584 {
+            return;
+        }
+        let bits = if (BRAILLE_BASE..=0x28FF).contains(&code) {
             (code - BRAILLE_BASE) as u8
         } else {
             0
-        }
+        };
+        (bits, bg)
     };
-    let combined = existing | bits;
+    let combined = existing_bits | bits;
     if let Some(ch) = char::from_u32(BRAILLE_BASE + combined as u32) {
-        buf[(x, y)].set_char(ch).set_fg(color);
+        // Ensure braille fg contrasts with existing bg (fill color).
+        // If they match, use white or black depending on brightness.
+        let fg = if colors_match(color, existing_bg) {
+            contrasting_color(color)
+        } else {
+            color
+        };
+        buf[(x, y)].set_char(ch).set_fg(fg).set_bg(existing_bg);
     }
 }
 

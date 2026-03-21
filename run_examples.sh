@@ -1,14 +1,39 @@
 #!/usr/bin/env bash
 set -e
 
+# Theme selection
 if [ -n "$1" ]; then
     theme="$1"
 else
-    echo "Available themes: dark, light, minimal, publication, solarized"
-    printf "Select theme [publication]: "
-    read -r theme
-    theme="${theme:-publication}"
+    echo "Available themes:"
+    echo "  [1] dark"
+    echo "  [2] light"
+    echo "  [3] minimal"
+    echo "  [4] publication"
+    echo "  [5] solarized"
+    printf "Select theme [4]: "
+    read -r choice
+    case "${choice:-4}" in
+        1|dark)        theme="dark" ;;
+        2|light)       theme="light" ;;
+        3|minimal)     theme="minimal" ;;
+        4|publication) theme="publication" ;;
+        5|solarized)   theme="solarized" ;;
+        *)             theme="$choice" ;;
+    esac
 fi
+
+echo "Using theme: $theme"
+echo ""
+
+# Prompt to continue or quit between examples
+wait_for_input() {
+    printf "\nPress Enter to continue, or n/Ctrl-C to quit... "
+    read -r ans
+    case "$ans" in
+        n|N|no|NO) echo "Stopped."; exit 0 ;;
+    esac
+}
 
 # Examples that need no feature flags
 for ex in \
@@ -80,26 +105,36 @@ for ex in \
 do
     echo "=== $ex ==="
     cargo run --release --example "$ex" -- "$theme"
+    wait_for_input
 done
 
 # Feature-gated examples
 echo "=== statistics (--features statistics) ==="
 cargo run --release --features statistics --example statistics -- "$theme"
+wait_for_input
 
 echo "=== trendline (--features statistics) ==="
 cargo run --release --features statistics --example trendline -- "$theme"
+wait_for_input
 
 echo "=== kitty_export (--features kitty) ==="
 cargo run --release --features kitty --example kitty_export
+wait_for_input
 
 echo "=== sixel_export (--features sixel) ==="
 cargo run --release --features sixel --example sixel_export
+wait_for_input
 
 echo "=== toml_theme (--features toml-themes) ==="
 cargo run --release --features toml-themes --example toml_theme
+wait_for_input
 
 echo "=== showcase_unicode (--features unicode-extended) ==="
 cargo run --release --features unicode-extended --example showcase_unicode -- "$theme"
+wait_for_input
 
 echo "=== showcase_features (--features statistics) ==="
 cargo run --release --features statistics --example showcase_features -- "$theme"
+
+echo ""
+echo "All examples complete."

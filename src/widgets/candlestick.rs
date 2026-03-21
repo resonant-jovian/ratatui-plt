@@ -228,48 +228,67 @@ impl Widget for &CandlestickChart {
                 self.bear_color
             };
 
-            // Wick: vertical line from low to high
+            // Compute screen positions
             let sy_high = pa.screen_y(candle.high).round() as u16;
             let sy_low = pa.screen_y(candle.low).round() as u16;
             let wick_top = sy_high.min(sy_low);
             let wick_bot = sy_high.max(sy_low);
 
-            for y in wick_top..=wick_bot {
-                if pa.contains(sx, y) {
-                    buf[(sx, y)].set_char('\u{2502}').set_fg(color); // │
-                }
-            }
-
-            // Body: filled region from open to close
             let sy_open = pa.screen_y(candle.open).round() as u16;
             let sy_close = pa.screen_y(candle.close).round() as u16;
             let body_top = sy_open.min(sy_close);
-            let body_bot = sy_open.max(sy_close);
+            // Ensure body is at least 1 row tall so tiny candles are visible
+            let body_bot = sy_open.max(sy_close).max(body_top);
 
-            // Use solid block for bull, light shade for bear
-            let body_char = if is_bull { '\u{2588}' } else { '\u{2591}' }; // █ or ░
+            // Body extends 1 column on each side of center (3 cols wide)
+            let body_left = if sx > pa.x { sx - 1 } else { sx };
+            let body_right = if sx + 1 < pa.x + pa.width { sx + 1 } else { sx };
 
-            if body_top == body_bot {
-                // Doji or very small body: draw a horizontal dash
-                if pa.contains(sx, body_top) {
-                    buf[(sx, body_top)].set_char('\u{2500}').set_fg(color); // ─
-                }
-            } else {
-                for y in body_top..=body_bot {
-                    if pa.contains(sx, y) {
-                        buf[(sx, y)].set_char(body_char).set_fg(color);
+            // 1. Clear the full candle area to remove grid dots
+            for y in wick_top..=wick_bot {
+                for x in body_left..=body_right {
+                    if pa.contains(x, y) {
+                        buf[(x, y)].set_char(' ');
                     }
                 }
             }
 
-            // Draw wider body if there is room (one column on each side)
-            if sx > pa.x && sx + 1 < pa.x + pa.width {
-                for &col in &[sx - 1, sx + 1] {
-                    for y in body_top..=body_bot {
-                        if pa.contains(col, y) {
-                            buf[(col, y)].set_char(body_char).set_fg(color);
+            // 2. Draw body (solid filled block, 3 columns wide)
+            for y in body_top..=body_bot {
+                for x in body_left..=body_right {
+                    if pa.contains(x, y) {
+                        buf[(x, y)].set_char('█').set_fg(color);
+                    }
+                }
+            }
+
+            // 3. Draw wicks on center column (AFTER body)
+            // Upper wick: from wick_top to body_top-1
+            if wick_top < body_top {
+                // T-cap at top of upper wick: ┬
+                if pa.contains(sx, wick_top) {
+                    buf[(sx, wick_top)].set_char('┬').set_fg(color);
+                }
+                // Wick stem
+                for y in (wick_top + 1)..body_top {
+                    if pa.contains(sx, y) {
+                        buf[(sx, y)].set_char('│').set_fg(color);
+                    }
+                }
+            }
+            // Lower wick: from body_bot+1 to wick_bot
+            if wick_bot > body_bot {
+                // Wick stem
+                if wick_bot > body_bot + 1 {
+                    for y in (body_bot + 1)..wick_bot {
+                        if pa.contains(sx, y) {
+                            buf[(sx, y)].set_char('│').set_fg(color);
                         }
                     }
+                }
+                // Inverted T-cap at bottom of lower wick: ┴
+                if pa.contains(sx, wick_bot) {
+                    buf[(sx, wick_bot)].set_char('┴').set_fg(color);
                 }
             }
         }
