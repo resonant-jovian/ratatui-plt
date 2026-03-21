@@ -315,6 +315,13 @@ pub struct LinearFitResult {
     pub std_err_intercept: f64,
 }
 
+impl LinearFitResult {
+    /// Evaluate the fitted line at x.
+    pub fn eval(&self, x: f64) -> f64 {
+        self.slope * x + self.intercept
+    }
+}
+
 /// Result of a polynomial regression fit.
 #[derive(Clone, Debug)]
 pub struct PolyFitResult {

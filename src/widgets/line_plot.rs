@@ -23,6 +23,7 @@ use crate::annotation::Annotation;
 use crate::axis::{AspectRatio, Axis};
 use crate::frame::{DataBounds, PlotArea, PlotFrame, ReferenceLine};
 use crate::legend::{Legend, LegendPosition};
+use crate::linked_view::SharedView;
 use crate::series::{Series, is_valid_point};
 use crate::spines::Spines;
 use crate::style::DashPattern;
@@ -56,6 +57,7 @@ pub struct LinePlot {
     theme: Theme,
     spines: Spines,
     reference_lines: Vec<ReferenceLine>,
+    shared_view: Option<SharedView>,
 }
 
 impl Default for LinePlot {
@@ -73,6 +75,7 @@ impl Default for LinePlot {
             theme: Theme::get_default(),
             spines: Spines::default(),
             reference_lines: Vec::new(),
+            shared_view: None,
         }
     }
 }
@@ -166,6 +169,12 @@ impl LinePlot {
         self.reference_lines = lines;
         self
     }
+
+    /// Link this plot to a shared view state for synchronized bounds.
+    pub fn shared_view(mut self, sv: SharedView) -> Self {
+        self.shared_view = Some(sv);
+        self
+    }
 }
 
 impl Widget for &LinePlot {
@@ -174,8 +183,21 @@ impl Widget for &LinePlot {
         let (data_x_min, data_x_max) = self.compute_x_bounds();
         let (data_y_min, data_y_max) = self.compute_y_bounds();
 
-        let (x_lo, x_hi) = self.x_axis.resolve_bounds(data_x_min, data_x_max);
-        let (y_lo, y_hi) = self.y_axis.resolve_bounds(data_y_min, data_y_max);
+        let (mut x_lo, mut x_hi) = self.x_axis.resolve_bounds(data_x_min, data_x_max);
+        let (mut y_lo, mut y_hi) = self.y_axis.resolve_bounds(data_y_min, data_y_max);
+
+        // Apply shared view overrides if linked
+        if let Some(ref sv) = self.shared_view {
+            let state = sv.borrow();
+            if let Some((lo, hi)) = state.x_bounds {
+                x_lo = lo;
+                x_hi = hi;
+            }
+            if let Some((lo, hi)) = state.y_bounds {
+                y_lo = lo;
+                y_hi = hi;
+            }
+        }
 
         // Create and render the plot frame (title, axes, grid, ticks, labels, spines, ref lines)
         let frame = PlotFrame::new(&self.x_axis, &self.y_axis, &self.theme)

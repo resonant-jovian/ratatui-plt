@@ -2,18 +2,37 @@
 
 use ratatui::buffer::Buffer;
 use ratatui::layout::Rect;
+#[cfg(feature = "statistics")]
+use ratatui::style::Color;
 use ratatui::widgets::Widget;
 
 use crate::annotation::Annotation;
 use crate::axis::{AspectRatio, Axis};
 use crate::colormap::{Colormap, Viridis};
+#[cfg(feature = "statistics")]
+use crate::drawing::draw_braille_line;
 use crate::frame::{DataBounds, PlotFrame, ReferenceLine};
 use crate::legend::{Legend, LegendPosition};
+use crate::linked_view::SharedView;
 use crate::norm::{LinearNorm, Normalize};
 use crate::series::Series;
 use crate::spines::Spines;
 use crate::style::MarkerShape;
 use crate::theme::Theme;
+
+/// Type of trendline to overlay on a scatter plot.
+///
+/// Requires the `statistics` feature.
+#[cfg(feature = "statistics")]
+#[derive(Clone, Debug)]
+pub enum TrendlineType {
+    /// Ordinary least squares linear regression.
+    Linear,
+    /// Polynomial regression of the given degree.
+    Polynomial(usize),
+    /// LOWESS (locally weighted scatterplot smoothing) with given fraction.
+    Lowess(f64),
+}
 
 /// A 2D scatter plot widget.
 ///
@@ -43,6 +62,16 @@ pub struct ScatterPlot {
     spines: Spines,
     reference_lines: Vec<ReferenceLine>,
     annotations: Vec<Annotation>,
+    shared_view: Option<SharedView>,
+    /// Trendline type to overlay.
+    #[cfg(feature = "statistics")]
+    trendline: Option<TrendlineType>,
+    /// Trendline color override.
+    #[cfg(feature = "statistics")]
+    trendline_color: Option<Color>,
+    /// Number of evaluation points for the trendline curve.
+    #[cfg(feature = "statistics")]
+    trendline_n_points: usize,
 }
 
 impl Default for ScatterPlot {
@@ -62,6 +91,13 @@ impl Default for ScatterPlot {
             spines: Spines::default(),
             reference_lines: Vec::new(),
             annotations: Vec::new(),
+            shared_view: None,
+            #[cfg(feature = "statistics")]
+            trendline: None,
+            #[cfg(feature = "statistics")]
+            trendline_color: None,
+            #[cfg(feature = "statistics")]
+            trendline_n_points: 100,
         }
     }
 }
@@ -156,6 +192,30 @@ impl ScatterPlot {
         self.annotations.push(ann);
         self
     }
+
+    /// Link this plot to a shared view state for synchronized bounds.
+    pub fn shared_view(mut self, sv: SharedView) -> Self {
+        self.shared_view = Some(sv);
+        self
+    }
+
+    /// Set the trendline type to overlay on the scatter plot.
+    ///
+    /// Requires the `statistics` feature.
+    #[cfg(feature = "statistics")]
+    pub fn trendline(mut self, tt: TrendlineType) -> Self {
+        self.trendline = Some(tt);
+        self
+    }
+
+    /// Set the trendline color (defaults to the first series color).
+    ///
+    /// Requires the `statistics` feature.
+    #[cfg(feature = "statistics")]
+    pub fn trendline_color(mut self, color: Color) -> Self {
+        self.trendline_color = Some(color);
+        self
+    }
 }
 
 impl Widget for &ScatterPlot {
@@ -184,8 +244,21 @@ impl Widget for &ScatterPlot {
             y_max = 1.0;
         }
 
-        let (x_lo, x_hi) = self.x_axis.resolve_bounds(x_min, x_max);
-        let (y_lo, y_hi) = self.y_axis.resolve_bounds(y_min, y_max);
+        let (mut x_lo, mut x_hi) = self.x_axis.resolve_bounds(x_min, x_max);
+        let (mut y_lo, mut y_hi) = self.y_axis.resolve_bounds(y_min, y_max);
+
+        // Apply shared view overrides if linked
+        if let Some(ref sv) = self.shared_view {
+            let state = sv.borrow();
+            if let Some((lo, hi)) = state.x_bounds {
+                x_lo = lo;
+                x_hi = hi;
+            }
+            if let Some((lo, hi)) = state.y_bounds {
+                y_lo = lo;
+                y_hi = hi;
+            }
+        }
 
         // Create and render the plot frame (title, axes, grid, ticks, labels, spines, ref lines)
         let frame = PlotFrame::new(&self.x_axis, &self.y_axis, &self.theme)
@@ -238,6 +311,67 @@ impl Widget for &ScatterPlot {
             }
         }
 
+        // Draw trendline (statistics feature)
+        #[cfg(feature = "statistics")]
+        if let Some(ref ttype) = self.trendline {
+            // Collect all (x, y) from all series
+            let all_x: Vec<f64> = self
+                .series
+                .iter()
+                .flat_map(|s| s.data.iter().map(|&(x, _)| x))
+                .filter(|v| v.is_finite())
+                .collect();
+            let all_y: Vec<f64> = self
+                .series
+                .iter()
+                .flat_map(|s| s.data.iter().map(|&(_, y)| y))
+                .filter(|v| v.is_finite())
+                .collect();
+
+            let trend_color = self.trendline_color.unwrap_or_else(|| {
+                self.series.first().map_or(Color::White, |s| s.color)
+            });
+
+            // Generate evaluation x values across the plot range
+            let n_eval = self.trendline_n_points;
+            let eval_xs: Vec<f64> = (0..n_eval)
+                .map(|i| x_lo + (x_hi - x_lo) * i as f64 / (n_eval - 1).max(1) as f64)
+                .collect();
+
+            let eval_ys: Option<Vec<f64>> = match ttype {
+                TrendlineType::Linear => {
+                    crate::statistics::linear_regression(&all_x, &all_y).map(|fit| {
+                        eval_xs.iter().map(|&x| fit.eval(x)).collect()
+                    })
+                }
+                TrendlineType::Polynomial(degree) => {
+                    crate::statistics::poly_fit(&all_x, &all_y, *degree).map(|fit| {
+                        eval_xs.iter().map(|&x| fit.eval(x)).collect()
+                    })
+                }
+                TrendlineType::Lowess(frac) => {
+                    crate::statistics::lowess(&all_x, &all_y, *frac).map(|result| {
+                        // Interpolate LOWESS result onto eval_xs
+                        eval_xs
+                            .iter()
+                            .map(|&ex| interpolate_lowess(&result.x, &result.y, ex))
+                            .collect()
+                    })
+                }
+            };
+
+            if let Some(ys) = eval_ys {
+                // Draw as connected braille line segments
+                for i in 0..eval_xs.len() - 1 {
+                    let sx0 = pa.screen_x(eval_xs[i]);
+                    let sy0 = pa.screen_y(ys[i]);
+                    let sx1 = pa.screen_x(eval_xs[i + 1]);
+                    let sy1 = pa.screen_y(ys[i + 1]);
+                    draw_braille_line(buf, sx0, sy0, sx1, sy1, trend_color, &pa);
+                }
+            }
+        }
+
         // Draw annotations
         PlotFrame::draw_annotations(&pa, &self.annotations, buf);
 
@@ -250,4 +384,40 @@ impl Widget for &ScatterPlot {
             (&legend).render(legend_area, buf);
         }
     }
+}
+
+/// Linear interpolation of a LOWESS result at a given x value.
+#[cfg(feature = "statistics")]
+fn interpolate_lowess(xs: &[f64], ys: &[f64], x: f64) -> f64 {
+    if xs.is_empty() {
+        return 0.0;
+    }
+    if xs.len() == 1 {
+        return ys[0];
+    }
+    // Clamp to range
+    if x <= xs[0] {
+        return ys[0];
+    }
+    let last = xs.len() - 1;
+    if x >= xs[last] {
+        return ys[last];
+    }
+    // Binary search for bracket
+    let mut lo = 0;
+    let mut hi = last;
+    while hi - lo > 1 {
+        let mid = (lo + hi) / 2;
+        if xs[mid] <= x {
+            lo = mid;
+        } else {
+            hi = mid;
+        }
+    }
+    let dx = xs[hi] - xs[lo];
+    if dx.abs() < f64::EPSILON {
+        return ys[lo];
+    }
+    let t = (x - xs[lo]) / dx;
+    ys[lo] * (1.0 - t) + ys[hi] * t
 }

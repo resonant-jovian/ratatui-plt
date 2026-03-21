@@ -65,6 +65,8 @@ pub mod transform;
 pub mod triangulation;
 pub mod widgets;
 
+pub mod linked_view;
+
 #[cfg(feature = "statistics")]
 pub mod statistics;
 

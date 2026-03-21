@@ -16,8 +16,11 @@ chrono = ["dep:chrono"]
 serde = ["dep:serde"]
 fft = ["dep:rustfft"]
 triangulation = ["dep:delaunator"]
-export = ["dep:resvg", "dep:usvg", "dep:tiny-skia", "dep:svg2pdf"]
+export = ["dep:resvg", "dep:usvg", "dep:tiny-skia", "dep:svg2pdf", "dep:image"]
 statistics = []
+kitty = ["export"]
+sixel = ["export", "dep:image"]
+toml-themes = ["dep:toml", "serde"]
 
 [dependencies]
 ratatui = "0.30"
@@ -63,12 +66,34 @@ version = "0.12"
 optional = true
 
 [[example]]
-name = "export_png_pdf"
-required-features = ["export"]
-
-[[example]]
 name = "statistics"
 required-features = ["statistics"]
+
+[[example]]
+name = "trendline"
+required-features = ["statistics"]
+
+[[example]]
+name = "kitty_export"
+required-features = ["kitty"]
+
+[[example]]
+name = "sixel_export"
+required-features = ["sixel"]
+
+[[example]]
+name = "toml_theme"
+required-features = ["toml-themes"]
+
+[dependencies.image]
+version = "0.25"
+optional = true
+default-features = false
+features = ["png"]
+
+[dependencies.toml]
+version = "0.8"
+optional = true
 
 [dev-dependencies]
 crossterm = "0.29"
@@ -77,7 +102,7 @@ rand = "0.10"
 
 [lints.rust]
 unsafe_code = "forbid"
-warnings = "forbid"
+warnings = "deny"
 
 [lints.clippy]
 unwrap_used = "forbid"

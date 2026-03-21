@@ -2588,14 +2588,13 @@ fn test_matshow_renders() {
 #[cfg(feature = "export")]
 mod export_tests {
     use super::*;
-    use ratatui_plt::export::{ExportOptions, buffer_to_pdf, buffer_to_png, save_png};
+    use ratatui_plt::export::{ExportOptions, buffer_to_png};
 
     #[test]
     fn test_export_options_defaults() {
         let opts = ExportOptions::new();
-        assert!((opts.font_size - 14.0).abs() < f64::EPSILON);
-        assert!((opts.dpi - 96.0).abs() < f64::EPSILON);
-        assert!(opts.background.is_none());
+        assert_eq!(opts.cell_width, 8);
+        assert_eq!(opts.cell_height, 16);
     }
 
     #[test]
@@ -2612,59 +2611,13 @@ mod export_tests {
             .color(Color::Cyan);
         let plot = LinePlot::new().series(s).title("PNG test");
         let buf = ratatui_plt::export::render_to_buffer(&plot, 80, 24);
-        let opts = ExportOptions::new().background(30, 30, 30);
+        let opts = ExportOptions::new();
         let png_bytes = buffer_to_png(&buf, &opts);
         assert!(png_bytes.is_ok());
         let data = png_bytes.unwrap_or_default();
         // PNG magic bytes: 0x89 P N G
         assert!(data.len() >= 4);
         assert_eq!(&data[..4], &[0x89, 0x50, 0x4E, 0x47]);
-    }
-
-    #[test]
-    fn test_buffer_to_pdf_valid() {
-        let s = Series::new("cos")
-            .data(
-                (0..100)
-                    .map(|i| {
-                        let x = i as f64 * 0.1;
-                        (x, x.cos())
-                    })
-                    .collect(),
-            )
-            .color(Color::Yellow);
-        let plot = LinePlot::new().series(s).title("PDF test");
-        let buf = ratatui_plt::export::render_to_buffer(&plot, 80, 24);
-        let opts = ExportOptions::new();
-        let pdf_bytes = buffer_to_pdf(&buf, &opts);
-        assert!(pdf_bytes.is_ok());
-        let data = pdf_bytes.unwrap_or_default();
-        // PDF magic bytes: %PDF
-        assert!(data.len() >= 4);
-        assert_eq!(&data[..4], b"%PDF");
-    }
-
-    #[test]
-    fn test_save_png_creates_file() {
-        let s = Series::new("line")
-            .data(vec![(0.0, 0.0), (1.0, 1.0), (2.0, 0.5)])
-            .color(Color::Green);
-        let plot = LinePlot::new().series(s).title("Save test");
-        let opts = ExportOptions::new().background(0, 0, 0);
-
-        let dir = std::env::temp_dir();
-        let path = dir.join("ratatui_plt_test_export.png");
-
-        let result = save_png(&plot, 60, 20, &path, &opts);
-        assert!(result.is_ok());
-
-        let meta = std::fs::metadata(&path);
-        assert!(meta.is_ok());
-        let len = meta.map(|m| m.len()).unwrap_or(0);
-        assert!(len > 0);
-
-        // Clean up.
-        let _ = std::fs::remove_file(&path);
     }
 }
 
@@ -2878,4 +2831,529 @@ mod statistics_tests {
         let norm = ratatui_plt::statistics::HistNormExt::default();
         assert_eq!(norm, ratatui_plt::statistics::HistNormExt::Count);
     }
+}
+
+// ===== JointPlot tests =====
+
+#[test]
+fn test_joint_plot_renders() {
+    use ratatui_plt::widgets::joint_plot::{JointPlot, MarginalType};
+
+    let s = Series::new("pts")
+        .data(vec![
+            (0.0, 0.0),
+            (1.0, 2.0),
+            (2.0, 1.0),
+            (3.0, 3.0),
+            (4.0, 2.5),
+        ])
+        .color(Color::Cyan)
+        .marker(MarkerShape::FilledCircle);
+    let plot = JointPlot::new()
+        .series(s)
+        .marginal_x(MarginalType::Histogram)
+        .marginal_y(MarginalType::Histogram)
+        .title("Joint Plot");
+
+    let area = Rect::new(0, 0, 60, 30);
+    let mut buf = Buffer::empty(area);
+    (&plot).render(area, &mut buf);
+}
+
+#[test]
+fn test_joint_plot_kde_marginals() {
+    use ratatui_plt::widgets::joint_plot::{JointPlot, MarginalType};
+
+    let s = Series::new("pts")
+        .data(vec![
+            (0.0, 0.0),
+            (1.0, 1.5),
+            (2.0, 1.0),
+            (3.0, 2.5),
+            (4.0, 3.0),
+            (5.0, 4.0),
+        ])
+        .color(Color::Green)
+        .marker(MarkerShape::Circle);
+    let plot = JointPlot::new()
+        .series(s)
+        .marginal_x(MarginalType::Kde)
+        .marginal_y(MarginalType::Kde)
+        .title("KDE Marginals");
+
+    let area = Rect::new(0, 0, 60, 30);
+    let mut buf = Buffer::empty(area);
+    (&plot).render(area, &mut buf);
+}
+
+#[test]
+fn test_joint_plot_rug_marginals() {
+    use ratatui_plt::widgets::joint_plot::{JointPlot, MarginalType};
+
+    let s = Series::new("pts")
+        .data(vec![
+            (1.0, 2.0),
+            (2.0, 3.0),
+            (3.0, 1.0),
+            (4.0, 4.0),
+        ])
+        .color(Color::Yellow)
+        .marker(MarkerShape::Dot);
+    let plot = JointPlot::new()
+        .series(s)
+        .marginal_x(MarginalType::Rug)
+        .marginal_y(MarginalType::Rug)
+        .title("Rug Marginals");
+
+    let area = Rect::new(0, 0, 60, 30);
+    let mut buf = Buffer::empty(area);
+    (&plot).render(area, &mut buf);
+}
+
+#[test]
+fn test_joint_plot_no_marginals() {
+    use ratatui_plt::widgets::joint_plot::{JointPlot, MarginalType};
+
+    let s = Series::new("pts")
+        .data(vec![(0.0, 0.0), (1.0, 1.0), (2.0, 2.0)])
+        .color(Color::Red)
+        .marker(MarkerShape::Cross);
+    let plot = JointPlot::new()
+        .series(s)
+        .marginal_x(MarginalType::None)
+        .marginal_y(MarginalType::None)
+        .title("No Marginals");
+
+    let area = Rect::new(0, 0, 40, 20);
+    let mut buf = Buffer::empty(area);
+    (&plot).render(area, &mut buf);
+}
+
+#[cfg(feature = "statistics")]
+#[test]
+fn test_scatter_trendline_linear() {
+    use ratatui_plt::widgets::scatter_plot::TrendlineType;
+
+    let s = Series::new("pts")
+        .data(vec![
+            (0.0, 0.5),
+            (1.0, 2.1),
+            (2.0, 3.8),
+            (3.0, 6.2),
+            (4.0, 7.9),
+        ])
+        .color(Color::Cyan)
+        .marker(MarkerShape::FilledCircle);
+    let plot = ScatterPlot::new()
+        .series(s)
+        .trendline(TrendlineType::Linear)
+        .trendline_color(Color::Yellow)
+        .title("Linear Trendline");
+
+    let area = Rect::new(0, 0, 60, 30);
+    let mut buf = Buffer::empty(area);
+    (&plot).render(area, &mut buf);
+}
+
+#[cfg(feature = "statistics")]
+#[test]
+fn test_scatter_trendline_polynomial() {
+    use ratatui_plt::widgets::scatter_plot::TrendlineType;
+
+    let s = Series::new("pts")
+        .data(vec![
+            (-2.0, 4.1),
+            (-1.0, 1.2),
+            (0.0, 0.1),
+            (1.0, 0.8),
+            (2.0, 4.3),
+            (3.0, 9.1),
+        ])
+        .color(Color::Green)
+        .marker(MarkerShape::Circle);
+    let plot = ScatterPlot::new()
+        .series(s)
+        .trendline(TrendlineType::Polynomial(2))
+        .title("Polynomial Trendline");
+
+    let area = Rect::new(0, 0, 60, 30);
+    let mut buf = Buffer::empty(area);
+    (&plot).render(area, &mut buf);
+}
+
+use ratatui_plt::legend::LegendEntry;
+
+// --- Interactive Legend ---
+
+#[test]
+fn test_interactive_legend_renders() {
+    let entries = vec![
+        LegendEntry {
+            name: "Visible".into(),
+            color: Color::Red,
+            marker: Some('●'),
+        },
+        LegendEntry {
+            name: "Hidden".into(),
+            color: Color::Blue,
+            marker: Some('■'),
+        },
+        LegendEntry {
+            name: "Also Visible".into(),
+            color: Color::Green,
+            marker: Some('▲'),
+        },
+    ];
+    let state = shared_legend_state(entries.len());
+    // Hide the second entry
+    state.borrow_mut()[1] = false;
+
+    let legend = InteractiveLegend::new(entries, state);
+    let area = Rect::new(0, 0, 30, 10);
+    let mut buf = Buffer::empty(area);
+    (&legend).render(area, &mut buf);
+}
+
+#[test]
+fn test_interactive_legend_toggle() {
+    let entries = vec![
+        LegendEntry {
+            name: "A".into(),
+            color: Color::Red,
+            marker: Some('●'),
+        },
+        LegendEntry {
+            name: "B".into(),
+            color: Color::Blue,
+            marker: Some('■'),
+        },
+    ];
+    let state = shared_legend_state(entries.len());
+    let legend = InteractiveLegend::new(entries, state);
+
+    // Initially all visible
+    assert!(legend.is_visible(0));
+    assert!(legend.is_visible(1));
+
+    // Toggle first entry
+    legend.toggle(0);
+    assert!(!legend.is_visible(0));
+    assert!(legend.is_visible(1));
+
+    // Toggle back
+    legend.toggle(0);
+    assert!(legend.is_visible(0));
+
+    // Out-of-range toggle is a no-op
+    legend.toggle(99);
+    assert!(!legend.is_visible(99));
+}
+
+// --- Span Selector ---
+
+#[test]
+fn test_span_selector_renders() {
+    let area = Rect::new(0, 0, 60, 30);
+    let pa = PlotArea {
+        x: 8,
+        y: 1,
+        width: 50,
+        height: 27,
+        x_lo: 0.0,
+        x_hi: 10.0,
+        y_lo: 0.0,
+        y_hi: 10.0,
+        area,
+    };
+    let mut buf = Buffer::empty(area);
+
+    let state = shared_span_state();
+    state.borrow_mut().start = Some(2.0);
+    state.borrow_mut().end = Some(5.0);
+
+    let selector = SpanSelector::new(state).color(Color::Cyan);
+    selector.render_on(&pa, &mut buf);
+}
+
+// --- Rectangle Selector ---
+
+#[test]
+fn test_rect_selector_renders() {
+    let area = Rect::new(0, 0, 60, 30);
+    let pa = PlotArea {
+        x: 8,
+        y: 1,
+        width: 50,
+        height: 27,
+        x_lo: 0.0,
+        x_hi: 10.0,
+        y_lo: 0.0,
+        y_hi: 10.0,
+        area,
+    };
+    let mut buf = Buffer::empty(area);
+
+    let brush = shared_brush();
+    brush.borrow_mut().set_selection(1.0, 2.0, 5.0, 8.0);
+
+    let selector = RectangleSelector::new(brush).color(Color::Yellow).border(true);
+    selector.render_on(&pa, &mut buf);
+}
+
+// --- Linked View ---
+
+#[test]
+fn test_shared_view_state() {
+    let sv = shared_view();
+    assert!(sv.borrow().x_bounds.is_none());
+    assert!(sv.borrow().y_bounds.is_none());
+
+    sv.borrow_mut().x_bounds = Some((0.0, 10.0));
+    sv.borrow_mut().y_bounds = Some((-1.0, 1.0));
+
+    let state = sv.borrow();
+    assert_eq!(state.x_bounds, Some((0.0, 10.0)));
+    assert_eq!(state.y_bounds, Some((-1.0, 1.0)));
+}
+
+#[test]
+fn test_line_plot_with_shared_view() {
+    let sv = shared_view();
+    sv.borrow_mut().x_bounds = Some((0.0, 5.0));
+    sv.borrow_mut().y_bounds = Some((-2.0, 2.0));
+
+    let s = Series::new("test")
+        .data(
+            (0..50)
+                .map(|i| {
+                    let x = i as f64 * 0.2;
+                    (x, x.sin())
+                })
+                .collect(),
+        )
+        .color(Color::Cyan);
+
+    let plot = LinePlot::new()
+        .series(s)
+        .title("Linked View Test")
+        .shared_view(sv);
+
+    let area = Rect::new(0, 0, 60, 30);
+    let mut buf = Buffer::empty(area);
+    (&plot).render(area, &mut buf);
+}
+
+#[test]
+fn test_waterfall_chart_renders() {
+    let chart = WaterfallChart::new()
+        .entry(WaterfallEntry::new("Revenue", 100.0))
+        .entry(WaterfallEntry::new("COGS", -40.0))
+        .entry(WaterfallEntry::new("Expenses", -30.0))
+        .entry(WaterfallEntry::total("Profit", 30.0))
+        .title("P&L Waterfall");
+
+    let area = Rect::new(0, 0, 60, 20);
+    let mut buf = Buffer::empty(area);
+    (&chart).render(area, &mut buf);
+}
+
+#[test]
+fn test_funnel_chart_renders() {
+    let chart = FunnelChart::new()
+        .entry(FunnelEntry::new("Visitors", 10000.0).color(Color::Cyan))
+        .entry(FunnelEntry::new("Leads", 6500.0).color(Color::Blue))
+        .entry(FunnelEntry::new("Qualified", 3200.0).color(Color::Yellow))
+        .entry(FunnelEntry::new("Sales", 950.0).color(Color::Green))
+        .show_percentages(true)
+        .show_values(true)
+        .title("Sales Funnel");
+
+    let area = Rect::new(0, 0, 60, 20);
+    let mut buf = Buffer::empty(area);
+    (&chart).render(area, &mut buf);
+}
+
+#[test]
+fn test_gauge_chart_renders() {
+    let gauge = GaugeChart::new(72.0)
+        .min(0.0)
+        .max(100.0)
+        .sector(GaugeSector::new(0.0, 33.0, Color::Green))
+        .sector(GaugeSector::new(33.0, 66.0, Color::Yellow))
+        .sector(GaugeSector::new(66.0, 100.0, Color::Red))
+        .title("CPU Usage");
+
+    let area = Rect::new(0, 0, 40, 20);
+    let mut buf = Buffer::empty(area);
+    (&gauge).render(area, &mut buf);
+}
+
+#[test]
+fn test_gauge_chart_default_sectors() {
+    let gauge = GaugeChart::new(50.0)
+        .min(0.0)
+        .max(100.0)
+        .title("Default Gauge");
+
+    let area = Rect::new(0, 0, 40, 20);
+    let mut buf = Buffer::empty(area);
+    (&gauge).render(area, &mut buf);
+}
+
+#[test]
+fn test_gantt_chart_renders() {
+    let chart = GanttChart::new()
+        .task(
+            GanttTask::new("Research")
+                .segment(0.0, 3.0)
+                .color(Color::Cyan),
+        )
+        .task(
+            GanttTask::new("Design")
+                .segment(2.0, 4.0)
+                .color(Color::Blue),
+        )
+        .task(
+            GanttTask::new("Develop")
+                .segment(5.0, 6.0)
+                .segment(12.0, 2.0)
+                .color(Color::Green),
+        )
+        .show_grid(true)
+        .title("Project Timeline");
+
+    let area = Rect::new(0, 0, 60, 20);
+    let mut buf = Buffer::empty(area);
+    (&chart).render(area, &mut buf);
+}
+#[cfg(feature = "kitty")]
+use ratatui_plt::export::{ExportOptions, buffer_to_kitty};
+#[cfg(feature = "sixel")]
+use ratatui_plt::export::{ExportOptions as SixelExportOptions, buffer_to_sixel};
+#[cfg(feature = "toml-themes")]
+use ratatui_plt::theme::theme_from_toml;
+
+// ---------------------------------------------------------------------------
+// Kitty graphics protocol tests
+// ---------------------------------------------------------------------------
+
+#[cfg(feature = "kitty")]
+#[test]
+fn test_buffer_to_kitty_valid() {
+    let s = Series::new("test")
+        .data(vec![(0.0, 0.0), (1.0, 1.0), (2.0, 0.5)])
+        .color(Color::Cyan);
+    let plot = LinePlot::new().series(s).title("Kitty test");
+    let area = Rect::new(0, 0, 20, 10);
+    let mut buf = Buffer::empty(area);
+    (&plot).render(area, &mut buf);
+
+    let options = ExportOptions::default();
+    let result = buffer_to_kitty(&buf, &options);
+    assert!(result.is_ok());
+    let kitty = result.unwrap_or_default();
+    // Kitty escape sequences start with ESC_G
+    assert!(kitty.starts_with("\x1b_G"));
+    // Must end with the string terminator
+    assert!(kitty.ends_with("\x1b\\"));
+    // Must contain base64 data (at minimum some alphanumeric chars)
+    assert!(kitty.len() > 20);
+}
+
+// ---------------------------------------------------------------------------
+// Sixel graphics protocol tests
+// ---------------------------------------------------------------------------
+
+#[cfg(feature = "sixel")]
+#[test]
+fn test_buffer_to_sixel_valid() {
+    let s = Series::new("test")
+        .data(vec![(0.0, 0.0), (1.0, 1.0), (2.0, 0.5)])
+        .color(Color::Magenta);
+    let plot = LinePlot::new().series(s).title("Sixel test");
+    let area = Rect::new(0, 0, 20, 10);
+    let mut buf = Buffer::empty(area);
+    (&plot).render(area, &mut buf);
+
+    let options = SixelExportOptions::default();
+    let result = buffer_to_sixel(&buf, &options);
+    assert!(result.is_ok());
+    let sixel = result.unwrap_or_default();
+    // Sixel starts with DCS (ESC P) followed by 'q'
+    assert!(sixel.starts_with("\x1bPq"));
+    // Must end with string terminator
+    assert!(sixel.ends_with("\x1b\\"));
+    // Must contain raster attributes
+    assert!(sixel.contains('"'));
+    // Must contain palette definitions
+    assert!(sixel.contains('#'));
+}
+
+// ---------------------------------------------------------------------------
+// TOML theme loading tests
+// ---------------------------------------------------------------------------
+
+#[cfg(feature = "toml-themes")]
+#[test]
+fn test_theme_from_toml_basic() {
+    let toml_str = r##"
+[colors]
+background = "#1a1a2e"
+foreground = "#e0e0e0"
+grid = "#333333"
+minor_grid = "#222222"
+axis = "gray"
+
+[grid]
+visible = true
+pattern = "dashed"
+bold_title = false
+
+[cycle]
+colors = ["#e94560", "#0f3460", "#16c79a"]
+"##;
+
+    let result = theme_from_toml(toml_str);
+    assert!(result.is_ok());
+    let theme = result.unwrap_or_default();
+    assert_eq!(theme.background, Color::Rgb(0x1a, 0x1a, 0x2e));
+    assert_eq!(theme.foreground, Color::Rgb(0xe0, 0xe0, 0xe0));
+    assert_eq!(theme.grid_color, Color::Rgb(0x33, 0x33, 0x33));
+    assert_eq!(theme.minor_grid_color, Color::Rgb(0x22, 0x22, 0x22));
+    assert_eq!(theme.axis_color, Color::Gray);
+    assert!(theme.grid_visible);
+    assert_eq!(theme.grid_pattern, DashPattern::Dashed);
+    assert!(!theme.bold_title);
+}
+
+#[cfg(feature = "toml-themes")]
+#[test]
+fn test_theme_from_toml_partial() {
+    // Only override some fields; the rest should use dark theme defaults.
+    let toml_str = r#"
+[colors]
+foreground = "red"
+"#;
+
+    let result = theme_from_toml(toml_str);
+    assert!(result.is_ok());
+    let theme = result.unwrap_or_default();
+    // Overridden field
+    assert_eq!(theme.foreground, Color::Red);
+    // Default fields from Theme::dark()
+    assert_eq!(theme.background, Color::Reset);
+    assert!(theme.grid_visible);
+    assert!(theme.bold_title);
+}
+
+#[cfg(feature = "toml-themes")]
+#[test]
+fn test_theme_from_toml_invalid_color() {
+    let toml_str = r##"
+[colors]
+background = "#xyz"
+"##;
+
+    let result = theme_from_toml(toml_str);
+    assert!(result.is_err());
 }

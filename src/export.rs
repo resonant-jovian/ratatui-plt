@@ -358,6 +358,364 @@ fn write_ansi_bg(out: &mut String, color: Color) {
     }
 }
 
+// ---------------------------------------------------------------------------
+// Export feature: PNG generation, Kitty and Sixel graphics protocols
+// ---------------------------------------------------------------------------
+
+/// Options for image export.
+#[cfg(feature = "export")]
+#[derive(Clone, Debug)]
+pub struct ExportOptions {
+    /// Width of each cell in pixels.
+    pub cell_width: u32,
+    /// Height of each cell in pixels.
+    pub cell_height: u32,
+}
+
+#[cfg(feature = "export")]
+impl Default for ExportOptions {
+    fn default() -> Self {
+        Self {
+            cell_width: 8,
+            cell_height: 16,
+        }
+    }
+}
+
+#[cfg(feature = "export")]
+impl ExportOptions {
+    /// Create new export options with default cell dimensions.
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Set the cell width in pixels.
+    pub fn cell_width(mut self, w: u32) -> Self {
+        self.cell_width = w;
+        self
+    }
+
+    /// Set the cell height in pixels.
+    pub fn cell_height(mut self, h: u32) -> Self {
+        self.cell_height = h;
+        self
+    }
+}
+
+/// Errors that can occur during image export.
+#[cfg(feature = "export")]
+#[derive(Debug)]
+pub enum ExportError {
+    /// I/O error writing output.
+    Io(std::io::Error),
+    /// Image encoding error.
+    Image(String),
+}
+
+#[cfg(feature = "export")]
+impl std::fmt::Display for ExportError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Io(e) => write!(f, "I/O error: {e}"),
+            Self::Image(e) => write!(f, "Image error: {e}"),
+        }
+    }
+}
+
+#[cfg(feature = "export")]
+impl std::error::Error for ExportError {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        match self {
+            Self::Io(e) => Some(e),
+            Self::Image(_) => None,
+        }
+    }
+}
+
+#[cfg(feature = "export")]
+impl From<std::io::Error> for ExportError {
+    fn from(e: std::io::Error) -> Self {
+        Self::Io(e)
+    }
+}
+
+/// Convert a ratatui buffer to PNG image bytes.
+///
+/// Each terminal cell is rendered as a `cell_width x cell_height` pixel rectangle
+/// using the cell's background color (foreground color if no background set).
+#[cfg(feature = "export")]
+pub fn buffer_to_png(buf: &Buffer, options: &ExportOptions) -> Result<Vec<u8>, ExportError> {
+    let area = buf.area;
+    let img_w = area.width as u32 * options.cell_width;
+    let img_h = area.height as u32 * options.cell_height;
+
+    let mut img = image::RgbaImage::new(img_w, img_h);
+
+    for row in 0..area.height {
+        for col in 0..area.width {
+            let idx = (row * area.width + col) as usize;
+            let cell = &buf.content[idx];
+
+            // Use background color if set, otherwise use foreground for text cells.
+            let (r, g, b) = if cell.bg != Color::Reset {
+                color_to_rgb(cell.bg)
+            } else if cell.symbol() != " " {
+                color_to_rgb(cell.fg)
+            } else {
+                color_to_rgb(Color::Reset)
+            };
+
+            let px_x_start = col as u32 * options.cell_width;
+            let px_y_start = row as u32 * options.cell_height;
+
+            for py in 0..options.cell_height {
+                for px in 0..options.cell_width {
+                    img.put_pixel(
+                        px_x_start + px,
+                        px_y_start + py,
+                        image::Rgba([r, g, b, 255]),
+                    );
+                }
+            }
+        }
+    }
+
+    let mut png_bytes: Vec<u8> = Vec::new();
+    let mut cursor = std::io::Cursor::new(&mut png_bytes);
+    img.write_to(&mut cursor, image::ImageFormat::Png)
+        .map_err(|e| ExportError::Image(e.to_string()))?;
+    Ok(png_bytes)
+}
+
+// ---------------------------------------------------------------------------
+// Kitty graphics protocol
+// ---------------------------------------------------------------------------
+
+/// Encode bytes as base64.
+#[cfg(feature = "kitty")]
+fn base64_encode(data: &[u8]) -> String {
+    const TABLE: &[u8; 64] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+    let mut result = String::with_capacity(data.len().div_ceil(3) * 4);
+    for chunk in data.chunks(3) {
+        let b0 = chunk[0] as u32;
+        let b1 = chunk.get(1).copied().unwrap_or(0) as u32;
+        let b2 = chunk.get(2).copied().unwrap_or(0) as u32;
+        let triple = (b0 << 16) | (b1 << 8) | b2;
+        result.push(TABLE[((triple >> 18) & 0x3F) as usize] as char);
+        result.push(TABLE[((triple >> 12) & 0x3F) as usize] as char);
+        if chunk.len() > 1 {
+            result.push(TABLE[((triple >> 6) & 0x3F) as usize] as char);
+        } else {
+            result.push('=');
+        }
+        if chunk.len() > 2 {
+            result.push(TABLE[(triple & 0x3F) as usize] as char);
+        } else {
+            result.push('=');
+        }
+    }
+    result
+}
+
+/// Convert a ratatui buffer to a Kitty graphics protocol escape sequence.
+///
+/// The buffer is first rendered to PNG, then base64-encoded and wrapped in
+/// Kitty escape sequences with chunked transfer (4096-byte chunks).
+#[cfg(feature = "kitty")]
+pub fn buffer_to_kitty(buf: &Buffer, options: &ExportOptions) -> Result<String, ExportError> {
+    let png_bytes = buffer_to_png(buf, options)?;
+    let b64 = base64_encode(&png_bytes);
+    let chunk_size = 4096;
+    let mut output = String::new();
+
+    if b64.len() <= chunk_size {
+        // Single chunk: m=0 means no more data.
+        let _ = write!(output, "\x1b_Gf=100,a=T,t=d,m=0;{b64}\x1b\\");
+    } else {
+        let chunks: Vec<&str> = {
+            let mut v = Vec::new();
+            let mut start = 0;
+            while start < b64.len() {
+                let end = (start + chunk_size).min(b64.len());
+                v.push(&b64[start..end]);
+                start = end;
+            }
+            v
+        };
+        let last_idx = chunks.len() - 1;
+        for (i, chunk) in chunks.iter().enumerate() {
+            if i == 0 {
+                let _ = write!(output, "\x1b_Gf=100,a=T,t=d,m=1;{chunk}\x1b\\");
+            } else if i == last_idx {
+                let _ = write!(output, "\x1b_Gm=0;{chunk}\x1b\\");
+            } else {
+                let _ = write!(output, "\x1b_Gm=1;{chunk}\x1b\\");
+            }
+        }
+    }
+
+    Ok(output)
+}
+
+/// Render a widget and print it using the Kitty graphics protocol.
+///
+/// The widget is rendered into an off-screen buffer, converted to PNG,
+/// and output as a Kitty inline image to stdout.
+#[cfg(feature = "kitty")]
+pub fn print_kitty<W: Widget>(
+    widget: W,
+    width: u16,
+    height: u16,
+    options: &ExportOptions,
+) -> Result<(), ExportError> {
+    let buf = render_to_buffer(widget, width, height);
+    let kitty = buffer_to_kitty(&buf, options)?;
+    print!("{kitty}");
+    Ok(())
+}
+
+// ---------------------------------------------------------------------------
+// Sixel graphics protocol
+// ---------------------------------------------------------------------------
+
+/// Convert a ratatui buffer to a Sixel graphics escape sequence.
+///
+/// The buffer is rendered to PNG, decoded to RGBA pixels, quantized to a
+/// 256-color palette, and encoded as Sixel data.
+#[cfg(feature = "sixel")]
+pub fn buffer_to_sixel(buf: &Buffer, options: &ExportOptions) -> Result<String, ExportError> {
+    let png_bytes = buffer_to_png(buf, options)?;
+    let img = image::load_from_memory(&png_bytes)
+        .map_err(|e| ExportError::Image(e.to_string()))?;
+    let rgba = img.to_rgba8();
+    let (width, height) = (rgba.width(), rgba.height());
+
+    // Build color palette: collect unique RGB triples, limit to 256.
+    let mut palette: Vec<(u8, u8, u8)> = Vec::new();
+    let mut pixel_indices: Vec<u16> = Vec::with_capacity((width * height) as usize);
+
+    for pixel in rgba.pixels() {
+        let rgb = (pixel[0], pixel[1], pixel[2]);
+        let idx = if let Some(pos) = palette.iter().position(|c| *c == rgb) {
+            pos as u16
+        } else if palette.len() < 256 {
+            let pos = palette.len() as u16;
+            palette.push(rgb);
+            pos
+        } else {
+            // Find nearest color in palette.
+            nearest_palette_color(&palette, rgb)
+        };
+        pixel_indices.push(idx);
+    }
+
+    // Build sixel output.
+    let mut output = String::new();
+
+    // DCS: enter sixel mode.
+    output.push_str("\x1bPq");
+
+    // Raster attributes: pixel aspect 1:1, image dimensions.
+    let _ = write!(output, "\"1;1;{width};{height}");
+
+    // Define palette entries.
+    for (i, &(r, g, b)) in palette.iter().enumerate() {
+        let r_pct = (r as u32 * 100) / 255;
+        let g_pct = (g as u32 * 100) / 255;
+        let b_pct = (b as u32 * 100) / 255;
+        let _ = write!(output, "#{i};2;{r_pct};{g_pct};{b_pct}");
+    }
+
+    // Encode sixel bands (6 rows each).
+    let mut band_start: u32 = 0;
+    while band_start < height {
+        let band_end = (band_start + 6).min(height);
+
+        // Find which colors are present in this band.
+        let mut colors_in_band: Vec<u16> = Vec::new();
+        for row in band_start..band_end {
+            for col in 0..width {
+                let idx = pixel_indices[(row * width + col) as usize];
+                if !colors_in_band.contains(&idx) {
+                    colors_in_band.push(idx);
+                }
+            }
+        }
+
+        for (ci, &color_idx) in colors_in_band.iter().enumerate() {
+            // Select color.
+            let _ = write!(output, "#{color_idx}");
+
+            // For each column, compute 6-bit sixel value.
+            for col in 0..width {
+                let mut sixel_val: u8 = 0;
+                for bit in 0..6u32 {
+                    let row = band_start + bit;
+                    if row < height {
+                        let pi = pixel_indices[(row * width + col) as usize];
+                        if pi == color_idx {
+                            sixel_val |= 1 << bit;
+                        }
+                    }
+                }
+                // Sixel character = value + 63.
+                output.push((sixel_val + 63) as char);
+            }
+
+            // Carriage return after each color pass (except the last in the band).
+            if ci < colors_in_band.len() - 1 {
+                output.push('$');
+            }
+        }
+
+        // Newline / next band.
+        band_start += 6;
+        if band_start < height {
+            output.push('-');
+        }
+    }
+
+    // String terminator.
+    output.push_str("\x1b\\");
+
+    Ok(output)
+}
+
+/// Find the index of the nearest color in the palette to the given RGB value.
+#[cfg(feature = "sixel")]
+fn nearest_palette_color(palette: &[(u8, u8, u8)], rgb: (u8, u8, u8)) -> u16 {
+    let mut best_idx: u16 = 0;
+    let mut best_dist = u32::MAX;
+    for (i, &(pr, pg, pb)) in palette.iter().enumerate() {
+        let dr = (rgb.0 as i32 - pr as i32).unsigned_abs();
+        let dg = (rgb.1 as i32 - pg as i32).unsigned_abs();
+        let db = (rgb.2 as i32 - pb as i32).unsigned_abs();
+        let dist = dr * dr + dg * dg + db * db;
+        if dist < best_dist {
+            best_dist = dist;
+            best_idx = i as u16;
+        }
+    }
+    best_idx
+}
+
+/// Render a widget and print it using the Sixel graphics protocol.
+///
+/// The widget is rendered into an off-screen buffer, converted to a Sixel
+/// image, and printed to stdout.
+#[cfg(feature = "sixel")]
+pub fn print_sixel<W: Widget>(
+    widget: W,
+    width: u16,
+    height: u16,
+    options: &ExportOptions,
+) -> Result<(), ExportError> {
+    let buf = render_to_buffer(widget, width, height);
+    let sixel = buffer_to_sixel(&buf, options)?;
+    print!("{sixel}");
+    Ok(())
+}
+
 /// Escape a string for embedding in XML/SVG.
 fn xml_escape(s: &str) -> String {
     let mut out = String::with_capacity(s.len());
@@ -373,213 +731,6 @@ fn xml_escape(s: &str) -> String {
     }
     out
 }
-
-// ---------------------------------------------------------------------------
-// PNG / PDF raster export (behind `export` feature)
-// ---------------------------------------------------------------------------
-
-#[cfg(feature = "export")]
-mod raster_export {
-    use super::*;
-    use std::path::Path;
-
-    /// Options for PNG/PDF rendering.
-    ///
-    /// Use the builder methods to customise font size, DPI, and background color.
-    ///
-    /// # Example
-    ///
-    /// ```rust,no_run
-    /// use ratatui_plt::export::ExportOptions;
-    /// let opts = ExportOptions::new()
-    ///     .font_size(16.0)
-    ///     .dpi(150.0)
-    ///     .background(30, 30, 30);
-    /// ```
-    pub struct ExportOptions {
-        /// Font size used when generating the intermediate SVG (default 14.0).
-        pub font_size: f64,
-        /// DPI for raster output; controls the pixel dimensions (default 96.0).
-        pub dpi: f64,
-        /// Optional RGB background colour. When `None` the pixmap starts transparent.
-        pub background: Option<(u8, u8, u8)>,
-    }
-
-    impl Default for ExportOptions {
-        fn default() -> Self {
-            Self {
-                font_size: 14.0,
-                dpi: 96.0,
-                background: None,
-            }
-        }
-    }
-
-    impl ExportOptions {
-        /// Create a new `ExportOptions` with default values.
-        pub fn new() -> Self {
-            Self::default()
-        }
-
-        /// Set the font size (in SVG px) used in the intermediate SVG.
-        pub fn font_size(mut self, size: f64) -> Self {
-            self.font_size = size;
-            self
-        }
-
-        /// Set the output DPI. Higher values produce larger pixel dimensions.
-        pub fn dpi(mut self, dpi: f64) -> Self {
-            self.dpi = dpi;
-            self
-        }
-
-        /// Set an opaque RGB background colour.
-        pub fn background(mut self, r: u8, g: u8, b: u8) -> Self {
-            self.background = Some((r, g, b));
-            self
-        }
-    }
-
-    /// Errors that can occur during PNG/PDF export.
-    #[derive(Debug)]
-    pub enum ExportError {
-        /// An I/O error (e.g. writing the output file).
-        Io(std::io::Error),
-        /// The intermediate SVG could not be parsed.
-        SvgParse(String),
-        /// PNG encoding failed.
-        PngEncode(String),
-        /// PDF conversion failed.
-        PdfConvert(String),
-    }
-
-    impl std::fmt::Display for ExportError {
-        fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-            match self {
-                Self::Io(e) => write!(f, "IO error: {e}"),
-                Self::SvgParse(e) => write!(f, "SVG parse error: {e}"),
-                Self::PngEncode(e) => write!(f, "PNG encode error: {e}"),
-                Self::PdfConvert(e) => write!(f, "PDF convert error: {e}"),
-            }
-        }
-    }
-
-    impl std::error::Error for ExportError {
-        fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
-            match self {
-                Self::Io(e) => Some(e),
-                _ => None,
-            }
-        }
-    }
-
-    impl From<std::io::Error> for ExportError {
-        fn from(e: std::io::Error) -> Self {
-            Self::Io(e)
-        }
-    }
-
-    /// Parse an SVG string into a `usvg::Tree`, loading system fonts.
-    fn svg_to_tree(svg_str: &str) -> Result<usvg::Tree, ExportError> {
-        let mut fontdb = usvg::fontdb::Database::new();
-        fontdb.load_system_fonts();
-        let options = usvg::Options {
-            fontdb: std::sync::Arc::new(fontdb),
-            ..Default::default()
-        };
-        usvg::Tree::from_str(svg_str, &options)
-            .map_err(|e| ExportError::SvgParse(e.to_string()))
-    }
-
-    /// Render a ratatui [`Buffer`] to PNG bytes.
-    ///
-    /// The buffer is first converted to an SVG string (via [`buffer_to_svg`]),
-    /// then rasterised at the requested DPI.
-    pub fn buffer_to_png(buf: &Buffer, options: &ExportOptions) -> Result<Vec<u8>, ExportError> {
-        let svg_str = buffer_to_svg(buf, options.font_size);
-        let tree = svg_to_tree(&svg_str)?;
-        let scale = (options.dpi / 72.0) as f32;
-        let size = tree.size();
-        let width = (size.width() * scale) as u32;
-        let height = (size.height() * scale) as u32;
-        let mut pixmap = tiny_skia::Pixmap::new(width.max(1), height.max(1))
-            .ok_or_else(|| ExportError::PngEncode("Failed to create pixmap".to_string()))?;
-        if let Some((r, g, b)) = options.background {
-            pixmap.fill(tiny_skia::Color::from_rgba8(r, g, b, 255));
-        }
-        let transform = tiny_skia::Transform::from_scale(scale, scale);
-        resvg::render(&tree, transform, &mut pixmap.as_mut());
-        pixmap
-            .encode_png()
-            .map_err(|e| ExportError::PngEncode(e.to_string()))
-    }
-
-    /// Parse an SVG string into a `svg2pdf::usvg::Tree` (the usvg version
-    /// that `svg2pdf` was built against), loading system fonts.
-    fn svg_to_pdf_tree(svg_str: &str) -> Result<svg2pdf::usvg::Tree, ExportError> {
-        let mut fontdb = svg2pdf::usvg::fontdb::Database::new();
-        fontdb.load_system_fonts();
-        let options = svg2pdf::usvg::Options {
-            fontdb: std::sync::Arc::new(fontdb),
-            ..Default::default()
-        };
-        svg2pdf::usvg::Tree::from_str(svg_str, &options)
-            .map_err(|e| ExportError::SvgParse(e.to_string()))
-    }
-
-    /// Render a ratatui [`Buffer`] to PDF bytes.
-    ///
-    /// The buffer is first converted to SVG, parsed into a `usvg::Tree`,
-    /// then converted to PDF via `svg2pdf`.
-    pub fn buffer_to_pdf(buf: &Buffer, options: &ExportOptions) -> Result<Vec<u8>, ExportError> {
-        let svg_str = buffer_to_svg(buf, options.font_size);
-        let tree = svg_to_pdf_tree(&svg_str)?;
-        let pdf_bytes = svg2pdf::to_pdf(
-            &tree,
-            svg2pdf::ConversionOptions::default(),
-            svg2pdf::PageOptions::default(),
-        )
-        .map_err(|e| ExportError::PdfConvert(e.to_string()))?;
-        Ok(pdf_bytes)
-    }
-
-    /// Render a widget at the given terminal dimensions and return PNG bytes.
-    ///
-    /// This is a convenience wrapper: it calls [`render_to_buffer`] followed
-    /// by [`buffer_to_png`].
-    pub fn save_png<W: Widget>(
-        widget: W,
-        width: u16,
-        height: u16,
-        path: impl AsRef<Path>,
-        options: &ExportOptions,
-    ) -> Result<(), ExportError> {
-        let buf = render_to_buffer(widget, width, height);
-        let data = buffer_to_png(&buf, options)?;
-        std::fs::write(path, data)?;
-        Ok(())
-    }
-
-    /// Render a widget at the given terminal dimensions and return PDF bytes.
-    ///
-    /// This is a convenience wrapper: it calls [`render_to_buffer`] followed
-    /// by [`buffer_to_pdf`].
-    pub fn save_pdf<W: Widget>(
-        widget: W,
-        width: u16,
-        height: u16,
-        path: impl AsRef<Path>,
-        options: &ExportOptions,
-    ) -> Result<(), ExportError> {
-        let buf = render_to_buffer(widget, width, height);
-        let data = buffer_to_pdf(&buf, options)?;
-        std::fs::write(path, data)?;
-        Ok(())
-    }
-}
-
-#[cfg(feature = "export")]
-pub use raster_export::*;
 
 #[cfg(test)]
 mod tests {

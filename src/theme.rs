@@ -189,3 +189,222 @@ impl Theme {
         ThemeGuard { previous }
     }
 }
+
+// ---------------------------------------------------------------------------
+// TOML theme loading (behind toml-themes feature)
+// ---------------------------------------------------------------------------
+
+/// Error type for TOML theme parsing and loading.
+#[cfg(feature = "toml-themes")]
+#[derive(Debug)]
+pub enum ThemeError {
+    /// I/O error reading a theme file.
+    Io(std::io::Error),
+    /// TOML parsing error.
+    Parse(String),
+    /// Invalid color string.
+    InvalidColor(String),
+}
+
+#[cfg(feature = "toml-themes")]
+impl std::fmt::Display for ThemeError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Io(e) => write!(f, "I/O error: {e}"),
+            Self::Parse(e) => write!(f, "TOML parse error: {e}"),
+            Self::InvalidColor(e) => write!(f, "Invalid color: {e}"),
+        }
+    }
+}
+
+#[cfg(feature = "toml-themes")]
+impl std::error::Error for ThemeError {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        match self {
+            Self::Io(e) => Some(e),
+            Self::Parse(_) | Self::InvalidColor(_) => None,
+        }
+    }
+}
+
+#[cfg(feature = "toml-themes")]
+impl From<std::io::Error> for ThemeError {
+    fn from(e: std::io::Error) -> Self {
+        Self::Io(e)
+    }
+}
+
+#[cfg(feature = "toml-themes")]
+#[derive(serde::Deserialize)]
+struct TomlTheme {
+    colors: Option<TomlColors>,
+    grid: Option<TomlGrid>,
+    cycle: Option<TomlCycle>,
+}
+
+#[cfg(feature = "toml-themes")]
+#[derive(serde::Deserialize)]
+struct TomlColors {
+    background: Option<String>,
+    foreground: Option<String>,
+    grid: Option<String>,
+    minor_grid: Option<String>,
+    axis: Option<String>,
+}
+
+#[cfg(feature = "toml-themes")]
+#[derive(serde::Deserialize)]
+struct TomlGrid {
+    visible: Option<bool>,
+    pattern: Option<String>,
+    bold_title: Option<bool>,
+}
+
+#[cfg(feature = "toml-themes")]
+#[derive(serde::Deserialize)]
+struct TomlCycle {
+    colors: Option<Vec<String>>,
+}
+
+/// Parse a color string into a ratatui [`Color`].
+///
+/// Supported formats:
+/// - `"#RRGGBB"` — hex RGB (e.g., `"#ff8000"`)
+/// - `"reset"` — [`Color::Reset`]
+/// - Named colors: `"red"`, `"blue"`, `"green"`, `"yellow"`, `"magenta"`,
+///   `"cyan"`, `"white"`, `"black"`, `"gray"`, `"darkgray"`,
+///   `"lightred"`, `"lightgreen"`, `"lightyellow"`, `"lightblue"`,
+///   `"lightmagenta"`, `"lightcyan"`
+#[cfg(feature = "toml-themes")]
+fn parse_color(s: &str) -> Result<Color, ThemeError> {
+    let s = s.trim();
+    if let Some(hex) = s.strip_prefix('#') {
+        if hex.len() != 6 {
+            return Err(ThemeError::InvalidColor(format!(
+                "expected 6 hex digits after '#', got '{s}'"
+            )));
+        }
+        let r = u8::from_str_radix(&hex[0..2], 16)
+            .map_err(|_| ThemeError::InvalidColor(format!("invalid hex color '{s}'")))?;
+        let g = u8::from_str_radix(&hex[2..4], 16)
+            .map_err(|_| ThemeError::InvalidColor(format!("invalid hex color '{s}'")))?;
+        let b = u8::from_str_radix(&hex[4..6], 16)
+            .map_err(|_| ThemeError::InvalidColor(format!("invalid hex color '{s}'")))?;
+        return Ok(Color::Rgb(r, g, b));
+    }
+
+    match s.to_lowercase().as_str() {
+        "reset" => Ok(Color::Reset),
+        "black" => Ok(Color::Black),
+        "red" => Ok(Color::Red),
+        "green" => Ok(Color::Green),
+        "yellow" => Ok(Color::Yellow),
+        "blue" => Ok(Color::Blue),
+        "magenta" => Ok(Color::Magenta),
+        "cyan" => Ok(Color::Cyan),
+        "gray" | "grey" => Ok(Color::Gray),
+        "darkgray" | "darkgrey" => Ok(Color::DarkGray),
+        "lightred" => Ok(Color::LightRed),
+        "lightgreen" => Ok(Color::LightGreen),
+        "lightyellow" => Ok(Color::LightYellow),
+        "lightblue" => Ok(Color::LightBlue),
+        "lightmagenta" => Ok(Color::LightMagenta),
+        "lightcyan" => Ok(Color::LightCyan),
+        "white" => Ok(Color::White),
+        _ => Err(ThemeError::InvalidColor(format!("unknown color '{s}'"))),
+    }
+}
+
+/// Parse a grid pattern string into a [`DashPattern`].
+#[cfg(feature = "toml-themes")]
+fn parse_pattern(s: &str) -> Result<DashPattern, ThemeError> {
+    match s.trim().to_lowercase().as_str() {
+        "solid" => Ok(DashPattern::Solid),
+        "dashed" => Ok(DashPattern::Dashed),
+        "dotted" => Ok(DashPattern::Dotted),
+        "dashdot" | "dash-dot" => Ok(DashPattern::DashDot),
+        _ => Err(ThemeError::Parse(format!("unknown grid pattern '{s}'"))),
+    }
+}
+
+/// Parse a TOML string into a [`Theme`].
+///
+/// Starts with [`Theme::dark()`] as a base and overrides any fields that
+/// are present in the TOML document.
+///
+/// # TOML Format
+///
+/// ```toml
+/// [colors]
+/// background = "#1a1a2e"
+/// foreground = "#e0e0e0"
+/// grid = "#333333"
+/// minor_grid = "#222222"
+/// axis = "gray"
+///
+/// [grid]
+/// visible = true
+/// pattern = "dashed"    # "solid", "dashed", "dotted", "dashdot"
+/// bold_title = true
+///
+/// [cycle]
+/// colors = ["#e94560", "#0f3460", "#16c79a"]
+/// ```
+#[cfg(feature = "toml-themes")]
+pub fn theme_from_toml(toml_str: &str) -> Result<Theme, ThemeError> {
+    let parsed: TomlTheme =
+        toml::from_str(toml_str).map_err(|e| ThemeError::Parse(e.to_string()))?;
+
+    let mut theme = Theme::dark();
+
+    if let Some(colors) = parsed.colors {
+        if let Some(ref s) = colors.background {
+            theme.background = parse_color(s)?;
+        }
+        if let Some(ref s) = colors.foreground {
+            theme.foreground = parse_color(s)?;
+        }
+        if let Some(ref s) = colors.grid {
+            theme.grid_color = parse_color(s)?;
+        }
+        if let Some(ref s) = colors.minor_grid {
+            theme.minor_grid_color = parse_color(s)?;
+        }
+        if let Some(ref s) = colors.axis {
+            theme.axis_color = parse_color(s)?;
+        }
+    }
+
+    if let Some(grid) = parsed.grid {
+        if let Some(v) = grid.visible {
+            theme.grid_visible = v;
+        }
+        if let Some(ref s) = grid.pattern {
+            theme.grid_pattern = parse_pattern(s)?;
+        }
+        if let Some(v) = grid.bold_title {
+            theme.bold_title = v;
+        }
+    }
+
+    if let Some(cycle) = parsed.cycle
+        && let Some(color_strings) = cycle.colors
+    {
+        let mut colors = Vec::with_capacity(color_strings.len());
+        for s in &color_strings {
+            colors.push(parse_color(s)?);
+        }
+        theme.color_cycle = ColorCycle::new(colors);
+    }
+
+    Ok(theme)
+}
+
+/// Load a [`Theme`] from a TOML file at the given path.
+///
+/// Reads the file contents and delegates to [`theme_from_toml`].
+#[cfg(feature = "toml-themes")]
+pub fn load_theme(path: impl AsRef<std::path::Path>) -> Result<Theme, ThemeError> {
+    let contents = std::fs::read_to_string(path)?;
+    theme_from_toml(&contents)
+}
