@@ -29,6 +29,8 @@ pub struct Theme {
     pub foreground: Color,
     /// Color for grid lines.
     pub grid_color: Color,
+    /// Color for minor grid lines (dimmer than major grid by default).
+    pub minor_grid_color: Color,
     /// Color for axis borders/spines.
     pub axis_color: Color,
     /// Color cycle for auto-coloring series.
@@ -54,6 +56,7 @@ impl Theme {
             background: Color::Reset,
             foreground: Color::White,
             grid_color: Color::Rgb(60, 60, 60),
+            minor_grid_color: Color::Rgb(40, 40, 40),
             axis_color: Color::Gray,
             color_cycle: ColorCycle::default(),
             grid_visible: true,
@@ -68,6 +71,7 @@ impl Theme {
             background: Color::Reset,
             foreground: Color::Black,
             grid_color: Color::Rgb(160, 160, 160),
+            minor_grid_color: Color::Rgb(200, 200, 200),
             axis_color: Color::Rgb(80, 80, 80),
             color_cycle: ColorCycle::default(),
             grid_visible: true,
@@ -82,6 +86,7 @@ impl Theme {
             background: Color::Reset,
             foreground: Color::White,
             grid_color: Color::Rgb(80, 80, 80),
+            minor_grid_color: Color::Rgb(50, 50, 50),
             axis_color: Color::Rgb(120, 120, 120),
             color_cycle: ColorCycle::default(),
             grid_visible: false,
@@ -96,6 +101,7 @@ impl Theme {
             background: Color::Reset,
             foreground: Color::White,
             grid_color: Color::Rgb(80, 80, 80),
+            minor_grid_color: Color::Rgb(50, 50, 50),
             axis_color: Color::White,
             color_cycle: ColorCycle::new(vec![
                 Color::White,
@@ -115,6 +121,7 @@ impl Theme {
             background: Color::Rgb(0, 43, 54),
             foreground: Color::Rgb(131, 148, 150),
             grid_color: Color::Rgb(30, 70, 80),
+            minor_grid_color: Color::Rgb(20, 55, 65),
             axis_color: Color::Rgb(88, 110, 117),
             color_cycle: ColorCycle::new(vec![
                 Color::Rgb(38, 139, 210),  // blue
@@ -147,4 +154,38 @@ impl Theme {
 
 std::thread_local! {
     static DEFAULT_THEME: std::cell::RefCell<Theme> = std::cell::RefCell::new(Theme::dark());
+}
+
+/// RAII guard that restores the previous [`Theme`] when dropped.
+///
+/// Created by [`Theme::activate`].
+///
+/// # Example
+///
+/// ```
+/// use ratatui_plt::theme::Theme;
+///
+/// {
+///     let _guard = Theme::solarized().activate();
+///     // All widgets constructed here use solarized theme
+/// } // previous theme is restored
+/// ```
+pub struct ThemeGuard {
+    previous: Theme,
+}
+
+impl Drop for ThemeGuard {
+    fn drop(&mut self) {
+        Theme::set_default(self.previous.clone());
+    }
+}
+
+impl Theme {
+    /// Activate this theme as the global default, returning a guard
+    /// that restores the previous theme when dropped.
+    pub fn activate(self) -> ThemeGuard {
+        let previous = Theme::get_default();
+        Theme::set_default(self);
+        ThemeGuard { previous }
+    }
 }

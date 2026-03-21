@@ -5,12 +5,15 @@ use ratatui::layout::Rect;
 use ratatui::style::Color;
 use ratatui::widgets::Widget;
 
+use crate::annotation::Annotation;
 use crate::axis::{AspectRatio, Axis};
 use crate::colormap::{Colormap, Viridis};
+use crate::drawing::draw_braille_line;
+use crate::frame::{DataBounds, PlotFrame, ReferenceLine};
 use crate::norm::{LinearNorm, Normalize};
 use crate::series::GridData;
+use crate::spines::Spines;
 use crate::theme::Theme;
-use crate::transform::{apply_aspect_ratio, data_to_screen};
 
 /// A contour plot widget.
 ///
@@ -36,6 +39,9 @@ pub struct ContourPlot {
     filled: bool,
     show_labels: bool,
     theme: Theme,
+    spines: Spines,
+    reference_lines: Vec<ReferenceLine>,
+    annotations: Vec<Annotation>,
 }
 
 impl ContourPlot {
@@ -54,6 +60,9 @@ impl ContourPlot {
             filled: false,
             show_labels: false,
             theme: Theme::get_default(),
+            spines: Spines::default(),
+            reference_lines: Vec::new(),
+            annotations: Vec::new(),
         }
     }
 
@@ -123,38 +132,34 @@ impl ContourPlot {
         self.theme = theme;
         self
     }
+
+    /// Set spine visibility.
+    pub fn spines(mut self, spines: Spines) -> Self {
+        self.spines = spines;
+        self
+    }
+
+    /// Add a reference line.
+    pub fn reference_line(mut self, line: ReferenceLine) -> Self {
+        self.reference_lines.push(line);
+        self
+    }
+
+    /// Set all reference lines.
+    pub fn reference_lines(mut self, lines: Vec<ReferenceLine>) -> Self {
+        self.reference_lines = lines;
+        self
+    }
+
+    /// Add an annotation.
+    pub fn annotation(mut self, ann: Annotation) -> Self {
+        self.annotations.push(ann);
+        self
+    }
 }
 
 impl Widget for &ContourPlot {
     fn render(self, area: Rect, buf: &mut Buffer) {
-        if area.width < 4 || area.height < 4 {
-            return;
-        }
-
-        let title_height: u16 = if self.title.is_some() { 1 } else { 0 };
-        let y_label_width: u16 = 8;
-        let tick_height: u16 = 1;
-
-        let px = area.x + y_label_width;
-        let py = area.y + title_height;
-        let pw = area.width.saturating_sub(y_label_width + 1);
-        let ph = area.height.saturating_sub(title_height + tick_height);
-
-        if pw < 2 || ph < 2 {
-            return;
-        }
-
-        // Draw title
-        if let Some(ref title) = self.title {
-            let start = area.x + (area.width.saturating_sub(title.len() as u16)) / 2;
-            for (i, ch) in title.chars().enumerate() {
-                let x = start + i as u16;
-                if x < area.x + area.width {
-                    buf[(x, area.y)].set_char(ch).set_fg(self.theme.foreground);
-                }
-            }
-        }
-
         let nrows = self.data.nrows();
         let ncols = self.data.ncols();
         if nrows < 2 || ncols < 2 {
@@ -166,10 +171,25 @@ impl Widget for &ContourPlot {
         let y_lo = self.data.y[0];
         let y_hi = self.data.y[nrows - 1];
 
-        let (ax_off, ay_off, aw, ah) =
-            apply_aspect_ratio(&self.aspect_ratio, x_hi - x_lo, y_hi - y_lo, pw, ph);
-        let px = px + ax_off;
-        let py = py + ay_off;
+        // Create and render the plot frame (title, axes, grid, ticks, labels, spines, ref lines)
+        let frame = PlotFrame::new(&self.x_axis, &self.y_axis, &self.theme)
+            .title(self.title.as_deref())
+            .aspect_ratio(self.aspect_ratio.clone())
+            .spines(self.spines.clone())
+            .reference_lines(&self.reference_lines);
+
+        let Some(pa) = frame.render(
+            area,
+            buf,
+            DataBounds {
+                x_lo,
+                x_hi,
+                y_lo,
+                y_hi,
+            },
+        ) else {
+            return;
+        };
 
         let levels = if self.levels.is_empty() {
             let (vmin, vmax) = self.data.value_bounds();
@@ -180,47 +200,15 @@ impl Widget for &ContourPlot {
             self.levels.clone()
         };
 
-        let (_vmin, _vmax) = self.data.value_bounds();
-
-        // Draw grid
-        let x_grid = self.x_axis.grid || self.theme.grid_visible;
-        let y_grid = self.y_axis.grid || self.theme.grid_visible;
-        if x_grid && !self.filled {
-            let gx_ticks = self.x_axis.tick_positions(x_lo, x_hi);
-            for &tv in &gx_ticks {
-                let sx = data_to_screen(tv, x_lo, x_hi, px as f64, (px + aw - 1) as f64);
-                let xi = sx.round() as u16;
-                if xi >= px && xi < px + aw {
-                    for y in py..py + ah {
-                        buf[(xi, y)].set_char('·').set_fg(self.theme.grid_color);
-                    }
-                }
-            }
-        }
-        if y_grid && !self.filled {
-            let gy_ticks = self.y_axis.tick_positions(y_lo, y_hi);
-            for &tv in &gy_ticks {
-                let sy = data_to_screen(tv, y_lo, y_hi, (py + ah - 1) as f64, py as f64);
-                let yi = sy.round() as u16;
-                if yi >= py && yi < py + ah {
-                    for x in px..px + aw {
-                        buf[(x, yi)].set_char('·').set_fg(self.theme.grid_color);
-                    }
-                }
-            }
-        }
-
         // Filled contours: half-block rendering with bilinear interpolation
         if self.filled {
-            let virt_h = ah as f64 * 2.0;
-            for cy in 0..ah {
-                for cx in 0..aw {
-                    let data_x =
-                        x_lo + (cx as f64 / (aw - 1).max(1) as f64) * (x_hi - x_lo);
+            let virt_h = pa.height as f64 * 2.0;
+            for cy in 0..pa.height {
+                for cx in 0..pa.width {
+                    let data_x = x_lo + (cx as f64 / (pa.width - 1).max(1) as f64) * (x_hi - x_lo);
 
                     let sample_color = |vy: f64| -> Color {
-                        let data_y =
-                            y_hi - (vy / (virt_h - 1.0).max(1.0)) * (y_hi - y_lo);
+                        let data_y = y_hi - (vy / (virt_h - 1.0).max(1.0)) * (y_hi - y_lo);
                         let gx = ((data_x - x_lo) / (x_hi - x_lo) * (ncols - 1) as f64)
                             .clamp(0.0, (ncols - 1) as f64);
                         let gy = ((data_y - y_lo) / (y_hi - y_lo) * (nrows - 1) as f64)
@@ -241,196 +229,133 @@ impl Widget for &ContourPlot {
                     let top = sample_color(cy as f64 * 2.0);
                     let bot = sample_color(cy as f64 * 2.0 + 1.0);
 
-                    let sx = px + cx;
-                    let sy = py + cy;
-                    if sx < area.x + area.width && sy < area.y + area.height {
+                    let sx = pa.x + cx;
+                    let sy = pa.y + cy;
+                    if pa.in_area(sx, sy) {
                         buf[(sx, sy)].set_char('▀').set_fg(top).set_bg(bot);
                     }
                 }
             }
         }
 
-        // Draw contour lines (skip when filled — bands already show levels)
+        // Draw contour lines (skip when filled -- bands already show levels)
         if !self.filled {
-        // Edge naming: top=v00-v10, right=v10-v11, bottom=v01-v11, left=v00-v01
-        // Corners: v00=top-left(j,i), v10=top-right(j,i+1), v01=bottom-left(j+1,i), v11=bottom-right(j+1,i+1)
-        for &level in &levels {
-            let t = self.norm.normalize(level);
-            let color = if self.filled {
-                // Use contrasting color for lines on filled contours
-                self.theme.foreground
-            } else {
-                self.colormap.color_at(t)
-            };
+            // Track first segment midpoint for each level (for label placement)
+            let mut level_label_positions: Vec<Option<(f64, f64)>> = vec![None; levels.len()];
 
-            for j in 0..nrows - 1 {
-                for i in 0..ncols - 1 {
-                    let v00 = self.data.values[j][i];
-                    let v10 = self.data.values[j][i + 1];
-                    let v01 = self.data.values[j + 1][i];
-                    let v11 = self.data.values[j + 1][i + 1];
+            // Edge naming: top=v00-v10, right=v10-v11, bottom=v01-v11, left=v00-v01
+            // Corners: v00=top-left(j,i), v10=top-right(j,i+1), v01=bottom-left(j+1,i), v11=bottom-right(j+1,i+1)
+            for (level_idx, &level) in levels.iter().enumerate() {
+                let t = self.norm.normalize(level);
+                let color = self.colormap.color_at(t);
 
-                    let case = ((v00 >= level) as u8)
-                        | (((v10 >= level) as u8) << 1)
-                        | (((v01 >= level) as u8) << 2)
-                        | (((v11 >= level) as u8) << 3);
+                for j in 0..nrows - 1 {
+                    for i in 0..ncols - 1 {
+                        let v00 = self.data.values[j][i];
+                        let v10 = self.data.values[j][i + 1];
+                        let v01 = self.data.values[j + 1][i];
+                        let v11 = self.data.values[j + 1][i + 1];
 
-                    if case == 0 || case == 15 {
-                        continue;
-                    }
+                        let case = ((v00 >= level) as u8)
+                            | (((v10 >= level) as u8) << 1)
+                            | (((v01 >= level) as u8) << 2)
+                            | (((v11 >= level) as u8) << 3);
 
-                    // Interpolation fraction along an edge
-                    let interp = |va: f64, vb: f64| -> f64 {
-                        if (vb - va).abs() < 1e-12 {
-                            0.5
-                        } else {
-                            (level - va) / (vb - va)
+                        if case == 0 || case == 15 {
+                            continue;
                         }
-                    };
 
-                    // Data coordinates of the four corners
-                    let x0 = self.data.x[i];
-                    let x1 = self.data.x[i + 1];
-                    let y0 = self.data.y[j];
-                    let y1 = self.data.y[j + 1];
+                        // Interpolation fraction along an edge
+                        let interp = |va: f64, vb: f64| -> f64 {
+                            if (vb - va).abs() < 1e-12 {
+                                0.5
+                            } else {
+                                (level - va) / (vb - va)
+                            }
+                        };
 
-                    // Edge crossing points in data coordinates
-                    let top = || {
-                        let f = interp(v00, v10);
-                        (x0 + f * (x1 - x0), y0)
-                    };
-                    let bottom = || {
-                        let f = interp(v01, v11);
-                        (x0 + f * (x1 - x0), y1)
-                    };
-                    let left = || {
-                        let f = interp(v00, v01);
-                        (x0, y0 + f * (y1 - y0))
-                    };
-                    let right = || {
-                        let f = interp(v10, v11);
-                        (x1, y0 + f * (y1 - y0))
-                    };
+                        // Data coordinates of the four corners
+                        let x0 = self.data.x[i];
+                        let x1 = self.data.x[i + 1];
+                        let y0 = self.data.y[j];
+                        let y1 = self.data.y[j + 1];
 
-                    // Collect line segments for this cell
-                    let segments: Vec<((f64, f64), (f64, f64))> = match case {
-                        1 | 14 => vec![(top(), left())],
-                        2 | 13 => vec![(top(), right())],
-                        3 | 12 => vec![(left(), right())],
-                        4 | 11 => vec![(bottom(), left())],
-                        5 => vec![(top(), left()), (bottom(), right())],
-                        6 | 9 => vec![(top(), bottom())],
-                        7 | 8 => vec![(bottom(), right())],
-                        10 => vec![(top(), right()), (bottom(), left())],
-                        _ => vec![],
-                    };
+                        // Edge crossing points in data coordinates
+                        let top_edge = || {
+                            let f = interp(v00, v10);
+                            (x0 + f * (x1 - x0), y0)
+                        };
+                        let bottom_edge = || {
+                            let f = interp(v01, v11);
+                            (x0 + f * (x1 - x0), y1)
+                        };
+                        let left_edge = || {
+                            let f = interp(v00, v01);
+                            (x0, y0 + f * (y1 - y0))
+                        };
+                        let right_edge = || {
+                            let f = interp(v10, v11);
+                            (x1, y0 + f * (y1 - y0))
+                        };
 
-                    // Draw each segment using Bresenham
-                    for ((dx0, dy0), (dx1, dy1)) in segments {
-                        let sx0 = data_to_screen(dx0, x_lo, x_hi, px as f64, (px + aw - 1) as f64);
-                        let sy0 = data_to_screen(dy0, y_lo, y_hi, (py + ah - 1) as f64, py as f64);
-                        let sx1 = data_to_screen(dx1, x_lo, x_hi, px as f64, (px + aw - 1) as f64);
-                        let sy1 = data_to_screen(dy1, y_lo, y_hi, (py + ah - 1) as f64, py as f64);
+                        // Collect line segments for this cell
+                        let segments: Vec<((f64, f64), (f64, f64))> = match case {
+                            1 | 14 => vec![(top_edge(), left_edge())],
+                            2 | 13 => vec![(top_edge(), right_edge())],
+                            3 | 12 => vec![(left_edge(), right_edge())],
+                            4 | 11 => vec![(bottom_edge(), left_edge())],
+                            5 => vec![(top_edge(), left_edge()), (bottom_edge(), right_edge())],
+                            6 | 9 => vec![(top_edge(), bottom_edge())],
+                            7 | 8 => vec![(bottom_edge(), right_edge())],
+                            10 => vec![(top_edge(), right_edge()), (bottom_edge(), left_edge())],
+                            _ => vec![],
+                        };
 
-                        draw_contour_line(buf, sx0, sy0, sx1, sy1, color, px, py, aw, ah);
+                        // Record the midpoint of the first segment for label placement
+                        if self.show_labels
+                            && level_label_positions[level_idx].is_none()
+                            && let Some(&((dx0, dy0), (dx1, dy1))) = segments.first()
+                        {
+                            level_label_positions[level_idx] =
+                                Some(((dx0 + dx1) / 2.0, (dy0 + dy1) / 2.0));
+                        }
+
+                        // Draw each segment using Braille sub-pixel rendering
+                        for ((dx0, dy0), (dx1, dy1)) in segments {
+                            let sx0 = pa.screen_x(dx0);
+                            let sy0 = pa.screen_y(dy0);
+                            let sx1 = pa.screen_x(dx1);
+                            let sy1 = pa.screen_y(dy1);
+
+                            draw_braille_line(buf, sx0, sy0, sx1, sy1, color, &pa);
+                        }
+                    }
+                }
+            }
+
+            // Draw contour level labels
+            if self.show_labels {
+                for (level_idx, &level) in levels.iter().enumerate() {
+                    if let Some((lx, ly)) = level_label_positions[level_idx] {
+                        let label = format!("{:.2}", level);
+                        let sx = pa.screen_x(lx).round() as u16;
+                        let sy = pa.screen_y(ly).round() as u16;
+                        let t = self.norm.normalize(level);
+                        let color = self.colormap.color_at(t);
+                        if pa.contains(sx, sy) {
+                            for (j, ch) in label.chars().enumerate() {
+                                let cx = sx + j as u16;
+                                if pa.contains(cx, sy) {
+                                    buf[(cx, sy)].set_char(ch).set_fg(color);
+                                }
+                            }
+                        }
                     }
                 }
             }
         }
-        }
 
-        // Draw axes
-        for x in px..px + aw {
-            if x < area.x + area.width {
-                buf[(x, py + ah)]
-                    .set_char('─')
-                    .set_fg(self.theme.axis_color);
-            }
-        }
-        for y in py..py + ah {
-            buf[(px.saturating_sub(1), y)]
-                .set_char('│')
-                .set_fg(self.theme.axis_color);
-        }
-
-        // Tick labels
-        let x_ticks = self.x_axis.tick_positions(x_lo, x_hi);
-        for &tv in &x_ticks {
-            let sx = data_to_screen(tv, x_lo, x_hi, px as f64, (px + aw - 1) as f64);
-            let label = self.x_axis.format_tick(tv);
-            let xi = sx.round() as u16;
-            let start = xi.saturating_sub(label.len() as u16 / 2);
-            let y = py + ah;
-            if y < area.y + area.height {
-                for (j, ch) in label.chars().enumerate() {
-                    let lx = start + j as u16;
-                    if lx >= area.x && lx < area.x + area.width {
-                        buf[(lx, y)].set_char(ch).set_fg(self.theme.axis_color);
-                    }
-                }
-            }
-        }
-
-        let y_ticks = self.y_axis.tick_positions(y_lo, y_hi);
-        for &tv in &y_ticks {
-            let sy = data_to_screen(tv, y_lo, y_hi, (py + ah - 1) as f64, py as f64);
-            let label = self.y_axis.format_tick(tv);
-            let yi = sy.round() as u16;
-            if yi >= py && yi < py + ah {
-                let start = px.saturating_sub(label.len() as u16 + 1);
-                for (j, ch) in label.chars().enumerate() {
-                    let lx = start + j as u16;
-                    if lx >= area.x && lx < px {
-                        buf[(lx, yi)].set_char(ch).set_fg(self.theme.axis_color);
-                    }
-                }
-            }
-        }
-    }
-}
-
-/// Draw a line between two screen-space points using Bresenham's algorithm.
-#[allow(clippy::too_many_arguments)]
-fn draw_contour_line(
-    buf: &mut Buffer,
-    x0: f64,
-    y0: f64,
-    x1: f64,
-    y1: f64,
-    color: Color,
-    clip_x: u16,
-    clip_y: u16,
-    clip_w: u16,
-    clip_h: u16,
-) {
-    let mut ix0 = x0.round() as i32;
-    let mut iy0 = y0.round() as i32;
-    let ix1 = x1.round() as i32;
-    let iy1 = y1.round() as i32;
-
-    let dx = (ix1 - ix0).abs();
-    let dy = -(iy1 - iy0).abs();
-    let sx = if ix0 < ix1 { 1 } else { -1 };
-    let sy = if iy0 < iy1 { 1 } else { -1 };
-    let mut err = dx + dy;
-
-    loop {
-        let px = ix0 as u16;
-        let py = iy0 as u16;
-        if px >= clip_x && px < clip_x + clip_w && py >= clip_y && py < clip_y + clip_h {
-            buf[(px, py)].set_char('·').set_fg(color);
-        }
-        if ix0 == ix1 && iy0 == iy1 {
-            break;
-        }
-        let e2 = 2 * err;
-        if e2 >= dy {
-            err += dy;
-            ix0 += sx;
-        }
-        if e2 <= dx {
-            err += dx;
-            iy0 += sy;
-        }
+        // Draw annotations
+        PlotFrame::draw_annotations(&pa, &self.annotations, buf);
     }
 }

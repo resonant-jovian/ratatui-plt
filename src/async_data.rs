@@ -45,6 +45,9 @@ pub struct AsyncSeries {
 #[derive(Clone)]
 pub struct AsyncSeriesSender {
     tx: watch::Sender<Vec<(f64, f64)>>,
+    /// Maximum number of points to retain. When set, older points are
+    /// dropped from the front of the buffer during `append`.
+    max_points: Option<usize>,
 }
 
 /// Create a linked `(AsyncSeriesSender, AsyncSeries)` pair.
@@ -53,7 +56,10 @@ pub struct AsyncSeriesSender {
 /// them into a [`Series`] on demand.
 pub fn async_series(name: &str) -> (AsyncSeriesSender, AsyncSeries) {
     let (tx, rx) = watch::channel(Vec::new());
-    let sender = AsyncSeriesSender { tx };
+    let sender = AsyncSeriesSender {
+        tx,
+        max_points: None,
+    };
     let receiver = AsyncSeries {
         name: name.to_string(),
         color: Color::White,
@@ -64,16 +70,33 @@ pub fn async_series(name: &str) -> (AsyncSeriesSender, AsyncSeries) {
 }
 
 impl AsyncSeriesSender {
+    /// Set the maximum number of points to retain during `append`.
+    ///
+    /// When set, older points are dropped from the front of the buffer.
+    /// This is useful for rolling/streaming plots.
+    pub fn max_points(mut self, n: usize) -> Self {
+        self.max_points = Some(n);
+        self
+    }
+
     /// Replace the current data with a new snapshot.
     pub fn send(&self, data: Vec<(f64, f64)>) {
         // Ignore the error — it just means the receiver was dropped.
         let _ = self.tx.send(data);
     }
 
-    /// Append points to the existing data.
+    /// Append points to the existing data. If `max_points` is set,
+    /// excess points are drained from the front.
     pub fn append(&self, points: &[(f64, f64)]) {
+        let max = self.max_points;
         self.tx.send_modify(|data| {
             data.extend_from_slice(points);
+            if let Some(max) = max {
+                if data.len() > max {
+                    let excess = data.len() - max;
+                    data.drain(..excess);
+                }
+            }
         });
     }
 

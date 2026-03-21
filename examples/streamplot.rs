@@ -31,11 +31,12 @@ fn main() -> color_eyre::Result<()> {
     enable_raw_mode()?;
     let mut terminal = Terminal::new(CrosstermBackend::new(io::stdout()))?;
 
-    // Saddle flow field: (x, -y)
-    let field = VectorFieldData::from_fn((-2.0, 2.0), (-2.0, 2.0), 20, 20, |x, y| (x, -y));
+    // Saddle flow field: (x, -y) with fewer grid points for clearer arrows
+    let field = VectorFieldData::from_fn((-2.0, 2.0), (-2.0, 2.0), 10, 10, |x, y| (x, -y));
 
     let plot = StreamPlot::new(field)
         .density(2)
+        .arrow_scale(2.5)
         .color_by_magnitude(true)
         .colormap(Coolwarm)
         .title("Saddle Flow Streamlines (q to quit)")

@@ -9,8 +9,12 @@ use ratatui::layout::Rect;
 use ratatui::style::{Color, Style};
 use ratatui::widgets::Widget;
 
+use crate::annotation::Annotation;
 use crate::axis::Axis;
+use crate::frame::{DataBounds, PlotFrame, ReferenceLine};
+use crate::legend::{Legend, LegendEntry, LegendPosition};
 use crate::series::Series;
+use crate::spines::Spines;
 use crate::theme::Theme;
 use crate::transform::data_to_screen;
 
@@ -51,6 +55,11 @@ pub struct StackedArea {
     y_axis: Axis,
     title: Option<String>,
     theme: Theme,
+    spines: Spines,
+    reference_lines: Vec<ReferenceLine>,
+    annotations: Vec<Annotation>,
+    show_legend: bool,
+    legend_position: LegendPosition,
 }
 
 impl Default for StackedArea {
@@ -61,6 +70,11 @@ impl Default for StackedArea {
             y_axis: Axis::new(),
             title: None,
             theme: Theme::get_default(),
+            spines: Spines::default(),
+            reference_lines: Vec::new(),
+            annotations: Vec::new(),
+            show_legend: true,
+            legend_position: LegendPosition::TopRight,
         }
     }
 }
@@ -94,36 +108,48 @@ impl StackedArea {
         self.theme = t;
         self
     }
+
+    /// Set spine visibility.
+    pub fn spines(mut self, spines: Spines) -> Self {
+        self.spines = spines;
+        self
+    }
+
+    /// Add a reference line.
+    pub fn reference_line(mut self, line: ReferenceLine) -> Self {
+        self.reference_lines.push(line);
+        self
+    }
+
+    /// Set all reference lines.
+    pub fn reference_lines(mut self, lines: Vec<ReferenceLine>) -> Self {
+        self.reference_lines = lines;
+        self
+    }
+
+    /// Add an annotation.
+    pub fn annotation(mut self, ann: Annotation) -> Self {
+        self.annotations.push(ann);
+        self
+    }
+
+    /// Show or hide the legend.
+    pub fn show_legend(mut self, show: bool) -> Self {
+        self.show_legend = show;
+        self
+    }
+
+    /// Set the legend position.
+    pub fn legend_position(mut self, pos: LegendPosition) -> Self {
+        self.legend_position = pos;
+        self
+    }
 }
 
 impl Widget for &StackedArea {
     fn render(self, area: Rect, buf: &mut Buffer) {
         if area.width < 4 || area.height < 4 || self.series.is_empty() {
             return;
-        }
-
-        let title_height: u16 = if self.title.is_some() { 1 } else { 0 };
-        let y_label_width: u16 = 8;
-        let tick_height: u16 = 1;
-
-        let px = area.x + y_label_width;
-        let py = area.y + title_height;
-        let pw = area.width.saturating_sub(y_label_width + 1);
-        let ph = area.height.saturating_sub(title_height + tick_height);
-
-        if pw < 2 || ph < 2 {
-            return;
-        }
-
-        // Draw title
-        if let Some(ref title) = self.title {
-            let start = area.x + (area.width.saturating_sub(title.len() as u16)) / 2;
-            for (i, ch) in title.chars().enumerate() {
-                let x = start + i as u16;
-                if x < area.x + area.width {
-                    buf[(x, area.y)].set_char(ch).set_fg(self.theme.foreground);
-                }
-            }
         }
 
         // Filter NaN from each series
@@ -166,7 +192,7 @@ impl Widget for &StackedArea {
 
         // Determine axis bounds
         let x_lo_data = all_x[0];
-        let x_hi_data = *all_x.last().unwrap();
+        let x_hi_data = *all_x.last().unwrap_or(&0.0);
         let (x_lo, x_hi) = self.x_axis.resolve_bounds(x_lo_data, x_hi_data);
 
         let y_max_data = cumulative
@@ -175,57 +201,34 @@ impl Widget for &StackedArea {
             .unwrap_or(1.0);
         let (y_lo, y_hi) = self.y_axis.resolve_bounds(0.0, y_max_data);
 
-        // Draw axes
-        for x in px..px + pw {
-            if x < area.x + area.width {
-                buf[(x, py + ph)]
-                    .set_char('─')
-                    .set_fg(self.theme.axis_color);
-            }
-        }
-        for y in py..py + ph {
-            buf[(px.saturating_sub(1), y)]
-                .set_char('│')
-                .set_fg(self.theme.axis_color);
-        }
+        // Create and render the plot frame
+        let frame = PlotFrame::new(&self.x_axis, &self.y_axis, &self.theme)
+            .title(self.title.as_deref())
+            .spines(self.spines.clone())
+            .reference_lines(&self.reference_lines);
 
-        // Draw grid
-        let x_grid = self.x_axis.grid || self.theme.grid_visible;
-        let y_grid = self.y_axis.grid || self.theme.grid_visible;
-        if x_grid {
-            let gx_ticks = self.x_axis.tick_positions(x_lo, x_hi);
-            for &tv in &gx_ticks {
-                let sx = data_to_screen(tv, x_lo, x_hi, px as f64, (px + pw - 1) as f64);
-                let xi = sx.round() as u16;
-                if xi >= px && xi < px + pw {
-                    for y in py..py + ph {
-                        buf[(xi, y)].set_char('·').set_fg(self.theme.grid_color);
-                    }
-                }
-            }
-        }
-        if y_grid {
-            let gy_ticks = self.y_axis.tick_positions(y_lo, y_hi);
-            for &tv in &gy_ticks {
-                let sy = data_to_screen(tv, y_lo, y_hi, (py + ph - 1) as f64, py as f64);
-                let yi = sy.round() as u16;
-                if yi >= py && yi < py + ph {
-                    for x in px..px + pw {
-                        buf[(x, yi)].set_char('·').set_fg(self.theme.grid_color);
-                    }
-                }
-            }
-        }
+        let Some(pa) = frame.render(
+            area,
+            buf,
+            DataBounds {
+                x_lo,
+                x_hi,
+                y_lo,
+                y_hi,
+            },
+        ) else {
+            return;
+        };
 
         // Render filled areas from top series to bottom (painter's algorithm)
-        for col_offset in 0..pw {
-            let screen_x = px + col_offset;
+        for col_offset in 0..pa.width {
+            let screen_x = pa.x + col_offset;
             if screen_x >= area.x + area.width {
                 break;
             }
 
             // Map screen column to data x
-            let data_x = x_lo + (col_offset as f64 / (pw - 1).max(1) as f64) * (x_hi - x_lo);
+            let data_x = x_lo + (col_offset as f64 / (pa.width - 1).max(1) as f64) * (x_hi - x_lo);
 
             // Interpolate cumulative values at this x for each series
             let mut cum_at_x: Vec<f64> = Vec::with_capacity(n_series);
@@ -239,10 +242,22 @@ impl Widget for &StackedArea {
                 let upper = cum_at_x[si];
                 let lower = if si > 0 { cum_at_x[si - 1] } else { 0.0 };
 
-                let sy_upper = data_to_screen(upper, y_lo, y_hi, (py + ph - 1) as f64, py as f64)
-                    .round() as u16;
-                let sy_lower = data_to_screen(lower, y_lo, y_hi, (py + ph - 1) as f64, py as f64)
-                    .round() as u16;
+                let sy_upper = data_to_screen(
+                    upper,
+                    y_lo,
+                    y_hi,
+                    (pa.y + pa.height - 1) as f64,
+                    pa.y as f64,
+                )
+                .round() as u16;
+                let sy_lower = data_to_screen(
+                    lower,
+                    y_lo,
+                    y_hi,
+                    (pa.y + pa.height - 1) as f64,
+                    pa.y as f64,
+                )
+                .round() as u16;
 
                 let color = if filtered[si].color != Color::White {
                     filtered[si].color
@@ -253,11 +268,11 @@ impl Widget for &StackedArea {
                 // Pick fill character based on series index for visual distinction
                 let fill_ch = FILL_CHARS[si % FILL_CHARS.len()];
 
-                let y_top = sy_upper.max(py);
-                let y_bot = sy_lower.min(py + ph - 1);
+                let y_top = sy_upper.max(pa.y);
+                let y_bot = sy_lower.min(pa.y + pa.height - 1);
 
                 for y in y_top..=y_bot {
-                    if y >= py && y < py + ph {
+                    if pa.contains(screen_x, y) {
                         buf[(screen_x, y)]
                             .set_char(fill_ch)
                             .set_style(Style::default().fg(color));
@@ -266,39 +281,33 @@ impl Widget for &StackedArea {
             }
         }
 
-        // Draw x-axis tick labels
-        let x_ticks = self.x_axis.tick_positions(x_lo, x_hi);
-        let tick_y = py + ph;
-        for &tv in &x_ticks {
-            let sx = data_to_screen(tv, x_lo, x_hi, px as f64, (px + pw - 1) as f64);
-            let label = self.x_axis.format_tick(tv);
-            let xi = sx.round() as u16;
-            let start = xi.saturating_sub(label.len() as u16 / 2);
-            if tick_y < area.y + area.height {
-                for (j, ch) in label.chars().enumerate() {
-                    let lx = start + j as u16;
-                    if lx >= area.x && lx < area.x + area.width {
-                        buf[(lx, tick_y)].set_char(ch).set_fg(self.theme.axis_color);
-                    }
-                }
-            }
-        }
+        // Draw annotations
+        PlotFrame::draw_annotations(&pa, &self.annotations, buf);
 
-        // Draw y-axis tick labels
-        let y_ticks = self.y_axis.tick_positions(y_lo, y_hi);
-        for &tv in &y_ticks {
-            let sy = data_to_screen(tv, y_lo, y_hi, (py + ph - 1) as f64, py as f64);
-            let label = self.y_axis.format_tick(tv);
-            let yi = sy.round() as u16;
-            if yi >= py && yi < py + ph {
-                let start = px.saturating_sub(label.len() as u16 + 1);
-                for (j, ch) in label.chars().enumerate() {
-                    let lx = start + j as u16;
-                    if lx >= area.x && lx < px {
-                        buf[(lx, yi)].set_char(ch).set_fg(self.theme.axis_color);
+        // Draw legend
+        if self.show_legend && !filtered.is_empty() {
+            let entries: Vec<LegendEntry> = filtered
+                .iter()
+                .enumerate()
+                .map(|(i, s)| {
+                    let color = if s.color != Color::White {
+                        s.color
+                    } else {
+                        COLOR_CYCLE[i % COLOR_CYCLE.len()]
+                    };
+                    let fill_ch = FILL_CHARS[i % FILL_CHARS.len()];
+                    LegendEntry {
+                        name: s.name.clone(),
+                        color,
+                        marker: Some(fill_ch),
                     }
-                }
-            }
+                })
+                .collect();
+            let legend = Legend::new(entries)
+                .position(self.legend_position.clone())
+                .theme(self.theme.clone());
+            let legend_area = Rect::new(pa.x, pa.y, pa.width, pa.height);
+            (&legend).render(legend_area, buf);
         }
     }
 }

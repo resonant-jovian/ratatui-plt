@@ -2,67 +2,83 @@
 
 **Scientific visualization widgets for [ratatui](https://ratatui.rs/) — matplotlib for the terminal.**
 
-`ratatui-plt` provides a comprehensive suite of configurable plot widgets, colormaps, axis systems, and layout tools designed for scientific computing and simulation monitoring. Built primarily for astrophysical applications (Vlasov-Poisson solvers, phase-space analysis), it works anywhere you need terminal-based scientific plots.
+[![Crates.io](https://img.shields.io/crates/v/ratatui-plt.svg)](https://crates.io/crates/ratatui-plt)
+[![docs.rs](https://docs.rs/ratatui-plt/badge.svg)](https://docs.rs/ratatui-plt)
+[![License: GPL-3.0](https://img.shields.io/badge/License-GPL--3.0-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)
+
+---
+
+`ratatui-plt` is a comprehensive plotting library for terminal UIs built on [ratatui](https://ratatui.rs/). It provides 30+ plot widgets, colormaps, axis systems, and layout tools for scientific computing, simulation monitoring, and data exploration — all rendered in the terminal using Unicode characters for sub-cell resolution.
+
+> **Status (0.0.1):** This is an early release. Most widgets work well, but the following have known rendering quality issues and are still being improved: **BandPlot** (fill gap artifacts), **BoxPlot / BoxenPlot** (outline alignment), **CandlestickPlot** (outline mismatches), **Contour3D** (surface artifacts), **VectorField 3D** (low contrast/density), **TernaryPlot** (staircase grid lines). Expect breaking API changes before 0.1.0.
 
 ## Features
 
-### 2D Plot Widgets
-- **LinePlot** — Multiple series, error bars, fill regions, step modes, dashed/dotted lines
-- **ScatterPlot** — Point clouds with color-mapped third values, configurable markers
-- **Heatmap** — Half-block rendering for 2x vertical resolution, colorbars, normalization
-- **Histogram** — Binning with count/density/probability modes, cumulative support
-- **BarChart** — Grouped and stacked modes, horizontal/vertical
-- **ContourPlot** — Marching squares iso-lines, filled contours (contourf-style)
-- **StemPlot** — Discrete event visualization with baseline
-- **ErrorBarPlot** — Standalone symmetric/asymmetric error bars
-- **BoxPlot** — Quartiles, whiskers (1.5xIQR), outlier detection
-- **VectorField** — 2D arrow fields with magnitude coloring (quiver plots)
-- **HexbinPlot** — Hexagonal binning for large datasets (10^4+ points)
-- **PieChart** — Pie/donut charts with explode, percentages, labels
-- **StackedArea** — Stacked filled areas with fill characters
-- **EventPlot** — Event timing / spike raster plots
+### 2D Plots
+- **LinePlot** — multiple series, fill regions, step modes, dash patterns, markers
+- **ScatterPlot** — color-mapped point clouds with configurable markers
+- **Heatmap** — half-block rendering for 2x vertical resolution, colorbars
+- **Histogram** — count/density/probability modes, stacked, cumulative
+- **BarChart** — grouped and stacked, horizontal/vertical
+- **ContourPlot** — filled contours and iso-lines via marching squares
+- **BoxPlot** — quartiles, whiskers, outliers, notched and bootstrap CI variants
+- **ViolinPlot** — KDE-based distribution shape with quartile markers
+- **StairsPlot** — step functions with fill-to-baseline
+- **StemPlot** — discrete event / impulse visualization
+- **ErrorBarPlot** — symmetric/asymmetric error bars
+- **StackedArea** — cumulative filled area charts
+- **EventPlot** — spike raster / event timing plots
 - **Hist2D** — 2D histogram rendered as heatmap
-- **ViolinPlot** — Violin plots with KDE and quartiles
+- **HexbinPlot** — hexagonal binning for large datasets
+- **PieChart** — pie/donut charts with explode and labels
+- **BandPlot** — uncertainty bands / confidence intervals
+- **SwarmPlot** — beeswarm plots with jitter
+- **StripPlot** — categorical strip/dot plots
+- **CandlestickPlot** — OHLC financial charts
+- **ECDF** — empirical cumulative distribution functions
+- **RugPlot** — marginal tick marks
 
-### 3D Plot Widgets
-- **Surface3D** — Colored surface with painter's algorithm, interactive camera
-- **Wireframe3D** — Depth-cued wireframe mesh
-- **Scatter3D** — 3D point cloud with depth cuing
+### 3D Plots
+- **Surface3D** — colored surface with half-block shading and wireframe
+- **Wireframe3D** — depth-cued wireframe mesh with Braille lines
+- **Scatter3D** — 3D point cloud with axis lines
+- **Bar3D** — 3D bar chart with depth sorting
+- **Contour3D** — filled contour surfaces in 3D
+- **Quiver3D** — 3D vector field arrows
 
-All 3D widgets support both static (`Widget`) and interactive (`StatefulWidget`) rendering with `Camera3DState` for keyboard-driven rotation and zoom.
+All 3D widgets support interactive camera control via `Camera3DState` (arrow keys to rotate, +/- to zoom).
 
-### Layout / Multi-Panel
-- **RadialPlot** — Polar coordinate rendering with circular grids and angular ticks
+### Specialized Plots
+- **RadialPlot** — polar coordinates: line, scatter, bar, fill-between
+- **TernaryPlot** — ternary/triangle diagrams with percentage labels
+- **NetworkGraph** — force-directed or manual-layout graph visualization
+- **ParallelCoords** — parallel coordinates for multivariate data
+- **SankeyDiagram** — flow diagrams with node-to-node bands
+- **SunburstChart** — hierarchical nested ring charts
+- **TreemapChart** — area-proportional hierarchical rectangles
+- **DendrogramPlot** — hierarchical clustering trees
+- **StreamPlot** — vector field streamlines via Runge-Kutta integration
+
+### Layout
 - **MultiPanel** — GridSpec-like subplot grid with `width_ratios` / `height_ratios`
-- **TwinAxes** — Dual y-axis overlay with independent scales
-- **StreamPlot** — Vector field streamlines via Runge-Kutta integration
+- **TwinAxes** — dual y-axis overlay with independent scales
+- **InsetPlot** — zoomed inset panels with highlighted source regions
 
-### Axis System (matplotlib-inspired)
+### Axis System
 - **Scales**: Linear, Log, SymLog (symmetric log), Power
-- **Aspect Ratio**: `Auto`, `Equal`, `Fixed(ratio)` — auto-compensates for terminal cell geometry
-- **Tick Locators**: `MaxNLocator` (nice round numbers), `LogLocator`, `MultipleLocator`, `FixedLocator`, `CategoricalLocator`
-- **Tick Formatters**: `ScalarFormatter`, `LogFormatter`, `SiFormatter` (engineering prefixes), `FuncFormatter`, `CategoricalFormatter`
+- **Aspect Ratio**: `Auto`, `Equal`, `Fixed(ratio)` with terminal cell geometry compensation
+- **Tick Locators**: `MaxNLocator`, `LogLocator`, `MultipleLocator`, `FixedLocator`, `CategoricalLocator`
+- **Tick Formatters**: `ScalarFormatter`, `LogFormatter`, `SiFormatter`, `FuncFormatter`, `CategoricalFormatter`
+- **Overlap detection**: x-axis labels are automatically skipped when they would collide
 
-### Normalization System
-- `LinearNorm`, `LogNorm`, `SymLogNorm`, `PowerNorm`, `BoundaryNorm`, `TwoSlopeNorm`
-- Essential for astrophysical data spanning many orders of magnitude
+### Rendering
+- **Braille sub-pixel lines** — 2x4 dots per cell for smooth curves and diagonals
+- **Half-block characters** — `▀`/`▄` for 2x vertical resolution in heatmaps and surfaces
+- **Unicode box-drawing** — clean axis borders and chart outlines
+- **Depth sorting** — painter's algorithm for correct 3D occlusion
 
-### Theme System
-- 5 presets: `dark`, `light`, `minimal`, `publication`, `solarized`
-- Global default via `Theme::set_default()`
-- All examples accept `--theme` CLI argument
-
-### Annotations & Legend
-- `Annotation` with optional arrow styles (`Arrow`, `FancyArrow`, `Bracket`)
-- `Legend` with position control (`TopLeft`, `TopRight`, `BottomLeft`, `BottomRight`, etc.)
-
-### Async Features (feature-gated: `async`)
-- `AnimationConfig` / `run_animation()` — animation loop framework
-- `AsyncSeries` / `AsyncGrid` — tokio-based streaming data
-- `compute_kde_async()` / `compute_histogram_async()` — background computation
-
-### Scientific Colormaps
-- **Sequential** (perceptually uniform): Viridis, Plasma, Inferno, Magma, Cividis
+### Colormaps
+- **Sequential**: Viridis, Plasma, Inferno, Magma, Cividis
 - **Diverging**: Coolwarm, RdBu, Seismic
 - **Cyclic**: Hsv, Twilight
 - **Seasonal**: Spring, Summer, Autumn, Winter
@@ -70,42 +86,42 @@ All 3D widgets support both static (`Widget`) and interactive (`StatefulWidget`)
 - **Custom**: `ListedColormap` from user-defined color stops
 - Colorbar widget for value-to-color mapping display
 
+### Normalization
+- `LinearNorm`, `LogNorm`, `SymLogNorm`, `PowerNorm`, `BoundaryNorm`, `TwoSlopeNorm`
+- Trait-based: implement `Normalize` for custom mappings
+
+### Themes
+- 5 presets: `dark`, `light`, `minimal`, `publication`, `solarized`
+- Global default via `Theme::set_default()`
+- All examples accept a theme CLI argument
+
+### Annotations & Legend
+- `Annotation` with optional arrow styles (`Arrow`, `FancyArrow`, `Bracket`)
+- `Legend` with configurable position
+- Reference lines and spans (`axhline`, `axvline`, `axhspan`, `axvspan`)
+- Spines control (show/hide individual axis borders)
+
 ### MathText
 - Greek letters: `\alpha` → α, `\beta` → β, `\Sigma` → Σ
 - Superscripts: `x^2` → x², `10^{-3}` → 10⁻³
 - Subscripts: `x_0` → x₀
 - Scientific notation formatting
 
-### Convenience Macros
-```rust
-// Quick series creation
-let s = series!("sin(x)", [(0.0, 0.0), (1.0, 0.84), (2.0, 0.91)]);
-let s = series!("cos(x)", data_vec, color = Color::Red);
-
-// Quick line plot
-let p = plot!(series1, series2);
-let p = plot!(title = "My Plot", series1, series2);
-
-// Quick heatmap
-let h = heatmap_widget!(grid_data, Plasma);
-
-// Quick subplot grid
-let panel = subplot!(2, 2, gap = 1);
-
-// Custom colormap
-let cmap = colormap_custom!("diverging", 0.0 => Color::Blue, 0.5 => Color::White, 1.0 => Color::Red);
-```
+### Optional Features
+- **`async`** — tokio-based animation loop, streaming data, background KDE/histogram
+- **`chrono`** — timestamp axis support
+- **`serde`** — serialization for data types
+- **`fft`** — power spectral density plots
+- **`triangulation`** — Delaunay triangulation for unstructured data
 
 ## Quick Start
 
-Add to your `Cargo.toml`:
 ```toml
 [dependencies]
 ratatui-plt = "0.0.1"
 ratatui = "0.30"
 ```
 
-Basic line plot:
 ```rust
 use ratatui_plt::prelude::*;
 
@@ -126,73 +142,76 @@ let plot = LinePlot::new()
 frame.render_widget(&plot, area);
 ```
 
-Heatmap with forced aspect ratio:
-```rust
-use ratatui_plt::prelude::*;
-
-let data = GridData::from_fn((-2.0, 2.0), (-2.0, 2.0), 50, 50, |x, y| {
-    (-(x * x + y * y)).exp()
-});
-
-let heatmap = Heatmap::new(data)
-    .colormap(Viridis)
-    .title("2D Gaussian")
-    .aspect_ratio(AspectRatio::Equal);
-
-frame.render_widget(&heatmap, area);
-```
-
-Interactive 3D surface:
-```rust
-use ratatui_plt::prelude::*;
-
-let data = GridData::from_fn((-3.0, 3.0), (-3.0, 3.0), 30, 30, |x, y| {
-    (x * x + y * y).sqrt().sin()
-});
-
-let surface = Surface3D::new(data).title("3D Surface");
-let mut camera = Camera3DState::default();
-
-// In event loop, handle arrow keys:
-camera.rotate(5.0, 0.0);  // Rotate azimuth
-camera.rotate(0.0, 5.0);  // Rotate elevation
-camera.zoom(0.9);          // Zoom in
-
-frame.render_stateful_widget(&surface, area, &mut camera);
-```
-
 ## Examples
 
-Run any example with:
+50 examples are included. Run any with:
 ```bash
 cargo run --example <name>
+# Pass a theme:
+cargo run --example line_plot -- light
 ```
 
 | Example | Description |
 |---------|-------------|
-| `line_plot` | Sine/cosine with error bands, legend, grid |
-| `scatter_plot` | Random point cloud with color-mapped values |
-| `heatmap` | 2D Gaussian with viridis colormap and colorbar |
-| `histogram` | Normal distribution with density normalization |
-| `contour` | 2D potential field with filled contours |
-| `surface3d` | Interactive 3D surface with keyboard rotation |
-| `stem_plot` | Discrete event sequence |
-| `box_plot` | Distribution comparison across groups |
-| `vector_field` | 2D velocity field arrows |
-| `multi_panel` | 4-panel dashboard layout |
-| `radial` | Polar coordinate radial profile |
-| `scientific_dashboard` | Full simulation monitoring dashboard |
+| `line_plot` | Sine/cosine with fill, legend, grid |
+| `scatter_plot` | Color-mapped point cloud |
+| `heatmap` | Correlation matrix with Viridis colorbar |
+| `histogram` | Stacked distributions |
+| `contour` | Filled 2D potential field |
+| `surface3d` | Interactive 3D surface with camera |
+| `wireframe3d` | Depth-cued 3D wireframe |
+| `scatter3d` | 3D point cloud |
+| `bar3d` | 3D bar chart with axis lines |
+| `box_plot` | Standard, notched, and bootstrap CI |
+| `violin_plot` | KDE distribution shapes |
+| `candlestick` | OHLC financial price action |
+| `ecdf` | Empirical CDFs for 3 distributions |
+| `stairs` | Step function plot |
+| `band` | Uncertainty bands (confidence intervals) |
+| `rug` | Histogram + KDE + rug marks |
+| `swarm` | Beeswarm by browser |
+| `strip` | Gene expression by cell type |
+| `stem_plot` | Discrete impulse events |
+| `error_bar` | Symmetric/asymmetric error bars |
+| `stacked_area` | Cumulative filled areas |
+| `bar_chart` | Grouped/stacked bars |
+| `pie_chart` | Pie/donut chart |
+| `hexbin` | Hexagonal binning |
+| `hist2d` | 2D histogram |
+| `event_plot` | Spike raster |
+| `radial` | Polar line, scatter, bar, fill |
+| `ternary` | Soil texture triangle |
+| `network` | Social network graph |
+| `parallel_coords` | Iris dataset parallel coordinates |
+| `sankey` | Energy flow Sankey diagram |
+| `sunburst` | World population sunburst |
+| `treemap` | Hierarchical treemap |
+| `dendrogram` | Clustering tree |
+| `streamplot` | Circular flow field |
+| `vector_field` | 3D vector field dipole |
+| `collections` | LineCollection / PathCollection |
+| `multi_panel` | 4-panel subplot grid |
+| `twin_axes` | Dual y-axis overlay |
+| `inset` | Damped sine with zoomed inset |
+| `crosshair` | Interactive crosshair |
+| `picking` | Nearest-point data picking |
+| `scientific_dashboard` | Full 4-panel simulation monitor |
+| `theme_config` | Built-in theme gallery |
+| `pcolormesh` | Pseudocolor mesh plot |
+| `triplot` | Triangulation mesh, faces, contours |
+| `contour3d` | 3D contour surface |
+| `quiver3d` | 3D vector arrows |
+| `boxen` | Letter-value (boxen) plot |
 
-## Design Principles
+## Convenience Macros
 
-- **Builder pattern** for all widgets: `LinePlot::new().series(s).title("Plot")`
-- **Reference rendering**: implements `Widget for &WidgetName` for zero-copy reuse
-- **Half-block characters** for heatmaps — doubles vertical resolution
-- **Braille-ready** marker support for sub-character resolution
-- **Terminal cell compensation**: aspect ratio system accounts for ~2:1 cell geometry
-- **Theming**: consistent styling via 5 built-in themes or custom `Theme` structs
-- **Annotations & legends**: first-class support for labeling and explaining plots
-- **Minimal dependencies**: only `ratatui`, `palette`, and `ordered-float`
+```rust
+let s = series!("sin(x)", [(0.0, 0.0), (1.0, 0.84), (2.0, 0.91)]);
+let p = plot!(title = "My Plot", series1, series2);
+let h = heatmap_widget!(grid_data, Plasma);
+let panel = subplot!(2, 2, gap = 1);
+let cmap = colormap_custom!("div", 0.0 => Color::Blue, 0.5 => Color::White, 1.0 => Color::Red);
+```
 
 ## License
 

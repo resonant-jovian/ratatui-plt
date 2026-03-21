@@ -333,6 +333,133 @@ impl TickFormatter for CategoricalFormatter {
     }
 }
 
+/// Locator that produces no ticks. Useful for clean minimal plots.
+#[derive(Clone, Debug)]
+pub struct NullLocator;
+
+impl TickLocator for NullLocator {
+    fn tick_values(&self, _vmin: f64, _vmax: f64) -> Vec<f64> {
+        vec![]
+    }
+
+    fn box_clone(&self) -> Box<dyn TickLocator> {
+        Box::new(self.clone())
+    }
+}
+
+/// Automatic minor tick locator. Places minor ticks between major ticks
+/// by subdividing the major tick intervals.
+#[derive(Clone)]
+pub struct AutoMinorLocator {
+    /// Number of minor intervals between major ticks.
+    pub n_intervals: usize,
+    /// Major tick locator to subdivide.
+    pub major: Box<dyn TickLocator>,
+}
+
+impl std::fmt::Debug for AutoMinorLocator {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("AutoMinorLocator")
+            .field("n_intervals", &self.n_intervals)
+            .finish()
+    }
+}
+
+impl AutoMinorLocator {
+    /// Create with the given number of subdivisions per major interval.
+    pub fn new(n_intervals: usize) -> Self {
+        Self {
+            n_intervals,
+            major: Box::new(MaxNLocator::new(8)),
+        }
+    }
+
+    /// Set a custom major locator to subdivide.
+    pub fn major(mut self, locator: impl TickLocator + 'static) -> Self {
+        self.major = Box::new(locator);
+        self
+    }
+}
+
+impl TickLocator for AutoMinorLocator {
+    fn tick_values(&self, vmin: f64, vmax: f64) -> Vec<f64> {
+        let major = self.major.tick_values(vmin, vmax);
+        if major.len() < 2 || self.n_intervals == 0 {
+            return Vec::new();
+        }
+        let mut minor = Vec::new();
+        for i in 0..major.len() - 1 {
+            let step = (major[i + 1] - major[i]) / self.n_intervals as f64;
+            for j in 1..self.n_intervals {
+                let v = major[i] + step * j as f64;
+                if v > vmin && v < vmax {
+                    minor.push(v);
+                }
+            }
+        }
+        minor
+    }
+
+    fn box_clone(&self) -> Box<dyn TickLocator> {
+        Box::new(Self {
+            n_intervals: self.n_intervals,
+            major: self.major.box_clone(),
+        })
+    }
+}
+
+/// Formatter that suppresses tick labels (renders empty strings).
+#[derive(Clone, Debug)]
+pub struct NullFormatter;
+
+impl TickFormatter for NullFormatter {
+    fn format(&self, _value: f64) -> String {
+        String::new()
+    }
+
+    fn box_clone(&self) -> Box<dyn TickFormatter> {
+        Box::new(self.clone())
+    }
+}
+
+/// Formatter that displays values as percentages.
+#[derive(Clone, Debug)]
+pub struct PercentFormatter {
+    /// Multiplier applied before formatting (e.g., 100.0 for [0,1] data).
+    pub scale: f64,
+    /// Number of decimal places.
+    pub decimals: usize,
+}
+
+impl PercentFormatter {
+    /// Create a percent formatter. `scale` is multiplied by the value
+    /// before appending '%'. Use `scale=100.0` for data already in [0,1].
+    pub fn new(scale: f64) -> Self {
+        Self { scale, decimals: 0 }
+    }
+
+    /// Set the number of decimal places.
+    pub fn decimals(mut self, n: usize) -> Self {
+        self.decimals = n;
+        self
+    }
+}
+
+impl TickFormatter for PercentFormatter {
+    fn format(&self, value: f64) -> String {
+        let scaled = value * self.scale;
+        if self.decimals == 0 {
+            format!("{:.0}%", scaled)
+        } else {
+            format!("{:.prec$}%", scaled, prec = self.decimals)
+        }
+    }
+
+    fn box_clone(&self) -> Box<dyn TickFormatter> {
+        Box::new(self.clone())
+    }
+}
+
 /// SI prefix formatter: k, M, G, T, m, µ, n, etc.
 #[derive(Clone, Debug)]
 pub struct SiFormatter;

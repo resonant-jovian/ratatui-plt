@@ -221,7 +221,12 @@ impl Scatter3D {
         }
 
         // Draw 3D axis lines and labels
-        let clip = ClipRect { x_min: px, y_min: py, x_max: px + pw, y_max: py + ph };
+        let clip = ClipRect {
+            x_min: px,
+            y_min: py,
+            x_max: px + pw,
+            y_max: py + ph,
+        };
         let origin = camera.project(0.0, 0.0, 0.0);
         let x_tip = camera.project(0.5, 0.0, 0.0);
         let y_tip = camera.project(0.0, 0.5, 0.0);
@@ -280,10 +285,7 @@ struct ClipRect {
     y_max: u16,
 }
 
-const BRAILLE_BITS: [[u8; 4]; 2] = [
-    [0x01, 0x02, 0x04, 0x40],
-    [0x08, 0x10, 0x20, 0x80],
-];
+const BRAILLE_BITS: [[u8; 4]; 2] = [[0x01, 0x02, 0x04, 0x40], [0x08, 0x10, 0x20, 0x80]];
 const BRAILLE_BASE: u32 = 0x2800;
 
 fn write_braille(buf: &mut Buffer, x: u16, y: u16, bits: u8, color: Color) {

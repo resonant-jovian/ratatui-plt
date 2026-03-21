@@ -5,9 +5,12 @@ use ratatui::layout::Rect;
 use ratatui::style::Color;
 use ratatui::widgets::Widget;
 
+use crate::annotation::Annotation;
 use crate::axis::Axis;
+use crate::frame::{DataBounds, PlotFrame, ReferenceLine};
+use crate::legend::{Legend, LegendEntry, LegendPosition};
+use crate::spines::Spines;
 use crate::theme::Theme;
-use crate::transform::data_to_screen;
 
 /// Histogram normalization mode.
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -18,6 +21,69 @@ pub enum HistNorm {
     Density,
     /// Probability (bar heights sum to 1).
     Probability,
+}
+
+/// Multi-histogram display mode.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum HistMode {
+    /// Single dataset (default, legacy behavior).
+    Single,
+    /// Stacked bars (datasets stacked on top of each other).
+    Stacked,
+    /// Layered/overlaid bars (drawn with transparency/overlap).
+    Layered,
+    /// Side-by-side bars within each bin.
+    SideBySide,
+}
+
+/// Histogram type (bar shape).
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum HistType {
+    /// Filled rectangular bars (default).
+    Bar,
+    /// Unfilled step outline.
+    Step,
+    /// Filled step outline.
+    StepFilled,
+}
+
+/// Binning algorithm selection.
+#[derive(Clone, Debug, PartialEq)]
+pub enum BinMethod {
+    /// Fixed number of bins.
+    Fixed(usize),
+    /// Freedman-Diaconis rule: bin_width = 2 * IQR * n^(-1/3).
+    Fd,
+    /// Scott's rule: bin_width = 3.5 * std * n^(-1/3).
+    Scott,
+    /// Sturges' rule: bins = ceil(log2(n)) + 1.
+    Sturges,
+    /// Square root rule: bins = ceil(sqrt(n)).
+    Sqrt,
+    /// Auto: pick the method that gives the most bins (between FD and Sturges).
+    Auto,
+}
+
+/// A single histogram dataset for multi-histogram support.
+#[derive(Clone, Debug)]
+pub struct HistDataset {
+    /// Raw data values.
+    pub data: Vec<f64>,
+    /// Bar color.
+    pub color: Color,
+    /// Dataset name (for legend).
+    pub name: String,
+}
+
+impl HistDataset {
+    /// Create a new histogram dataset.
+    pub fn new(name: impl Into<String>, data: Vec<f64>, color: Color) -> Self {
+        Self {
+            data,
+            color,
+            name: name.into(),
+        }
+    }
 }
 
 /// A histogram widget.
@@ -43,6 +109,17 @@ pub struct Histogram {
     y_axis: Axis,
     cumulative: bool,
     theme: Theme,
+    spines: Spines,
+    reference_lines: Vec<ReferenceLine>,
+    annotations: Vec<Annotation>,
+    // Multi-dataset support
+    datasets: Vec<HistDataset>,
+    hist_mode: HistMode,
+    histtype: HistType,
+    bin_method: Option<BinMethod>,
+    rwidth: f64,
+    show_legend: bool,
+    legend_position: LegendPosition,
 }
 
 impl Histogram {
@@ -59,6 +136,16 @@ impl Histogram {
             y_axis: Axis::new(),
             cumulative: false,
             theme: Theme::get_default(),
+            spines: Spines::default(),
+            reference_lines: Vec::new(),
+            annotations: Vec::new(),
+            datasets: Vec::new(),
+            hist_mode: HistMode::Single,
+            histtype: HistType::Bar,
+            bin_method: None,
+            rwidth: 1.0,
+            show_legend: true,
+            legend_position: LegendPosition::TopRight,
         }
     }
 
@@ -114,39 +201,100 @@ impl Histogram {
         self
     }
 
-    /// Compute bin edges and heights. NaN values are filtered out.
-    fn compute_bins(&self) -> (Vec<f64>, Vec<f64>) {
-        let (lo, hi) = self.range.unwrap_or_else(|| {
-            let min = self
-                .data
-                .iter()
-                .filter(|v| v.is_finite())
-                .cloned()
-                .fold(f64::INFINITY, f64::min);
-            let max = self
-                .data
-                .iter()
-                .filter(|v| v.is_finite())
-                .cloned()
-                .fold(f64::NEG_INFINITY, f64::max);
-            if min == max {
-                (min - 1.0, max + 1.0)
-            } else {
-                (min, max)
-            }
-        });
+    /// Set spine visibility.
+    pub fn spines(mut self, spines: Spines) -> Self {
+        self.spines = spines;
+        self
+    }
 
-        let bin_width = (hi - lo) / self.bins as f64;
-        let edges: Vec<f64> = (0..=self.bins).map(|i| lo + i as f64 * bin_width).collect();
-        let mut counts = vec![0.0f64; self.bins];
+    /// Add a reference line.
+    pub fn reference_line(mut self, line: ReferenceLine) -> Self {
+        self.reference_lines.push(line);
+        self
+    }
 
-        for &v in &self.data {
+    /// Set all reference lines.
+    pub fn reference_lines(mut self, lines: Vec<ReferenceLine>) -> Self {
+        self.reference_lines = lines;
+        self
+    }
+
+    /// Add an annotation.
+    pub fn annotation(mut self, ann: Annotation) -> Self {
+        self.annotations.push(ann);
+        self
+    }
+
+    /// Add a dataset for multi-histogram display.
+    pub fn dataset(mut self, ds: HistDataset) -> Self {
+        self.datasets.push(ds);
+        self
+    }
+
+    /// Set the multi-histogram display mode.
+    pub fn hist_mode(mut self, mode: HistMode) -> Self {
+        self.hist_mode = mode;
+        self
+    }
+
+    /// Set the histogram type (bar shape).
+    pub fn histtype(mut self, ht: HistType) -> Self {
+        self.histtype = ht;
+        self
+    }
+
+    /// Set the binning algorithm.
+    pub fn bin_method(mut self, method: BinMethod) -> Self {
+        self.bin_method = Some(method);
+        self
+    }
+
+    /// Set the relative bar width (0.0 to 1.0, default 0.9).
+    pub fn rwidth(mut self, rw: f64) -> Self {
+        self.rwidth = rw.clamp(0.01, 1.0);
+        self
+    }
+
+    /// Show or hide the legend.
+    pub fn show_legend(mut self, show: bool) -> Self {
+        self.show_legend = show;
+        self
+    }
+
+    /// Set the legend position.
+    pub fn legend_position(mut self, pos: LegendPosition) -> Self {
+        self.legend_position = pos;
+        self
+    }
+
+    /// Resolve the number of bins from data, considering bin_method and explicit bins setting.
+    fn resolve_bin_count(&self, data: &[f64]) -> usize {
+        if let Some(ref method) = self.bin_method {
+            compute_bin_count(method, data)
+        } else {
+            self.bins
+        }
+    }
+
+    /// Compute bin edges and heights for a single dataset. NaN values are filtered out.
+    fn compute_bins_for_data(
+        &self,
+        data: &[f64],
+        n_bins: usize,
+        lo: f64,
+        hi: f64,
+    ) -> (Vec<f64>, Vec<f64>) {
+        let bin_width = (hi - lo) / n_bins as f64;
+        let edges: Vec<f64> = (0..=n_bins).map(|i| lo + i as f64 * bin_width).collect();
+        let mut counts = vec![0.0f64; n_bins];
+
+        for &v in data {
             if !v.is_finite() {
                 continue;
             }
             if v >= lo && v <= hi {
                 let idx = ((v - lo) / bin_width).floor() as usize;
-                let idx = idx.min(self.bins - 1);
+                let idx = idx.min(n_bins - 1);
                 counts[idx] += 1.0;
             }
         }
@@ -157,157 +305,530 @@ impl Histogram {
             }
         }
 
+        let n_total = data.iter().filter(|v| v.is_finite()).count() as f64;
         let heights = match self.norm_mode {
             HistNorm::Count => counts,
-            HistNorm::Density => {
-                let total = self.data.len() as f64;
-                counts.iter().map(|&c| c / (total * bin_width)).collect()
-            }
-            HistNorm::Probability => {
-                let total = self.data.len() as f64;
-                counts.iter().map(|&c| c / total).collect()
-            }
+            HistNorm::Density => counts.iter().map(|&c| c / (n_total * bin_width)).collect(),
+            HistNorm::Probability => counts.iter().map(|&c| c / n_total).collect(),
         };
 
         (edges, heights)
+    }
+
+    /// Compute bin edges and heights (legacy single-dataset API). NaN values are filtered out.
+    fn compute_bins(&self) -> (Vec<f64>, Vec<f64>) {
+        let n_bins = self.resolve_bin_count(&self.data);
+        let (lo, hi) = self.compute_range_for_data(&self.data);
+        self.compute_bins_for_data(&self.data, n_bins, lo, hi)
+    }
+
+    /// Compute the data range for a single dataset, respecting the explicit range if set.
+    fn compute_range_for_data(&self, data: &[f64]) -> (f64, f64) {
+        self.range.unwrap_or_else(|| {
+            let min = data
+                .iter()
+                .filter(|v| v.is_finite())
+                .cloned()
+                .fold(f64::INFINITY, f64::min);
+            let max = data
+                .iter()
+                .filter(|v| v.is_finite())
+                .cloned()
+                .fold(f64::NEG_INFINITY, f64::max);
+            if min == max {
+                (min - 1.0, max + 1.0)
+            } else {
+                (min, max)
+            }
+        })
+    }
+
+    /// Compute the global data range across all datasets.
+    fn compute_global_range(&self) -> (f64, f64) {
+        if let Some(r) = self.range {
+            return r;
+        }
+
+        let mut min = f64::INFINITY;
+        let mut max = f64::NEG_INFINITY;
+
+        // Include primary data
+        if !self.data.is_empty() {
+            for &v in &self.data {
+                if v.is_finite() {
+                    min = min.min(v);
+                    max = max.max(v);
+                }
+            }
+        }
+
+        // Include datasets
+        for ds in &self.datasets {
+            for &v in &ds.data {
+                if v.is_finite() {
+                    min = min.min(v);
+                    max = max.max(v);
+                }
+            }
+        }
+
+        if min == max {
+            (min - 1.0, max + 1.0)
+        } else {
+            (min, max)
+        }
+    }
+}
+
+/// Compute the number of bins using the specified binning method.
+fn compute_bin_count(method: &BinMethod, data: &[f64]) -> usize {
+    let clean: Vec<f64> = data.iter().copied().filter(|v| v.is_finite()).collect();
+    let n = clean.len();
+    if n < 2 {
+        return 1;
+    }
+
+    match method {
+        BinMethod::Fixed(count) => (*count).max(1),
+        BinMethod::Fd => fd_bins(&clean),
+        BinMethod::Scott => scott_bins(&clean),
+        BinMethod::Sturges => sturges_bins(n),
+        BinMethod::Sqrt => sqrt_bins(n),
+        BinMethod::Auto => {
+            // Pick the method giving the most bins between FD and Sturges
+            let fd = fd_bins(&clean);
+            let sturges = sturges_bins(n);
+            fd.max(sturges)
+        }
+    }
+}
+
+/// Freedman-Diaconis rule: bin_width = 2 * IQR * n^(-1/3), bins = ceil(range / bin_width).
+fn fd_bins(data: &[f64]) -> usize {
+    let n = data.len();
+    if n < 2 {
+        return 1;
+    }
+    let mut sorted = data.to_vec();
+    sorted.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
+
+    let q1 = percentile_sorted(&sorted, 25.0);
+    let q3 = percentile_sorted(&sorted, 75.0);
+    let iqr = q3 - q1;
+
+    if iqr <= 0.0 {
+        return sturges_bins(n); // fallback
+    }
+
+    let bin_width = 2.0 * iqr * (n as f64).powf(-1.0 / 3.0);
+    let range = sorted[n - 1] - sorted[0];
+    ((range / bin_width).ceil() as usize).max(1)
+}
+
+/// Scott's rule: bin_width = 3.5 * std * n^(-1/3).
+fn scott_bins(data: &[f64]) -> usize {
+    let n = data.len();
+    if n < 2 {
+        return 1;
+    }
+    let mean = data.iter().sum::<f64>() / n as f64;
+    let variance = data.iter().map(|&v| (v - mean).powi(2)).sum::<f64>() / n as f64;
+    let std_dev = variance.sqrt();
+
+    if std_dev <= 0.0 {
+        return 1;
+    }
+
+    let bin_width = 3.5 * std_dev * (n as f64).powf(-1.0 / 3.0);
+    let mut sorted = data.to_vec();
+    sorted.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
+    let range = sorted[n - 1] - sorted[0];
+    ((range / bin_width).ceil() as usize).max(1)
+}
+
+/// Sturges' rule: bins = ceil(log2(n)) + 1.
+fn sturges_bins(n: usize) -> usize {
+    ((n as f64).log2().ceil() as usize + 1).max(1)
+}
+
+/// Square root rule: bins = ceil(sqrt(n)).
+fn sqrt_bins(n: usize) -> usize {
+    ((n as f64).sqrt().ceil() as usize).max(1)
+}
+
+/// Compute a percentile from pre-sorted data.
+fn percentile_sorted(sorted: &[f64], p: f64) -> f64 {
+    if sorted.is_empty() {
+        return 0.0;
+    }
+    let k = (p / 100.0) * (sorted.len() - 1) as f64;
+    let f = k.floor() as usize;
+    let c = f.min(sorted.len() - 1);
+    let d = k - f as f64;
+    if c + 1 < sorted.len() {
+        sorted[c] + d * (sorted[c + 1] - sorted[c])
+    } else {
+        sorted[c]
     }
 }
 
 impl Widget for &Histogram {
     fn render(self, area: Rect, buf: &mut Buffer) {
-        if area.width < 4 || area.height < 4 {
-            return;
+        // Determine if we're in multi-dataset mode
+        let has_datasets = !self.datasets.is_empty();
+
+        if has_datasets {
+            self.render_multi(area, buf);
+        } else {
+            self.render_single(area, buf);
         }
+    }
+}
 
-        let title_height: u16 = if self.title.is_some() { 1 } else { 0 };
-        let y_label_width: u16 = 8;
-        let tick_height: u16 = 1;
-
-        let px = area.x + y_label_width;
-        let py = area.y + title_height;
-        let pw = area.width.saturating_sub(y_label_width + 1);
-        let ph = area.height.saturating_sub(title_height + tick_height);
-
-        if pw < 2 || ph < 2 {
-            return;
-        }
-
-        // Draw title
-        if let Some(ref title) = self.title {
-            let start = area.x + (area.width.saturating_sub(title.len() as u16)) / 2;
-            for (i, ch) in title.chars().enumerate() {
-                let x = start + i as u16;
-                if x < area.x + area.width {
-                    buf[(x, area.y)].set_char(ch).set_fg(self.theme.foreground);
-                }
-            }
-        }
-
+impl Histogram {
+    /// Render the single-dataset histogram (legacy path).
+    fn render_single(&self, area: Rect, buf: &mut Buffer) {
         let (edges, heights) = self.compute_bins();
         if edges.len() < 2 || heights.is_empty() {
             return;
         }
 
         let x_lo = edges[0];
-        let x_hi = *edges.last().unwrap();
+        let x_hi = *edges.last().unwrap_or(&x_lo);
         let y_max = heights.iter().cloned().fold(0.0f64, f64::max);
+        let y_lo = 0.0;
         let y_hi = if y_max == 0.0 { 1.0 } else { y_max * 1.1 };
 
-        // Draw axes
-        for x in px..px + pw {
-            buf[(x, py + ph)]
-                .set_char('─')
-                .set_fg(self.theme.axis_color);
-        }
-        for y in py..py + ph {
-            buf[(px.saturating_sub(1), y)]
-                .set_char('│')
-                .set_fg(self.theme.axis_color);
-        }
+        // Create and render the plot frame (title, axes, grid, ticks, labels, spines, ref lines)
+        let frame = PlotFrame::new(&self.x_axis, &self.y_axis, &self.theme)
+            .title(self.title.as_deref())
+            .spines(self.spines.clone())
+            .reference_lines(&self.reference_lines);
 
-        // Draw grid
-        let x_grid = self.x_axis.grid || self.theme.grid_visible;
-        let y_grid = self.y_axis.grid || self.theme.grid_visible;
-        if x_grid {
-            let gx_ticks = self.x_axis.tick_positions(x_lo, x_hi);
-            for &tv in &gx_ticks {
-                let sx = data_to_screen(tv, x_lo, x_hi, px as f64, (px + pw - 1) as f64);
-                let xi = sx.round() as u16;
-                if xi >= px && xi < px + pw {
-                    for y in py..py + ph {
-                        buf[(xi, y)].set_char('·').set_fg(self.theme.grid_color);
-                    }
-                }
-            }
-        }
-        if y_grid {
-            let gy_ticks = self.y_axis.tick_positions(0.0, y_hi);
-            for &tv in &gy_ticks {
-                let sy = data_to_screen(tv, 0.0, y_hi, (py + ph - 1) as f64, py as f64);
-                let yi = sy.round() as u16;
-                if yi >= py && yi < py + ph {
-                    for x in px..px + pw {
-                        buf[(x, yi)].set_char('·').set_fg(self.theme.grid_color);
-                    }
-                }
-            }
-        }
+        let Some(pa) = frame.render(
+            area,
+            buf,
+            DataBounds {
+                x_lo,
+                x_hi,
+                y_lo,
+                y_hi,
+            },
+        ) else {
+            return;
+        };
 
         // Draw bars
+        self.draw_bars(
+            &pa,
+            &edges,
+            &heights,
+            self.color,
+            buf,
+            BarSlotLayout {
+                ds_index: 0,
+                n_datasets: 1,
+            },
+        );
+
+        // Draw annotations
+        PlotFrame::draw_annotations(&pa, &self.annotations, buf);
+    }
+
+    /// Render multiple datasets according to hist_mode.
+    fn render_multi(&self, area: Rect, buf: &mut Buffer) {
+        let (global_lo, global_hi) = self.compute_global_range();
+
+        // Resolve bin count from all data combined
+        let all_data: Vec<f64> = self
+            .datasets
+            .iter()
+            .flat_map(|ds| ds.data.iter().copied())
+            .collect();
+        let n_bins = self.resolve_bin_count(&all_data);
+
+        // Compute bin heights for each dataset
+        let mut all_edges = Vec::new();
+        let mut all_heights = Vec::new();
+        for ds in &self.datasets {
+            let (edges, heights) =
+                self.compute_bins_for_data(&ds.data, n_bins, global_lo, global_hi);
+            all_edges.push(edges);
+            all_heights.push(heights);
+        }
+
+        if all_edges.is_empty() || all_edges[0].len() < 2 {
+            return;
+        }
+
+        let edges = &all_edges[0]; // All share same edges
+
+        // Compute y_max depending on mode
+        let y_max = match self.hist_mode {
+            HistMode::Single | HistMode::Layered | HistMode::SideBySide => all_heights
+                .iter()
+                .flat_map(|h| h.iter())
+                .cloned()
+                .fold(0.0f64, f64::max),
+            HistMode::Stacked => {
+                // Sum per bin
+                let n = all_heights.first().map_or(0, |h| h.len());
+                (0..n)
+                    .map(|i| {
+                        all_heights
+                            .iter()
+                            .map(|h| h.get(i).copied().unwrap_or(0.0))
+                            .sum::<f64>()
+                    })
+                    .fold(0.0f64, f64::max)
+            }
+        };
+
+        let x_lo = edges[0];
+        let x_hi = *edges.last().unwrap_or(&x_lo);
+        let y_lo = 0.0;
+        let y_hi = if y_max == 0.0 { 1.0 } else { y_max * 1.1 };
+
+        let frame = PlotFrame::new(&self.x_axis, &self.y_axis, &self.theme)
+            .title(self.title.as_deref())
+            .spines(self.spines.clone())
+            .reference_lines(&self.reference_lines);
+
+        let Some(pa) = frame.render(
+            area,
+            buf,
+            DataBounds {
+                x_lo,
+                x_hi,
+                y_lo,
+                y_hi,
+            },
+        ) else {
+            return;
+        };
+
+        let n_ds = self.datasets.len();
+
+        match self.hist_mode {
+            HistMode::Single => {
+                // Just render the first dataset
+                if !all_heights.is_empty() {
+                    self.draw_bars(
+                        &pa,
+                        edges,
+                        &all_heights[0],
+                        self.datasets[0].color,
+                        buf,
+                        BarSlotLayout {
+                            ds_index: 0,
+                            n_datasets: 1,
+                        },
+                    );
+                }
+            }
+            HistMode::Stacked => {
+                // Draw stacked bars (bottom to top)
+                let n = all_heights.first().map_or(0, |h| h.len());
+                let mut bottoms = vec![0.0f64; n];
+
+                for (ds_i, ds) in self.datasets.iter().enumerate() {
+                    let heights = &all_heights[ds_i];
+                    for i in 0..n {
+                        let h = heights.get(i).copied().unwrap_or(0.0);
+                        let bottom = bottoms[i];
+                        let top = bottom + h;
+
+                        let bar_left = pa.screen_x(edges[i]);
+                        let bar_right = pa.screen_x(edges[i + 1]);
+                        let bin_width_px = bar_right - bar_left;
+                        let offset = bin_width_px * (1.0 - self.rwidth) / 2.0;
+
+                        let bar_top_y = pa.screen_y(top);
+                        let bar_bottom_y = pa.screen_y(bottom);
+
+                        // Use floor/ceil to match draw_bars and avoid inter-bin gaps
+                        let x_start = (bar_left + offset).floor() as u16;
+                        let x_end = (bar_right - offset).ceil() as u16;
+                        let y_top = bar_top_y.round() as u16;
+                        let y_bot = bar_bottom_y.round() as u16;
+
+                        self.draw_bar_region(
+                            &pa,
+                            &BarRect {
+                                x_start,
+                                x_end,
+                                y_top,
+                                y_bot,
+                            },
+                            ds.color,
+                            buf,
+                        );
+                        bottoms[i] = top;
+                    }
+                }
+            }
+            HistMode::Layered => {
+                // Draw overlaid bars (back to front)
+                for (ds_i, ds) in self.datasets.iter().enumerate().rev() {
+                    self.draw_bars(
+                        &pa,
+                        edges,
+                        &all_heights[ds_i],
+                        ds.color,
+                        buf,
+                        BarSlotLayout {
+                            ds_index: 0,
+                            n_datasets: 1,
+                        },
+                    );
+                }
+            }
+            HistMode::SideBySide => {
+                // Draw side-by-side bars
+                for (ds_i, ds) in self.datasets.iter().enumerate() {
+                    self.draw_bars(
+                        &pa,
+                        edges,
+                        &all_heights[ds_i],
+                        ds.color,
+                        buf,
+                        BarSlotLayout {
+                            ds_index: ds_i,
+                            n_datasets: n_ds,
+                        },
+                    );
+                }
+            }
+        }
+
+        // Draw annotations
+        PlotFrame::draw_annotations(&pa, &self.annotations, buf);
+
+        // Draw legend
+        if self.show_legend && !self.datasets.is_empty() {
+            let entries: Vec<LegendEntry> = self
+                .datasets
+                .iter()
+                .map(|ds| LegendEntry {
+                    name: ds.name.clone(),
+                    color: ds.color,
+                    marker: Some('█'),
+                })
+                .collect();
+            let legend = Legend::new(entries)
+                .position(self.legend_position.clone())
+                .theme(self.theme.clone());
+            let legend_area = Rect::new(pa.x, pa.y, pa.width, pa.height);
+            (&legend).render(legend_area, buf);
+        }
+    }
+
+    /// Draw bars for one dataset within a bin set, supporting side-by-side offset.
+    fn draw_bars(
+        &self,
+        pa: &crate::frame::PlotArea,
+        edges: &[f64],
+        heights: &[f64],
+        color: Color,
+        buf: &mut Buffer,
+        slot: BarSlotLayout,
+    ) {
         for i in 0..heights.len() {
-            let bar_left = data_to_screen(edges[i], x_lo, x_hi, px as f64, (px + pw - 1) as f64);
-            let bar_right =
-                data_to_screen(edges[i + 1], x_lo, x_hi, px as f64, (px + pw - 1) as f64);
-            let bar_top = data_to_screen(heights[i], 0.0, y_hi, (py + ph - 1) as f64, py as f64);
+            let bar_left = pa.screen_x(edges[i]);
+            let bar_right = pa.screen_x(edges[i + 1]);
+            let bin_width_px = bar_right - bar_left;
 
-            let x_start = bar_left.round() as u16;
-            let x_end = bar_right.round() as u16;
-            let y_top = bar_top.round() as u16;
+            // Apply rwidth
+            let effective_width = bin_width_px * self.rwidth;
+            let rwidth_offset = (bin_width_px - effective_width) / 2.0;
 
-            for x in x_start..x_end {
-                if x >= px && x < px + pw {
-                    for y in y_top..py + ph {
-                        if y >= py && y < py + ph {
-                            buf[(x, y)].set_char('█').set_fg(self.color);
+            // For side-by-side, subdivide the effective width
+            let sub_width = effective_width / slot.n_datasets as f64;
+            let x_start_f = bar_left + rwidth_offset + slot.ds_index as f64 * sub_width;
+            let x_end_f = x_start_f + sub_width;
+
+            let bar_top = pa.screen_y(heights[i]);
+            let bar_bottom = pa.screen_y(0.0);
+
+            // Use floor for left edge and ceil for right edge so that
+            // adjacent bins share the boundary pixel without gaps.
+            let rect = BarRect {
+                x_start: x_start_f.floor() as u16,
+                x_end: x_end_f.ceil() as u16,
+                y_top: bar_top.round() as u16,
+                y_bot: bar_bottom.round() as u16,
+            };
+
+            match self.histtype {
+                HistType::Bar => {
+                    self.draw_bar_region(pa, &rect, color, buf);
+                }
+                HistType::Step => {
+                    // Draw only the outline (top edge + sides)
+                    // Top edge
+                    for x in rect.x_start..rect.x_end {
+                        if pa.contains(x, rect.y_top) {
+                            buf[(x, rect.y_top)].set_char('─').set_fg(color);
+                        }
+                    }
+                    // Left side
+                    for y in rect.y_top..rect.y_bot {
+                        if pa.contains(rect.x_start, y) {
+                            buf[(rect.x_start, y)].set_char('│').set_fg(color);
+                        }
+                    }
+                    // Right side
+                    if rect.x_end > 0 {
+                        let rx = rect.x_end.saturating_sub(1);
+                        for y in rect.y_top..rect.y_bot {
+                            if pa.contains(rx, y) {
+                                buf[(rx, y)].set_char('│').set_fg(color);
+                            }
                         }
                     }
                 }
-            }
-
-        }
-
-        // Draw tick labels
-        let x_ticks = self.x_axis.tick_positions(x_lo, x_hi);
-        let tick_y = py + ph;
-        for &tv in &x_ticks {
-            let sx = data_to_screen(tv, x_lo, x_hi, px as f64, (px + pw - 1) as f64);
-            let label = self.x_axis.format_tick(tv);
-            let xi = sx.round() as u16;
-            let start = xi.saturating_sub(label.len() as u16 / 2);
-            if tick_y < area.y + area.height {
-                for (j, ch) in label.chars().enumerate() {
-                    let lx = start + j as u16;
-                    if lx >= area.x && lx < area.x + area.width {
-                        buf[(lx, tick_y)].set_char(ch).set_fg(self.theme.axis_color);
-                    }
-                }
-            }
-        }
-
-        let y_ticks = self.y_axis.tick_positions(0.0, y_hi);
-        for &tv in &y_ticks {
-            let sy = data_to_screen(tv, 0.0, y_hi, (py + ph - 1) as f64, py as f64);
-            let label = self.y_axis.format_tick(tv);
-            let yi = sy.round() as u16;
-            if yi >= py && yi < py + ph {
-                let start = px.saturating_sub(label.len() as u16 + 1);
-                for (j, ch) in label.chars().enumerate() {
-                    let lx = start + j as u16;
-                    if lx >= area.x && lx < px {
-                        buf[(lx, yi)].set_char(ch).set_fg(self.theme.axis_color);
+                HistType::StepFilled => {
+                    // Fill the bar
+                    self.draw_bar_region(pa, &rect, color, buf);
+                    // Draw outline on top
+                    for x in rect.x_start..rect.x_end {
+                        if pa.contains(x, rect.y_top) {
+                            buf[(x, rect.y_top)].set_char('▀').set_fg(color);
+                        }
                     }
                 }
             }
         }
     }
+
+    /// Fill a rectangular bar region.
+    fn draw_bar_region(
+        &self,
+        pa: &crate::frame::PlotArea,
+        rect: &BarRect,
+        color: Color,
+        buf: &mut Buffer,
+    ) {
+        for x in rect.x_start..rect.x_end {
+            for y in rect.y_top..rect.y_bot {
+                if pa.contains(x, y) {
+                    buf[(x, y)].set_char('█').set_fg(color);
+                }
+            }
+        }
+    }
+}
+
+/// Pixel bounds for a histogram bar rectangle.
+struct BarRect {
+    x_start: u16,
+    x_end: u16,
+    y_top: u16,
+    y_bot: u16,
+}
+
+/// Layout parameters for side-by-side bar positioning.
+struct BarSlotLayout {
+    ds_index: usize,
+    n_datasets: usize,
 }

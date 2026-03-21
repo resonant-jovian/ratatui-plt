@@ -6,6 +6,7 @@
 use ratatui::style::Color;
 
 /// Arrow style for annotations.
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[derive(Clone, Debug, Default)]
 pub enum ArrowStyle {
     /// Simple line: ─

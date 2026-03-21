@@ -290,7 +290,20 @@ impl Widget for &TwinAxes {
                 let sy0 = data_to_screen(y0, py_lo, py_hi, (py + ph - 1) as f64, py as f64);
                 let sx1 = data_to_screen(x1, x_lo, x_hi, px as f64, (px + pw - 1) as f64);
                 let sy1 = data_to_screen(y1, py_lo, py_hi, (py + ph - 1) as f64, py as f64);
-                draw_braille_line(buf, sx0, sy0, sx1, sy1, s.color, &ClipRect { x_min: px, y_min: py, x_max: px + pw, y_max: py + ph });
+                draw_braille_line(
+                    buf,
+                    sx0,
+                    sy0,
+                    sx1,
+                    sy1,
+                    s.color,
+                    &ClipRect {
+                        x_min: px,
+                        y_min: py,
+                        x_max: px + pw,
+                        y_max: py + ph,
+                    },
+                );
             }
         }
 
@@ -306,7 +319,20 @@ impl Widget for &TwinAxes {
                 let sy0 = data_to_screen(y0, sy_lo, sy_hi, (py + ph - 1) as f64, py as f64);
                 let sx1 = data_to_screen(x1, x_lo, x_hi, px as f64, (px + pw - 1) as f64);
                 let sy1 = data_to_screen(y1, sy_lo, sy_hi, (py + ph - 1) as f64, py as f64);
-                draw_braille_line(buf, sx0, sy0, sx1, sy1, s.color, &ClipRect { x_min: px, y_min: py, x_max: px + pw, y_max: py + ph });
+                draw_braille_line(
+                    buf,
+                    sx0,
+                    sy0,
+                    sx1,
+                    sy1,
+                    s.color,
+                    &ClipRect {
+                        x_min: px,
+                        y_min: py,
+                        x_max: px + pw,
+                        y_max: py + ph,
+                    },
+                );
             }
         }
     }
@@ -319,10 +345,7 @@ struct ClipRect {
     y_max: u16,
 }
 
-const BRAILLE_BITS: [[u8; 4]; 2] = [
-    [0x01, 0x02, 0x04, 0x40],
-    [0x08, 0x10, 0x20, 0x80],
-];
+const BRAILLE_BITS: [[u8; 4]; 2] = [[0x01, 0x02, 0x04, 0x40], [0x08, 0x10, 0x20, 0x80]];
 const BRAILLE_BASE: u32 = 0x2800;
 
 fn write_braille(buf: &mut Buffer, x: u16, y: u16, bits: u8, color: Color) {

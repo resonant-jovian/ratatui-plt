@@ -42,12 +42,19 @@
 
 pub mod annotation;
 pub mod axis;
+pub mod brushing;
+pub mod collections;
 pub mod color_cycle;
 pub mod colormap;
+pub mod config;
+pub mod drawing;
+pub mod export;
+pub mod frame;
 pub mod legend;
 pub mod macros;
 pub mod mathtext;
 pub mod norm;
+pub mod picking;
 pub mod prelude;
 pub mod series;
 pub mod spines;
@@ -55,7 +62,14 @@ pub mod style;
 pub mod theme;
 pub mod ticker;
 pub mod transform;
+pub mod triangulation;
 pub mod widgets;
+
+#[cfg(feature = "fft")]
+pub mod fft;
+
+#[cfg(feature = "chrono")]
+pub mod date_axis;
 
 #[cfg(feature = "async")]
 pub mod animation;

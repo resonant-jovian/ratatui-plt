@@ -5,10 +5,13 @@ use ratatui::layout::Rect;
 use ratatui::style::Color;
 use ratatui::widgets::Widget;
 
+use crate::annotation::Annotation;
 use crate::axis::Axis;
+use crate::drawing::draw_braille_line;
+use crate::frame::{DataBounds, PlotFrame, ReferenceLine};
+use crate::spines::Spines;
 use crate::style::MarkerShape;
 use crate::theme::Theme;
-use crate::transform::data_to_screen;
 
 /// A stem plot widget — vertical lines from a baseline to data points.
 ///
@@ -34,6 +37,9 @@ pub struct StemPlot {
     x_axis: Axis,
     y_axis: Axis,
     theme: Theme,
+    spines: Spines,
+    reference_lines: Vec<ReferenceLine>,
+    annotations: Vec<Annotation>,
 }
 
 impl StemPlot {
@@ -47,6 +53,9 @@ impl StemPlot {
             x_axis: Axis::new(),
             y_axis: Axis::new(),
             theme: Theme::get_default(),
+            spines: Spines::default(),
+            reference_lines: Vec::new(),
+            annotations: Vec::new(),
         }
     }
 
@@ -85,36 +94,36 @@ impl StemPlot {
         self.theme = theme;
         self
     }
+
+    /// Set spine visibility.
+    pub fn spines(mut self, spines: Spines) -> Self {
+        self.spines = spines;
+        self
+    }
+
+    /// Add a reference line.
+    pub fn reference_line(mut self, line: ReferenceLine) -> Self {
+        self.reference_lines.push(line);
+        self
+    }
+
+    /// Set all reference lines.
+    pub fn reference_lines(mut self, lines: Vec<ReferenceLine>) -> Self {
+        self.reference_lines = lines;
+        self
+    }
+
+    /// Add an annotation.
+    pub fn annotation(mut self, ann: Annotation) -> Self {
+        self.annotations.push(ann);
+        self
+    }
 }
 
 impl Widget for &StemPlot {
     fn render(self, area: Rect, buf: &mut Buffer) {
         if area.width < 4 || area.height < 4 || self.data.is_empty() {
             return;
-        }
-
-        let title_height: u16 = if self.title.is_some() { 1 } else { 0 };
-        let y_label_width: u16 = 8;
-        let tick_height: u16 = 1;
-
-        let px = area.x + y_label_width;
-        let py = area.y + title_height;
-        let pw = area.width.saturating_sub(y_label_width + 1);
-        let ph = area.height.saturating_sub(title_height + tick_height);
-
-        if pw < 2 || ph < 2 {
-            return;
-        }
-
-        // Title
-        if let Some(ref title) = self.title {
-            let start = area.x + (area.width.saturating_sub(title.len() as u16)) / 2;
-            for (i, ch) in title.chars().enumerate() {
-                let x = start + i as u16;
-                if x < area.x + area.width {
-                    buf[(x, area.y)].set_char(ch).set_fg(self.theme.foreground);
-                }
-            }
         }
 
         // Compute bounds
@@ -140,51 +149,30 @@ impl Widget for &StemPlot {
         let (x_lo, x_hi) = self.x_axis.resolve_bounds(x_min, x_max);
         let (y_lo, y_hi) = self.y_axis.resolve_bounds(y_min, y_max);
 
-        // Draw axes
-        for x in px..px + pw {
-            buf[(x, py + ph)]
-                .set_char('─')
-                .set_fg(self.theme.axis_color);
-        }
-        for y in py..py + ph {
-            buf[(px.saturating_sub(1), y)]
-                .set_char('│')
-                .set_fg(self.theme.axis_color);
-        }
+        // Create and render the plot frame (title, axes, grid, ticks, labels, spines, ref lines)
+        let frame = PlotFrame::new(&self.x_axis, &self.y_axis, &self.theme)
+            .title(self.title.as_deref())
+            .spines(self.spines.clone())
+            .reference_lines(&self.reference_lines);
 
-        // Draw grid
-        let x_grid = self.x_axis.grid || self.theme.grid_visible;
-        let y_grid = self.y_axis.grid || self.theme.grid_visible;
-        if x_grid {
-            let gx_ticks = self.x_axis.tick_positions(x_lo, x_hi);
-            for &tv in &gx_ticks {
-                let sx = data_to_screen(tv, x_lo, x_hi, px as f64, (px + pw - 1) as f64);
-                let xi = sx.round() as u16;
-                if xi >= px && xi < px + pw {
-                    for y in py..py + ph {
-                        buf[(xi, y)].set_char('·').set_fg(self.theme.grid_color);
-                    }
-                }
-            }
-        }
-        if y_grid {
-            let gy_ticks = self.y_axis.tick_positions(y_lo, y_hi);
-            for &tv in &gy_ticks {
-                let sy = data_to_screen(tv, y_lo, y_hi, (py + ph - 1) as f64, py as f64);
-                let yi = sy.round() as u16;
-                if yi >= py && yi < py + ph {
-                    for x in px..px + pw {
-                        buf[(x, yi)].set_char('·').set_fg(self.theme.grid_color);
-                    }
-                }
-            }
-        }
+        let Some(pa) = frame.render(
+            area,
+            buf,
+            DataBounds {
+                x_lo,
+                x_hi,
+                y_lo,
+                y_hi,
+            },
+        ) else {
+            return;
+        };
 
         // Draw baseline
-        let base_sy = data_to_screen(self.baseline, y_lo, y_hi, (py + ph - 1) as f64, py as f64);
+        let base_sy = pa.screen_y(self.baseline);
         let base_yi = base_sy.round() as u16;
-        if base_yi >= py && base_yi < py + ph {
-            for x in px..px + pw {
+        if base_yi >= pa.y && base_yi < pa.y + pa.height {
+            for x in pa.x..pa.x + pa.width {
                 buf[(x, base_yi)]
                     .set_char('─')
                     .set_fg(self.theme.axis_color);
@@ -193,51 +181,27 @@ impl Widget for &StemPlot {
 
         // Draw stems and markers
         for &(x, y) in &self.data {
-            let sx = data_to_screen(x, x_lo, x_hi, px as f64, (px + pw - 1) as f64);
-            let sy = data_to_screen(y, y_lo, y_hi, (py + ph - 1) as f64, py as f64);
+            let sx = pa.screen_x(x);
+            let sy = pa.screen_y(y);
             let xi = sx.round() as u16;
             let yi = sy.round() as u16;
 
-            if xi < px || xi >= px + pw {
+            if xi < pa.x || xi >= pa.x + pa.width {
                 continue;
             }
 
-            // Draw stem line
-            let (y_top, y_bot) = if yi < base_yi {
-                (yi, base_yi)
-            } else {
-                (base_yi, yi)
-            };
-            for sy in y_top..=y_bot {
-                if sy >= py && sy < py + ph {
-                    buf[(xi, sy)].set_char('│').set_fg(self.color);
-                }
-            }
+            // Draw stem line using Braille sub-pixel rendering
+            draw_braille_line(buf, sx, base_sy, sx, sy, self.color, &pa);
 
             // Draw marker at data point
-            if yi >= py && yi < py + ph {
+            if pa.contains(xi, yi) {
                 buf[(xi, yi)]
                     .set_char(self.marker.char())
                     .set_fg(self.color);
             }
         }
 
-        // Tick labels
-        let x_ticks = self.x_axis.tick_positions(x_lo, x_hi);
-        for &tv in &x_ticks {
-            let sx = data_to_screen(tv, x_lo, x_hi, px as f64, (px + pw - 1) as f64);
-            let label = self.x_axis.format_tick(tv);
-            let xi = sx.round() as u16;
-            let start = xi.saturating_sub(label.len() as u16 / 2);
-            let y = py + ph;
-            if y < area.y + area.height {
-                for (j, ch) in label.chars().enumerate() {
-                    let lx = start + j as u16;
-                    if lx >= area.x && lx < area.x + area.width {
-                        buf[(lx, y)].set_char(ch).set_fg(self.theme.axis_color);
-                    }
-                }
-            }
-        }
+        // Draw annotations
+        PlotFrame::draw_annotations(&pa, &self.annotations, buf);
     }
 }

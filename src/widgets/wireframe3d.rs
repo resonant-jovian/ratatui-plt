@@ -189,7 +189,12 @@ impl Wireframe3D {
         });
 
         // Draw segments with depth-cued brightness
-        let clip = ClipRect { x_min: px, y_min: py, x_max: px + pw, y_max: py + ph };
+        let clip = ClipRect {
+            x_min: px,
+            y_min: py,
+            x_max: px + pw,
+            y_max: py + ph,
+        };
         for seg in &segments {
             let brightness =
                 ((seg.depth - depth_min) / depth_range * 200.0 + 55.0).clamp(55.0, 255.0) as u8;
@@ -221,10 +226,7 @@ struct ClipRect {
     y_max: u16,
 }
 
-const BRAILLE_BITS: [[u8; 4]; 2] = [
-    [0x01, 0x02, 0x04, 0x40],
-    [0x08, 0x10, 0x20, 0x80],
-];
+const BRAILLE_BITS: [[u8; 4]; 2] = [[0x01, 0x02, 0x04, 0x40], [0x08, 0x10, 0x20, 0x80]];
 const BRAILLE_BASE: u32 = 0x2800;
 
 fn write_braille(buf: &mut Buffer, x: u16, y: u16, bits: u8, color: Color) {

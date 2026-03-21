@@ -6,6 +6,8 @@ use ratatui::style::{Color, Style};
 use ratatui::widgets::{StatefulWidget, Widget};
 
 use crate::colormap::{Colormap, Viridis};
+use crate::drawing::draw_braille_line;
+use crate::frame::PlotArea;
 use crate::norm::{LinearNorm, Normalize};
 use crate::series::GridData;
 use crate::theme::Theme;
@@ -196,18 +198,33 @@ impl Surface3D {
         // Sort back-to-front (painter's algorithm)
         faces.sort_by(|a, b| b.2.partial_cmp(&a.2).unwrap_or(std::cmp::Ordering::Equal));
 
-        // Draw faces with scanline rasterization
+        // Build PlotArea for Braille line drawing
+        let pa = PlotArea {
+            x: px,
+            y: py,
+            width: pw,
+            height: ph,
+            x_lo: 0.0,
+            x_hi: 0.0,
+            y_lo: 0.0,
+            y_hi: 0.0,
+            area: Rect::new(px, py, pw, ph),
+        };
+
+        // Draw faces with scanline rasterization using half-block shading
         for &(j, i, _) in &faces {
             let idx00 = j * ncols + i;
             let idx10 = j * ncols + i + 1;
             let idx01 = (j + 1) * ncols + i;
             let idx11 = (j + 1) * ncols + i + 1;
 
-            let avg_val =
-                (projected[idx00].3 + projected[idx10].3 + projected[idx01].3 + projected[idx11].3)
-                    / 4.0;
-            let t = self.norm.normalize(avg_val);
-            let color = self.colormap.color_at(t);
+            // Compute per-vertex color values for interpolation
+            let t00 = self.norm.normalize(projected[idx00].3);
+            let t10 = self.norm.normalize(projected[idx10].3);
+            let t01 = self.norm.normalize(projected[idx01].3);
+            let t11 = self.norm.normalize(projected[idx11].3);
+            let avg_t = (t00 + t10 + t01 + t11) / 4.0;
+            let color = self.colormap.color_at(avg_t);
 
             // Quad corners in screen space: order as a proper quad (not Z-order)
             // v00--v10
@@ -235,55 +252,134 @@ impl Surface3D {
             // Expand quad slightly to eliminate gaps between adjacent faces
             let centroid_x = screen_quad.iter().map(|c| c.0).sum::<i32>() / 4;
             let centroid_y = screen_quad.iter().map(|c| c.1).sum::<i32>() / 4;
-            let expanded_quad: Vec<(i32, i32)> = screen_quad.iter().map(|&(x, y)| {
-                let dx = if x > centroid_x { 1 } else if x < centroid_x { -1 } else { 0 };
-                let dy = if y > centroid_y { 1 } else if y < centroid_y { -1 } else { 0 };
-                (x + dx, y + dy)
-            }).collect();
+            let expanded_quad: Vec<(i32, i32)> = screen_quad
+                .iter()
+                .map(|&(x, y)| {
+                    let dx = if x > centroid_x {
+                        1
+                    } else if x < centroid_x {
+                        -1
+                    } else {
+                        0
+                    };
+                    let dy = if y > centroid_y {
+                        1
+                    } else if y < centroid_y {
+                        -1
+                    } else {
+                        0
+                    };
+                    (x + dx, y + dy)
+                })
+                .collect();
 
             // Bounding box of the expanded quad
-            let bb_min_x = expanded_quad.iter().map(|c| c.0).min().unwrap();
-            let bb_max_x = expanded_quad.iter().map(|c| c.0).max().unwrap();
-            let bb_min_y = expanded_quad.iter().map(|c| c.1).min().unwrap();
-            let bb_max_y = expanded_quad.iter().map(|c| c.1).max().unwrap();
+            let Some(bb_min_x) = expanded_quad.iter().map(|c| c.0).min() else {
+                continue;
+            };
+            let Some(bb_max_x) = expanded_quad.iter().map(|c| c.0).max() else {
+                continue;
+            };
+            let Some(bb_min_y) = expanded_quad.iter().map(|c| c.1).min() else {
+                continue;
+            };
+            let Some(bb_max_y) = expanded_quad.iter().map(|c| c.1).max() else {
+                continue;
+            };
 
-            // Fill using point-in-quad test (winding number) on expanded quad
-            for sy in bb_min_y..=bb_max_y {
+            // Fill using half-block characters for doubled vertical resolution.
+            // Process rows in pairs: for each pair (row, row+1), use '▀' with
+            // fg = upper row color and bg = lower row color.
+            let mut row = bb_min_y;
+            while row <= bb_max_y {
+                let upper_row = row;
+                let lower_row = row + 1;
                 for sx in bb_min_x..=bb_max_x {
                     let ux = sx as u16;
-                    let uy = sy as u16;
-                    if ux >= px
+                    let uy_upper = upper_row as u16;
+                    let upper_in = ux >= px
                         && ux < px + pw
-                        && uy >= py
-                        && uy < py + ph
-                        && point_in_quad(sx, sy, &expanded_quad)
-                    {
-                        buf[(ux, uy)]
-                            .set_char('█')
-                            .set_style(Style::default().fg(color));
+                        && uy_upper >= py
+                        && uy_upper < py + ph
+                        && point_in_quad(sx, upper_row, &expanded_quad);
+                    let lower_in = lower_row <= bb_max_y
+                        && ux >= px
+                        && ux < px + pw
+                        && (lower_row as u16) >= py
+                        && (lower_row as u16) < py + ph
+                        && point_in_quad(sx, lower_row, &expanded_quad);
+
+                    if upper_in && lower_in {
+                        // Both rows inside quad: use ▀ with fg=upper color, bg=lower color
+                        // Interpolate colors based on vertical position within the quad
+                        let upper_frac = if bb_max_y != bb_min_y {
+                            (upper_row - bb_min_y) as f64 / (bb_max_y - bb_min_y) as f64
+                        } else {
+                            0.5
+                        };
+                        let lower_frac = if bb_max_y != bb_min_y {
+                            (lower_row - bb_min_y) as f64 / (bb_max_y - bb_min_y) as f64
+                        } else {
+                            0.5
+                        };
+                        let upper_color = shade_surface_color(color, 1.0 - upper_frac * 0.2);
+                        let lower_color = shade_surface_color(color, 1.0 - lower_frac * 0.2);
+                        buf[(ux, uy_upper)]
+                            .set_char('\u{2580}') // ▀
+                            .set_style(Style::default().fg(upper_color).bg(lower_color));
+                    } else if upper_in {
+                        // Only upper row inside: use ▀ with fg=color, bg unchanged
+                        let upper_frac = if bb_max_y != bb_min_y {
+                            (upper_row - bb_min_y) as f64 / (bb_max_y - bb_min_y) as f64
+                        } else {
+                            0.5
+                        };
+                        let upper_color = shade_surface_color(color, 1.0 - upper_frac * 0.2);
+                        buf[(ux, uy_upper)]
+                            .set_char('\u{2580}') // ▀
+                            .set_style(Style::default().fg(upper_color));
+                    } else if lower_in {
+                        // Only lower row inside: use ▄ with fg=color
+                        let lower_frac = if bb_max_y != bb_min_y {
+                            (lower_row - bb_min_y) as f64 / (bb_max_y - bb_min_y) as f64
+                        } else {
+                            0.5
+                        };
+                        let lower_color = shade_surface_color(color, 1.0 - lower_frac * 0.2);
+                        buf[(ux, uy_upper)]
+                            .set_char('\u{2584}') // ▄
+                            .set_style(Style::default().fg(lower_color));
                     }
                 }
+                row += 2;
             }
 
-            // Draw wireframe edges between adjacent corners
+            // Draw wireframe edges using Braille lines for higher resolution
             if self.show_wireframe {
                 let wire_color = self.theme.axis_color;
                 let edges = [(0, 1), (1, 2), (2, 3), (3, 0)];
                 for &(a, b) in &edges {
-                    draw_surface_line(
-                        buf,
-                        screen_quad[a],
-                        screen_quad[b],
-                        wire_color,
-                        px,
-                        py,
-                        pw,
-                        ph,
-                    );
+                    let ax = screen_quad[a].0 as f64;
+                    let ay = screen_quad[a].1 as f64;
+                    let bx = screen_quad[b].0 as f64;
+                    let by = screen_quad[b].1 as f64;
+                    draw_braille_line(buf, ax, ay, bx, by, wire_color, &pa);
                 }
             }
         }
 
+        // Draw 3D axis lines at the edges of the data bounding box
+        draw_axis_lines(
+            camera,
+            buf,
+            &pa,
+            &ScreenBounds {
+                sx_min,
+                sx_max,
+                sy_min,
+                sy_max,
+            },
+        );
     }
 }
 
@@ -322,43 +418,69 @@ fn point_in_quad(px: i32, py: i32, quad: &[(i32, i32)]) -> bool {
     true
 }
 
-/// Draw a line between two pixel positions using Bresenham's algorithm.
-#[allow(clippy::too_many_arguments)]
-fn draw_surface_line(
-    buf: &mut Buffer,
-    p0: (i32, i32),
-    p1: (i32, i32),
-    color: Color,
-    clip_x: u16,
-    clip_y: u16,
-    clip_w: u16,
-    clip_h: u16,
-) {
-    let (mut ix0, mut iy0) = p0;
-    let (ix1, iy1) = p1;
-    let dx = (ix1 - ix0).abs();
-    let dy = -(iy1 - iy0).abs();
-    let sx = if ix0 < ix1 { 1 } else { -1 };
-    let sy = if iy0 < iy1 { 1 } else { -1 };
-    let mut err = dx + dy;
+/// Apply a shading factor to a surface color for half-block rendering.
+fn shade_surface_color(color: Color, factor: f64) -> Color {
+    match color {
+        Color::Rgb(r, g, b) => Color::Rgb(
+            (r as f64 * factor).round().clamp(0.0, 255.0) as u8,
+            (g as f64 * factor).round().clamp(0.0, 255.0) as u8,
+            (b as f64 * factor).round().clamp(0.0, 255.0) as u8,
+        ),
+        other => other,
+    }
+}
 
-    loop {
-        let px = ix0 as u16;
-        let py = iy0 as u16;
-        if px >= clip_x && px < clip_x + clip_w && py >= clip_y && py < clip_y + clip_h {
-            buf[(px, py)].set_char('·').set_fg(color);
-        }
-        if ix0 == ix1 && iy0 == iy1 {
-            break;
-        }
-        let e2 = 2 * err;
-        if e2 >= dy {
-            err += dy;
-            ix0 += sx;
-        }
-        if e2 <= dx {
-            err += dx;
-            iy0 += sy;
-        }
+/// Projected screen coordinate bounds from 3D camera.
+struct ScreenBounds {
+    sx_min: f64,
+    sx_max: f64,
+    sy_min: f64,
+    sy_max: f64,
+}
+
+/// Draw 3D axis lines (X, Y, Z) at the edges of the data bounding box.
+fn draw_axis_lines(camera: &Camera3D, buf: &mut Buffer, pa: &PlotArea, sb: &ScreenBounds) {
+    let (px, pw, py, ph) = (pa.x, pa.width, pa.y, pa.height);
+
+    // Project axis origin and tips from normalized [-1,1] space
+    let origin = camera.project(-1.0, -1.0, -0.8);
+    let x_tip = camera.project(1.0, -1.0, -0.8);
+    let y_tip = camera.project(-1.0, 1.0, -0.8);
+    let z_tip = camera.project(-1.0, -1.0, 0.8);
+
+    let to_sx = |v: f64| data_to_screen(v, sb.sx_min, sb.sx_max, px as f64, (px + pw - 1) as f64);
+    let to_sy = |v: f64| data_to_screen(v, sb.sy_min, sb.sy_max, py as f64, (py + ph - 1) as f64);
+
+    let ox = to_sx(origin.0);
+    let oy = to_sy(origin.1);
+
+    // X axis line and label
+    let xx = to_sx(x_tip.0);
+    let xy = to_sy(x_tip.1);
+    draw_braille_line(buf, ox, oy, xx, xy, Color::Red, pa);
+    let xxi = xx.round() as u16;
+    let xyi = xy.round() as u16;
+    if xxi >= px && xxi < px + pw && xyi >= py && xyi < py + ph {
+        buf[(xxi, xyi)].set_char('X').set_fg(Color::Red);
+    }
+
+    // Y axis line and label
+    let yx = to_sx(y_tip.0);
+    let yy = to_sy(y_tip.1);
+    draw_braille_line(buf, ox, oy, yx, yy, Color::Green, pa);
+    let yxi = yx.round() as u16;
+    let yyi = yy.round() as u16;
+    if yxi >= px && yxi < px + pw && yyi >= py && yyi < py + ph {
+        buf[(yxi, yyi)].set_char('Y').set_fg(Color::Green);
+    }
+
+    // Z axis line and label
+    let zx = to_sx(z_tip.0);
+    let zy = to_sy(z_tip.1);
+    draw_braille_line(buf, ox, oy, zx, zy, Color::Blue, pa);
+    let zxi = zx.round() as u16;
+    let zyi = zy.round() as u16;
+    if zxi >= px && zxi < px + pw && zyi >= py && zyi < py + ph {
+        buf[(zxi, zyi)].set_char('Z').set_fg(Color::Blue);
     }
 }

@@ -24,12 +24,14 @@ use ratatui::layout::Rect;
 use ratatui::style::Color;
 use ratatui::widgets::Widget;
 
+use crate::annotation::Annotation;
 use crate::axis::Axis;
 use crate::colormap::{Colormap, Viridis};
+use crate::frame::{DataBounds, PlotFrame, ReferenceLine};
 use crate::norm::{LinearNorm, Normalize};
 use crate::series::VectorFieldData;
+use crate::spines::Spines;
 use crate::theme::Theme;
-use crate::transform::data_to_screen;
 
 /// A streamline plot widget for visualising vector fields.
 ///
@@ -57,6 +59,9 @@ pub struct StreamPlot {
     arrow_scale: f64,
     /// Visual theme.
     theme: Theme,
+    spines: Spines,
+    reference_lines: Vec<ReferenceLine>,
+    annotations: Vec<Annotation>,
 }
 
 impl StreamPlot {
@@ -73,6 +78,9 @@ impl StreamPlot {
             colormap: Box::new(Viridis),
             arrow_scale: 1.0,
             theme: Theme::get_default(),
+            spines: Spines::default(),
+            reference_lines: Vec::new(),
+            annotations: Vec::new(),
         }
     }
 
@@ -129,6 +137,30 @@ impl StreamPlot {
         self.theme = theme;
         self
     }
+
+    /// Set spine visibility.
+    pub fn spines(mut self, spines: Spines) -> Self {
+        self.spines = spines;
+        self
+    }
+
+    /// Add a reference line.
+    pub fn reference_line(mut self, line: ReferenceLine) -> Self {
+        self.reference_lines.push(line);
+        self
+    }
+
+    /// Set all reference lines.
+    pub fn reference_lines(mut self, lines: Vec<ReferenceLine>) -> Self {
+        self.reference_lines = lines;
+        self
+    }
+
+    /// Add an annotation.
+    pub fn annotation(mut self, ann: Annotation) -> Self {
+        self.annotations.push(ann);
+        self
+    }
 }
 
 /// Interpolate the vector field at an arbitrary (x, y) position.
@@ -138,20 +170,30 @@ fn interpolate_field(field: &VectorFieldData, x: f64, y: f64) -> (f64, f64) {
     field.interpolate(x, y)
 }
 
-/// Integrate a single streamline using 4th-order Runge-Kutta.
-/// Returns a list of (x, y) points along the streamline.
-#[allow(clippy::too_many_arguments)]
-fn trace_streamline(
-    field: &VectorFieldData,
-    x0: f64,
-    y0: f64,
+/// Bounding box for streamline integration.
+struct StreamBounds {
     x_lo: f64,
     x_hi: f64,
     y_lo: f64,
     y_hi: f64,
+}
+
+/// Integrate a single streamline using 4th-order Runge-Kutta.
+/// Returns a list of (x, y) points along the streamline.
+fn trace_streamline(
+    field: &VectorFieldData,
+    x0: f64,
+    y0: f64,
+    bounds: &StreamBounds,
     max_steps: usize,
     dt: f64,
 ) -> Vec<(f64, f64)> {
+    let StreamBounds {
+        x_lo,
+        x_hi,
+        y_lo,
+        y_hi,
+    } = *bounds;
     let mut points = Vec::with_capacity(max_steps);
     let mut x = x0;
     let mut y = y0;
@@ -194,10 +236,7 @@ struct ClipRect {
     y_max: u16,
 }
 
-const BRAILLE_BITS: [[u8; 4]; 2] = [
-    [0x01, 0x02, 0x04, 0x40],
-    [0x08, 0x10, 0x20, 0x80],
-];
+const BRAILLE_BITS: [[u8; 4]; 2] = [[0x01, 0x02, 0x04, 0x40], [0x08, 0x10, 0x20, 0x80]];
 const BRAILLE_BASE: u32 = 0x2800;
 
 fn write_braille(buf: &mut Buffer, x: u16, y: u16, bits: u8, color: Color) {
@@ -293,30 +332,6 @@ impl Widget for &StreamPlot {
             return;
         }
 
-        let title_height: u16 = if self.title.is_some() { 1 } else { 0 };
-        let y_label_width: u16 = 8;
-        let tick_height: u16 = 1;
-
-        let px = area.x + y_label_width;
-        let py = area.y + title_height;
-        let pw = area.width.saturating_sub(y_label_width + 1);
-        let ph = area.height.saturating_sub(title_height + tick_height);
-
-        if pw < 2 || ph < 2 {
-            return;
-        }
-
-        // Draw title
-        if let Some(ref title) = self.title {
-            let start = area.x + (area.width.saturating_sub(title.len() as u16)) / 2;
-            for (i, ch) in title.chars().enumerate() {
-                let x = start + i as u16;
-                if x < area.x + area.width {
-                    buf[(x, area.y)].set_char(ch).set_fg(self.theme.foreground);
-                }
-            }
-        }
-
         // Compute data bounds
         let mut x_min = f64::INFINITY;
         let mut x_max = f64::NEG_INFINITY;
@@ -336,47 +351,29 @@ impl Widget for &StreamPlot {
         let max_mag = self.field.max_magnitude();
         let norm = LinearNorm::new(0.0, if max_mag == 0.0 { 1.0 } else { max_mag });
 
-        // Draw axes
-        for x in px..px + pw {
-            if x < area.x + area.width {
-                buf[(x, py + ph)]
-                    .set_char('─')
-                    .set_fg(self.theme.axis_color);
-            }
-        }
-        for y in py..py + ph {
-            buf[(px.saturating_sub(1), y)]
-                .set_char('│')
-                .set_fg(self.theme.axis_color);
-        }
+        // Create and render the plot frame (title, axes, grid, ticks, labels, spines, ref lines)
+        let frame = PlotFrame::new(&self.x_axis, &self.y_axis, &self.theme)
+            .title(self.title.as_deref())
+            .spines(self.spines.clone())
+            .reference_lines(&self.reference_lines);
 
-        // Draw grid
-        let x_grid = self.x_axis.grid || self.theme.grid_visible;
-        let y_grid = self.y_axis.grid || self.theme.grid_visible;
-        if x_grid {
-            let gx_ticks = self.x_axis.tick_positions(x_lo, x_hi);
-            for &tv in &gx_ticks {
-                let sx = data_to_screen(tv, x_lo, x_hi, px as f64, (px + pw - 1) as f64);
-                let xi = sx.round() as u16;
-                if xi >= px && xi < px + pw {
-                    for y in py..py + ph {
-                        buf[(xi, y)].set_char('·').set_fg(self.theme.grid_color);
-                    }
-                }
-            }
-        }
-        if y_grid {
-            let gy_ticks = self.y_axis.tick_positions(y_lo, y_hi);
-            for &tv in &gy_ticks {
-                let sy = data_to_screen(tv, y_lo, y_hi, (py + ph - 1) as f64, py as f64);
-                let yi = sy.round() as u16;
-                if yi >= py && yi < py + ph {
-                    for x in px..px + pw {
-                        buf[(x, yi)].set_char('·').set_fg(self.theme.grid_color);
-                    }
-                }
-            }
-        }
+        let Some(pa) = frame.render(
+            area,
+            buf,
+            DataBounds {
+                x_lo,
+                x_hi,
+                y_lo,
+                y_hi,
+            },
+        ) else {
+            return;
+        };
+
+        let px = pa.x;
+        let py = pa.y;
+        let pw = pa.width;
+        let ph = pa.height;
 
         // Generate seed points on a grid
         let x_range = x_hi - x_lo;
@@ -399,12 +396,16 @@ impl Widget for &StreamPlot {
                 let sy = y_lo + y_range * (si as f64 + 0.5) / n_seeds_y as f64;
 
                 // Trace forward
-                let forward =
-                    trace_streamline(&self.field, sx, sy, x_lo, x_hi, y_lo, y_hi, max_steps, dt);
+                let sb = StreamBounds {
+                    x_lo,
+                    x_hi,
+                    y_lo,
+                    y_hi,
+                };
+                let forward = trace_streamline(&self.field, sx, sy, &sb, max_steps, dt);
 
                 // Trace backward
-                let backward =
-                    trace_streamline(&self.field, sx, sy, x_lo, x_hi, y_lo, y_hi, max_steps, -dt);
+                let backward = trace_streamline(&self.field, sx, sy, &sb, max_steps, -dt);
 
                 // Combine: reverse of backward (excluding seed) + forward
                 let mut points: Vec<(f64, f64)> = Vec::new();
@@ -418,15 +419,20 @@ impl Widget for &StreamPlot {
                 }
 
                 // Render the streamline using braille sub-pixel lines
-                let clip = ClipRect { x_min: px, y_min: py, x_max: px + pw, y_max: py + ph };
+                let clip = ClipRect {
+                    x_min: px,
+                    y_min: py,
+                    x_max: px + pw,
+                    y_max: py + ph,
+                };
                 let mut prev_screen: Option<(f64, f64)> = None;
                 for (idx, &(ptx, pty)) in points.iter().enumerate() {
-                    let scr_x = data_to_screen(ptx, x_lo, x_hi, px as f64, (px + pw - 1) as f64);
-                    let scr_y = data_to_screen(pty, y_lo, y_hi, (py + ph - 1) as f64, py as f64);
+                    let scr_x = pa.screen_x(ptx);
+                    let scr_y = pa.screen_y(pty);
                     let xi = scr_x.round() as u16;
                     let yi = scr_y.round() as u16;
 
-                    if xi < px || xi >= px + pw || yi < py || yi >= py + ph {
+                    if !pa.contains(xi, yi) {
                         prev_screen = None;
                         continue;
                     }
@@ -458,43 +464,7 @@ impl Widget for &StreamPlot {
             }
         }
 
-        // Tick labels on X axis
-        let x_ticks = self.x_axis.tick_positions(x_lo, x_hi);
-        for &tv in &x_ticks {
-            let sx = data_to_screen(tv, x_lo, x_hi, px as f64, (px + pw - 1) as f64);
-            let label = self.x_axis.format_tick(tv);
-            let xi = sx.round() as u16;
-            let start = xi.saturating_sub(label.len() as u16 / 2);
-            let y = py + ph;
-            if y < area.y + area.height {
-                for (j, ch) in label.chars().enumerate() {
-                    let lx = start + j as u16;
-                    if lx >= area.x && lx < area.x + area.width {
-                        buf[(lx, y)].set_char(ch).set_fg(self.theme.axis_color);
-                    }
-                }
-            }
-        }
-
-        // Tick labels on Y axis
-        let y_ticks = self.y_axis.tick_positions(y_lo, y_hi);
-        for &tv in &y_ticks {
-            let sy = data_to_screen(tv, y_lo, y_hi, (py + ph - 1) as f64, py as f64);
-            let label = self.y_axis.format_tick(tv);
-            let yi = sy.round() as u16;
-            if yi >= py && yi < py + ph {
-                let label_start = if label.len() < y_label_width as usize {
-                    px.saturating_sub(y_label_width) + (y_label_width - label.len() as u16)
-                } else {
-                    px.saturating_sub(y_label_width)
-                };
-                for (j, ch) in label.chars().enumerate() {
-                    let lx = label_start + j as u16;
-                    if lx >= area.x && lx < px.saturating_sub(1) {
-                        buf[(lx, yi)].set_char(ch).set_fg(self.theme.axis_color);
-                    }
-                }
-            }
-        }
+        // Draw annotations
+        PlotFrame::draw_annotations(&pa, &self.annotations, buf);
     }
 }

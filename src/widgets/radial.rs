@@ -4,8 +4,33 @@ use ratatui::buffer::Buffer;
 use ratatui::layout::Rect;
 use ratatui::widgets::Widget;
 
+use crate::drawing::{BRAILLE_BITS, write_braille};
 use crate::series::Series;
 use crate::theme::Theme;
+
+/// Theta direction for polar plots.
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub enum ThetaDirection {
+    /// Angles increase counter-clockwise (default, mathematical convention).
+    #[default]
+    CounterClockwise,
+    /// Angles increase clockwise (compass convention).
+    Clockwise,
+}
+
+/// Type of polar plot rendering.
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub enum PolarPlotType {
+    /// Connected line segments (default).
+    #[default]
+    Line,
+    /// Markers only, no connecting lines.
+    Scatter,
+    /// Wedge/bar segments from origin.
+    Bar,
+    /// Filled region between data and r_min.
+    FillBetween,
+}
 
 /// A radial (polar coordinate) plot widget.
 ///
@@ -35,6 +60,14 @@ pub struct RadialPlot {
     n_rings: usize,
     n_spokes: usize,
     r_max: Option<f64>,
+    /// Minimum radial value (default: 0.0).
+    r_min: Option<f64>,
+    /// Direction of increasing theta.
+    theta_direction: ThetaDirection,
+    /// Offset for theta=0 position in radians (default: 0 = right/east).
+    theta_offset: f64,
+    /// Type of polar plot rendering.
+    plot_type: PolarPlotType,
     theme: Theme,
 }
 
@@ -46,6 +79,10 @@ impl Default for RadialPlot {
             n_rings: 4,
             n_spokes: 8,
             r_max: None,
+            r_min: None,
+            theta_direction: ThetaDirection::default(),
+            theta_offset: 0.0,
+            plot_type: PolarPlotType::default(),
             theme: Theme::get_default(),
         }
     }
@@ -75,6 +112,26 @@ impl RadialPlot {
     }
     pub fn r_max(mut self, r: f64) -> Self {
         self.r_max = Some(r);
+        self
+    }
+    /// Set the minimum radial value.
+    pub fn r_min(mut self, r: f64) -> Self {
+        self.r_min = Some(r);
+        self
+    }
+    /// Set the direction of increasing theta.
+    pub fn theta_direction(mut self, dir: ThetaDirection) -> Self {
+        self.theta_direction = dir;
+        self
+    }
+    /// Set the theta=0 offset in radians.
+    pub fn theta_offset(mut self, offset: f64) -> Self {
+        self.theta_offset = offset;
+        self
+    }
+    /// Set the polar plot type.
+    pub fn plot_type(mut self, pt: PolarPlotType) -> Self {
+        self.plot_type = pt;
         self
     }
     /// Set the theme.
@@ -119,32 +176,54 @@ impl Widget for &RadialPlot {
         let r_screen_x = r_data / cell_aspect; // wider to compensate
         let r_screen_y = r_data;
 
-        // Maximum data radius
+        // Data radius range
+        let r_min = self.r_min.unwrap_or(0.0);
         let r_max = self.r_max.unwrap_or_else(|| {
             self.series
                 .iter()
                 .flat_map(|s| s.data.iter().map(|&(_, r)| r))
                 .fold(0.0f64, f64::max)
         });
-        let r_max = if r_max == 0.0 { 1.0 } else { r_max };
+        let r_max = if r_max == r_min { r_min + 1.0 } else { r_max };
 
-        // Draw concentric rings
+        // Helper: transform theta based on direction and offset
+        let transform_theta = |theta: f64| -> f64 {
+            let t = theta + self.theta_offset;
+            match self.theta_direction {
+                ThetaDirection::CounterClockwise => t,
+                ThetaDirection::Clockwise => -t,
+            }
+        };
+
+        // Draw concentric rings using Braille sub-pixel rendering
         for ring in 1..=self.n_rings {
             let r_frac = ring as f64 / self.n_rings as f64;
-            let rx = (r_frac * r_screen_x).round();
-            let ry = (r_frac * r_screen_y).round();
+            let rx = r_frac * r_screen_x;
+            let ry = r_frac * r_screen_y;
 
-            // Draw ring using approximation
-            let n_points = (2.0 * std::f64::consts::PI * rx.max(ry)).round().max(20.0) as usize;
-            for k in 0..n_points {
-                let theta = 2.0 * std::f64::consts::PI * k as f64 / n_points as f64;
-                let dx = (rx * theta.cos()).round() as i16;
-                let dy = (ry * theta.sin()).round() as i16;
-                let sx = (cx as i16 + dx) as u16;
-                let sy = (cy as i16 + dy) as u16;
-                if sx >= area.x && sx < area.x + area.width && sy >= py && sy < py + ph {
-                    buf[(sx, sy)].set_char('·').set_fg(self.theme.grid_color);
-                }
+            // Draw ring as connected Braille line segments
+            let n_seg = (2.0 * std::f64::consts::PI * rx.max(ry)).round().max(40.0) as usize;
+            for k in 0..n_seg {
+                let theta0 = 2.0 * std::f64::consts::PI * k as f64 / n_seg as f64;
+                let theta1 = 2.0 * std::f64::consts::PI * (k + 1) as f64 / n_seg as f64;
+                let sx0 = cx as f64 + rx * theta0.cos();
+                let sy0 = cy as f64 + ry * theta0.sin();
+                let sx1 = cx as f64 + rx * theta1.cos();
+                let sy1 = cy as f64 + ry * theta1.sin();
+                draw_braille_line_clipped(
+                    buf,
+                    sx0,
+                    sy0,
+                    sx1,
+                    sy1,
+                    self.theme.grid_color,
+                    &ClipRect {
+                        x: area.x,
+                        y: py,
+                        w: area.width,
+                        h: ph,
+                    },
+                );
             }
 
             // Ring label
@@ -161,20 +240,25 @@ impl Widget for &RadialPlot {
             }
         }
 
-        // Draw spokes
+        // Draw spokes using Braille sub-pixel rendering
         for spoke in 0..self.n_spokes {
             let theta = 2.0 * std::f64::consts::PI * spoke as f64 / self.n_spokes as f64;
             let dx = r_screen_x * theta.cos();
             let dy = r_screen_y * theta.sin();
-            let steps = (dx.abs().max(dy.abs())).round() as usize;
-            for s in 0..=steps {
-                let frac = s as f64 / steps.max(1) as f64;
-                let sx = (cx as f64 + dx * frac).round() as u16;
-                let sy = (cy as f64 + dy * frac).round() as u16;
-                if sx >= area.x && sx < area.x + area.width && sy >= py && sy < py + ph {
-                    buf[(sx, sy)].set_char('·').set_fg(self.theme.grid_color);
-                }
-            }
+            draw_braille_line_clipped(
+                buf,
+                cx as f64,
+                cy as f64,
+                cx as f64 + dx,
+                cy as f64 + dy,
+                self.theme.grid_color,
+                &ClipRect {
+                    x: area.x,
+                    y: py,
+                    w: area.width,
+                    h: ph,
+                },
+            );
 
             // Angle label
             let deg = (theta.to_degrees()).round() as i32;
@@ -197,35 +281,171 @@ impl Widget for &RadialPlot {
         // Draw series data
         for s in &self.series {
             let mut prev: Option<(u16, u16)> = None;
+            // For Bar mode: track previous transformed theta and r_frac for gap filling
+            let mut prev_bar: Option<(f64, f64)> = None;
             for &(theta, r) in &s.data {
-                let r_frac = (r / r_max).clamp(0.0, 1.0);
-                let sx = (cx as f64 + r_frac * r_screen_x * theta.cos()).round() as u16;
-                let sy = (cy as f64 + r_frac * r_screen_y * theta.sin()).round() as u16;
+                let t = transform_theta(theta);
+                let r_frac = ((r - r_min) / (r_max - r_min)).clamp(0.0, 1.0);
+                let sx = (cx as f64 + r_frac * r_screen_x * t.cos()).round() as u16;
+                let sy = (cy as f64 + r_frac * r_screen_y * t.sin()).round() as u16;
 
-                if sx >= area.x && sx < area.x + area.width && sy >= py && sy < py + ph {
-                    let ch = s.marker.map_or('●', |m| m.char());
-                    buf[(sx, sy)].set_char(ch).set_fg(s.color);
-                }
-
-                // Connect to previous point
-                if let Some((px, py_prev)) = prev
-                    && (sx != px || sy != py_prev)
-                {
-                    // Simple line between consecutive points
-                    let dx = sx as i32 - px as i32;
-                    let dy = sy as i32 - py_prev as i32;
-                    let steps = dx.abs().max(dy.abs());
-                    for step in 1..steps {
-                        let frac = step as f64 / steps as f64;
-                        let ix = (px as f64 + dx as f64 * frac).round() as u16;
-                        let iy = (py_prev as f64 + dy as f64 * frac).round() as u16;
-                        if ix >= area.x && ix < area.x + area.width && iy >= py && iy < py + ph {
-                            buf[(ix, iy)].set_char('·').set_fg(s.color);
+                match self.plot_type {
+                    PolarPlotType::Scatter => {
+                        // Only markers, no lines
+                        if sx >= area.x && sx < area.x + area.width && sy >= py && sy < py + ph {
+                            let ch = s.marker.map_or('●', |m| m.char());
+                            buf[(sx, sy)].set_char(ch).set_fg(s.color);
+                        }
+                    }
+                    PolarPlotType::Bar => {
+                        // Radial bar from origin to data point
+                        let steps = r_frac * r_screen_y;
+                        let n_steps = steps.round().max(1.0) as usize;
+                        for step in 0..=n_steps {
+                            let frac = step as f64 / n_steps as f64 * r_frac;
+                            let bx = (cx as f64 + frac * r_screen_x * t.cos()).round() as u16;
+                            let by = (cy as f64 + frac * r_screen_y * t.sin()).round() as u16;
+                            if bx >= area.x && bx < area.x + area.width && by >= py && by < py + ph
+                            {
+                                buf[(bx, by)].set_char('█').set_fg(s.color);
+                            }
+                        }
+                        // Fill gap to previous bar by sweeping the arc at each radius level
+                        if let Some((prev_t, prev_rf)) = prev_bar {
+                            let min_rf = r_frac.min(prev_rf);
+                            let outer_r = min_rf * r_screen_y;
+                            let n_rad = outer_r.round().max(1.0) as usize;
+                            for ri in 1..=n_rad {
+                                let frac = ri as f64 / n_rad as f64 * min_rf;
+                                let arc_r = frac * r_screen_x.max(r_screen_y);
+                                let n_interp = arc_r.round().max(2.0) as usize;
+                                for ai in 0..=n_interp {
+                                    let a_frac = ai as f64 / n_interp as f64;
+                                    let interp_t = prev_t + (t - prev_t) * a_frac;
+                                    let bx = (cx as f64 + frac * r_screen_x * interp_t.cos())
+                                        .round()
+                                        as u16;
+                                    let by = (cy as f64 + frac * r_screen_y * interp_t.sin())
+                                        .round()
+                                        as u16;
+                                    if bx >= area.x
+                                        && bx < area.x + area.width
+                                        && by >= py
+                                        && by < py + ph
+                                    {
+                                        buf[(bx, by)].set_char('█').set_fg(s.color);
+                                    }
+                                }
+                            }
+                        }
+                        prev_bar = Some((t, r_frac));
+                    }
+                    PolarPlotType::FillBetween => {
+                        // Fill from r_min to r
+                        let steps = r_frac * r_screen_y;
+                        let n_steps = steps.round().max(1.0) as usize;
+                        for step in 0..=n_steps {
+                            let frac = step as f64 / n_steps as f64 * r_frac;
+                            let bx = (cx as f64 + frac * r_screen_x * t.cos()).round() as u16;
+                            let by = (cy as f64 + frac * r_screen_y * t.sin()).round() as u16;
+                            if bx >= area.x && bx < area.x + area.width && by >= py && by < py + ph
+                            {
+                                buf[(bx, by)].set_char('░').set_fg(s.color);
+                            }
+                        }
+                    }
+                    PolarPlotType::Line => {
+                        // Marker at data point
+                        if sx >= area.x && sx < area.x + area.width && sy >= py && sy < py + ph {
+                            let ch = s.marker.map_or('●', |m| m.char());
+                            buf[(sx, sy)].set_char(ch).set_fg(s.color);
+                        }
+                        // Connect to previous point using Braille sub-pixel rendering
+                        if let Some((px, py_prev)) = prev
+                            && (sx != px || sy != py_prev)
+                        {
+                            draw_braille_line_clipped(
+                                buf,
+                                px as f64,
+                                py_prev as f64,
+                                sx as f64,
+                                sy as f64,
+                                s.color,
+                                &ClipRect {
+                                    x: area.x,
+                                    y: py,
+                                    w: area.width,
+                                    h: ph,
+                                },
+                            );
                         }
                     }
                 }
                 prev = Some((sx, sy));
             }
+        }
+    }
+}
+
+/// Clipping rectangle for Braille line drawing.
+struct ClipRect {
+    x: u16,
+    y: u16,
+    w: u16,
+    h: u16,
+}
+
+/// Draw a Braille sub-pixel line clipped to a rectangular region.
+///
+/// Coordinates are in terminal cell space (floating point). The line is
+/// rendered at 2x4 sub-pixel resolution using Unicode Braille characters.
+fn draw_braille_line_clipped(
+    buf: &mut Buffer,
+    x0: f64,
+    y0: f64,
+    x1: f64,
+    y1: f64,
+    color: ratatui::style::Color,
+    clip: &ClipRect,
+) {
+    let mut ix0 = (x0 * 2.0).round() as i32;
+    let mut iy0 = (y0 * 4.0).round() as i32;
+    let ix1 = (x1 * 2.0).round() as i32;
+    let iy1 = (y1 * 4.0).round() as i32;
+
+    let dx = (ix1 - ix0).abs();
+    let dy = -(iy1 - iy0).abs();
+    let sx = if ix0 < ix1 { 1 } else { -1 };
+    let sy = if iy0 < iy1 { 1 } else { -1 };
+    let mut err = dx + dy;
+
+    loop {
+        if ix0 >= 0 && iy0 >= 0 {
+            let cell_x = (ix0 / 2) as u16;
+            let cell_y = (iy0 / 4) as u16;
+            if cell_x >= clip.x
+                && cell_x < clip.x + clip.w
+                && cell_y >= clip.y
+                && cell_y < clip.y + clip.h
+            {
+                let dot_col = (ix0 % 2) as usize;
+                let dot_row = (iy0 % 4) as usize;
+                let bit = BRAILLE_BITS[dot_col][dot_row];
+                write_braille(buf, cell_x, cell_y, bit, color);
+            }
+        }
+
+        if ix0 == ix1 && iy0 == iy1 {
+            break;
+        }
+        let e2 = 2 * err;
+        if e2 >= dy {
+            err += dy;
+            ix0 += sx;
+        }
+        if e2 <= dx {
+            err += dx;
+            iy0 += sy;
         }
     }
 }

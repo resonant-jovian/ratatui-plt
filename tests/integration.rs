@@ -5,6 +5,7 @@ use ratatui::widgets::{StatefulWidget, Widget};
 use ratatui_plt::prelude::*;
 use ratatui_plt::widgets::bar_chart::{BarDataset, BarMode};
 use ratatui_plt::widgets::box_plot::BoxData;
+use ratatui_plt::widgets::histogram::{BinMethod, HistDataset, HistMode, HistType};
 use ratatui_plt::widgets::violin_plot::ViolinData;
 use ratatui_plt::{plot, series};
 
@@ -422,10 +423,7 @@ fn test_hist2d_renders() {
             (t.sin(), t.cos())
         })
         .collect();
-    let plot = Hist2D::new(data)
-        .bins_x(10)
-        .bins_y(10)
-        .title("Hist2D");
+    let plot = Hist2D::new(data).bins_x(10).bins_y(10).title("Hist2D");
 
     let area = Rect::new(0, 0, 40, 20);
     let mut buf = Buffer::empty(area);
@@ -467,10 +465,18 @@ fn test_radial_plot_renders() {
 #[test]
 fn test_stacked_area_renders() {
     let s1 = Series::new("A")
-        .data((0..10).map(|i| (i as f64, (i as f64 * 0.3).sin().abs())).collect())
+        .data(
+            (0..10)
+                .map(|i| (i as f64, (i as f64 * 0.3).sin().abs()))
+                .collect(),
+        )
         .color(Color::Cyan);
     let s2 = Series::new("B")
-        .data((0..10).map(|i| (i as f64, (i as f64 * 0.2).cos().abs())).collect())
+        .data(
+            (0..10)
+                .map(|i| (i as f64, (i as f64 * 0.2).cos().abs()))
+                .collect(),
+        )
         .color(Color::Yellow);
     let s3 = Series::new("C")
         .data((0..10).map(|i| (i as f64, 0.5)).collect())
@@ -488,7 +494,9 @@ fn test_stacked_area_renders() {
 
 #[test]
 fn test_stem_plot_renders() {
-    let data: Vec<(f64, f64)> = (0..10).map(|i| (i as f64, (i as f64 * 0.5).sin())).collect();
+    let data: Vec<(f64, f64)> = (0..10)
+        .map(|i| (i as f64, (i as f64 * 0.5).sin()))
+        .collect();
     let plot = StemPlot::new(data).color(Color::Green).title("Stem");
 
     let area = Rect::new(0, 0, 40, 20);
@@ -585,14 +593,15 @@ fn test_streamplot_renders() {
 
 #[test]
 fn test_violin_plot_renders() {
-    let vals1: Vec<f64> = (0..20).map(|i| 5.0 + (i as f64 * 0.3).sin() * 2.0).collect();
-    let vals2: Vec<f64> = (0..20).map(|i| 7.0 + (i as f64 * 0.2).cos() * 3.0).collect();
+    let vals1: Vec<f64> = (0..20)
+        .map(|i| 5.0 + (i as f64 * 0.3).sin() * 2.0)
+        .collect();
+    let vals2: Vec<f64> = (0..20)
+        .map(|i| 7.0 + (i as f64 * 0.2).cos() * 3.0)
+        .collect();
     let d1 = ViolinData::new("A", vals1, Color::Cyan);
     let d2 = ViolinData::new("B", vals2, Color::Yellow);
-    let plot = ViolinPlot::new()
-        .dataset(d1)
-        .dataset(d2)
-        .title("Violin");
+    let plot = ViolinPlot::new().dataset(d1).dataset(d2).title("Violin");
 
     let area = Rect::new(0, 0, 40, 20);
     let mut buf = Buffer::empty(area);
@@ -772,7 +781,11 @@ fn test_marker_shapes() {
     let mut unique = chars.clone();
     unique.sort();
     unique.dedup();
-    assert_eq!(chars.len(), unique.len(), "Marker shapes must have distinct chars");
+    assert_eq!(
+        chars.len(),
+        unique.len(),
+        "Marker shapes must have distinct chars"
+    );
 }
 
 #[test]
@@ -781,8 +794,14 @@ fn test_line_style_constructors() {
     let dashed = LineStyle::dashed();
     let dotted = LineStyle::dotted();
     // They should produce different patterns
-    assert_ne!(format!("{:?}", solid.pattern), format!("{:?}", dashed.pattern));
-    assert_ne!(format!("{:?}", dashed.pattern), format!("{:?}", dotted.pattern));
+    assert_ne!(
+        format!("{:?}", solid.pattern),
+        format!("{:?}", dashed.pattern)
+    );
+    assert_ne!(
+        format!("{:?}", dashed.pattern),
+        format!("{:?}", dotted.pattern)
+    );
 }
 
 // --- Data Types ---
@@ -909,4 +928,1407 @@ fn test_wireframe3d_stateful_renders() {
     let mut buf = Buffer::empty(area);
     let mut state = Camera3DState::default();
     StatefulWidget::render(&plot, area, &mut buf, &mut state);
+}
+
+// ========================================================================
+// Phase 1-8 comprehensive tests
+// ========================================================================
+
+// ===== 1. New scales (axis.rs) =====
+
+#[test]
+fn test_logit_scale_transform_and_inverse() {
+    let logit = Scale::Logit;
+    // Logit(0.5) = log(0.5/0.5) = 0
+    assert!((logit.transform(0.5) - 0.0).abs() < 1e-10);
+    // Logit(0.1) < 0
+    assert!(logit.transform(0.1) < 0.0);
+    // Logit(0.9) > 0
+    assert!(logit.transform(0.9) > 0.0);
+    // Roundtrip
+    for &p in &[0.1, 0.25, 0.5, 0.75, 0.9] {
+        let t = logit.transform(p);
+        let back = logit.inverse(t);
+        assert!(
+            (back - p).abs() < 1e-6,
+            "Logit roundtrip failed for p={p}: got {back}"
+        );
+    }
+}
+
+#[test]
+fn test_asinh_scale_transform_and_inverse() {
+    let asinh = Scale::Asinh { linear_width: 1.0 };
+    // asinh(0) = 0
+    assert!((asinh.transform(0.0) - 0.0).abs() < 1e-10);
+    // Positive values
+    let t1 = asinh.transform(10.0);
+    assert!(t1 > 0.0);
+    // Negative values (symmetric)
+    let t_neg = asinh.transform(-10.0);
+    assert!((t_neg + t1).abs() < 1e-10);
+    // Roundtrip
+    for &v in &[-100.0, -1.0, 0.0, 1.0, 100.0] {
+        let t = asinh.transform(v);
+        let back = asinh.inverse(t);
+        assert!(
+            (back - v).abs() < 1e-6,
+            "Asinh roundtrip failed for v={v}: got {back}"
+        );
+    }
+}
+
+#[test]
+fn test_func_scale_with_custom_forward_inverse() {
+    fn square(x: f64) -> f64 {
+        x * x
+    }
+    fn sqrt(x: f64) -> f64 {
+        x.sqrt()
+    }
+
+    let func = Scale::Func {
+        forward: square,
+        inverse: sqrt,
+    };
+    assert!((func.transform(3.0) - 9.0).abs() < 1e-10);
+    assert!((func.inverse(9.0) - 3.0).abs() < 1e-10);
+    // Roundtrip for positive values
+    for &v in &[0.5, 1.0, 2.0, 4.0] {
+        let t = func.transform(v);
+        let back = func.inverse(t);
+        assert!(
+            (back - v).abs() < 1e-6,
+            "Func roundtrip failed for v={v}: got {back}"
+        );
+    }
+}
+
+// ===== 2. New locators and formatters (ticker.rs) =====
+
+#[test]
+fn test_null_locator_returns_empty_ticks() {
+    let loc = NullLocator;
+    let ticks = loc.tick_values(0.0, 100.0);
+    assert!(ticks.is_empty());
+    let ticks2 = loc.tick_values(-50.0, 50.0);
+    assert!(ticks2.is_empty());
+}
+
+#[test]
+fn test_null_formatter_returns_empty_strings() {
+    let fmt = NullFormatter;
+    assert_eq!(fmt.format(0.0), "");
+    assert_eq!(fmt.format(42.0), "");
+    assert_eq!(fmt.format(-100.0), "");
+    assert_eq!(fmt.format(f64::MAX), "");
+}
+
+#[test]
+fn test_percent_formatter_formats_correctly() {
+    // scale=100 means input values are in [0, 1]
+    let fmt = PercentFormatter::new(100.0);
+    assert_eq!(fmt.format(0.0), "0%");
+    assert_eq!(fmt.format(0.5), "50%");
+    assert_eq!(fmt.format(1.0), "100%");
+
+    // With decimals
+    let fmt_dec = PercentFormatter::new(100.0).decimals(1);
+    assert_eq!(fmt_dec.format(0.5), "50.0%");
+    assert_eq!(fmt_dec.format(0.123), "12.3%");
+
+    // scale=1 means input values are already percentages
+    let fmt_raw = PercentFormatter::new(1.0);
+    assert_eq!(fmt_raw.format(50.0), "50%");
+}
+
+#[test]
+fn test_auto_minor_locator_produces_correct_subdivisions() {
+    let loc = AutoMinorLocator::new(5);
+    let ticks = loc.tick_values(0.0, 100.0);
+    // Should produce minor ticks between major ticks
+    assert!(!ticks.is_empty());
+    // All minor ticks should be within range
+    for &t in &ticks {
+        assert!(t > 0.0 && t < 100.0, "minor tick {t} outside (0, 100)");
+    }
+
+    // With 2 subdivisions
+    let loc2 = AutoMinorLocator::new(2);
+    let ticks2 = loc2.tick_values(0.0, 10.0);
+    assert!(!ticks2.is_empty());
+    // Each minor tick should be between consecutive major ticks
+    for &t in &ticks2 {
+        assert!(t > 0.0 && t < 10.0);
+    }
+}
+
+// ===== 3. New normalizations (norm.rs) =====
+
+#[test]
+fn test_centered_norm_maps_center_to_half() {
+    let n = CenteredNorm::new(0.0, 10.0);
+    // Center maps to 0.5
+    assert!((n.normalize(0.0) - 0.5).abs() < 1e-10);
+    // Extremes map to 0 and 1
+    assert!((n.normalize(-10.0) - 0.0).abs() < 1e-10);
+    assert!((n.normalize(10.0) - 1.0).abs() < 1e-10);
+    // Symmetric
+    let lo = n.normalize(-5.0);
+    let hi = n.normalize(5.0);
+    assert!((lo + hi - 1.0).abs() < 1e-10);
+}
+
+#[test]
+fn test_centered_norm_from_bounds() {
+    let n = CenteredNorm::from_bounds(0.0, -20.0, 10.0);
+    // halfrange = max(20, 10) = 20
+    assert!((n.normalize(0.0) - 0.5).abs() < 1e-10);
+    assert!((n.normalize(-20.0) - 0.0).abs() < 1e-10);
+    assert!((n.normalize(20.0) - 1.0).abs() < 1e-10);
+}
+
+#[test]
+fn test_asinh_norm_handles_positive_negative_zero() {
+    let n = AsinhNorm::new(1.0, -100.0, 100.0);
+    // Zero should map near 0.5 (symmetric range)
+    let center = n.normalize(0.0);
+    assert!((center - 0.5).abs() < 0.01, "center={center}");
+    // Positive values > 0.5
+    assert!(n.normalize(50.0) > 0.5);
+    // Negative values < 0.5
+    assert!(n.normalize(-50.0) < 0.5);
+    // Extremes
+    assert!(n.normalize(100.0) > 0.9);
+    assert!(n.normalize(-100.0) < 0.1);
+    // Monotonic
+    assert!(n.normalize(-10.0) < n.normalize(0.0));
+    assert!(n.normalize(0.0) < n.normalize(10.0));
+}
+
+#[test]
+fn test_func_norm_with_custom_function() {
+    // Square root normalization: map [0, 100] -> [0, 1] via sqrt(v/100)
+    let n = FuncNorm::new(|v| (v.max(0.0) / 100.0).sqrt());
+    assert!((n.normalize(0.0) - 0.0).abs() < 1e-10);
+    assert!((n.normalize(100.0) - 1.0).abs() < 1e-10);
+    assert!((n.normalize(25.0) - 0.5).abs() < 1e-10);
+    // Clamping: negative input clamped to 0 by our function, then normalize clamps to [0,1]
+    assert!((n.normalize(-10.0) - 0.0).abs() < 1e-10);
+}
+
+// ===== 4. Colormap registry (colormap.rs) =====
+
+#[test]
+fn test_get_colormap_viridis_returns_some() {
+    let cmap = get_colormap("viridis");
+    assert!(cmap.is_some());
+    assert_eq!(cmap.unwrap().name(), "viridis");
+}
+
+#[test]
+fn test_get_colormap_blues_returns_some() {
+    let cmap = get_colormap("blues");
+    assert!(cmap.is_some());
+    assert_eq!(cmap.unwrap().name(), "Blues");
+}
+
+#[test]
+fn test_get_colormap_nonexistent_returns_none() {
+    assert!(get_colormap("nonexistent").is_none());
+    assert!(get_colormap("foobar").is_none());
+    assert!(get_colormap("").is_none());
+}
+
+#[test]
+fn test_all_registered_colormaps_produce_valid_colors() {
+    let names = [
+        "viridis",
+        "plasma",
+        "inferno",
+        "magma",
+        "cividis",
+        "hot",
+        "spring",
+        "summer",
+        "autumn",
+        "winter",
+        "grayscale",
+        "blues",
+        "greens",
+        "reds",
+        "oranges",
+        "purples",
+        "greys",
+        "coolwarm",
+        "rdbu",
+        "seismic",
+        "twilight",
+        "hsv",
+        "jet",
+        "turbo",
+        "tab20",
+        "set1",
+        "paired",
+        "dark2",
+        "accent",
+        "piyg",
+        "prgn",
+        "brbg",
+        "puor",
+        "rdgy",
+        "rdylbu",
+        "rdylgn",
+        "spectral",
+    ];
+    for name in &names {
+        let cmap = get_colormap(name).unwrap_or_else(|| panic!("colormap '{name}' not found"));
+        for &t in &[0.0, 0.5, 1.0] {
+            let c = cmap.color_at(t);
+            assert!(
+                matches!(c, Color::Rgb(_, _, _)),
+                "colormap '{name}' at t={t} did not produce Rgb: {:?}",
+                c
+            );
+        }
+    }
+}
+
+// ===== 5. PlotFrame (frame.rs) =====
+
+#[test]
+fn test_plot_area_screen_x_roundtrip() {
+    let pa = PlotArea {
+        x: 10,
+        y: 5,
+        width: 60,
+        height: 30,
+        x_lo: 0.0,
+        x_hi: 100.0,
+        y_lo: 0.0,
+        y_hi: 50.0,
+        area: Rect::new(0, 0, 80, 40),
+    };
+
+    // screen_x -> data_x_from_screen roundtrip
+    for &data_x in &[0.0, 25.0, 50.0, 75.0, 100.0] {
+        let sx = pa.screen_x(data_x).round() as u16;
+        let recovered = pa.data_x_from_screen(sx);
+        assert!(
+            (recovered - data_x).abs() < 2.0,
+            "x roundtrip failed for data_x={data_x}: got {recovered}"
+        );
+    }
+}
+
+#[test]
+fn test_plot_area_screen_y_roundtrip() {
+    let pa = PlotArea {
+        x: 10,
+        y: 5,
+        width: 60,
+        height: 30,
+        x_lo: 0.0,
+        x_hi: 100.0,
+        y_lo: 0.0,
+        y_hi: 50.0,
+        area: Rect::new(0, 0, 80, 40),
+    };
+
+    for &data_y in &[0.0, 12.5, 25.0, 37.5, 50.0] {
+        let sy = pa.screen_y(data_y).round() as u16;
+        let recovered = pa.data_y_from_screen(sy);
+        assert!(
+            (recovered - data_y).abs() < 2.5,
+            "y roundtrip failed for data_y={data_y}: got {recovered}"
+        );
+    }
+}
+
+#[test]
+fn test_plot_area_contains() {
+    let pa = PlotArea {
+        x: 10,
+        y: 5,
+        width: 20,
+        height: 10,
+        x_lo: 0.0,
+        x_hi: 1.0,
+        y_lo: 0.0,
+        y_hi: 1.0,
+        area: Rect::new(0, 0, 40, 20),
+    };
+
+    // Inside
+    assert!(pa.contains(10, 5));
+    assert!(pa.contains(15, 10));
+    assert!(pa.contains(29, 14));
+    // On boundary (right edge exclusive)
+    assert!(!pa.contains(30, 5));
+    // On boundary (bottom edge exclusive)
+    assert!(!pa.contains(10, 15));
+    // Outside
+    assert!(!pa.contains(9, 5));
+    assert!(!pa.contains(10, 4));
+    assert!(!pa.contains(31, 16));
+}
+
+#[test]
+fn test_plot_area_nearest_point() {
+    let pa = PlotArea {
+        x: 0,
+        y: 0,
+        width: 100,
+        height: 50,
+        x_lo: 0.0,
+        x_hi: 10.0,
+        y_lo: 0.0,
+        y_hi: 10.0,
+        area: Rect::new(0, 0, 100, 50),
+    };
+
+    let points = vec![(0.0, 0.0), (5.0, 5.0), (10.0, 10.0)];
+
+    // Click near point (5, 5)
+    let sx = pa.screen_x(5.0).round() as u16;
+    let sy = pa.screen_y(5.0).round() as u16;
+    let result = pa.nearest_point(sx, sy, &points);
+    assert!(result.is_some());
+    let (idx, dx, dy) = result.unwrap();
+    assert_eq!(idx, 1);
+    assert!((dx - 5.0).abs() < 1e-10);
+    assert!((dy - 5.0).abs() < 1e-10);
+
+    // Empty points returns None
+    assert!(pa.nearest_point(50, 25, &[]).is_none());
+}
+
+#[test]
+fn test_reference_line_constructors() {
+    let hl = ReferenceLine::hline(0.0, Color::Gray);
+    assert!(matches!(hl, ReferenceLine::Horizontal { y, .. } if (y - 0.0).abs() < 1e-10));
+
+    let vl = ReferenceLine::vline(5.0, Color::Red);
+    assert!(matches!(vl, ReferenceLine::Vertical { x, .. } if (x - 5.0).abs() < 1e-10));
+
+    let hld = ReferenceLine::hline_dashed(1.0, Color::Blue);
+    assert!(
+        matches!(hld, ReferenceLine::Horizontal { y, dash: RefLineDash::Dashed, .. } if (y - 1.0).abs() < 1e-10)
+    );
+
+    let vld = ReferenceLine::vline_dashed(2.0, Color::Green);
+    assert!(
+        matches!(vld, ReferenceLine::Vertical { x, dash: RefLineDash::Dashed, .. } if (x - 2.0).abs() < 1e-10)
+    );
+
+    let hs = ReferenceLine::hspan(0.5, 1.5, Color::Cyan);
+    assert!(
+        matches!(hs, ReferenceLine::HorizontalSpan { y1, y2, .. } if (y1 - 0.5).abs() < 1e-10 && (y2 - 1.5).abs() < 1e-10)
+    );
+
+    let vs = ReferenceLine::vspan(2.0, 4.0, Color::Magenta);
+    assert!(
+        matches!(vs, ReferenceLine::VerticalSpan { x1, x2, .. } if (x1 - 2.0).abs() < 1e-10 && (x2 - 4.0).abs() < 1e-10)
+    );
+}
+
+// ===== 6. Export (export.rs) integration-level tests =====
+
+#[test]
+fn test_export_render_to_buffer_correct_size() {
+    use ratatui_plt::export::render_to_buffer;
+
+    let s = Series::new("s")
+        .data(vec![(0.0, 0.0), (1.0, 1.0)])
+        .color(Color::Cyan);
+    let plot = LinePlot::new().series(s).title("Export Test");
+    let buf = render_to_buffer(&plot, 80, 24);
+
+    assert_eq!(buf.area.width, 80);
+    assert_eq!(buf.area.height, 24);
+    assert_eq!(buf.content.len(), 80 * 24);
+}
+
+#[test]
+fn test_export_buffer_to_text_non_empty() {
+    use ratatui_plt::export::{buffer_to_text, render_to_buffer};
+
+    let s = Series::new("s")
+        .data(vec![(0.0, 0.0), (1.0, 1.0), (2.0, 0.5)])
+        .color(Color::Red);
+    let plot = LinePlot::new().series(s).title("Text Export");
+    let buf = render_to_buffer(&plot, 60, 20);
+    let text = buffer_to_text(&buf);
+
+    assert!(!text.is_empty());
+    // Should contain the title
+    assert!(text.contains("Text Export"));
+}
+
+#[test]
+fn test_export_buffer_to_svg_valid_start_tag() {
+    use ratatui_plt::export::{buffer_to_svg, render_to_buffer};
+
+    let s = Series::new("s")
+        .data(vec![(0.0, 0.0), (1.0, 1.0)])
+        .color(Color::Green);
+    let plot = LinePlot::new().series(s).title("SVG Export");
+    let buf = render_to_buffer(&plot, 40, 12);
+    let svg = buffer_to_svg(&buf, 14.0);
+
+    assert!(svg.starts_with("<svg"), "SVG should start with <svg tag");
+    assert!(svg.contains("</svg>"), "SVG should have closing </svg> tag");
+    assert!(svg.contains("xmlns"), "SVG should contain xmlns attribute");
+}
+
+// ===== 7. New widgets (render-without-panic tests) =====
+
+#[test]
+fn test_ecdf_plot_renders() {
+    let plot = EcdfPlot::new()
+        .dataset(EcdfDataset::new(
+            "Sample A",
+            vec![1.0, 2.0, 3.0, 4.0, 5.0],
+            Color::Cyan,
+        ))
+        .dataset(EcdfDataset::new(
+            "Sample B",
+            vec![2.0, 3.0, 4.0, 5.0, 8.0],
+            Color::Yellow,
+        ))
+        .title("ECDF");
+
+    let area = Rect::new(0, 0, 40, 20);
+    let mut buf = Buffer::empty(area);
+    (&plot).render(area, &mut buf);
+}
+
+#[test]
+fn test_stairs_plot_renders() {
+    use ratatui_plt::widgets::stairs::StairsDataset;
+
+    let plot = StairsPlot::new()
+        .dataset(StairsDataset::new(
+            "Hist",
+            vec![0.0, 1.0, 2.0, 3.0, 4.0],
+            vec![5.0, 12.0, 8.0, 3.0],
+            Color::Cyan,
+        ))
+        .title("Stairs");
+
+    let area = Rect::new(0, 0, 40, 20);
+    let mut buf = Buffer::empty(area);
+    (&plot).render(area, &mut buf);
+}
+
+#[test]
+fn test_rug_plot_renders() {
+    let plot = RugPlot::new()
+        .dataset(RugDataset::new(
+            "Obs",
+            vec![1.0, 2.5, 3.0, 4.2, 5.5],
+            Color::Cyan,
+        ))
+        .title("Rug");
+
+    let area = Rect::new(0, 0, 40, 20);
+    let mut buf = Buffer::empty(area);
+    (&plot).render(area, &mut buf);
+}
+
+#[test]
+fn test_strip_plot_renders() {
+    let plot = StripPlot::new()
+        .group(StripGroup::new("A", vec![1.0, 2.0, 3.0, 4.0], Color::Cyan))
+        .group(StripGroup::new(
+            "B",
+            vec![2.0, 3.0, 5.0, 7.0],
+            Color::Yellow,
+        ))
+        .jitter(0.0)
+        .title("Strip");
+
+    let area = Rect::new(0, 0, 40, 20);
+    let mut buf = Buffer::empty(area);
+    (&plot).render(area, &mut buf);
+}
+
+#[test]
+fn test_band_plot_renders() {
+    let x: Vec<f64> = (0..20).map(|i| i as f64 * 0.25).collect();
+    let y_lower: Vec<f64> = x.iter().map(|&v| v.sin() - 0.3).collect();
+    let y_upper: Vec<f64> = x.iter().map(|&v| v.sin() + 0.3).collect();
+
+    let plot = BandPlot::new()
+        .band(Band::new("confidence", x, y_lower, y_upper).color(Color::Cyan))
+        .title("Band");
+
+    let area = Rect::new(0, 0, 40, 20);
+    let mut buf = Buffer::empty(area);
+    (&plot).render(area, &mut buf);
+}
+
+#[test]
+fn test_candlestick_chart_renders() {
+    let plot = CandlestickChart::new()
+        .candles(vec![
+            Candle::new(1.0, 100.0, 110.0, 95.0, 108.0),
+            Candle::new(2.0, 108.0, 115.0, 105.0, 103.0),
+            Candle::new(3.0, 103.0, 112.0, 100.0, 110.0),
+            Candle::new(4.0, 110.0, 118.0, 107.0, 115.0),
+            Candle::new(5.0, 115.0, 120.0, 110.0, 108.0),
+        ])
+        .title("OHLC");
+
+    let area = Rect::new(0, 0, 40, 20);
+    let mut buf = Buffer::empty(area);
+    (&plot).render(area, &mut buf);
+}
+
+#[test]
+fn test_parallel_coords_renders() {
+    use ratatui_plt::widgets::parallel_coords::{ParallelAxis, ParallelRecord};
+
+    let plot = ParallelCoords::new()
+        .axes(vec![
+            ParallelAxis::new("Speed", 0.0, 100.0),
+            ParallelAxis::new("Power", 0.0, 500.0),
+            ParallelAxis::new("Weight", 1000.0, 3000.0),
+        ])
+        .record(
+            ParallelRecord::new(vec![60.0, 300.0, 1500.0])
+                .color(Color::Cyan)
+                .name("Car A"),
+        )
+        .record(
+            ParallelRecord::new(vec![80.0, 450.0, 2000.0])
+                .color(Color::Red)
+                .name("Car B"),
+        )
+        .title("Parallel Coords");
+
+    let area = Rect::new(0, 0, 60, 20);
+    let mut buf = Buffer::empty(area);
+    (&plot).render(area, &mut buf);
+}
+
+#[test]
+fn test_bar3d_renders_with_camera_state() {
+    use ratatui_plt::widgets::bar3d::{Bar3D, Bar3DData};
+
+    let bars = vec![
+        Bar3DData::new(0.0, 0.0, 3.0).color(Color::Cyan),
+        Bar3DData::new(1.0, 0.0, 5.0).color(Color::Yellow),
+        Bar3DData::new(2.0, 0.0, 2.0).color(Color::Green),
+        Bar3DData::new(0.0, 1.0, 4.0).color(Color::Red),
+    ];
+    let plot = Bar3D::new(bars).title("3D Bars");
+
+    let area = Rect::new(0, 0, 40, 20);
+    let mut buf = Buffer::empty(area);
+    let mut state = Camera3DState::default();
+    StatefulWidget::render(&plot, area, &mut buf, &mut state);
+}
+
+#[test]
+fn test_swarm_plot_renders() {
+    use ratatui_plt::widgets::swarm::SwarmGroup;
+
+    let plot = SwarmPlot::new()
+        .group(SwarmGroup::new(
+            "A",
+            vec![1.0, 1.1, 1.2, 2.0, 3.0, 3.1, 4.0],
+            Color::Cyan,
+        ))
+        .group(SwarmGroup::new(
+            "B",
+            vec![2.0, 2.5, 3.0, 3.5, 4.0, 4.5, 5.0],
+            Color::Yellow,
+        ))
+        .title("Swarm");
+
+    let area = Rect::new(0, 0, 40, 20);
+    let mut buf = Buffer::empty(area);
+    (&plot).render(area, &mut buf);
+}
+
+#[test]
+fn test_boxen_plot_renders() {
+    use ratatui_plt::widgets::boxen::BoxenGroup;
+
+    let data_a: Vec<f64> = (0..50)
+        .map(|i| 5.0 + (i as f64 * 0.1).sin() * 3.0)
+        .collect();
+    let data_b: Vec<f64> = (0..50)
+        .map(|i| 8.0 + (i as f64 * 0.15).cos() * 2.0)
+        .collect();
+
+    let plot = BoxenPlot::new()
+        .group(BoxenGroup::new("A", data_a, Color::Cyan))
+        .group(BoxenGroup::new("B", data_b, Color::Yellow))
+        .title("Boxen");
+
+    let area = Rect::new(0, 0, 40, 20);
+    let mut buf = Buffer::empty(area);
+    (&plot).render(area, &mut buf);
+}
+
+#[test]
+fn test_quiver3d_renders_with_camera_state() {
+    use ratatui_plt::widgets::quiver3d::Arrow3D;
+
+    let arrows: Vec<Arrow3D> = (0..3)
+        .flat_map(|i| {
+            (0..3).map(move |j| {
+                let x = i as f64 - 1.0;
+                let y = j as f64 - 1.0;
+                Arrow3D::new(x, y, 0.0, -y * 0.3, x * 0.3, 0.1)
+            })
+        })
+        .collect();
+
+    let plot = Quiver3D::new(arrows).title("3D Quiver");
+
+    let area = Rect::new(0, 0, 40, 20);
+    let mut buf = Buffer::empty(area);
+    let mut state = Camera3DState::default();
+    StatefulWidget::render(&plot, area, &mut buf, &mut state);
+}
+
+#[test]
+fn test_contour3d_renders_with_camera_state() {
+    let data = GridData::from_fn((-2.0, 2.0), (-2.0, 2.0), 10, 10, |x, y| {
+        (-(x * x + y * y) / 2.0).exp()
+    });
+    let plot = Contour3D::new(data).levels(5).title("3D Contour");
+
+    let area = Rect::new(0, 0, 40, 20);
+    let mut buf = Buffer::empty(area);
+    let mut state = Camera3DState::default();
+    StatefulWidget::render(&plot, area, &mut buf, &mut state);
+}
+
+#[test]
+fn test_dendrogram_renders() {
+    let links = vec![
+        DendroLink::new(0, 1, 1.0),
+        DendroLink::new(2, 3, 1.5),
+        DendroLink::new(4, 5, 3.0),
+    ];
+    let labels = vec!["A".into(), "B".into(), "C".into(), "D".into()];
+    let plot = Dendrogram::new(links, labels).title("Clustering");
+
+    let area = Rect::new(0, 0, 40, 20);
+    let mut buf = Buffer::empty(area);
+    (&plot).render(area, &mut buf);
+}
+
+#[test]
+fn test_pcolormesh_renders() {
+    let nr = 5;
+    let nt = 8;
+    let mut x = vec![vec![0.0; nt + 1]; nr + 1];
+    let mut y = vec![vec![0.0; nt + 1]; nr + 1];
+    let mut values = vec![vec![0.0; nt]; nr];
+
+    for i in 0..=nr {
+        let r = i as f64 / nr as f64;
+        for j in 0..=nt {
+            let theta = 2.0 * std::f64::consts::PI * j as f64 / nt as f64;
+            x[i][j] = r * theta.cos();
+            y[i][j] = r * theta.sin();
+        }
+    }
+    for i in 0..nr {
+        for j in 0..nt {
+            values[i][j] = (i as f64 + j as f64) / (nr + nt) as f64;
+        }
+    }
+
+    let plot = Pcolormesh::new(x, y, values).title("Polar Mesh");
+
+    let area = Rect::new(0, 0, 40, 20);
+    let mut buf = Buffer::empty(area);
+    (&plot).render(area, &mut buf);
+}
+
+#[test]
+fn test_crosshair_overlay_renders() {
+    // First render a plot to get a PlotArea
+    let s = Series::new("data")
+        .data(vec![(0.0, 0.0), (5.0, 5.0), (10.0, 2.0)])
+        .color(Color::Cyan);
+    let plot = LinePlot::new().series(s).title("Crosshair Test");
+
+    let area = Rect::new(0, 0, 60, 20);
+    let mut buf = Buffer::empty(area);
+    (&plot).render(area, &mut buf);
+
+    // Create a PlotArea for the crosshair to render on
+    let pa = PlotArea {
+        x: 8,
+        y: 1,
+        width: 50,
+        height: 16,
+        x_lo: 0.0,
+        x_hi: 10.0,
+        y_lo: 0.0,
+        y_hi: 5.0,
+        area,
+    };
+
+    let cursor = Crosshair::new(5.0, 2.5)
+        .color(Color::Yellow)
+        .show_labels(true);
+    cursor.render_on(&pa, &mut buf);
+    // No panic is the test
+}
+
+// ===== 8. Enhanced existing widgets =====
+
+#[test]
+fn test_line_plot_step_mode_pre_renders() {
+    use ratatui_plt::widgets::line_plot::StepMode;
+
+    let s = Series::new("step")
+        .data(vec![(0.0, 1.0), (1.0, 3.0), (2.0, 2.0), (3.0, 4.0)])
+        .color(Color::Cyan);
+    let plot = LinePlot::new()
+        .series(s)
+        .step_mode(StepMode::Pre)
+        .title("Step Pre");
+
+    let area = Rect::new(0, 0, 40, 20);
+    let mut buf = Buffer::empty(area);
+    (&plot).render(area, &mut buf);
+}
+
+#[test]
+fn test_line_plot_step_mode_mid_renders() {
+    use ratatui_plt::widgets::line_plot::StepMode;
+
+    let s = Series::new("step")
+        .data(vec![(0.0, 1.0), (1.0, 3.0), (2.0, 2.0), (3.0, 4.0)])
+        .color(Color::Yellow);
+    let plot = LinePlot::new()
+        .series(s)
+        .step_mode(StepMode::Mid)
+        .title("Step Mid");
+
+    let area = Rect::new(0, 0, 40, 20);
+    let mut buf = Buffer::empty(area);
+    (&plot).render(area, &mut buf);
+}
+
+#[test]
+fn test_line_plot_step_mode_post_renders() {
+    use ratatui_plt::widgets::line_plot::StepMode;
+
+    let s = Series::new("step")
+        .data(vec![(0.0, 1.0), (1.0, 3.0), (2.0, 2.0), (3.0, 4.0)])
+        .color(Color::Green);
+    let plot = LinePlot::new()
+        .series(s)
+        .step_mode(StepMode::Post)
+        .title("Step Post");
+
+    let area = Rect::new(0, 0, 40, 20);
+    let mut buf = Buffer::empty(area);
+    (&plot).render(area, &mut buf);
+}
+
+#[test]
+fn test_heatmap_show_values_renders() {
+    let data = GridData::from_fn((-1.0, 1.0), (-1.0, 1.0), 5, 5, |x, y| x + y);
+    let hm = Heatmap::new(data).show_values(true).title("Heatmap Values");
+
+    let area = Rect::new(0, 0, 60, 20);
+    let mut buf = Buffer::empty(area);
+    (&hm).render(area, &mut buf);
+}
+
+#[test]
+fn test_heatmap_mask_renders() {
+    let data = GridData::from_fn((-1.0, 1.0), (-1.0, 1.0), 5, 5, |x, y| x * y);
+    // Mask the diagonal cells
+    let mask = (0..5).map(|i| (0..5).map(|j| i == j).collect()).collect();
+    let hm = Heatmap::new(data).mask(mask).title("Masked Heatmap");
+
+    let area = Rect::new(0, 0, 40, 20);
+    let mut buf = Buffer::empty(area);
+    (&hm).render(area, &mut buf);
+}
+
+#[test]
+fn test_contour_show_labels_renders() {
+    let data = GridData::from_fn((-2.0, 2.0), (-2.0, 2.0), 15, 15, |x, y| x * x + y * y);
+    let contour = ContourPlot::new(data)
+        .levels(5)
+        .show_labels(true)
+        .title("Contour Labels");
+
+    let area = Rect::new(0, 0, 60, 30);
+    let mut buf = Buffer::empty(area);
+    (&contour).render(area, &mut buf);
+}
+
+#[test]
+fn test_box_plot_show_means_renders() {
+    let g1 = BoxData::new(
+        "A",
+        vec![1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0],
+        Color::Cyan,
+    );
+    let plot = BoxPlot::new()
+        .box_data(g1)
+        .show_means(true)
+        .title("Box Means");
+
+    let area = Rect::new(0, 0, 40, 20);
+    let mut buf = Buffer::empty(area);
+    (&plot).render(area, &mut buf);
+}
+
+#[test]
+fn test_box_plot_notch_renders() {
+    let g1 = BoxData::new(
+        "A",
+        vec![1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0],
+        Color::Cyan,
+    );
+    let g2 = BoxData::new(
+        "B",
+        vec![3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0, 11.0, 12.0],
+        Color::Yellow,
+    );
+    let plot = BoxPlot::new()
+        .box_data(g1)
+        .box_data(g2)
+        .notch(true)
+        .title("Notched Box");
+
+    let area = Rect::new(0, 0, 40, 20);
+    let mut buf = Buffer::empty(area);
+    (&plot).render(area, &mut buf);
+}
+
+#[test]
+fn test_box_plot_show_means_and_notch_renders() {
+    let g = BoxData::new(
+        "Combined",
+        (1..=20).map(|i| i as f64).collect(),
+        Color::Green,
+    );
+    let plot = BoxPlot::new()
+        .box_data(g)
+        .show_means(true)
+        .notch(true)
+        .title("Means + Notch");
+
+    let area = Rect::new(0, 0, 40, 20);
+    let mut buf = Buffer::empty(area);
+    (&plot).render(area, &mut buf);
+}
+
+#[test]
+fn test_histogram_multiple_datasets_renders() {
+    let hist = Histogram::new(vec![1.0, 2.0, 3.0])
+        .dataset(HistDataset::new(
+            "Set A",
+            vec![1.0, 1.5, 2.0, 2.5, 3.0],
+            Color::Cyan,
+        ))
+        .dataset(HistDataset::new(
+            "Set B",
+            vec![2.0, 2.5, 3.0, 3.5, 4.0],
+            Color::Yellow,
+        ))
+        .hist_mode(HistMode::Stacked)
+        .title("Multi-Histogram");
+
+    let area = Rect::new(0, 0, 40, 20);
+    let mut buf = Buffer::empty(area);
+    (&hist).render(area, &mut buf);
+}
+
+#[test]
+fn test_histogram_bin_method_fd_renders() {
+    let data: Vec<f64> = (0..100).map(|i| (i as f64 * 0.05).sin()).collect();
+    let hist = Histogram::new(data)
+        .bin_method(BinMethod::Fd)
+        .title("FD Bins");
+
+    let area = Rect::new(0, 0, 40, 20);
+    let mut buf = Buffer::empty(area);
+    (&hist).render(area, &mut buf);
+}
+
+#[test]
+fn test_histogram_bin_method_scott_renders() {
+    let data: Vec<f64> = (0..100).map(|i| (i as f64 * 0.05).cos()).collect();
+    let hist = Histogram::new(data)
+        .bin_method(BinMethod::Scott)
+        .title("Scott Bins");
+
+    let area = Rect::new(0, 0, 40, 20);
+    let mut buf = Buffer::empty(area);
+    (&hist).render(area, &mut buf);
+}
+
+#[test]
+fn test_histogram_bin_method_sturges_renders() {
+    let data: Vec<f64> = (0..80).map(|i| i as f64 * 0.1).collect();
+    let hist = Histogram::new(data)
+        .bin_method(BinMethod::Sturges)
+        .title("Sturges Bins");
+
+    let area = Rect::new(0, 0, 40, 20);
+    let mut buf = Buffer::empty(area);
+    (&hist).render(area, &mut buf);
+}
+
+#[test]
+fn test_histogram_bin_method_sqrt_renders() {
+    let data: Vec<f64> = (0..64).map(|i| i as f64 * 0.1).collect();
+    let hist = Histogram::new(data)
+        .bin_method(BinMethod::Sqrt)
+        .title("Sqrt Bins");
+
+    let area = Rect::new(0, 0, 40, 20);
+    let mut buf = Buffer::empty(area);
+    (&hist).render(area, &mut buf);
+}
+
+#[test]
+fn test_histogram_bin_method_auto_renders() {
+    let data: Vec<f64> = (0..200).map(|i| (i as f64 * 0.03).sin() * 5.0).collect();
+    let hist = Histogram::new(data)
+        .bin_method(BinMethod::Auto)
+        .title("Auto Bins");
+
+    let area = Rect::new(0, 0, 40, 20);
+    let mut buf = Buffer::empty(area);
+    (&hist).render(area, &mut buf);
+}
+
+#[test]
+fn test_histogram_step_type_renders() {
+    let data: Vec<f64> = (0..50).map(|i| i as f64 * 0.2).collect();
+    let hist = Histogram::new(data)
+        .histtype(HistType::Step)
+        .bins(10)
+        .title("Step Histogram");
+
+    let area = Rect::new(0, 0, 40, 20);
+    let mut buf = Buffer::empty(area);
+    (&hist).render(area, &mut buf);
+}
+
+#[test]
+fn test_histogram_side_by_side_mode_renders() {
+    let hist = Histogram::new(vec![1.0])
+        .dataset(HistDataset::new(
+            "X",
+            vec![1.0, 2.0, 3.0, 4.0, 5.0],
+            Color::Cyan,
+        ))
+        .dataset(HistDataset::new(
+            "Y",
+            vec![2.0, 3.0, 4.0, 5.0, 6.0],
+            Color::Red,
+        ))
+        .hist_mode(HistMode::SideBySide)
+        .bins(5)
+        .title("Side-by-side");
+
+    let area = Rect::new(0, 0, 40, 20);
+    let mut buf = Buffer::empty(area);
+    (&hist).render(area, &mut buf);
+}
+
+#[test]
+fn test_violin_plot_split_mode_renders() {
+    let vals1: Vec<f64> = (0..30)
+        .map(|i| 5.0 + (i as f64 * 0.3).sin() * 2.0)
+        .collect();
+    let vals2: Vec<f64> = (0..30)
+        .map(|i| 5.0 + (i as f64 * 0.2).cos() * 3.0)
+        .collect();
+    let d1 = ViolinData::new("Male", vals1, Color::Cyan);
+    let d2 = ViolinData::new("Female", vals2, Color::Magenta);
+    let plot = ViolinPlot::new()
+        .dataset(d1)
+        .dataset(d2)
+        .split(true)
+        .title("Split Violin");
+
+    let area = Rect::new(0, 0, 40, 20);
+    let mut buf = Buffer::empty(area);
+    (&plot).render(area, &mut buf);
+}
+
+// ========================================================================
+// Gap Analysis Implementation Tests
+// ========================================================================
+
+#[test]
+fn test_minor_grid_color_theme() {
+    let theme = Theme::dark();
+    assert!(matches!(theme.minor_grid_color, Color::Rgb(40, 40, 40)));
+}
+
+#[test]
+fn test_tick_direction_and_params() {
+    use ratatui_plt::axis::TickDirection;
+    let axis = Axis::new()
+        .tick_direction(TickDirection::InOut)
+        .tick_size(2)
+        .tick_padding(2)
+        .label_rotation(LabelRotation::Vertical);
+    assert_eq!(axis.tick_direction, TickDirection::InOut);
+    assert_eq!(axis.tick_size, 2);
+    assert_eq!(axis.tick_padding, 2);
+    assert_eq!(axis.label_rotation, LabelRotation::Vertical);
+}
+
+#[test]
+fn test_custom_dash_pattern_renders() {
+    let s = Series::new("custom_dash")
+        .data(vec![(0.0, 0.0), (1.0, 1.0), (2.0, 0.5)])
+        .color(Color::Cyan)
+        .line_style(LineStyle {
+            pattern: DashPattern::Custom(vec![6, 3]),
+            thickness: ratatui_plt::style::Thickness::Normal,
+        });
+    let plot = LinePlot::new().series(s);
+    let area = Rect::new(0, 0, 40, 20);
+    let mut buf = Buffer::empty(area);
+    (&plot).render(area, &mut buf);
+}
+
+#[test]
+fn test_hatch_pattern_char_at() {
+    let fwd = HatchPattern::Forward;
+    let has_some = (0..10u16)
+        .flat_map(|r| (0..10u16).map(move |c| (r, c)))
+        .any(|(r, c)| fwd.char_at(r, c).is_some());
+    assert!(has_some);
+    assert!(HatchPattern::None.char_at(0, 0).is_none());
+}
+
+#[test]
+fn test_multi_column_legend_size() {
+    use ratatui_plt::legend::LegendEntry;
+    let entries = vec![
+        LegendEntry {
+            name: "AAAA".into(),
+            color: Color::Red,
+            marker: None,
+        },
+        LegendEntry {
+            name: "BBBB".into(),
+            color: Color::Blue,
+            marker: None,
+        },
+        LegendEntry {
+            name: "CCCC".into(),
+            color: Color::Green,
+            marker: None,
+        },
+        LegendEntry {
+            name: "DDDD".into(),
+            color: Color::Yellow,
+            marker: None,
+        },
+    ];
+    let l1 = ratatui_plt::legend::Legend::new(entries.clone()).columns(1);
+    let l2 = ratatui_plt::legend::Legend::new(entries).columns(2);
+    let (w1, h1) = l1.size();
+    let (w2, h2) = l2.size();
+    assert!(w2 > w1);
+    assert!(h2 < h1);
+}
+
+#[test]
+fn test_colorbar_extend_renders() {
+    use ratatui_plt::colormap::{Colorbar, ColorbarExtend, Viridis};
+    let cb = Colorbar::new(&Viridis, 0.0, 10.0).extend(ColorbarExtend::Both);
+    let area = Rect::new(0, 0, 12, 20);
+    let mut buf = Buffer::empty(area);
+    (&cb).render(area, &mut buf);
+}
+
+#[test]
+fn test_colormap_resample() {
+    use ratatui_plt::colormap::{Colormap, Viridis, resample};
+    let r = resample(&Viridis, 10);
+    assert_eq!(r.name(), "viridis_resampled");
+    assert_eq!(Viridis.color_at(0.0), r.color_at(0.0));
+}
+
+#[test]
+fn test_split_at_nan() {
+    let data = vec![
+        (0.0, 0.0),
+        (1.0, 1.0),
+        (f64::NAN, 0.0),
+        (3.0, 3.0),
+        (4.0, 4.0),
+    ];
+    let segs = split_at_nan(&data);
+    assert_eq!(segs.len(), 2);
+    assert_eq!(segs[0].len(), 2);
+    assert_eq!(segs[1].len(), 2);
+}
+
+#[test]
+fn test_collections_api() {
+    let lc = LineCollection::new()
+        .segment((0.0, 0.0), (1.0, 1.0), Color::Red)
+        .segment((1.0, 0.0), (0.0, 1.0), Color::Blue);
+    assert_eq!(lc.segments.len(), 2);
+    let pc =
+        PathCollection::new().path(vec![(0.0, 0.0), (1.0, 1.0), (2.0, 0.0)], Color::Green, true);
+    assert_eq!(pc.paths.len(), 1);
+}
+
+#[test]
+fn test_sankey_diagram_renders() {
+    let d = SankeyDiagram::new()
+        .node(SankeyNode {
+            label: "A".into(),
+            color: Color::Red,
+        })
+        .node(SankeyNode {
+            label: "B".into(),
+            color: Color::Blue,
+        })
+        .node(SankeyNode {
+            label: "C".into(),
+            color: Color::Green,
+        })
+        .flow(SankeyFlow {
+            source: 0,
+            target: 2,
+            value: 5.0,
+            color: None,
+        })
+        .flow(SankeyFlow {
+            source: 1,
+            target: 2,
+            value: 3.0,
+            color: None,
+        })
+        .title("Sankey");
+    let area = Rect::new(0, 0, 60, 20);
+    let mut buf = Buffer::empty(area);
+    (&d).render(area, &mut buf);
+}
+
+#[test]
+fn test_treemap_renders() {
+    let root = TreemapNode {
+        label: "R".into(),
+        value: 100.0,
+        color: None,
+        children: vec![
+            TreemapNode {
+                label: "A".into(),
+                value: 60.0,
+                color: Some(Color::Red),
+                children: vec![],
+            },
+            TreemapNode {
+                label: "B".into(),
+                value: 40.0,
+                color: Some(Color::Blue),
+                children: vec![],
+            },
+        ],
+    };
+    let tm = Treemap::new(root).title("TM");
+    let area = Rect::new(0, 0, 40, 20);
+    let mut buf = Buffer::empty(area);
+    (&tm).render(area, &mut buf);
+}
+
+#[test]
+fn test_sunburst_renders() {
+    let root = SunburstNode {
+        label: "R".into(),
+        value: 100.0,
+        color: None,
+        children: vec![
+            SunburstNode {
+                label: "A".into(),
+                value: 60.0,
+                color: Some(Color::Cyan),
+                children: vec![],
+            },
+            SunburstNode {
+                label: "B".into(),
+                value: 40.0,
+                color: Some(Color::Yellow),
+                children: vec![],
+            },
+        ],
+    };
+    let sb = Sunburst::new(root).title("SB");
+    let area = Rect::new(0, 0, 40, 20);
+    let mut buf = Buffer::empty(area);
+    (&sb).render(area, &mut buf);
+}
+
+#[test]
+fn test_ternary_plot_renders() {
+    let data = TernaryData {
+        label: "Mix".into(),
+        points: vec![(0.5, 0.3, 0.2), (0.1, 0.8, 0.1)],
+        color: Color::Cyan,
+        marker: MarkerShape::FilledCircle,
+    };
+    let plot = TernaryPlot::new().dataset(data).title("Tern");
+    let area = Rect::new(0, 0, 50, 25);
+    let mut buf = Buffer::empty(area);
+    (&plot).render(area, &mut buf);
+}
+
+#[test]
+fn test_network_plot_renders() {
+    let plot = NetworkPlot::new()
+        .node(GraphNode {
+            label: "A".into(),
+            color: Color::Cyan,
+            position: None,
+            marker: MarkerShape::FilledCircle,
+        })
+        .node(GraphNode {
+            label: "B".into(),
+            color: Color::Yellow,
+            position: None,
+            marker: MarkerShape::FilledCircle,
+        })
+        .edge(GraphEdge {
+            source: 0,
+            target: 1,
+            weight: 1.0,
+            color: None,
+        })
+        .layout(GraphLayout::Circular)
+        .title("Net");
+    let area = Rect::new(0, 0, 40, 20);
+    let mut buf = Buffer::empty(area);
+    (&plot).render(area, &mut buf);
+}
+
+#[test]
+fn test_triangulation_and_triplot() {
+    use ratatui_plt::triangulation::Triangulation;
+    let tri =
+        Triangulation::from_explicit(vec![(0.0, 0.0), (1.0, 0.0), (0.5, 0.87)], vec![(0, 1, 2)]);
+    assert_eq!(tri.edges().len(), 3);
+    let plot = TriPlot::new(tri).title("Tri");
+    let area = Rect::new(0, 0, 40, 20);
+    let mut buf = Buffer::empty(area);
+    (&plot).render(area, &mut buf);
+}
+
+#[test]
+fn test_inset_axes_rect() {
+    let inset = InsetAxes::new(0.5, 0.1, 0.4, 0.3);
+    let parent = Rect::new(0, 0, 100, 50);
+    let r = inset.rect(parent);
+    assert_eq!(r.x, 50);
+    assert_eq!(r.y, 5);
+}
+
+#[test]
+fn test_pick_nearest() {
+    let pa = PlotArea {
+        x: 0,
+        y: 0,
+        width: 100,
+        height: 50,
+        x_lo: 0.0,
+        x_hi: 10.0,
+        y_lo: 0.0,
+        y_hi: 10.0,
+        area: Rect::new(0, 0, 100, 50),
+    };
+    let s1 = Series::new("a")
+        .data(vec![(2.0, 3.0), (5.0, 5.0)])
+        .color(Color::Red);
+    let result = pick_nearest(
+        pa.screen_x(5.0).round() as u16,
+        pa.screen_y(5.0).round() as u16,
+        &[s1],
+        &pa,
+    );
+    assert!(result.is_some());
+    assert_eq!(result.unwrap().point_index, 1);
+}
+
+#[test]
+fn test_brush_state() {
+    let mut brush = BrushState::new();
+    brush.set_selection(1.0, 1.0, 5.0, 5.0);
+    assert!(brush.contains(3.0, 3.0));
+    assert!(!brush.contains(0.0, 0.0));
+    let data = vec![(0.0, 0.0), (3.0, 3.0), (6.0, 6.0)];
+    brush.update_indices(&[&data]);
+    assert_eq!(brush.selected_indices[0], vec![1]);
+}
+
+#[test]
+fn test_theme_guard_restores() {
+    let orig = Theme::get_default();
+    {
+        let _g = Theme::solarized().activate();
+        assert!(matches!(
+            Theme::get_default().background,
+            Color::Rgb(0, 43, 54)
+        ));
+    }
+    assert_eq!(
+        format!("{:?}", orig.background),
+        format!("{:?}", Theme::get_default().background)
+    );
+}
+
+#[test]
+fn test_plot_config_activate() {
+    let mut cfg = PlotConfig::default();
+    cfg.grid_visible = true;
+    let _g = cfg.activate();
+    assert!(PlotConfig::get_default().grid_visible);
+}
+
+#[test]
+fn test_radial_plot_enhancements() {
+    let data: Vec<(f64, f64)> = (0..36)
+        .map(|i| (i as f64 * std::f64::consts::TAU / 36.0, 1.0))
+        .collect();
+    let s = Series::new("c").data(data).color(Color::Magenta);
+    let plot = RadialPlot::new()
+        .series(s)
+        .theta_direction(ThetaDirection::Clockwise)
+        .plot_type(PolarPlotType::Scatter)
+        .title("Enhanced Polar");
+    let area = Rect::new(0, 0, 40, 20);
+    let mut buf = Buffer::empty(area);
+    (&plot).render(area, &mut buf);
+}
+
+#[test]
+fn test_box_plot_bootstrap_ci() {
+    let data: Vec<f64> = (0..50).map(|i| i as f64 * 0.2).collect();
+    let g = BoxData::new("Bootstrap", data, Color::Cyan);
+    let plot = BoxPlot::new()
+        .box_data(g)
+        .bootstrap_ci(true)
+        .bootstrap_n(100)
+        .title("CI");
+    let area = Rect::new(0, 0, 40, 20);
+    let mut buf = Buffer::empty(area);
+    (&plot).render(area, &mut buf);
 }

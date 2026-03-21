@@ -1,4 +1,7 @@
-//! Contour plot example: 2D potential field from two Gaussian peaks with filled contours.
+//! Contour plot example: filled 2D potential field.
+//!
+//! Demonstrates filled contour rendering with a high-resolution grid
+//! and the Viridis colormap.
 
 use std::io;
 
@@ -44,9 +47,9 @@ fn main() -> color_eyre::Result<()> {
         .levels(12)
         .filled(true)
         .colormap(Viridis)
-        .title("2D Potential Field (two Gaussian peaks)")
-        .x_axis(Axis::new().label("x"))
-        .y_axis(Axis::new().label("y"))
+        .title("2D Potential Field (two Gaussian peaks) — q to quit")
+        .x_axis(Axis::new().label("x").grid(true))
+        .y_axis(Axis::new().label("y").grid(true))
         .aspect_ratio(AspectRatio::Equal);
 
     loop {

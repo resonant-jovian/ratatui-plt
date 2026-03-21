@@ -207,6 +207,109 @@ impl Normalize for BoundaryNorm {
     }
 }
 
+/// Centered normalization: symmetric around a center value.
+///
+/// Maps [vmin, vcenter] to [0, 0.5] and [vcenter, vmax] to [0.5, 1.0],
+/// ensuring the center maps to 0.5. Useful for diverging colormaps.
+#[derive(Clone, Debug)]
+pub struct CenteredNorm {
+    pub vcenter: f64,
+    pub halfrange: f64,
+}
+
+impl CenteredNorm {
+    /// Create a centered norm. `halfrange` is the distance from center to each extreme.
+    /// If 0, it will be computed as max(|vmin - vcenter|, |vmax - vcenter|).
+    pub fn new(vcenter: f64, halfrange: f64) -> Self {
+        Self { vcenter, halfrange }
+    }
+
+    /// Create from data bounds, automatically computing the symmetric range.
+    pub fn from_bounds(vcenter: f64, vmin: f64, vmax: f64) -> Self {
+        let halfrange = (vmin - vcenter).abs().max((vmax - vcenter).abs());
+        Self { vcenter, halfrange }
+    }
+}
+
+impl Normalize for CenteredNorm {
+    fn normalize(&self, value: f64) -> f64 {
+        if self.halfrange == 0.0 {
+            return 0.5;
+        }
+        (0.5 + 0.5 * (value - self.vcenter) / self.halfrange).clamp(0.0, 1.0)
+    }
+
+    fn box_clone(&self) -> Box<dyn Normalize> {
+        Box::new(self.clone())
+    }
+}
+
+/// Inverse hyperbolic sine normalization. Matches the `Asinh` scale.
+///
+/// Provides smooth transition between linear (near zero) and logarithmic behavior.
+#[derive(Clone, Debug)]
+pub struct AsinhNorm {
+    pub linear_width: f64,
+    pub vmin: f64,
+    pub vmax: f64,
+}
+
+impl AsinhNorm {
+    pub fn new(linear_width: f64, vmin: f64, vmax: f64) -> Self {
+        Self {
+            linear_width,
+            vmin,
+            vmax,
+        }
+    }
+}
+
+impl Normalize for AsinhNorm {
+    fn normalize(&self, value: f64) -> f64 {
+        let t_min = (self.vmin / self.linear_width).asinh();
+        let t_max = (self.vmax / self.linear_width).asinh();
+        let t_val = (value / self.linear_width).asinh();
+        if t_max == t_min {
+            return 0.5;
+        }
+        ((t_val - t_min) / (t_max - t_min)).clamp(0.0, 1.0)
+    }
+
+    fn box_clone(&self) -> Box<dyn Normalize> {
+        Box::new(self.clone())
+    }
+}
+
+/// User-defined normalization function.
+///
+/// Wraps an arbitrary function that maps values to [0, 1].
+pub struct FuncNorm {
+    func: Box<dyn Fn(f64) -> f64 + Send + Sync>,
+}
+
+impl FuncNorm {
+    pub fn new(f: impl Fn(f64) -> f64 + Send + Sync + 'static) -> Self {
+        Self { func: Box::new(f) }
+    }
+}
+
+impl Normalize for FuncNorm {
+    fn normalize(&self, value: f64) -> f64 {
+        (self.func)(value).clamp(0.0, 1.0)
+    }
+
+    fn box_clone(&self) -> Box<dyn Normalize> {
+        // FuncNorm cannot be cloned; return a LinearNorm fallback.
+        Box::new(LinearNorm::new(0.0, 1.0))
+    }
+}
+
+impl std::fmt::Debug for FuncNorm {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("FuncNorm").finish()
+    }
+}
+
 /// Two-slope normalization: different rates above and below a center value.
 ///
 /// Critical for diverging colormaps where the center represents a meaningful value

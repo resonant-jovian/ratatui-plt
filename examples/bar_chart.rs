@@ -33,11 +33,21 @@ fn main() -> color_eyre::Result<()> {
     let mut terminal = Terminal::new(CrosstermBackend::new(io::stdout()))?;
 
     let categories = vec!["Q1", "Q2", "Q3", "Q4", "Q5"];
-    let widgets = BarDataset::new("Widgets", vec![120.0, 150.0, 180.0, 140.0, 200.0], Color::Cyan);
-    let gadgets =
-        BarDataset::new("Gadgets", vec![90.0, 110.0, 130.0, 160.0, 175.0], Color::Yellow);
-    let gizmos =
-        BarDataset::new("Gizmos", vec![60.0, 80.0, 100.0, 120.0, 90.0], Color::Magenta);
+    let widgets = BarDataset::new(
+        "Widgets",
+        vec![120.0, 150.0, 180.0, 140.0, 200.0],
+        Color::Cyan,
+    );
+    let gadgets = BarDataset::new(
+        "Gadgets",
+        vec![90.0, 110.0, 130.0, 160.0, 175.0],
+        Color::Yellow,
+    );
+    let gizmos = BarDataset::new(
+        "Gizmos",
+        vec![60.0, 80.0, 100.0, 120.0, 90.0],
+        Color::Magenta,
+    );
 
     let chart = BarChart::new()
         .categories(categories)

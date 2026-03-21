@@ -28,6 +28,19 @@ pub enum Scale {
     },
     /// Power-law scale: y = x^gamma.
     Power(f64),
+    /// Logit scale for probability data in (0, 1). Critical for ROC curves.
+    /// Transform: log(p / (1 - p)).
+    Logit,
+    /// Inverse hyperbolic sine scale. Smoother than SymLog near zero.
+    /// Transform: asinh(x / linear_width) where linear_width controls the
+    /// transition between linear and logarithmic behavior.
+    Asinh { linear_width: f64 },
+    /// User-defined scale with custom forward and inverse transforms.
+    /// The closures must be inverses of each other.
+    Func {
+        forward: fn(f64) -> f64,
+        inverse: fn(f64) -> f64,
+    },
 }
 
 impl Scale {
@@ -63,6 +76,12 @@ impl Scale {
                     -((-value).powf(*gamma))
                 }
             }
+            Self::Logit => {
+                let v = value.clamp(1e-10, 1.0 - 1e-10);
+                (v / (1.0 - v)).ln()
+            }
+            Self::Asinh { linear_width } => (value / linear_width).asinh(),
+            Self::Func { forward, .. } => forward(value),
         }
     }
 
@@ -93,11 +112,18 @@ impl Scale {
                     -((-value).powf(1.0 / gamma))
                 }
             }
+            Self::Logit => {
+                let e = value.exp();
+                e / (1.0 + e)
+            }
+            Self::Asinh { linear_width } => value.sinh() * linear_width,
+            Self::Func { inverse, .. } => inverse(value),
         }
     }
 }
 
 /// Axis bounds specification.
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[derive(Clone, Debug, Default)]
 pub enum Bounds {
     /// Automatically determined from data.
@@ -111,6 +137,7 @@ pub enum Bounds {
 ///
 /// Terminal cells are typically ~2:1 (height:width in pixels), so `Equal`
 /// automatically compensates to produce visually square data units.
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[derive(Clone, Debug, Default)]
 pub enum AspectRatio {
     /// Aspect ratio determined by available area (default).
@@ -126,6 +153,30 @@ pub enum AspectRatio {
 /// Terminal cell aspect ratio (width / height in pixels).
 /// Most terminals have cells approximately twice as tall as wide.
 pub const TERMINAL_CELL_ASPECT: f64 = 0.5;
+
+/// Direction tick marks are drawn relative to the axis spine.
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub enum TickDirection {
+    /// Tick marks extend inward from the spine.
+    In,
+    /// Tick marks extend outward from the spine (default).
+    #[default]
+    Out,
+    /// Tick marks extend both in and out.
+    InOut,
+}
+
+/// Orientation for tick labels.
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub enum LabelRotation {
+    /// Labels are drawn horizontally (default).
+    #[default]
+    Horizontal,
+    /// Labels are drawn vertically (one character per row).
+    Vertical,
+}
 
 /// Axis configuration.
 ///
@@ -162,6 +213,14 @@ pub struct Axis {
     pub minor_grid: bool,
     /// Number of minor ticks between major ticks.
     pub minor_tick_count: usize,
+    /// Direction tick marks extend from the axis spine.
+    pub tick_direction: TickDirection,
+    /// Length of tick marks in characters.
+    pub tick_size: u16,
+    /// Padding between tick marks and tick labels in characters.
+    pub tick_padding: u16,
+    /// Rotation for tick labels.
+    pub label_rotation: LabelRotation,
 }
 
 /// Configuration for major/minor grid lines.
@@ -200,6 +259,10 @@ impl Default for Axis {
             inverted: false,
             minor_grid: false,
             minor_tick_count: 4,
+            tick_direction: TickDirection::default(),
+            tick_size: 1,
+            tick_padding: 1,
+            label_rotation: LabelRotation::default(),
         }
     }
 }
@@ -273,6 +336,30 @@ impl Axis {
     /// Set the number of minor tick subdivisions between major ticks.
     pub fn minor_tick_count(mut self, count: usize) -> Self {
         self.minor_tick_count = count;
+        self
+    }
+
+    /// Set the tick mark direction.
+    pub fn tick_direction(mut self, dir: TickDirection) -> Self {
+        self.tick_direction = dir;
+        self
+    }
+
+    /// Set the tick mark length in characters.
+    pub fn tick_size(mut self, size: u16) -> Self {
+        self.tick_size = size;
+        self
+    }
+
+    /// Set the padding between tick marks and labels.
+    pub fn tick_padding(mut self, padding: u16) -> Self {
+        self.tick_padding = padding;
+        self
+    }
+
+    /// Set the tick label rotation.
+    pub fn label_rotation(mut self, rotation: LabelRotation) -> Self {
+        self.label_rotation = rotation;
         self
     }
 

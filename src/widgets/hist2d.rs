@@ -7,11 +7,13 @@ use ratatui::layout::Rect;
 use ratatui::style::Style;
 use ratatui::widgets::Widget;
 
+use crate::annotation::Annotation;
 use crate::axis::Axis;
 use crate::colormap::{Colorbar, Colormap, Viridis};
+use crate::frame::{DataBounds, PlotFrame, ReferenceLine};
 use crate::norm::{LinearNorm, Normalize};
+use crate::spines::Spines;
 use crate::theme::Theme;
-use crate::transform::data_to_screen;
 
 /// A 2D histogram widget.
 ///
@@ -39,6 +41,9 @@ pub struct Hist2D {
     show_colorbar: bool,
     /// Visual theme.
     theme: Theme,
+    spines: Spines,
+    reference_lines: Vec<ReferenceLine>,
+    annotations: Vec<Annotation>,
 }
 
 impl Hist2D {
@@ -54,6 +59,9 @@ impl Hist2D {
             title: None,
             show_colorbar: true,
             theme: Theme::get_default(),
+            spines: Spines::default(),
+            reference_lines: Vec::new(),
+            annotations: Vec::new(),
         }
     }
 
@@ -100,6 +108,30 @@ impl Hist2D {
     /// Set the visual theme.
     pub fn theme(mut self, theme: Theme) -> Self {
         self.theme = theme;
+        self
+    }
+
+    /// Set spine visibility.
+    pub fn spines(mut self, spines: Spines) -> Self {
+        self.spines = spines;
+        self
+    }
+
+    /// Add a reference line.
+    pub fn reference_line(mut self, line: ReferenceLine) -> Self {
+        self.reference_lines.push(line);
+        self
+    }
+
+    /// Set all reference lines.
+    pub fn reference_lines(mut self, lines: Vec<ReferenceLine>) -> Self {
+        self.reference_lines = lines;
+        self
+    }
+
+    /// Add an annotation.
+    pub fn annotation(mut self, ann: Annotation) -> Self {
+        self.annotations.push(ann);
         self
     }
 
@@ -158,33 +190,6 @@ impl Widget for &Hist2D {
             return;
         }
 
-        let title_height: u16 = if self.title.is_some() { 1 } else { 0 };
-        let colorbar_width: u16 = if self.show_colorbar { 10 } else { 0 };
-        let y_label_width: u16 = 7;
-        let tick_height: u16 = 1;
-
-        let px = area.x + y_label_width;
-        let py = area.y + title_height;
-        let pw = area
-            .width
-            .saturating_sub(y_label_width + colorbar_width + 1);
-        let ph = area.height.saturating_sub(title_height + tick_height);
-
-        if pw < 2 || ph < 2 {
-            return;
-        }
-
-        // Draw title
-        if let Some(ref title) = self.title {
-            let start = area.x + (area.width.saturating_sub(title.len() as u16)) / 2;
-            for (i, ch) in title.chars().enumerate() {
-                let x = start + i as u16;
-                if x < area.x + area.width {
-                    buf[(x, area.y)].set_char(ch).set_fg(self.theme.foreground);
-                }
-            }
-        }
-
         let (grid, x_min, x_max, y_min, y_max) = self.compute_bins();
         let nrows = grid.len();
         let ncols = if nrows > 0 { grid[0].len() } else { 0 };
@@ -204,33 +209,33 @@ impl Widget for &Hist2D {
             None => Box::new(LinearNorm::new(0.0, vmax.max(1.0))),
         };
 
-        // Draw grid
-        let x_grid = self.x_axis.grid || self.theme.grid_visible;
-        let y_grid = self.y_axis.grid || self.theme.grid_visible;
-        if x_grid {
-            let gx_ticks = self.x_axis.tick_positions(x_min, x_max);
-            for &tv in &gx_ticks {
-                let sx = data_to_screen(tv, x_min, x_max, px as f64, (px + pw - 1) as f64);
-                let xi = sx.round() as u16;
-                if xi >= px && xi < px + pw {
-                    for y in py..py + ph {
-                        buf[(xi, y)].set_char('·').set_fg(self.theme.grid_color);
-                    }
-                }
-            }
-        }
-        if y_grid {
-            let gy_ticks = self.y_axis.tick_positions(y_min, y_max);
-            for &tv in &gy_ticks {
-                let sy = data_to_screen(tv, y_min, y_max, (py + ph - 1) as f64, py as f64);
-                let yi = sy.round() as u16;
-                if yi >= py && yi < py + ph {
-                    for x in px..px + pw {
-                        buf[(x, yi)].set_char('·').set_fg(self.theme.grid_color);
-                    }
-                }
-            }
-        }
+        let colorbar_width: u16 = if self.show_colorbar { 10 } else { 0 };
+
+        // Create and render the plot frame (title, axes, grid, ticks, labels, spines, ref lines)
+        let frame = PlotFrame::new(&self.x_axis, &self.y_axis, &self.theme)
+            .title(self.title.as_deref())
+            .spines(self.spines.clone())
+            .colorbar_width(colorbar_width)
+            .y_label_width(7)
+            .reference_lines(&self.reference_lines);
+
+        let Some(pa) = frame.render(
+            area,
+            buf,
+            DataBounds {
+                x_lo: x_min,
+                x_hi: x_max,
+                y_lo: y_min,
+                y_hi: y_max,
+            },
+        ) else {
+            return;
+        };
+
+        let px = pa.x;
+        let py = pa.y;
+        let pw = pa.width;
+        let ph = pa.height;
 
         // Render using half-block characters
         let effective_height = ph as usize * 2;
@@ -238,7 +243,7 @@ impl Widget for &Hist2D {
             for cx in 0..pw {
                 let screen_x = px + cx;
                 let screen_y = py + cy;
-                if screen_x >= area.x + area.width || screen_y >= area.y + area.height {
+                if !pa.in_area(screen_x, screen_y) {
                     continue;
                 }
 
@@ -264,39 +269,8 @@ impl Widget for &Hist2D {
             }
         }
 
-        // Draw tick labels
-        let x_ticks = self.x_axis.tick_positions(x_min, x_max);
-        for &tv in &x_ticks {
-            let sx = data_to_screen(tv, x_min, x_max, px as f64, (px + pw - 1) as f64);
-            let label = self.x_axis.format_tick(tv);
-            let xi = sx.round() as u16;
-            let start = xi.saturating_sub(label.len() as u16 / 2);
-            let y = py + ph;
-            if y < area.y + area.height {
-                for (j, ch) in label.chars().enumerate() {
-                    let lx = start + j as u16;
-                    if lx >= area.x && lx < area.x + area.width {
-                        buf[(lx, y)].set_char(ch).set_fg(self.theme.axis_color);
-                    }
-                }
-            }
-        }
-
-        let y_ticks = self.y_axis.tick_positions(y_min, y_max);
-        for &tv in &y_ticks {
-            let sy = data_to_screen(tv, y_min, y_max, (py + ph - 1) as f64, py as f64);
-            let label = self.y_axis.format_tick(tv);
-            let yi = sy.round() as u16;
-            if yi >= py && yi < py + ph {
-                let start = px.saturating_sub(label.len() as u16 + 1);
-                for (j, ch) in label.chars().enumerate() {
-                    let lx = start + j as u16;
-                    if lx >= area.x && lx < px {
-                        buf[(lx, yi)].set_char(ch).set_fg(self.theme.axis_color);
-                    }
-                }
-            }
-        }
+        // Draw annotations
+        PlotFrame::draw_annotations(&pa, &self.annotations, buf);
 
         // Colorbar
         if self.show_colorbar {
