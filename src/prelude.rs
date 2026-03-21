@@ -6,7 +6,7 @@
 
 pub use ratatui::style::Color;
 
-pub use crate::annotation::Annotation;
+pub use crate::annotation::{Annotation, enclosed_number};
 pub use crate::axis::{AspectRatio, Axis, Bounds, GridConfig, LabelRotation, Scale, TickDirection};
 pub use crate::brushing::{BrushState, SharedBrush, shared_brush};
 pub use crate::collections::{LineCollection, PathCollection};
@@ -84,8 +84,13 @@ pub use crate::export::{
 };
 #[cfg(feature = "export")]
 pub use crate::export::{ExportError, ExportOptions, buffer_to_png};
-pub use crate::frame::{DataBounds, PlotArea, PlotFrame, RefLineDash, ReferenceLine};
-pub use crate::legend::{Legend, LegendPosition};
+#[cfg(feature = "kitty")]
+pub use crate::export::{buffer_to_kitty, print_kitty};
+#[cfg(feature = "sixel")]
+pub use crate::export::{buffer_to_sixel, print_sixel};
+pub use crate::frame::{BorderStyle, DataBounds, PlotArea, PlotFrame, RefLineDash, ReferenceLine};
+pub use crate::legend::{InteractiveLegend, Legend, LegendPosition, SharedLegendState, shared_legend_state};
+pub use crate::linked_view::{SharedView, SharedViewState, shared_view};
 pub use crate::norm::{
     AsinhNorm, BoundaryNorm, CenteredNorm, FuncNorm, LinearNorm, LogNorm, Normalize, PowerNorm,
     SymLogNorm, TwoSlopeNorm,
@@ -146,7 +151,7 @@ pub use crate::widgets::swarm::SwarmPlot;
 pub use crate::widgets::ternary::{TernaryData, TernaryPlot};
 pub use crate::widgets::treemap::{Treemap, TreemapNode};
 pub use crate::widgets::twin_axes::TwinAxes;
-pub use crate::widgets::vector_field::VectorField;
+pub use crate::widgets::vector_field::{ArrowCharSet, VectorField};
 pub use crate::widgets::violin_plot::{ViolinInner, ViolinPlot};
 pub use crate::widgets::waterfall::{WaterfallChart, WaterfallEntry};
 
@@ -179,16 +184,6 @@ pub use crate::statistics::{
     LowessResult, PolyFitResult, bootstrap_ci, iqr, linear_regression, lowess, mean,
     mean_estimator, median, median_estimator, percentile, poly_fit, std_dev, variance,
 };
-
-// Interactivity
-pub use crate::legend::{InteractiveLegend, SharedLegendState, shared_legend_state};
-pub use crate::linked_view::{SharedView, SharedViewState, shared_view};
-
-// Sixel/Kitty export
-#[cfg(feature = "kitty")]
-pub use crate::export::{buffer_to_kitty, print_kitty};
-#[cfg(feature = "sixel")]
-pub use crate::export::{buffer_to_sixel, print_sixel};
 
 // TOML themes
 #[cfg(feature = "toml-themes")]

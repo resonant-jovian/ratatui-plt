@@ -266,6 +266,77 @@ impl PlotArea {
     }
 }
 
+/// Border style for plot frames.
+#[derive(Clone, Debug, Default)]
+pub enum BorderStyle {
+    /// Standard single-line box drawing (┌─┐│└┘). Default.
+    #[default]
+    Single,
+    /// Rounded corners (╭─╮│╰╯).
+    Rounded,
+    /// Double-line box drawing (╔═╗║╚╝).
+    Double,
+    /// No border.
+    None,
+}
+
+impl BorderStyle {
+    /// Top-left corner character.
+    pub fn top_left(&self) -> char {
+        match self {
+            Self::Single => '┌',
+            Self::Rounded => '╭',
+            Self::Double => '╔',
+            Self::None => ' ',
+        }
+    }
+    /// Top-right corner character.
+    pub fn top_right(&self) -> char {
+        match self {
+            Self::Single => '┐',
+            Self::Rounded => '╮',
+            Self::Double => '╗',
+            Self::None => ' ',
+        }
+    }
+    /// Bottom-left corner character.
+    pub fn bottom_left(&self) -> char {
+        match self {
+            Self::Single => '└',
+            Self::Rounded => '╰',
+            Self::Double => '╚',
+            Self::None => ' ',
+        }
+    }
+    /// Bottom-right corner character.
+    pub fn bottom_right(&self) -> char {
+        match self {
+            Self::Single => '┘',
+            Self::Rounded => '╯',
+            Self::Double => '╝',
+            Self::None => ' ',
+        }
+    }
+    /// Horizontal line character.
+    pub fn horizontal(&self) -> char {
+        match self {
+            Self::Single => '─',
+            Self::Rounded => '─',
+            Self::Double => '═',
+            Self::None => ' ',
+        }
+    }
+    /// Vertical line character.
+    pub fn vertical(&self) -> char {
+        match self {
+            Self::Single => '│',
+            Self::Rounded => '│',
+            Self::Double => '║',
+            Self::None => ' ',
+        }
+    }
+}
+
 /// Shared rendering framework for 2D plot chrome (axes, title, grid, ticks, labels).
 ///
 /// # Example
@@ -293,6 +364,7 @@ pub struct PlotFrame<'a> {
     colorbar_width: u16,
     y_label_width: u16,
     reference_lines: &'a [ReferenceLine],
+    border_style: BorderStyle,
 }
 
 impl<'a> PlotFrame<'a> {
@@ -308,6 +380,7 @@ impl<'a> PlotFrame<'a> {
             colorbar_width: 0,
             y_label_width: 8,
             reference_lines: &[],
+            border_style: BorderStyle::Single,
         }
     }
 
@@ -344,6 +417,12 @@ impl<'a> PlotFrame<'a> {
     /// Set reference lines to draw.
     pub fn reference_lines(mut self, lines: &'a [ReferenceLine]) -> Self {
         self.reference_lines = lines;
+        self
+    }
+
+    /// Set the border style for the plot frame.
+    pub fn border_style(mut self, style: BorderStyle) -> Self {
+        self.border_style = style;
         self
     }
 
@@ -407,11 +486,13 @@ impl<'a> PlotFrame<'a> {
         }
 
         // Draw spines (axis borders)
+        let h_char = self.border_style.horizontal();
+        let v_char = self.border_style.vertical();
         if self.spines.bottom {
             for x in px..px + aw {
                 if x < area.x + area.width {
                     buf[(x, py + ah)]
-                        .set_char('─')
+                        .set_char(h_char)
                         .set_fg(self.theme.axis_color);
                 }
             }
@@ -419,7 +500,7 @@ impl<'a> PlotFrame<'a> {
         if self.spines.left && px > area.x {
             for y in py..py + ah {
                 buf[(px.saturating_sub(1), y)]
-                    .set_char('│')
+                    .set_char(v_char)
                     .set_fg(self.theme.axis_color);
             }
         }
@@ -428,7 +509,7 @@ impl<'a> PlotFrame<'a> {
                 if x < area.x + area.width {
                     let ty = py.saturating_sub(1);
                     if ty >= area.y {
-                        buf[(x, ty)].set_char('─').set_fg(self.theme.axis_color);
+                        buf[(x, ty)].set_char(h_char).set_fg(self.theme.axis_color);
                     }
                 }
             }
@@ -437,7 +518,7 @@ impl<'a> PlotFrame<'a> {
             let rx = px + aw;
             if rx < area.x + area.width {
                 for y in py..py + ah {
-                    buf[(rx, y)].set_char('│').set_fg(self.theme.axis_color);
+                    buf[(rx, y)].set_char(v_char).set_fg(self.theme.axis_color);
                 }
             }
         }

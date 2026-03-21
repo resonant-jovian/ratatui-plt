@@ -5,6 +5,34 @@
 
 use ratatui::style::Color;
 
+/// Convert a number (1-20) to its enclosed circled variant.
+/// Returns the original number as a string if out of range.
+pub fn enclosed_number(n: usize) -> String {
+    match n {
+        1 => "\u{2460}".to_string(),  // ①
+        2 => "\u{2461}".to_string(),  // ②
+        3 => "\u{2462}".to_string(),  // ③
+        4 => "\u{2463}".to_string(),  // ④
+        5 => "\u{2464}".to_string(),  // ⑤
+        6 => "\u{2465}".to_string(),  // ⑥
+        7 => "\u{2466}".to_string(),  // ⑦
+        8 => "\u{2467}".to_string(),  // ⑧
+        9 => "\u{2468}".to_string(),  // ⑨
+        10 => "\u{2469}".to_string(), // ⑩
+        11 => "\u{246A}".to_string(), // ⑪
+        12 => "\u{246B}".to_string(), // ⑫
+        13 => "\u{246C}".to_string(), // ⑬
+        14 => "\u{246D}".to_string(), // ⑭
+        15 => "\u{246E}".to_string(), // ⑮
+        16 => "\u{246F}".to_string(), // ⑯
+        17 => "\u{2470}".to_string(), // ⑰
+        18 => "\u{2471}".to_string(), // ⑱
+        19 => "\u{2472}".to_string(), // ⑲
+        20 => "\u{2473}".to_string(), // ⑳
+        _ => n.to_string(),
+    }
+}
+
 /// Arrow style for annotations.
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[derive(Clone, Debug, Default)]

@@ -21,6 +21,7 @@ statistics = []
 kitty = ["export"]
 sixel = ["export", "dep:image"]
 toml-themes = ["dep:toml", "serde"]
+unicode-extended = []
 
 [dependencies]
 ratatui = "0.30"

@@ -14,6 +14,24 @@ use crate::series::VectorFieldData;
 use crate::spines::Spines;
 use crate::theme::Theme;
 
+/// Character set for rendering vector field arrows.
+///
+/// Controls the Unicode characters used to represent arrow directions.
+/// Each variant maps the 8 compass directions to a different set of
+/// Unicode arrows.
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub enum ArrowCharSet {
+    /// Standard Unicode arrows: ←↑→↓↗↘↙↖
+    #[default]
+    Standard,
+    /// Heavy/bold arrows: ⬅⬆➡⬇⬉⬈⬊⬋
+    Heavy,
+    /// Harpoon arrows (half-barbed): ↼↾⇀⇂↿⇁↽⇃
+    Harpoon,
+    /// Double-stroke arrows: ⇐⇑⇒⇓⇖⇗⇘⇙
+    Double,
+}
+
 /// A 2D vector field (quiver) plot widget.
 ///
 /// Renders arrows at grid points showing vector direction and magnitude.
@@ -41,6 +59,7 @@ pub struct VectorField {
     colormap: Box<dyn Colormap>,
     norm: Box<dyn Normalize>,
     arrow_scale: f64,
+    arrow_char_set: ArrowCharSet,
     theme: Theme,
     spines: Spines,
     reference_lines: Vec<ReferenceLine>,
@@ -64,6 +83,7 @@ impl VectorField {
                 if max_mag == 0.0 { 1.0 } else { max_mag },
             )),
             arrow_scale: 1.0,
+            arrow_char_set: ArrowCharSet::default(),
             theme: Theme::get_default(),
             spines: Spines::default(),
             reference_lines: Vec::new(),
@@ -109,6 +129,12 @@ impl VectorField {
         self
     }
 
+    /// Set the arrow character set for rendering directions.
+    pub fn arrow_char_set(mut self, char_set: ArrowCharSet) -> Self {
+        self.arrow_char_set = char_set;
+        self
+    }
+
     /// Set the theme.
     pub fn theme(mut self, theme: Theme) -> Self {
         self.theme = theme;
@@ -140,23 +166,58 @@ impl VectorField {
     }
 }
 
-/// Choose an arrow character based on the direction angle.
-fn arrow_char(dx: f64, dy: f64) -> char {
+/// Choose an arrow character based on the direction angle and character set.
+fn arrow_char(dx: f64, dy: f64, char_set: &ArrowCharSet) -> char {
     if dx == 0.0 && dy == 0.0 {
         return '·';
     }
     let angle = dy.atan2(dx);
     let octant = ((angle + std::f64::consts::PI) / (std::f64::consts::PI / 4.0)).round() as i32 % 8;
-    match octant {
-        0 => '←',
-        1 => '↙',
-        2 => '↓',
-        3 => '↘',
-        4 => '→',
-        5 => '↗',
-        6 => '↑',
-        7 => '↖',
-        _ => '→',
+    match char_set {
+        ArrowCharSet::Standard => match octant {
+            0 => '←',
+            1 => '↙',
+            2 => '↓',
+            3 => '↘',
+            4 => '→',
+            5 => '↗',
+            6 => '↑',
+            7 => '↖',
+            _ => '→',
+        },
+        ArrowCharSet::Heavy => match octant {
+            0 => '⬅',
+            1 => '⬋',
+            2 => '⬇',
+            3 => '⬊',
+            4 => '➡',
+            5 => '⬈',
+            6 => '⬆',
+            7 => '⬉',
+            _ => '➡',
+        },
+        ArrowCharSet::Harpoon => match octant {
+            0 => '↼',
+            1 => '⇃',
+            2 => '⇂',
+            3 => '⇁',
+            4 => '⇀',
+            5 => '↾',
+            6 => '↿',
+            7 => '↽',
+            _ => '⇀',
+        },
+        ArrowCharSet::Double => match octant {
+            0 => '⇐',
+            1 => '⇙',
+            2 => '⇓',
+            3 => '⇘',
+            4 => '⇒',
+            5 => '⇗',
+            6 => '⇑',
+            7 => '⇖',
+            _ => '⇒',
+        },
     }
 }
 
@@ -218,7 +279,7 @@ impl Widget for &VectorField {
                     self.color
                 };
 
-                let ch = arrow_char(dx, -dy); // Negate dy because screen y is inverted
+                let ch = arrow_char(dx, -dy, &self.arrow_char_set); // Negate dy because screen y is inverted
                 buf[(xi, yi)].set_char(ch).set_fg(color);
             }
         }

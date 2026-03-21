@@ -649,7 +649,7 @@ impl Histogram {
                         // Use floor/ceil to match draw_bars and avoid inter-bin gaps
                         let x_start = (bar_left + offset).floor() as u16;
                         let x_end = (bar_right - offset).ceil() as u16;
-                        let y_top = bar_top_y.round() as u16;
+                        let y_top = bar_top_y.floor() as u16;
                         let y_bot = bar_bottom_y.round() as u16;
 
                         self.draw_bar_region(
@@ -659,6 +659,8 @@ impl Histogram {
                                 x_end,
                                 y_top,
                                 y_bot,
+                                #[cfg(feature = "unicode-extended")]
+                                top_frac: bar_top_y.fract(),
                             },
                             ds.color,
                             buf,
@@ -755,8 +757,10 @@ impl Histogram {
             let rect = BarRect {
                 x_start: x_start_f.floor() as u16,
                 x_end: x_end_f.ceil() as u16,
-                y_top: bar_top.round() as u16,
+                y_top: bar_top.floor() as u16,
                 y_bot: bar_bottom.round() as u16,
+                #[cfg(feature = "unicode-extended")]
+                top_frac: bar_top.fract(),
             };
 
             match self.histtype {
@@ -802,6 +806,10 @@ impl Histogram {
     }
 
     /// Fill a rectangular bar region.
+    ///
+    /// When the `unicode-extended` feature is enabled, the topmost row of each bar
+    /// uses a vertical eighth-block character to represent the fractional fill,
+    /// giving 8x vertical sub-cell precision at the bar edge.
     fn draw_bar_region(
         &self,
         pa: &crate::frame::PlotArea,
@@ -809,10 +817,41 @@ impl Histogram {
         color: Color,
         buf: &mut Buffer,
     ) {
-        for x in rect.x_start..rect.x_end {
-            for y in rect.y_top..rect.y_bot {
-                if pa.contains(x, y) {
-                    buf[(x, y)].set_char('█').set_fg(color);
+        #[cfg(feature = "unicode-extended")]
+        {
+            // With unicode-extended: use vertical eighth blocks for the top row
+            // to represent the fractional part of the bar height.
+            //
+            // The bar fills fully from y_top+1 down to y_bot. The topmost row
+            // (y_top) gets a partial fill character based on how much of that
+            // cell the bar actually occupies. Since screen y increases downward,
+            // a fractional part close to 0.0 means the bar nearly fills the
+            // whole top cell (use a nearly-full block), while a fraction close
+            // to 1.0 means the bar barely enters the top cell (use a thin sliver).
+            let fill_fraction = 1.0 - rect.top_frac;
+            let fill_char = crate::drawing::vertical_fill_char(fill_fraction);
+
+            for x in rect.x_start..rect.x_end {
+                // Draw the fractional top row
+                if pa.contains(x, rect.y_top) && fill_char != ' ' {
+                    buf[(x, rect.y_top)].set_char(fill_char).set_fg(color);
+                }
+                // Fill solid rows below the top
+                for y in (rect.y_top + 1)..rect.y_bot {
+                    if pa.contains(x, y) {
+                        buf[(x, y)].set_char('\u{2588}').set_fg(color);
+                    }
+                }
+            }
+        }
+
+        #[cfg(not(feature = "unicode-extended"))]
+        {
+            for x in rect.x_start..rect.x_end {
+                for y in rect.y_top..rect.y_bot {
+                    if pa.contains(x, y) {
+                        buf[(x, y)].set_char('█').set_fg(color);
+                    }
                 }
             }
         }
@@ -825,6 +864,10 @@ struct BarRect {
     x_end: u16,
     y_top: u16,
     y_bot: u16,
+    /// Fractional part of the top position within its cell (0.0 = cell top, 1.0 = cell bottom).
+    /// Used by unicode-extended rendering for sub-cell bar-top precision.
+    #[cfg(feature = "unicode-extended")]
+    top_frac: f64,
 }
 
 /// Layout parameters for side-by-side bar positioning.

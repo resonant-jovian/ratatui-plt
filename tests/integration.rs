@@ -3357,3 +3357,262 @@ background = "#xyz"
     let result = theme_from_toml(toml_str);
     assert!(result.is_err());
 }
+
+// ---------------------------------------------------------------------------
+// Unicode-extended feature tests
+// ---------------------------------------------------------------------------
+
+#[cfg(feature = "unicode-extended")]
+mod unicode_extended {
+    use ratatui::buffer::Buffer;
+    use ratatui::layout::Rect;
+    use ratatui::style::Color;
+    use ratatui::widgets::Widget;
+
+    use ratatui_plt::drawing::{sextant_char, vertical_fill_char, VERTICAL_FILL_LEVELS};
+    use ratatui_plt::widgets::histogram::Histogram;
+
+    #[test]
+    fn test_sextant_char_empty() {
+        assert_eq!(sextant_char(0), ' ');
+    }
+
+    #[test]
+    fn test_sextant_char_full() {
+        assert_eq!(sextant_char(0x3F), '\u{2588}'); // █ FULL BLOCK
+    }
+
+    #[test]
+    fn test_sextant_char_top_left() {
+        let ch = sextant_char(1);
+        // Pattern 1 = top-left only → U+1FB00 BLOCK SEXTANT-1
+        assert_eq!(ch, '\u{1FB00}');
+        assert!(ch != ' ' && ch != '\u{2588}');
+    }
+
+    #[test]
+    fn test_sextant_char_upper_half() {
+        // Pattern 0b010101 = 21 → upper half block U+2580
+        assert_eq!(sextant_char(0b010101), '\u{2580}');
+    }
+
+    #[test]
+    fn test_sextant_char_lower_half() {
+        // Pattern 0b101010 = 42 → lower half block U+2584
+        assert_eq!(sextant_char(0b101010), '\u{2584}');
+    }
+
+    #[test]
+    fn test_sextant_char_high_bits_masked() {
+        // Bits above the lower 6 should be masked off
+        assert_eq!(sextant_char(0xFF), sextant_char(0x3F));
+        assert_eq!(sextant_char(0x80), sextant_char(0));
+    }
+
+    #[test]
+    fn test_sextant_char_all_patterns_valid() {
+        // Every 6-bit pattern should produce a valid, distinct character
+        let mut chars: Vec<char> = (0..64u8).map(sextant_char).collect();
+        // All should be valid Unicode
+        for &ch in &chars {
+            assert!(ch as u32 > 0 || ch == ' ');
+        }
+        // All 64 patterns should map to distinct characters
+        chars.sort();
+        chars.dedup();
+        assert_eq!(chars.len(), 64);
+    }
+
+    #[test]
+    fn test_vertical_fill_levels_length() {
+        assert_eq!(VERTICAL_FILL_LEVELS.len(), 9);
+    }
+
+    #[test]
+    fn test_vertical_fill_levels_endpoints() {
+        assert_eq!(VERTICAL_FILL_LEVELS[0], ' ');
+        assert_eq!(VERTICAL_FILL_LEVELS[8], '\u{2588}'); // █
+    }
+
+    #[test]
+    fn test_vertical_fill_levels_monotonic() {
+        // Each level should be a distinct character
+        for i in 0..8 {
+            assert_ne!(
+                VERTICAL_FILL_LEVELS[i], VERTICAL_FILL_LEVELS[i + 1],
+                "levels {} and {} should differ",
+                i,
+                i + 1,
+            );
+        }
+    }
+
+    #[test]
+    fn test_vertical_fill_char_boundaries() {
+        assert_eq!(vertical_fill_char(0.0), ' ');
+        assert_eq!(vertical_fill_char(1.0), '\u{2588}');
+        // Clamped outside range
+        assert_eq!(vertical_fill_char(-1.0), ' ');
+        assert_eq!(vertical_fill_char(2.0), '\u{2588}');
+    }
+
+    #[test]
+    fn test_vertical_fill_char_midpoint() {
+        // 0.5 should map to level 4 = ▄ lower half block
+        assert_eq!(vertical_fill_char(0.5), '\u{2584}');
+    }
+
+    #[test]
+    fn test_histogram_renders_unicode_extended() {
+        let data = vec![1.0, 1.5, 2.0, 2.5, 3.0, 3.5, 4.0, 4.5, 5.0];
+        let hist = Histogram::new(data)
+            .bins(5)
+            .color(Color::Cyan)
+            .title("Unicode Extended Histogram");
+        let area = Rect::new(0, 0, 60, 20);
+        let mut buf = Buffer::empty(area);
+        (&hist).render(area, &mut buf);
+        // Should not panic — rendering with unicode-extended bar tops
+    }
+}
+
+#[test]
+fn test_marker_shapes_extended() {
+    // Verify all new MarkerShape variants return valid, distinct chars
+    let extended_shapes = [
+        MarkerShape::TriangleDown,
+        MarkerShape::TriangleRight,
+        MarkerShape::TriangleLeft,
+        MarkerShape::FilledDiamond,
+        MarkerShape::CircleHalfLeft,
+        MarkerShape::CircleHalfRight,
+        MarkerShape::CircleHalfTop,
+        MarkerShape::CircleHalfBottom,
+        MarkerShape::Pentagon,
+        MarkerShape::Hexagon,
+    ];
+    let chars: Vec<char> = extended_shapes.iter().map(|s| s.char()).collect();
+    // All chars should be distinct
+    let mut unique = chars.clone();
+    unique.sort();
+    unique.dedup();
+    assert_eq!(
+        chars.len(),
+        unique.len(),
+        "Extended marker shapes must have distinct chars"
+    );
+    // None of them should collide with the original marker shapes
+    let original_shapes = [
+        MarkerShape::Dot,
+        MarkerShape::Cross,
+        MarkerShape::Plus,
+        MarkerShape::Circle,
+        MarkerShape::FilledCircle,
+        MarkerShape::Triangle,
+        MarkerShape::Square,
+        MarkerShape::FilledSquare,
+        MarkerShape::Diamond,
+        MarkerShape::Star,
+        MarkerShape::Braille,
+    ];
+    let original_chars: Vec<char> = original_shapes.iter().map(|s| s.char()).collect();
+    for c in &chars {
+        assert!(
+            !original_chars.contains(c),
+            "Extended marker char '{c}' collides with an original marker",
+        );
+    }
+}
+
+#[test]
+fn test_vector_field_arrow_styles() {
+    let field = VectorFieldData::from_fn((-1.0, 1.0), (-1.0, 1.0), 5, 5, |x, y| (-y, x));
+    let area = Rect::new(0, 0, 40, 20);
+
+    // Render with each ArrowCharSet variant — should not panic
+    let styles = [
+        ArrowCharSet::Standard,
+        ArrowCharSet::Heavy,
+        ArrowCharSet::Harpoon,
+        ArrowCharSet::Double,
+    ];
+    for style in styles {
+        let plot = VectorField::new(field.clone())
+            .arrow_char_set(style)
+            .title("Arrow Style Test");
+        let mut buf = Buffer::empty(area);
+        (&plot).render(area, &mut buf);
+    }
+}
+
+#[test]
+fn test_pie_chart_renders_with_unicode_extended() {
+    // Test that PieChart renders without panic (the arc quadrants
+    // are only active when the unicode-extended feature is enabled,
+    // but the test should pass either way).
+    use ratatui_plt::widgets::pie_chart::{PieChart, PieSlice};
+
+    let chart = PieChart::new()
+        .slice(PieSlice::new("A", 40.0).color(Color::Cyan))
+        .slice(PieSlice::new("B", 35.0).color(Color::Yellow))
+        .slice(PieSlice::new("C", 25.0).color(Color::Red))
+        .title("Unicode Pie")
+        .show_percentages(true);
+    let area = Rect::new(0, 0, 50, 25);
+    let mut buf = Buffer::empty(area);
+    (&chart).render(area, &mut buf);
+}
+
+#[cfg(feature = "unicode-extended")]
+#[test]
+fn test_horizontal_fill_levels() {
+    assert_eq!(ratatui_plt::drawing::HORIZONTAL_FILL_LEVELS.len(), 9);
+    assert_eq!(ratatui_plt::drawing::HORIZONTAL_FILL_LEVELS[0], ' ');
+    assert_eq!(ratatui_plt::drawing::HORIZONTAL_FILL_LEVELS[8], '\u{2588}');
+}
+
+#[cfg(feature = "unicode-extended")]
+#[test]
+fn test_quadrant_char() {
+    assert_eq!(ratatui_plt::drawing::quadrant_char(0), ' ');
+    assert_eq!(ratatui_plt::drawing::quadrant_char(0x0F), '\u{2588}');
+    assert_eq!(ratatui_plt::drawing::quadrant_char(0b0011), '\u{2580}'); // upper half
+    assert_eq!(ratatui_plt::drawing::quadrant_char(0b1100), '\u{2584}'); // lower half
+}
+
+#[test]
+fn test_marker_shapes_dingbats() {
+    use ratatui_plt::prelude::MarkerShape;
+    let dingbats = [
+        MarkerShape::FourPointedStar,
+        MarkerShape::SixPointedStar,
+        MarkerShape::EightPointedStar,
+        MarkerShape::Sparkle,
+        MarkerShape::SmallCircle,
+        MarkerShape::Ring,
+    ];
+    for m in &dingbats {
+        let c = m.char();
+        assert_ne!(c, ' ');
+    }
+}
+
+#[test]
+fn test_border_style_chars() {
+    use ratatui_plt::frame::BorderStyle;
+    let s = BorderStyle::Single;
+    assert_eq!(s.top_left(), '┌');
+    let r = BorderStyle::Rounded;
+    assert_eq!(r.top_left(), '╭');
+    let d = BorderStyle::Double;
+    assert_eq!(d.top_left(), '╔');
+}
+
+#[test]
+fn test_enclosed_numbers() {
+    use ratatui_plt::annotation::enclosed_number;
+    assert_eq!(enclosed_number(1), "①");
+    assert_eq!(enclosed_number(10), "⑩");
+    assert_eq!(enclosed_number(20), "⑳");
+    assert_eq!(enclosed_number(21), "21"); // falls back to string
+}

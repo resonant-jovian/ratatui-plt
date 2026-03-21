@@ -271,6 +271,35 @@ impl Widget for &PieChart {
             }
         }
 
+        // When unicode-extended is enabled, draw arc quadrant characters along the
+        // outer rim for smoother circular edges.
+        #[cfg(feature = "unicode-extended")]
+        {
+            let n_arc = (2.0 * std::f64::consts::PI * r_screen_x.max(r_screen_y))
+                .round()
+                .max(24.0) as usize;
+            for step in 0..n_arc {
+                let theta = 2.0 * std::f64::consts::PI * step as f64 / n_arc as f64;
+                let sx = cx + r_screen_x * theta.cos();
+                let sy = cy + r_screen_y * theta.sin();
+                let xi = sx.round() as u16;
+                let yi = sy.round() as u16;
+                if xi >= area.x && xi < area.x + area.width && yi >= py && yi < py + ph {
+                    // Choose arc quadrant character based on which quadrant of
+                    // the circle this point falls in:
+                    //   ◜ upper-left   ◝ upper-right
+                    //   ◟ lower-left   ◞ lower-right
+                    let arc_ch = match (theta.cos() >= 0.0, theta.sin() < 0.0) {
+                        (false, true) => '◜',  // upper-left quadrant
+                        (true, true) => '◝',   // upper-right quadrant
+                        (true, false) => '◞',  // lower-right quadrant
+                        (false, false) => '◟', // lower-left quadrant
+                    };
+                    buf[(xi, yi)].set_char(arc_ch).set_fg(Color::DarkGray);
+                }
+            }
+        }
+
         // Draw labels and/or percentages outside the pie
         if self.show_labels || self.show_percentages {
             for (i, slice) in self.slices.iter().enumerate() {
