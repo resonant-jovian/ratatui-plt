@@ -86,6 +86,14 @@ required-features = ["sixel"]
 name = "toml_theme"
 required-features = ["toml-themes"]
 
+[[example]]
+name = "showcase_unicode"
+required-features = ["unicode-extended"]
+
+[[example]]
+name = "showcase_features"
+required-features = ["statistics"]
+
 [dependencies.image]
 version = "0.25"
 optional = true

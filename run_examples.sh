@@ -97,3 +97,9 @@ cargo run --release --features sixel --example sixel_export
 
 echo "=== toml_theme (--features toml-themes) ==="
 cargo run --release --features toml-themes --example toml_theme
+
+echo "=== showcase_unicode (--features unicode-extended) ==="
+cargo run --release --features unicode-extended --example showcase_unicode -- "$theme"
+
+echo "=== showcase_features (--features statistics) ==="
+cargo run --release --features statistics --example showcase_features -- "$theme"
