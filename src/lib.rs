@@ -65,6 +65,9 @@ pub mod transform;
 pub mod triangulation;
 pub mod widgets;
 
+#[cfg(feature = "statistics")]
+pub mod statistics;
+
 #[cfg(feature = "fft")]
 pub mod fft;
 

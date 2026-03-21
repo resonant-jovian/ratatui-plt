@@ -2332,3 +2332,550 @@ fn test_box_plot_bootstrap_ci() {
     let mut buf = Buffer::empty(area);
     (&plot).render(area, &mut buf);
 }
+
+// ── FacetGrid tests ──
+
+#[test]
+fn test_facet_data_new_empty() {
+    let data = FacetData::new();
+    assert_eq!(data.len(), 0);
+    assert!(data.is_empty());
+    assert!(data.row_keys().is_empty());
+    assert!(data.col_keys().is_empty());
+    assert!(data.hue_keys().is_empty());
+}
+
+#[test]
+fn test_facet_data_row_col_keys() {
+    let data = FacetData::new()
+        .record(FacetRecord {
+            row_key: "B".into(),
+            col_key: "Y".into(),
+            hue_key: Some("h1".into()),
+            x: 1.0,
+            y: 2.0,
+        })
+        .record(FacetRecord {
+            row_key: "A".into(),
+            col_key: "X".into(),
+            hue_key: Some("h2".into()),
+            x: 3.0,
+            y: 4.0,
+        })
+        .record(FacetRecord {
+            row_key: "B".into(),
+            col_key: "X".into(),
+            hue_key: Some("h1".into()),
+            x: 5.0,
+            y: 6.0,
+        });
+
+    // Keys should be in order of first appearance
+    assert_eq!(data.row_keys(), vec!["B", "A"]);
+    assert_eq!(data.col_keys(), vec!["Y", "X"]);
+    assert_eq!(data.hue_keys(), vec!["h1", "h2"]);
+}
+
+#[test]
+fn test_facet_data_series_data() {
+    let data = FacetData::new()
+        .record(FacetRecord {
+            row_key: "R1".into(),
+            col_key: "C1".into(),
+            hue_key: Some("h".into()),
+            x: 1.0,
+            y: 10.0,
+        })
+        .record(FacetRecord {
+            row_key: "R1".into(),
+            col_key: "C1".into(),
+            hue_key: Some("h".into()),
+            x: 2.0,
+            y: 20.0,
+        })
+        .record(FacetRecord {
+            row_key: "R1".into(),
+            col_key: "C2".into(),
+            hue_key: None,
+            x: 3.0,
+            y: 30.0,
+        })
+        .record(FacetRecord {
+            row_key: "R2".into(),
+            col_key: "C1".into(),
+            hue_key: Some("h".into()),
+            x: 4.0,
+            y: 40.0,
+        });
+
+    // Filter by row + col + hue
+    let pts = data.series_data("R1", "C1", Some("h"));
+    assert_eq!(pts.len(), 2);
+    assert!((pts[0].0 - 1.0).abs() < 1e-10);
+    assert!((pts[1].1 - 20.0).abs() < 1e-10);
+
+    // Filter by row + col without hue (returns all matching row/col)
+    let pts_all = data.series_data("R1", "C1", None);
+    assert_eq!(pts_all.len(), 2);
+
+    // No match
+    let pts_empty = data.series_data("R2", "C2", None);
+    assert!(pts_empty.is_empty());
+}
+
+#[test]
+fn test_facet_grid_renders() {
+    let data = FacetData::new()
+        .record(FacetRecord {
+            row_key: "A".into(),
+            col_key: "X".into(),
+            hue_key: None,
+            x: 0.0,
+            y: 0.0,
+        })
+        .record(FacetRecord {
+            row_key: "A".into(),
+            col_key: "X".into(),
+            hue_key: None,
+            x: 1.0,
+            y: 1.0,
+        })
+        .record(FacetRecord {
+            row_key: "A".into(),
+            col_key: "Y".into(),
+            hue_key: None,
+            x: 0.0,
+            y: 2.0,
+        })
+        .record(FacetRecord {
+            row_key: "B".into(),
+            col_key: "X".into(),
+            hue_key: None,
+            x: 1.0,
+            y: 3.0,
+        })
+        .record(FacetRecord {
+            row_key: "B".into(),
+            col_key: "Y".into(),
+            hue_key: None,
+            x: 2.0,
+            y: 4.0,
+        });
+
+    let grid = FacetGrid::new(data)
+        .map_scatter()
+        .share_x(true)
+        .share_y(true)
+        .suptitle("Test Facet")
+        .col_titles(true)
+        .row_titles(true)
+        .gap(1);
+
+    let area = Rect::new(0, 0, 80, 40);
+    let mut buf = Buffer::empty(area);
+    (&grid).render(area, &mut buf);
+    // Just verify it doesn't panic
+}
+
+// ========================================================================
+// ImagePlot Tests
+// ========================================================================
+
+#[test]
+fn test_image_data_dimensions() {
+    // Scalar
+    let scalar = ImageData::Scalar(vec![vec![1.0, 2.0, 3.0], vec![4.0, 5.0, 6.0]]);
+    assert_eq!(scalar.nrows(), 2);
+    assert_eq!(scalar.ncols(), 3);
+
+    // RGB
+    let rgb = ImageData::Rgb(vec![
+        vec![(255, 0, 0), (0, 255, 0)],
+        vec![(0, 0, 255), (255, 255, 0)],
+        vec![(255, 0, 255), (0, 255, 255)],
+    ]);
+    assert_eq!(rgb.nrows(), 3);
+    assert_eq!(rgb.ncols(), 2);
+
+    // RGBA
+    let rgba = ImageData::Rgba(vec![vec![
+        (255, 0, 0, 255),
+        (0, 255, 0, 128),
+        (0, 0, 255, 0),
+        (255, 255, 0, 255),
+    ]]);
+    assert_eq!(rgba.nrows(), 1);
+    assert_eq!(rgba.ncols(), 4);
+
+    // Empty
+    let empty = ImageData::Scalar(vec![]);
+    assert_eq!(empty.nrows(), 0);
+    assert_eq!(empty.ncols(), 0);
+}
+
+#[test]
+fn test_image_plot_scalar_renders() {
+    let data: Vec<Vec<f64>> = (0..4)
+        .map(|r| (0..4).map(|c| (r * 4 + c) as f64).collect())
+        .collect();
+    let img = ImagePlot::new(ImageData::Scalar(data))
+        .title("Scalar Image")
+        .show_colorbar(true);
+
+    let area = Rect::new(0, 0, 40, 20);
+    let mut buf = Buffer::empty(area);
+    (&img).render(area, &mut buf);
+}
+
+#[test]
+fn test_image_plot_rgb_renders() {
+    let data: Vec<Vec<(u8, u8, u8)>> = (0..3)
+        .map(|r| {
+            (0..3)
+                .map(|c| ((r * 80) as u8, (c * 80) as u8, 128))
+                .collect()
+        })
+        .collect();
+    let img = ImagePlot::new(ImageData::Rgb(data))
+        .title("RGB Image")
+        .show_colorbar(false);
+
+    let area = Rect::new(0, 0, 40, 20);
+    let mut buf = Buffer::empty(area);
+    (&img).render(area, &mut buf);
+}
+
+#[test]
+fn test_spy_renders() {
+    // Banded sparse matrix
+    let size = 8;
+    let matrix: Vec<Vec<f64>> = (0..size)
+        .map(|r| {
+            (0..size)
+                .map(|c| {
+                    if r == c || r + 1 == c || (r > 0 && r - 1 == c) {
+                        1.0
+                    } else {
+                        0.0
+                    }
+                })
+                .collect()
+        })
+        .collect();
+    let plot = spy(&matrix);
+
+    let area = Rect::new(0, 0, 40, 20);
+    let mut buf = Buffer::empty(area);
+    (&plot).render(area, &mut buf);
+}
+
+#[test]
+fn test_matshow_renders() {
+    let matrix: Vec<Vec<f64>> = (0..5)
+        .map(|r| (0..5).map(|c| (r as f64 - 2.0) * (c as f64 - 2.0)).collect())
+        .collect();
+    let plot = matshow(matrix);
+
+    let area = Rect::new(0, 0, 40, 20);
+    let mut buf = Buffer::empty(area);
+    (&plot).render(area, &mut buf);
+}
+
+// ---------------------------------------------------------------------------
+// PNG / PDF export tests (behind `export` feature)
+// ---------------------------------------------------------------------------
+
+#[cfg(feature = "export")]
+mod export_tests {
+    use super::*;
+    use ratatui_plt::export::{ExportOptions, buffer_to_pdf, buffer_to_png, save_png};
+
+    #[test]
+    fn test_export_options_defaults() {
+        let opts = ExportOptions::new();
+        assert!((opts.font_size - 14.0).abs() < f64::EPSILON);
+        assert!((opts.dpi - 96.0).abs() < f64::EPSILON);
+        assert!(opts.background.is_none());
+    }
+
+    #[test]
+    fn test_buffer_to_png_valid() {
+        let s = Series::new("sin")
+            .data(
+                (0..100)
+                    .map(|i| {
+                        let x = i as f64 * 0.1;
+                        (x, x.sin())
+                    })
+                    .collect(),
+            )
+            .color(Color::Cyan);
+        let plot = LinePlot::new().series(s).title("PNG test");
+        let buf = ratatui_plt::export::render_to_buffer(&plot, 80, 24);
+        let opts = ExportOptions::new().background(30, 30, 30);
+        let png_bytes = buffer_to_png(&buf, &opts);
+        assert!(png_bytes.is_ok());
+        let data = png_bytes.unwrap_or_default();
+        // PNG magic bytes: 0x89 P N G
+        assert!(data.len() >= 4);
+        assert_eq!(&data[..4], &[0x89, 0x50, 0x4E, 0x47]);
+    }
+
+    #[test]
+    fn test_buffer_to_pdf_valid() {
+        let s = Series::new("cos")
+            .data(
+                (0..100)
+                    .map(|i| {
+                        let x = i as f64 * 0.1;
+                        (x, x.cos())
+                    })
+                    .collect(),
+            )
+            .color(Color::Yellow);
+        let plot = LinePlot::new().series(s).title("PDF test");
+        let buf = ratatui_plt::export::render_to_buffer(&plot, 80, 24);
+        let opts = ExportOptions::new();
+        let pdf_bytes = buffer_to_pdf(&buf, &opts);
+        assert!(pdf_bytes.is_ok());
+        let data = pdf_bytes.unwrap_or_default();
+        // PDF magic bytes: %PDF
+        assert!(data.len() >= 4);
+        assert_eq!(&data[..4], b"%PDF");
+    }
+
+    #[test]
+    fn test_save_png_creates_file() {
+        let s = Series::new("line")
+            .data(vec![(0.0, 0.0), (1.0, 1.0), (2.0, 0.5)])
+            .color(Color::Green);
+        let plot = LinePlot::new().series(s).title("Save test");
+        let opts = ExportOptions::new().background(0, 0, 0);
+
+        let dir = std::env::temp_dir();
+        let path = dir.join("ratatui_plt_test_export.png");
+
+        let result = save_png(&plot, 60, 20, &path, &opts);
+        assert!(result.is_ok());
+
+        let meta = std::fs::metadata(&path);
+        assert!(meta.is_ok());
+        let len = meta.map(|m| m.len()).unwrap_or(0);
+        assert!(len > 0);
+
+        // Clean up.
+        let _ = std::fs::remove_file(&path);
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Statistics module tests (behind `statistics` feature)
+// ---------------------------------------------------------------------------
+
+#[cfg(feature = "statistics")]
+mod statistics_tests {
+    use ratatui_plt::statistics::{
+        Kde, bootstrap_ci, iqr, linear_regression, lowess, mean, mean_estimator,
+        median, median_estimator, percentile, poly_fit, std_dev, variance,
+    };
+
+    #[test]
+    fn test_mean_basic() {
+        let data = [1.0, 2.0, 3.0, 4.0, 5.0];
+        assert!((mean(&data) - 3.0).abs() < 1e-10);
+    }
+
+    #[test]
+    fn test_std_dev_basic() {
+        let data = [2.0, 4.0, 4.0, 4.0, 5.0, 5.0, 7.0, 9.0];
+        let v = variance(&data);
+        // population variance = 4.0
+        assert!((v - 4.0).abs() < 1e-10);
+        assert!((std_dev(&data) - 2.0).abs() < 1e-10);
+    }
+
+    #[test]
+    fn test_percentile_median() {
+        let sorted = [1.0, 2.0, 3.0, 4.0, 5.0];
+        assert!((percentile(&sorted, 50.0) - 3.0).abs() < 1e-10);
+        assert!((median(&sorted) - 3.0).abs() < 1e-10);
+    }
+
+    #[test]
+    fn test_iqr_basic() {
+        // IQR of [1,2,3,4,5,6,7]: Q1=2, Q3=6, IQR=4
+        let sorted = [1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0];
+        let q1 = percentile(&sorted, 25.0);
+        let q3 = percentile(&sorted, 75.0);
+        let data_iqr = iqr(&sorted);
+        assert!((data_iqr - (q3 - q1)).abs() < 1e-10);
+    }
+
+    #[test]
+    fn test_linear_regression_perfect() {
+        // y = 2x + 1
+        let x: Vec<f64> = (0..10).map(|i| i as f64).collect();
+        let y: Vec<f64> = x.iter().map(|&xi| 2.0 * xi + 1.0).collect();
+        let fit = linear_regression(&x, &y);
+        assert!(fit.is_some());
+        let fit = fit.unwrap();
+        assert!((fit.slope - 2.0).abs() < 1e-10);
+        assert!((fit.intercept - 1.0).abs() < 1e-10);
+        assert!((fit.r_squared - 1.0).abs() < 1e-10);
+    }
+
+    #[test]
+    fn test_poly_fit_quadratic() {
+        // y = x^2
+        let x: Vec<f64> = (-5..=5).map(|i| i as f64).collect();
+        let y: Vec<f64> = x.iter().map(|&xi| xi * xi).collect();
+        let fit = poly_fit(&x, &y, 2);
+        assert!(fit.is_some());
+        let fit = fit.unwrap();
+        // coefficients: [a2, a1, a0] for a2*x^2 + a1*x + a0
+        assert_eq!(fit.coefficients.len(), 3);
+        assert!((fit.coefficients[0] - 1.0).abs() < 1e-8, "leading coeff: {}", fit.coefficients[0]);
+        assert!(fit.coefficients[1].abs() < 1e-8, "linear coeff: {}", fit.coefficients[1]);
+        assert!(fit.coefficients[2].abs() < 1e-8, "constant coeff: {}", fit.coefficients[2]);
+        assert!((fit.r_squared - 1.0).abs() < 1e-8);
+    }
+
+    #[test]
+    fn test_poly_fit_eval_horner() {
+        // Verify Horner's method: p(x) = 2x^2 + 3x + 1
+        let fit = ratatui_plt::statistics::PolyFitResult {
+            coefficients: vec![2.0, 3.0, 1.0],
+            r_squared: 1.0,
+        };
+        assert!((fit.eval(0.0) - 1.0).abs() < 1e-10);
+        assert!((fit.eval(1.0) - 6.0).abs() < 1e-10);
+        assert!((fit.eval(2.0) - 15.0).abs() < 1e-10);
+    }
+
+    #[test]
+    fn test_poly_fit_to_series() {
+        let fit = ratatui_plt::statistics::PolyFitResult {
+            coefficients: vec![1.0, 0.0, 0.0],
+            r_squared: 1.0,
+        };
+        let s = fit.to_series(0.0, 10.0, 50, "x^2");
+        assert_eq!(s.data.len(), 50);
+        assert_eq!(s.name, "x^2");
+    }
+
+    #[test]
+    fn test_kde_produces_output() {
+        let data = vec![1.0, 2.0, 2.5, 3.0, 3.5, 4.0, 5.0];
+        let kde = Kde::new().n_points(50);
+        let (x_vals, densities) = kde.fit(&data);
+        assert_eq!(x_vals.len(), 50);
+        assert_eq!(densities.len(), 50);
+        // All densities should be non-negative
+        for &d in &densities {
+            assert!(d >= 0.0);
+        }
+        // At least some density should be positive
+        assert!(densities.iter().any(|&d| d > 0.0));
+    }
+
+    #[test]
+    fn test_kde_empty() {
+        let data: Vec<f64> = Vec::new();
+        let (x_vals, densities) = Kde::new().fit(&data);
+        assert!(x_vals.is_empty());
+        assert!(densities.is_empty());
+    }
+
+    #[test]
+    fn test_lowess_smooth() {
+        let x: Vec<f64> = (0..20).map(|i| i as f64 * 0.5).collect();
+        let y: Vec<f64> = x.iter().map(|&xi| xi.sin()).collect();
+        let result = lowess(&x, &y, 0.3);
+        assert!(result.is_some());
+        let result = result.unwrap();
+        assert_eq!(result.x.len(), x.len());
+        assert_eq!(result.y.len(), x.len());
+        // All values should be finite
+        for &v in &result.y {
+            assert!(v.is_finite());
+        }
+    }
+
+    #[test]
+    fn test_lowess_to_series() {
+        let x: Vec<f64> = (0..10).map(|i| i as f64).collect();
+        let y: Vec<f64> = x.iter().map(|&xi| xi * 2.0).collect();
+        let result = lowess(&x, &y, 0.5);
+        assert!(result.is_some());
+        let s = result.unwrap().to_series("smooth", ratatui::style::Color::Cyan);
+        assert_eq!(s.name, "smooth");
+        assert_eq!(s.data.len(), 10);
+    }
+
+    #[test]
+    fn test_bootstrap_ci_basic() {
+        // Data centered around 5.0
+        let data: Vec<f64> = (0..50).map(|i| 4.0 + (i as f64) * 0.04).collect();
+        let true_mean = mean(&data);
+        let ci = bootstrap_ci(&data, mean_estimator, 500, 0.95, 12345);
+        // The CI should contain the true mean
+        assert!(ci.lower <= true_mean);
+        assert!(ci.upper >= true_mean);
+        // The estimate should be close to the true mean
+        assert!((ci.estimate - true_mean).abs() < 1e-10);
+    }
+
+    #[test]
+    fn test_bootstrap_ci_median() {
+        let data: Vec<f64> = (1..=21).map(|i| i as f64).collect();
+        let true_median = 11.0;
+        let ci = bootstrap_ci(&data, median_estimator, 500, 0.95, 42);
+        assert!(ci.lower <= true_median);
+        assert!(ci.upper >= true_median);
+    }
+
+    #[test]
+    fn test_linear_regression_edge_cases() {
+        // Too few points
+        assert!(linear_regression(&[1.0], &[2.0]).is_none());
+        // Length mismatch
+        assert!(linear_regression(&[1.0, 2.0], &[1.0]).is_none());
+        // All x identical
+        assert!(linear_regression(&[1.0, 1.0, 1.0], &[1.0, 2.0, 3.0]).is_none());
+    }
+
+    #[test]
+    fn test_poly_fit_edge_cases() {
+        // degree 0 not allowed
+        assert!(poly_fit(&[1.0, 2.0], &[1.0, 2.0], 0).is_none());
+        // data shorter than degree
+        assert!(poly_fit(&[1.0], &[1.0], 1).is_none());
+    }
+
+    #[test]
+    fn test_lowess_edge_cases() {
+        // Empty data
+        assert!(lowess(&[], &[], 0.5).is_none());
+        // frac out of range
+        assert!(lowess(&[1.0], &[1.0], 0.0).is_none());
+        assert!(lowess(&[1.0], &[1.0], 1.5).is_none());
+        // Length mismatch
+        assert!(lowess(&[1.0, 2.0], &[1.0], 0.5).is_none());
+    }
+
+    #[test]
+    fn test_mean_empty() {
+        assert!((mean(&[]) - 0.0).abs() < 1e-10);
+    }
+
+    #[test]
+    fn test_variance_empty() {
+        assert!((variance(&[]) - 0.0).abs() < 1e-10);
+    }
+
+    #[test]
+    fn test_hist_norm_ext_default() {
+        let norm = ratatui_plt::statistics::HistNormExt::default();
+        assert_eq!(norm, ratatui_plt::statistics::HistNormExt::Count);
+    }
+}

@@ -82,6 +82,8 @@ pub use crate::config::{ConfigGuard, PlotConfig};
 pub use crate::export::{
     buffer_to_ansi, buffer_to_svg, buffer_to_text, render_to_buffer, save_ansi, save_svg, save_text,
 };
+#[cfg(feature = "export")]
+pub use crate::export::{ExportError, ExportOptions, buffer_to_pdf, buffer_to_png, save_pdf, save_png};
 pub use crate::frame::{DataBounds, PlotArea, PlotFrame, RefLineDash, ReferenceLine};
 pub use crate::legend::{Legend, LegendPosition};
 pub use crate::norm::{
@@ -112,8 +114,10 @@ pub use crate::widgets::dendrogram::{DendroLink, DendroOrientation, Dendrogram};
 pub use crate::widgets::ecdf::{EcdfDataset, EcdfPlot};
 pub use crate::widgets::error_bar::ErrorBarPlot;
 pub use crate::widgets::event_plot::{EventGroup, EventPlot};
+pub use crate::widgets::facet_grid::{FacetData, FacetGrid, FacetRecord};
 pub use crate::widgets::heatmap::Heatmap;
 pub use crate::widgets::hexbin::HexbinPlot;
+pub use crate::widgets::image_plot::{ImageData, ImageOrigin, ImagePlot, Interpolation, matshow, spy};
 pub use crate::widgets::hist2d::Hist2D;
 pub use crate::widgets::histogram::Histogram;
 pub use crate::widgets::line_plot::LinePlot;
@@ -158,6 +162,14 @@ pub use crate::fft::{hamming_window, hann_window, psd, stft};
 pub use crate::widgets::psd::PsdPlot;
 #[cfg(feature = "fft")]
 pub use crate::widgets::spectrogram::Spectrogram;
+
+// Statistics (behind statistics feature)
+#[cfg(feature = "statistics")]
+pub use crate::statistics::{
+    BandwidthMethod, BootstrapCI, EstimatorFn, HistNormExt, Kde, Kernel, LinearFitResult,
+    LowessResult, PolyFitResult, bootstrap_ci, iqr, linear_regression, lowess, mean,
+    mean_estimator, median, median_estimator, percentile, poly_fit, std_dev, variance,
+};
 
 // Layout
 pub use crate::widgets::inset::InsetAxes;

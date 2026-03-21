@@ -374,6 +374,213 @@ fn xml_escape(s: &str) -> String {
     out
 }
 
+// ---------------------------------------------------------------------------
+// PNG / PDF raster export (behind `export` feature)
+// ---------------------------------------------------------------------------
+
+#[cfg(feature = "export")]
+mod raster_export {
+    use super::*;
+    use std::path::Path;
+
+    /// Options for PNG/PDF rendering.
+    ///
+    /// Use the builder methods to customise font size, DPI, and background color.
+    ///
+    /// # Example
+    ///
+    /// ```rust,no_run
+    /// use ratatui_plt::export::ExportOptions;
+    /// let opts = ExportOptions::new()
+    ///     .font_size(16.0)
+    ///     .dpi(150.0)
+    ///     .background(30, 30, 30);
+    /// ```
+    pub struct ExportOptions {
+        /// Font size used when generating the intermediate SVG (default 14.0).
+        pub font_size: f64,
+        /// DPI for raster output; controls the pixel dimensions (default 96.0).
+        pub dpi: f64,
+        /// Optional RGB background colour. When `None` the pixmap starts transparent.
+        pub background: Option<(u8, u8, u8)>,
+    }
+
+    impl Default for ExportOptions {
+        fn default() -> Self {
+            Self {
+                font_size: 14.0,
+                dpi: 96.0,
+                background: None,
+            }
+        }
+    }
+
+    impl ExportOptions {
+        /// Create a new `ExportOptions` with default values.
+        pub fn new() -> Self {
+            Self::default()
+        }
+
+        /// Set the font size (in SVG px) used in the intermediate SVG.
+        pub fn font_size(mut self, size: f64) -> Self {
+            self.font_size = size;
+            self
+        }
+
+        /// Set the output DPI. Higher values produce larger pixel dimensions.
+        pub fn dpi(mut self, dpi: f64) -> Self {
+            self.dpi = dpi;
+            self
+        }
+
+        /// Set an opaque RGB background colour.
+        pub fn background(mut self, r: u8, g: u8, b: u8) -> Self {
+            self.background = Some((r, g, b));
+            self
+        }
+    }
+
+    /// Errors that can occur during PNG/PDF export.
+    #[derive(Debug)]
+    pub enum ExportError {
+        /// An I/O error (e.g. writing the output file).
+        Io(std::io::Error),
+        /// The intermediate SVG could not be parsed.
+        SvgParse(String),
+        /// PNG encoding failed.
+        PngEncode(String),
+        /// PDF conversion failed.
+        PdfConvert(String),
+    }
+
+    impl std::fmt::Display for ExportError {
+        fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+            match self {
+                Self::Io(e) => write!(f, "IO error: {e}"),
+                Self::SvgParse(e) => write!(f, "SVG parse error: {e}"),
+                Self::PngEncode(e) => write!(f, "PNG encode error: {e}"),
+                Self::PdfConvert(e) => write!(f, "PDF convert error: {e}"),
+            }
+        }
+    }
+
+    impl std::error::Error for ExportError {
+        fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+            match self {
+                Self::Io(e) => Some(e),
+                _ => None,
+            }
+        }
+    }
+
+    impl From<std::io::Error> for ExportError {
+        fn from(e: std::io::Error) -> Self {
+            Self::Io(e)
+        }
+    }
+
+    /// Parse an SVG string into a `usvg::Tree`, loading system fonts.
+    fn svg_to_tree(svg_str: &str) -> Result<usvg::Tree, ExportError> {
+        let mut fontdb = usvg::fontdb::Database::new();
+        fontdb.load_system_fonts();
+        let options = usvg::Options {
+            fontdb: std::sync::Arc::new(fontdb),
+            ..Default::default()
+        };
+        usvg::Tree::from_str(svg_str, &options)
+            .map_err(|e| ExportError::SvgParse(e.to_string()))
+    }
+
+    /// Render a ratatui [`Buffer`] to PNG bytes.
+    ///
+    /// The buffer is first converted to an SVG string (via [`buffer_to_svg`]),
+    /// then rasterised at the requested DPI.
+    pub fn buffer_to_png(buf: &Buffer, options: &ExportOptions) -> Result<Vec<u8>, ExportError> {
+        let svg_str = buffer_to_svg(buf, options.font_size);
+        let tree = svg_to_tree(&svg_str)?;
+        let scale = (options.dpi / 72.0) as f32;
+        let size = tree.size();
+        let width = (size.width() * scale) as u32;
+        let height = (size.height() * scale) as u32;
+        let mut pixmap = tiny_skia::Pixmap::new(width.max(1), height.max(1))
+            .ok_or_else(|| ExportError::PngEncode("Failed to create pixmap".to_string()))?;
+        if let Some((r, g, b)) = options.background {
+            pixmap.fill(tiny_skia::Color::from_rgba8(r, g, b, 255));
+        }
+        let transform = tiny_skia::Transform::from_scale(scale, scale);
+        resvg::render(&tree, transform, &mut pixmap.as_mut());
+        pixmap
+            .encode_png()
+            .map_err(|e| ExportError::PngEncode(e.to_string()))
+    }
+
+    /// Parse an SVG string into a `svg2pdf::usvg::Tree` (the usvg version
+    /// that `svg2pdf` was built against), loading system fonts.
+    fn svg_to_pdf_tree(svg_str: &str) -> Result<svg2pdf::usvg::Tree, ExportError> {
+        let mut fontdb = svg2pdf::usvg::fontdb::Database::new();
+        fontdb.load_system_fonts();
+        let options = svg2pdf::usvg::Options {
+            fontdb: std::sync::Arc::new(fontdb),
+            ..Default::default()
+        };
+        svg2pdf::usvg::Tree::from_str(svg_str, &options)
+            .map_err(|e| ExportError::SvgParse(e.to_string()))
+    }
+
+    /// Render a ratatui [`Buffer`] to PDF bytes.
+    ///
+    /// The buffer is first converted to SVG, parsed into a `usvg::Tree`,
+    /// then converted to PDF via `svg2pdf`.
+    pub fn buffer_to_pdf(buf: &Buffer, options: &ExportOptions) -> Result<Vec<u8>, ExportError> {
+        let svg_str = buffer_to_svg(buf, options.font_size);
+        let tree = svg_to_pdf_tree(&svg_str)?;
+        let pdf_bytes = svg2pdf::to_pdf(
+            &tree,
+            svg2pdf::ConversionOptions::default(),
+            svg2pdf::PageOptions::default(),
+        )
+        .map_err(|e| ExportError::PdfConvert(e.to_string()))?;
+        Ok(pdf_bytes)
+    }
+
+    /// Render a widget at the given terminal dimensions and return PNG bytes.
+    ///
+    /// This is a convenience wrapper: it calls [`render_to_buffer`] followed
+    /// by [`buffer_to_png`].
+    pub fn save_png<W: Widget>(
+        widget: W,
+        width: u16,
+        height: u16,
+        path: impl AsRef<Path>,
+        options: &ExportOptions,
+    ) -> Result<(), ExportError> {
+        let buf = render_to_buffer(widget, width, height);
+        let data = buffer_to_png(&buf, options)?;
+        std::fs::write(path, data)?;
+        Ok(())
+    }
+
+    /// Render a widget at the given terminal dimensions and return PDF bytes.
+    ///
+    /// This is a convenience wrapper: it calls [`render_to_buffer`] followed
+    /// by [`buffer_to_pdf`].
+    pub fn save_pdf<W: Widget>(
+        widget: W,
+        width: u16,
+        height: u16,
+        path: impl AsRef<Path>,
+        options: &ExportOptions,
+    ) -> Result<(), ExportError> {
+        let buf = render_to_buffer(widget, width, height);
+        let data = buffer_to_pdf(&buf, options)?;
+        std::fs::write(path, data)?;
+        Ok(())
+    }
+}
+
+#[cfg(feature = "export")]
+pub use raster_export::*;
+
 #[cfg(test)]
 mod tests {
     use super::*;
