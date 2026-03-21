@@ -119,7 +119,16 @@ fn main() -> color_eyre::Result<()> {
             let y_hi = 14.0_f64;
 
             let buf = frame.buffer_mut();
-            if let Some(pa) = pf.render(area, buf, DataBounds { x_lo, x_hi, y_lo, y_hi }) {
+            if let Some(pa) = pf.render(
+                area,
+                buf,
+                DataBounds {
+                    x_lo,
+                    x_hi,
+                    y_lo,
+                    y_hi,
+                },
+            ) {
                 // Draw scatter points with colormap
                 let cmap = Viridis;
                 let norm = LinearNorm::new(0.0, 1.0);

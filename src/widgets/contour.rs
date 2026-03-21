@@ -178,7 +178,16 @@ impl Widget for &ContourPlot {
             .spines(self.spines.clone())
             .reference_lines(&self.reference_lines);
 
-        let Some(pa) = frame.render(area, buf, DataBounds { x_lo, x_hi, y_lo, y_hi }) else {
+        let Some(pa) = frame.render(
+            area,
+            buf,
+            DataBounds {
+                x_lo,
+                x_hi,
+                y_lo,
+                y_hi,
+            },
+        ) else {
             return;
         };
 
@@ -350,4 +359,3 @@ impl Widget for &ContourPlot {
         PlotFrame::draw_annotations(&pa, &self.annotations, buf);
     }
 }
-

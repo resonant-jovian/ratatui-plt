@@ -4,7 +4,7 @@ use ratatui::buffer::Buffer;
 use ratatui::layout::Rect;
 use ratatui::widgets::Widget;
 
-use crate::drawing::{write_braille, BRAILLE_BITS};
+use crate::drawing::{BRAILLE_BITS, write_braille};
 use crate::series::Series;
 use crate::theme::Theme;
 
@@ -211,8 +211,18 @@ impl Widget for &RadialPlot {
                 let sx1 = cx as f64 + rx * theta1.cos();
                 let sy1 = cy as f64 + ry * theta1.sin();
                 draw_braille_line_clipped(
-                    buf, sx0, sy0, sx1, sy1, self.theme.grid_color,
-                    &ClipRect { x: area.x, y: py, w: area.width, h: ph },
+                    buf,
+                    sx0,
+                    sy0,
+                    sx1,
+                    sy1,
+                    self.theme.grid_color,
+                    &ClipRect {
+                        x: area.x,
+                        y: py,
+                        w: area.width,
+                        h: ph,
+                    },
                 );
             }
 
@@ -236,8 +246,18 @@ impl Widget for &RadialPlot {
             let dx = r_screen_x * theta.cos();
             let dy = r_screen_y * theta.sin();
             draw_braille_line_clipped(
-                buf, cx as f64, cy as f64, cx as f64 + dx, cy as f64 + dy,
-                self.theme.grid_color, &ClipRect { x: area.x, y: py, w: area.width, h: ph },
+                buf,
+                cx as f64,
+                cy as f64,
+                cx as f64 + dx,
+                cy as f64 + dy,
+                self.theme.grid_color,
+                &ClipRect {
+                    x: area.x,
+                    y: py,
+                    w: area.width,
+                    h: ph,
+                },
             );
 
             // Angle label
@@ -302,9 +322,17 @@ impl Widget for &RadialPlot {
                                 for ai in 0..=n_interp {
                                     let a_frac = ai as f64 / n_interp as f64;
                                     let interp_t = prev_t + (t - prev_t) * a_frac;
-                                    let bx = (cx as f64 + frac * r_screen_x * interp_t.cos()).round() as u16;
-                                    let by = (cy as f64 + frac * r_screen_y * interp_t.sin()).round() as u16;
-                                    if bx >= area.x && bx < area.x + area.width && by >= py && by < py + ph {
+                                    let bx = (cx as f64 + frac * r_screen_x * interp_t.cos())
+                                        .round()
+                                        as u16;
+                                    let by = (cy as f64 + frac * r_screen_y * interp_t.sin())
+                                        .round()
+                                        as u16;
+                                    if bx >= area.x
+                                        && bx < area.x + area.width
+                                        && by >= py
+                                        && by < py + ph
+                                    {
                                         buf[(bx, by)].set_char('█').set_fg(s.color);
                                     }
                                 }
@@ -337,8 +365,18 @@ impl Widget for &RadialPlot {
                             && (sx != px || sy != py_prev)
                         {
                             draw_braille_line_clipped(
-                                buf, px as f64, py_prev as f64, sx as f64, sy as f64,
-                                s.color, &ClipRect { x: area.x, y: py, w: area.width, h: ph },
+                                buf,
+                                px as f64,
+                                py_prev as f64,
+                                sx as f64,
+                                sy as f64,
+                                s.color,
+                                &ClipRect {
+                                    x: area.x,
+                                    y: py,
+                                    w: area.width,
+                                    h: ph,
+                                },
                             );
                         }
                     }

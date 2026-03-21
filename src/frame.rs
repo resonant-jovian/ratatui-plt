@@ -351,12 +351,7 @@ impl<'a> PlotFrame<'a> {
     ///
     /// `bounds` contains the already-resolved data bounds
     /// (after axis bounds resolution). Returns `None` if the area is too small.
-    pub fn render(
-        &self,
-        area: Rect,
-        buf: &mut Buffer,
-        bounds: DataBounds,
-    ) -> Option<PlotArea> {
+    pub fn render(&self, area: Rect, buf: &mut Buffer, bounds: DataBounds) -> Option<PlotArea> {
         let DataBounds {
             x_lo,
             x_hi,
@@ -507,17 +502,20 @@ impl<'a> PlotFrame<'a> {
         }
 
         // Draw reference lines and spans
-        self.draw_reference_lines(buf, &PlotArea {
-            x: px,
-            y: py,
-            width: aw,
-            height: ah,
-            x_lo,
-            x_hi,
-            y_lo,
-            y_hi,
-            area,
-        });
+        self.draw_reference_lines(
+            buf,
+            &PlotArea {
+                x: px,
+                y: py,
+                width: aw,
+                height: ah,
+                x_lo,
+                x_hi,
+                y_lo,
+                y_hi,
+                area,
+            },
+        );
 
         // Draw x tick labels with overlap detection
         let x_ticks = self.x_axis.tick_positions(x_lo, x_hi);
@@ -634,11 +632,7 @@ impl<'a> PlotFrame<'a> {
         }
     }
 
-    fn draw_reference_lines(
-        &self,
-        buf: &mut Buffer,
-        pa: &PlotArea,
-    ) {
+    fn draw_reference_lines(&self, buf: &mut Buffer, pa: &PlotArea) {
         let (px, py, aw, ah) = (pa.x, pa.y, pa.width, pa.height);
         let (x_lo, x_hi, y_lo, y_hi) = (pa.x_lo, pa.x_hi, pa.y_lo, pa.y_hi);
         for refline in self.reference_lines {

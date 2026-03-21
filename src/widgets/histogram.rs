@@ -505,12 +505,31 @@ impl Histogram {
             .spines(self.spines.clone())
             .reference_lines(&self.reference_lines);
 
-        let Some(pa) = frame.render(area, buf, DataBounds { x_lo, x_hi, y_lo, y_hi }) else {
+        let Some(pa) = frame.render(
+            area,
+            buf,
+            DataBounds {
+                x_lo,
+                x_hi,
+                y_lo,
+                y_hi,
+            },
+        ) else {
             return;
         };
 
         // Draw bars
-        self.draw_bars(&pa, &edges, &heights, self.color, buf, BarSlotLayout { ds_index: 0, n_datasets: 1 });
+        self.draw_bars(
+            &pa,
+            &edges,
+            &heights,
+            self.color,
+            buf,
+            BarSlotLayout {
+                ds_index: 0,
+                n_datasets: 1,
+            },
+        );
 
         // Draw annotations
         PlotFrame::draw_annotations(&pa, &self.annotations, buf);
@@ -575,7 +594,16 @@ impl Histogram {
             .spines(self.spines.clone())
             .reference_lines(&self.reference_lines);
 
-        let Some(pa) = frame.render(area, buf, DataBounds { x_lo, x_hi, y_lo, y_hi }) else {
+        let Some(pa) = frame.render(
+            area,
+            buf,
+            DataBounds {
+                x_lo,
+                x_hi,
+                y_lo,
+                y_hi,
+            },
+        ) else {
             return;
         };
 
@@ -591,7 +619,10 @@ impl Histogram {
                         &all_heights[0],
                         self.datasets[0].color,
                         buf,
-                        BarSlotLayout { ds_index: 0, n_datasets: 1 },
+                        BarSlotLayout {
+                            ds_index: 0,
+                            n_datasets: 1,
+                        },
                     );
                 }
             }
@@ -621,7 +652,17 @@ impl Histogram {
                         let y_top = bar_top_y.round() as u16;
                         let y_bot = bar_bottom_y.round() as u16;
 
-                        self.draw_bar_region(&pa, &BarRect { x_start, x_end, y_top, y_bot }, ds.color, buf);
+                        self.draw_bar_region(
+                            &pa,
+                            &BarRect {
+                                x_start,
+                                x_end,
+                                y_top,
+                                y_bot,
+                            },
+                            ds.color,
+                            buf,
+                        );
                         bottoms[i] = top;
                     }
                 }
@@ -629,13 +670,33 @@ impl Histogram {
             HistMode::Layered => {
                 // Draw overlaid bars (back to front)
                 for (ds_i, ds) in self.datasets.iter().enumerate().rev() {
-                    self.draw_bars(&pa, edges, &all_heights[ds_i], ds.color, buf, BarSlotLayout { ds_index: 0, n_datasets: 1 });
+                    self.draw_bars(
+                        &pa,
+                        edges,
+                        &all_heights[ds_i],
+                        ds.color,
+                        buf,
+                        BarSlotLayout {
+                            ds_index: 0,
+                            n_datasets: 1,
+                        },
+                    );
                 }
             }
             HistMode::SideBySide => {
                 // Draw side-by-side bars
                 for (ds_i, ds) in self.datasets.iter().enumerate() {
-                    self.draw_bars(&pa, edges, &all_heights[ds_i], ds.color, buf, BarSlotLayout { ds_index: ds_i, n_datasets: n_ds });
+                    self.draw_bars(
+                        &pa,
+                        edges,
+                        &all_heights[ds_i],
+                        ds.color,
+                        buf,
+                        BarSlotLayout {
+                            ds_index: ds_i,
+                            n_datasets: n_ds,
+                        },
+                    );
                 }
             }
         }

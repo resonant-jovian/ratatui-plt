@@ -179,7 +179,16 @@ impl Widget for &PsdPlot {
             .spines(self.spines.clone())
             .reference_lines(&self.reference_lines);
 
-        let Some(pa) = frame.render(area, buf, DataBounds { x_lo, x_hi, y_lo, y_hi }) else {
+        let Some(pa) = frame.render(
+            area,
+            buf,
+            DataBounds {
+                x_lo,
+                x_hi,
+                y_lo,
+                y_hi,
+            },
+        ) else {
             return;
         };
 
@@ -212,7 +221,18 @@ impl Widget for &PsdPlot {
                 let sy0 = pa.screen_y(y0);
                 let sx1 = pa.screen_x(x1);
                 let sy1 = pa.screen_y(y1);
-                draw_line(buf, &LineSegment { x0: sx0, y0: sy0, x1: sx1, y1: sy1 }, s.color, &s.line_style.pattern, &clip);
+                draw_line(
+                    buf,
+                    &LineSegment {
+                        x0: sx0,
+                        y0: sy0,
+                        x1: sx1,
+                        y1: sy1,
+                    },
+                    s.color,
+                    &s.line_style.pattern,
+                    &clip,
+                );
             }
 
             // Draw markers

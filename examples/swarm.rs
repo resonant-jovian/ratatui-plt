@@ -84,7 +84,11 @@ fn main() -> color_eyre::Result<()> {
 
     let plot = SwarmPlot::new()
         .group(SwarmGroup::new("Chrome", chrome, Color::Rgb(80, 200, 255)))
-        .group(SwarmGroup::new("Firefox", firefox, Color::Rgb(255, 160, 40)))
+        .group(SwarmGroup::new(
+            "Firefox",
+            firefox,
+            Color::Rgb(255, 160, 40),
+        ))
         .group(SwarmGroup::new("Safari", safari, Color::Rgb(220, 100, 255)))
         .group(SwarmGroup::new("Edge", edge, Color::Rgb(100, 220, 100)))
         .title("Beeswarm: Response Times by Browser (q to quit)")

@@ -39,7 +39,15 @@ pub fn write_braille(buf: &mut Buffer, x: u16, y: u16, bits: u8, color: Color) {
 ///
 /// Coordinates are in terminal cell space (floating point). The line is clipped
 /// to the given plot area bounds.
-pub fn draw_braille_line(buf: &mut Buffer, x0: f64, y0: f64, x1: f64, y1: f64, color: Color, pa: &PlotArea) {
+pub fn draw_braille_line(
+    buf: &mut Buffer,
+    x0: f64,
+    y0: f64,
+    x1: f64,
+    y1: f64,
+    color: Color,
+    pa: &PlotArea,
+) {
     // Scale to braille sub-pixel coordinates (2x horizontal, 4x vertical)
     let mut ix0 = (x0 * 2.0).round() as i32;
     let mut iy0 = (y0 * 4.0).round() as i32;

@@ -67,7 +67,11 @@ fn main() -> color_eyre::Result<()> {
     let t_cells = StripGroup::new("T cells", lcg_data(42, 100, 8.5, 2.5), Color::Cyan);
     let nk_cells = StripGroup::new("NK cells", lcg_data(137, 80, 5.0, 1.8), Color::Green);
     let b_cells = StripGroup::new("B cells", lcg_data(271, 90, 2.0, 1.2), Color::Yellow);
-    let monocytes = StripGroup::new("Monocytes", lcg_data(503, 70, 3.5, 3.0), Color::Rgb(255, 140, 0));
+    let monocytes = StripGroup::new(
+        "Monocytes",
+        lcg_data(503, 70, 3.5, 3.0),
+        Color::Rgb(255, 140, 0),
+    );
     let macrophages = StripGroup::new("Macrophages", lcg_data(999, 60, 0.8, 2.0), Color::Magenta);
 
     let plot = StripPlot::new()

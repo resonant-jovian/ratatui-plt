@@ -350,7 +350,16 @@ impl Widget for &BoxenPlot {
             .spines(self.spines.clone())
             .reference_lines(&self.reference_lines);
 
-        let Some(pa) = frame.render(area, buf, DataBounds { x_lo, x_hi, y_lo, y_hi }) else {
+        let Some(pa) = frame.render(
+            area,
+            buf,
+            DataBounds {
+                x_lo,
+                x_hi,
+                y_lo,
+                y_hi,
+            },
+        ) else {
             return;
         };
 
@@ -437,7 +446,9 @@ impl Widget for &BoxenPlot {
                     }
                 }
                 if box_right > box_left + 1 && pa.contains(box_right - 1, bottom) {
-                    buf[(box_right - 1, bottom)].set_char('┘').set_fg(depth_color);
+                    buf[(box_right - 1, bottom)]
+                        .set_char('┘')
+                        .set_fg(depth_color);
                 }
                 // Side edges — skip corner rows
                 for y in (top + 1)..bottom {

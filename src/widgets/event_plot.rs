@@ -251,7 +251,16 @@ impl EventPlot {
             .y_label_width(label_width)
             .reference_lines(&self.reference_lines);
 
-        let Some(pa) = frame.render(area, buf, DataBounds { x_lo, x_hi, y_lo, y_hi }) else {
+        let Some(pa) = frame.render(
+            area,
+            buf,
+            DataBounds {
+                x_lo,
+                x_hi,
+                y_lo,
+                y_hi,
+            },
+        ) else {
             return;
         };
 
@@ -341,7 +350,16 @@ impl EventPlot {
             .spines(self.spines.clone())
             .reference_lines(&self.reference_lines);
 
-        let Some(pa) = frame.render(area, buf, DataBounds { x_lo, x_hi, y_lo, y_hi }) else {
+        let Some(pa) = frame.render(
+            area,
+            buf,
+            DataBounds {
+                x_lo,
+                x_hi,
+                y_lo,
+                y_hi,
+            },
+        ) else {
             return;
         };
 

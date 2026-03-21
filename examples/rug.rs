@@ -75,18 +75,15 @@ fn main() -> color_eyre::Result<()> {
     // Inspired by realistic Gutenberg-Richter magnitude-frequency distribution:
     // many small quakes, exponentially fewer large ones
     let magnitudes: Vec<f64> = vec![
-        2.1, 2.1, 2.2, 2.3, 2.3, 2.4, 2.4, 2.5, 2.5, 2.6, 2.6, 2.7, 2.7, 2.8, 2.9, 2.9, 3.0,
-        3.0, 3.1, 3.1, 3.2, 3.2, 3.3, 3.3, 3.4, 3.5, 3.5, 3.6, 3.7, 3.8, 3.9, 4.0, 4.1, 4.2,
-        4.3, 4.4, 4.5, 4.7, 4.9, 5.0, 5.1, 5.3, 5.5, 5.6, 5.8, 6.0, 6.2, 6.5, 6.7, 7.0, 7.1,
-        7.3, 7.5, 7.8, 8.0, 8.1,
+        2.1, 2.1, 2.2, 2.3, 2.3, 2.4, 2.4, 2.5, 2.5, 2.6, 2.6, 2.7, 2.7, 2.8, 2.9, 2.9, 3.0, 3.0,
+        3.1, 3.1, 3.2, 3.2, 3.3, 3.3, 3.4, 3.5, 3.5, 3.6, 3.7, 3.8, 3.9, 4.0, 4.1, 4.2, 4.3, 4.4,
+        4.5, 4.7, 4.9, 5.0, 5.1, 5.3, 5.5, 5.6, 5.8, 6.0, 6.2, 6.5, 6.7, 7.0, 7.1, 7.3, 7.5, 7.8,
+        8.0, 8.1,
     ];
 
     // Compute KDE curve
     let kde_points = gaussian_kde(&magnitudes, 0.3, 200);
-    let kde_y_max = kde_points
-        .iter()
-        .map(|&(_, y)| y)
-        .fold(0.0_f64, f64::max);
+    let kde_y_max = kde_points.iter().map(|&(_, y)| y).fold(0.0_f64, f64::max);
 
     // Shared axis bounds for histogram and KDE overlay
     let x_lo = 1.5;
@@ -152,9 +149,7 @@ fn main() -> color_eyre::Result<()> {
 
             let plot_x = hist_area.x + y_label_width;
             let plot_y = hist_area.y + title_height;
-            let plot_width = hist_area
-                .width
-                .saturating_sub(y_label_width + 1);
+            let plot_width = hist_area.width.saturating_sub(y_label_width + 1);
             let plot_height = hist_area
                 .height
                 .saturating_sub(title_height + tick_height + x_label_height);

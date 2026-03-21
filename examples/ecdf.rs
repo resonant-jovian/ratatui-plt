@@ -55,7 +55,7 @@ fn main() -> color_eyre::Result<()> {
                 + (t * 0.577).cos()      // Euler-Mascheroni
                 + (t * 1.414).cos()      // sqrt(2)
                 + (t * 4.669).sin()      // Feigenbaum
-                + (t * 0.693).cos();     // ln(2)
+                + (t * 0.693).cos(); // ln(2)
             sum * 0.3 // scale to roughly [-3, 3]
         })
         .collect();

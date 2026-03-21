@@ -58,8 +58,7 @@ fn main() -> color_eyre::Result<()> {
     for i in 0..size {
         for j in (i + 1)..size {
             let seed = (i * 31 + j * 17) as f64;
-            let val =
-                ((seed * 0.7).sin() * 0.6 + (seed * 1.3).cos() * 0.3).clamp(-0.95, 0.95);
+            let val = ((seed * 0.7).sin() * 0.6 + (seed * 1.3).cos() * 0.3).clamp(-0.95, 0.95);
             pairs.push((i, j, val));
         }
     }

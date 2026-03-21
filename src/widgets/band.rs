@@ -205,7 +205,16 @@ impl Widget for &BandPlot {
             .spines(self.spines.clone())
             .reference_lines(&self.reference_lines);
 
-        let Some(pa) = frame.render(area, buf, DataBounds { x_lo, x_hi, y_lo, y_hi }) else {
+        let Some(pa) = frame.render(
+            area,
+            buf,
+            DataBounds {
+                x_lo,
+                x_hi,
+                y_lo,
+                y_hi,
+            },
+        ) else {
             return;
         };
 
@@ -221,8 +230,7 @@ impl Widget for &BandPlot {
                     let screen_x = pa.x + col_offset;
                     // Map screen column to data x coordinate
                     let data_x = pa.x_lo
-                        + (col_offset as f64 / (pa.width - 1).max(1) as f64)
-                            * (pa.x_hi - pa.x_lo);
+                        + (col_offset as f64 / (pa.width - 1).max(1) as f64) * (pa.x_hi - pa.x_lo);
 
                     // Find the data segment containing this x and interpolate
                     let yl_interp = interpolate_at(&band.x[..n], &band.y_lower[..n], data_x);

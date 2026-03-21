@@ -269,7 +269,16 @@ impl Widget for &Dendrogram {
             .spines(self.spines.clone())
             .reference_lines(&self.reference_lines);
 
-        let Some(pa) = frame.render(area, buf, DataBounds { x_lo, x_hi, y_lo, y_hi }) else {
+        let Some(pa) = frame.render(
+            area,
+            buf,
+            DataBounds {
+                x_lo,
+                x_hi,
+                y_lo,
+                y_hi,
+            },
+        ) else {
             return;
         };
 
@@ -301,28 +310,37 @@ impl Widget for &Dendrogram {
             match self.orientation {
                 DendroOrientation::Bottom => {
                     // Vertical from left child up to merge height
-                    draw_vertical_segment(
-                        buf, &pa, left_pos, left_height, merge_height, color,
-                    );
+                    draw_vertical_segment(buf, &pa, left_pos, left_height, merge_height, color);
                     // Vertical from right child up to merge height
-                    draw_vertical_segment(
-                        buf, &pa, right_pos, right_height, merge_height, color,
-                    );
+                    draw_vertical_segment(buf, &pa, right_pos, right_height, merge_height, color);
                     // Horizontal connecting at merge height
-                    draw_horizontal_segment(
-                        buf, &pa, left_pos, right_pos, merge_height, color,
-                    );
+                    draw_horizontal_segment(buf, &pa, left_pos, right_pos, merge_height, color);
                 }
                 DendroOrientation::Top => {
                     let flip_h = |h: f64| height_hi - h;
                     draw_vertical_segment(
-                        buf, &pa, left_pos, flip_h(left_height), flip_h(merge_height), color,
+                        buf,
+                        &pa,
+                        left_pos,
+                        flip_h(left_height),
+                        flip_h(merge_height),
+                        color,
                     );
                     draw_vertical_segment(
-                        buf, &pa, right_pos, flip_h(right_height), flip_h(merge_height), color,
+                        buf,
+                        &pa,
+                        right_pos,
+                        flip_h(right_height),
+                        flip_h(merge_height),
+                        color,
                     );
                     draw_horizontal_segment(
-                        buf, &pa, left_pos, right_pos, flip_h(merge_height), color,
+                        buf,
+                        &pa,
+                        left_pos,
+                        right_pos,
+                        flip_h(merge_height),
+                        color,
                     );
                 }
                 DendroOrientation::Left => {

@@ -313,9 +313,7 @@ impl Widget for &TernaryPlot {
                 let (bx, by) = ternary_to_cartesian(1.0 - frac, frac, 0.0);
                 let (sbx, sby) = to_screen(bx, by);
                 // Place label below the bottom edge
-                let lx = (sbx - label.len() as f64 / 2.0)
-                    .round()
-                    .max(area.x as f64) as u16;
+                let lx = (sbx - label.len() as f64 / 2.0).round().max(area.x as f64) as u16;
                 let ly = (sby + 1.0).round() as u16;
                 if ly < area.y + area.height {
                     for (j, ch) in label.chars().enumerate() {
@@ -329,9 +327,7 @@ impl Widget for &TernaryPlot {
                 // Left edge: ticks for component C (top corner value increases upward)
                 let (lx2, ly2) = ternary_to_cartesian(1.0 - frac, 0.0, frac);
                 let (slx, sly) = to_screen(lx2, ly2);
-                let lx_pos = (slx - label.len() as f64 - 1.0)
-                    .round()
-                    .max(area.x as f64) as u16;
+                let lx_pos = (slx - label.len() as f64 - 1.0).round().max(area.x as f64) as u16;
                 let ly_pos = sly.round() as u16;
                 if ly_pos >= area.y && ly_pos < area.y + area.height {
                     for (j, ch) in label.chars().enumerate() {

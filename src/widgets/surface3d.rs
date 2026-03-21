@@ -369,7 +369,17 @@ impl Surface3D {
         }
 
         // Draw 3D axis lines at the edges of the data bounding box
-        draw_axis_lines(camera, buf, &pa, &ScreenBounds { sx_min, sx_max, sy_min, sy_max });
+        draw_axis_lines(
+            camera,
+            buf,
+            &pa,
+            &ScreenBounds {
+                sx_min,
+                sx_max,
+                sy_min,
+                sy_max,
+            },
+        );
     }
 }
 
@@ -429,12 +439,7 @@ struct ScreenBounds {
 }
 
 /// Draw 3D axis lines (X, Y, Z) at the edges of the data bounding box.
-fn draw_axis_lines(
-    camera: &Camera3D,
-    buf: &mut Buffer,
-    pa: &PlotArea,
-    sb: &ScreenBounds,
-) {
+fn draw_axis_lines(camera: &Camera3D, buf: &mut Buffer, pa: &PlotArea, sb: &ScreenBounds) {
     let (px, pw, py, ph) = (pa.x, pa.width, pa.y, pa.height);
 
     // Project axis origin and tips from normalized [-1,1] space
