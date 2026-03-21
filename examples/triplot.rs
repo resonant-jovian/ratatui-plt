@@ -9,6 +9,7 @@ use crossterm::{
 };
 use ratatui::prelude::*;
 use ratatui_plt::prelude::*;
+use ratatui_plt::ticker::MaxNLocator;
 use ratatui_plt::triangulation::Triangulation;
 
 fn parse_theme() -> Theme {
@@ -30,11 +31,11 @@ fn parse_theme() -> Theme {
 type Vertices = Vec<(f64, f64)>;
 type Triangles = Vec<(usize, usize, usize)>;
 
-/// Build a 5x5 regular grid on [-2, 2] x [-2, 2] with 25 vertices and 32 triangles.
+/// Build an 8x8 regular grid on [-2, 2] x [-2, 2] with 64 vertices and 98 triangles.
 ///
 /// Each grid cell is split into two triangles along the diagonal.
 fn make_grid_triangulation() -> (Vertices, Triangles) {
-    let n = 5;
+    let n = 8;
     let lo = -2.0_f64;
     let hi = 2.0_f64;
     let step = (hi - lo) / (n - 1) as f64;
@@ -74,7 +75,9 @@ fn main() -> color_eyre::Result<()> {
     let (verts, tris) = make_grid_triangulation();
     let tri_plot = TriPlot::new(Triangulation::from_explicit(verts, tris))
         .title("Mesh Edges")
-        .edge_color(Color::Cyan);
+        .edge_color(Color::Cyan)
+        .x_axis(Axis::new().locator(MaxNLocator::new(4)))
+        .y_axis(Axis::new().locator(MaxNLocator::new(4)));
 
     // --- Middle panel: TriColor (colored faces) ---
     let (verts, tris) = make_grid_triangulation();
@@ -93,7 +96,9 @@ fn main() -> color_eyre::Result<()> {
     let tri_color = TriColor::new(Triangulation::from_explicit(verts, tris))
         .face_values(face_values)
         .colormap(Viridis)
-        .title("Colored Faces");
+        .title("Colored Faces")
+        .x_axis(Axis::new().locator(MaxNLocator::new(4)))
+        .y_axis(Axis::new().locator(MaxNLocator::new(4)));
 
     // --- Right panel: TriContour (contour lines on vertex values) ---
     let (verts, tris) = make_grid_triangulation();
@@ -101,8 +106,10 @@ fn main() -> color_eyre::Result<()> {
     let vertex_values: Vec<f64> = verts.iter().map(|&(x, y)| (x * x + y * y).sqrt()).collect();
     let tri_contour = TriContour::new(Triangulation::from_explicit(verts, tris))
         .vertex_values(vertex_values)
-        .levels_auto(8)
-        .title("Contour Lines");
+        .levels_auto(10)
+        .title("Contour Lines")
+        .x_axis(Axis::new().locator(MaxNLocator::new(4)))
+        .y_axis(Axis::new().locator(MaxNLocator::new(4)));
 
     // Multi-panel layout: 1 row, 3 columns
     let panel = MultiPanel::new(1, 3)

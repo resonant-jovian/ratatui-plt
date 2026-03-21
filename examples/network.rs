@@ -37,51 +37,61 @@ fn main() -> color_eyre::Result<()> {
     enable_raw_mode()?;
     let mut terminal = Terminal::new(CrosstermBackend::new(io::stdout()))?;
 
-    // Community 1 (Cyan): Alice, Bob, Carol
-    // Community 2 (Yellow): Dave, Eve, Frank
-    // Community 3 (Magenta): Grace, Hank
+    // Community 1 (Cyan): Alice, Bob, Carol — upper left triangle
+    // Community 2 (Yellow): Dave, Eve, Frank — upper right triangle
+    // Community 3 (Magenta): Grace, Hank — bottom center pair
+    //
+    // Manual layout gives clean, readable edge orientations.
     let plot = NetworkPlot::new()
-        // Community 1
+        // Community 1 — upper left
         .node(
             GraphNode::new("Alice")
                 .color(Color::Cyan)
+                .position(-3.0, 2.0)
                 .marker(MarkerShape::FilledCircle),
         ) // 0
         .node(
             GraphNode::new("Bob")
                 .color(Color::Cyan)
+                .position(-4.0, 0.0)
                 .marker(MarkerShape::FilledCircle),
         ) // 1
         .node(
             GraphNode::new("Carol")
                 .color(Color::Cyan)
+                .position(-1.5, 0.0)
                 .marker(MarkerShape::FilledCircle),
         ) // 2
-        // Community 2
+        // Community 2 — upper right
         .node(
             GraphNode::new("Dave")
                 .color(Color::Yellow)
+                .position(1.5, 0.0)
                 .marker(MarkerShape::FilledCircle),
         ) // 3
         .node(
             GraphNode::new("Eve")
                 .color(Color::Yellow)
+                .position(3.0, 2.0)
                 .marker(MarkerShape::FilledCircle),
         ) // 4
         .node(
             GraphNode::new("Frank")
                 .color(Color::Yellow)
+                .position(4.0, 0.0)
                 .marker(MarkerShape::FilledCircle),
         ) // 5
-        // Community 3
+        // Community 3 — bottom center
         .node(
             GraphNode::new("Grace")
                 .color(Color::Magenta)
+                .position(-1.0, -2.5)
                 .marker(MarkerShape::FilledCircle),
         ) // 6
         .node(
             GraphNode::new("Hank")
                 .color(Color::Magenta)
+                .position(1.0, -2.5)
                 .marker(MarkerShape::FilledCircle),
         ) // 7
         // Intra-community edges (strong ties)
@@ -97,7 +107,7 @@ fn main() -> color_eyre::Result<()> {
         .edge(GraphEdge::new(1, 6, 1.0)) // Bob - Grace (bridge 1-3)
         .edge(GraphEdge::new(5, 7, 1.0)) // Frank - Hank (bridge 2-3)
         .edge(GraphEdge::new(0, 4, 0.5)) // Alice - Eve (weak bridge)
-        .layout(GraphLayout::ForceDirected)
+        .layout(GraphLayout::Manual)
         .title("Social Network Graph (q to quit)")
         .show_labels(true);
 

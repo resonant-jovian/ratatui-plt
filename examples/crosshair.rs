@@ -1,7 +1,8 @@
-//! Interactive crosshair overlay on a scatter plot.
+//! Interactive crosshair overlay on a galaxy-like scatter plot.
 //!
 //! Arrow keys move the crosshair in data space. The current data coordinates
-//! are displayed next to the cursor.
+//! are displayed next to the cursor. The scatter pattern shows a spiral
+//! galaxy with a central bulge, two arms, and a sparse halo.
 
 use std::io;
 
@@ -36,48 +37,69 @@ fn main() -> color_eyre::Result<()> {
     enable_raw_mode()?;
     let mut terminal = Terminal::new(CrosstermBackend::new(io::stdout()))?;
 
-    // Generate deterministic scatter data: two clusters + a ring
+    // Generate deterministic scatter data simulating a galaxy-like spiral pattern
+    // with a central bulge, two spiral arms, and scattered halo stars.
     let mut points = Vec::new();
     let mut color_vals = Vec::new();
 
-    // Cluster 1: centred at (2, 3)
-    for i in 0..80 {
-        let t = i as f64 * 0.079;
-        let x = 2.0 + 1.2 * t.sin() + 0.3 * (t * 2.7).cos();
-        let y = 3.0 + 0.9 * t.cos() + 0.3 * (t * 3.1).sin();
+    // Central bulge: dense cluster at origin with a 2D pseudo-Gaussian spread
+    for i in 0..100 {
+        let t = i as f64 * 0.063;
+        let r = 0.8 * (1.0 - (t * 0.5).cos().abs()) + 0.1 * (t * 3.7).sin();
+        let angle = t * 7.3;
+        let x = 5.0 + r * angle.cos();
+        let y = 5.0 + r * angle.sin();
         points.push((x, y));
-        color_vals.push(0.2);
+        color_vals.push(0.9); // bright yellow/white core
     }
 
-    // Cluster 2: centred at (7, 6)
-    for i in 0..80 {
-        let t = i as f64 * 0.079;
-        let x = 7.0 + 1.0 * (t * 1.3).cos() + 0.4 * (t * 2.1).sin();
-        let y = 6.0 + 1.1 * (t * 0.9).sin() + 0.3 * (t * 3.3).cos();
-        points.push((x, y));
-        color_vals.push(0.7);
-    }
-
-    // Ring pattern: centred at (5, 4)
+    // Spiral arm 1: logarithmic spiral with scatter
     for i in 0..120 {
-        let theta = i as f64 * std::f64::consts::TAU / 120.0;
-        let r = 3.5 + 0.3 * (theta * 5.0).sin();
-        let x = 5.0 + r * theta.cos();
-        let y = 4.0 + r * theta.sin();
+        let t = i as f64 * 0.05;
+        let r = 0.8 + 1.8 * t;
+        let angle = t * 2.5 + 0.3;
+        let scatter_r = 0.3 + 0.15 * (t * 4.1).sin();
+        let scatter_a = (i as f64 * 0.17).sin() * 0.2;
+        let x = 5.0 + (r + scatter_r) * (angle + scatter_a).cos();
+        let y = 5.0 + (r + scatter_r) * (angle + scatter_a).sin();
         points.push((x, y));
-        color_vals.push((theta / std::f64::consts::TAU).fract());
+        color_vals.push(0.3 + 0.2 * (t / 6.0)); // blue-ish arm
     }
 
-    let series = Series::new("scatter")
+    // Spiral arm 2: opposite side, tighter winding
+    for i in 0..120 {
+        let t = i as f64 * 0.05;
+        let r = 0.8 + 1.8 * t;
+        let angle = t * 2.5 + std::f64::consts::PI + 0.1;
+        let scatter_r = 0.25 + 0.2 * (t * 3.3).cos();
+        let scatter_a = (i as f64 * 0.23).cos() * 0.15;
+        let x = 5.0 + (r + scatter_r) * (angle + scatter_a).cos();
+        let y = 5.0 + (r + scatter_r) * (angle + scatter_a).sin();
+        points.push((x, y));
+        color_vals.push(0.15 + 0.2 * (t / 6.0)); // cyan arm
+    }
+
+    // Halo: sparse outer stars
+    for i in 0..60 {
+        let t = i as f64 * 0.105;
+        let r = 5.0 + 2.5 * (t * 0.7).sin().abs() + 1.0 * (t * 1.9).cos();
+        let angle = t * 4.1;
+        let x = 5.0 + r * angle.cos();
+        let y = 5.0 + r * angle.sin();
+        points.push((x, y));
+        color_vals.push(0.6 + 0.1 * (t * 0.3).sin()); // reddish halo
+    }
+
+    let series = Series::new("galaxy")
         .data(points)
         .marker(MarkerShape::FilledCircle);
 
-    let x_axis = Axis::new().label("x").grid(true);
-    let y_axis = Axis::new().label("y").grid(true);
+    let x_axis = Axis::new().label("RA offset (kpc)").grid(true);
+    let y_axis = Axis::new().label("Dec offset (kpc)").grid(true);
 
-    // Crosshair position in data coordinates
+    // Crosshair position in data coordinates, start at galactic center
     let mut cursor_x = 5.0_f64;
-    let mut cursor_y = 4.0_f64;
+    let mut cursor_y = 5.0_f64;
     let step = 0.2;
 
     loop {
@@ -88,13 +110,13 @@ fn main() -> color_eyre::Result<()> {
             // so we can obtain the PlotArea for the crosshair overlay.
             let theme = Theme::get_default();
             let pf = PlotFrame::new(&x_axis, &y_axis, &theme)
-                .title(Some("Interactive Crosshair (arrows to move, q to quit)"));
+                .title(Some("Galaxy Crosshair (arrows to move, q to quit)"));
 
             // Compute data bounds
-            let x_lo = 0.0_f64;
-            let x_hi = 10.0_f64;
-            let y_lo = -1.0_f64;
-            let y_hi = 9.0_f64;
+            let x_lo = -4.0_f64;
+            let x_hi = 14.0_f64;
+            let y_lo = -4.0_f64;
+            let y_hi = 14.0_f64;
 
             let buf = frame.buffer_mut();
             if let Some(pa) = pf.render(area, buf, x_lo, x_hi, y_lo, y_hi) {

@@ -47,6 +47,7 @@ pub mod collections;
 pub mod color_cycle;
 pub mod colormap;
 pub mod config;
+pub mod drawing;
 pub mod export;
 pub mod frame;
 pub mod legend;

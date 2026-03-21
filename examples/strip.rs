@@ -1,8 +1,9 @@
 //! Strip plot example: Gene Expression by Cell Type.
 //!
 //! Simulates single-cell gene expression measurements (log2 TPM) for a
-//! marker gene across 4 immune cell types, each with distinct expression
+//! marker gene across 5 immune cell types, each with distinct expression
 //! distributions generated via a deterministic linear congruential generator.
+//! Features custom styling with spine control and a reference threshold line.
 
 use std::io;
 
@@ -57,24 +58,29 @@ fn main() -> color_eyre::Result<()> {
     enable_raw_mode()?;
     let mut terminal = Terminal::new(CrosstermBackend::new(io::stdout()))?;
 
-    // Four immune cell types with different expression patterns for gene CD3E:
+    // Five immune cell types with different expression patterns for gene CD3E:
     //   T cells:        high expression (center 8.5, moderate spread)
     //   NK cells:       moderate expression (center 5.0, tight)
     //   B cells:        low expression (center 2.0, tight)
+    //   Monocytes:      bimodal - some activated, some off (center 3.5, wide)
     //   Macrophages:    very low / off (center 0.8, wide due to noise)
-    let t_cells = StripGroup::new("T cells", lcg_data(42, 80, 8.5, 2.5), Color::Cyan);
-    let nk_cells = StripGroup::new("NK cells", lcg_data(137, 60, 5.0, 1.8), Color::Green);
-    let b_cells = StripGroup::new("B cells", lcg_data(271, 70, 2.0, 1.2), Color::Yellow);
-    let macrophages = StripGroup::new("Macrophages", lcg_data(999, 50, 0.8, 2.0), Color::Magenta);
+    let t_cells = StripGroup::new("T cells", lcg_data(42, 100, 8.5, 2.5), Color::Cyan);
+    let nk_cells = StripGroup::new("NK cells", lcg_data(137, 80, 5.0, 1.8), Color::Green);
+    let b_cells = StripGroup::new("B cells", lcg_data(271, 90, 2.0, 1.2), Color::Yellow);
+    let monocytes = StripGroup::new("Monocytes", lcg_data(503, 70, 3.5, 3.0), Color::Rgb(255, 140, 0));
+    let macrophages = StripGroup::new("Macrophages", lcg_data(999, 60, 0.8, 2.0), Color::Magenta);
 
     let plot = StripPlot::new()
         .group(t_cells)
         .group(nk_cells)
         .group(b_cells)
+        .group(monocytes)
         .group(macrophages)
-        .jitter(0.35)
-        .title("Gene Expression by Cell Type: CD3E (q to quit)")
-        .y_axis(Axis::new().label("log2(TPM + 1)").grid(true));
+        .jitter(0.38)
+        .title("Single-Cell Gene Expression: CD3E (q to quit)")
+        .y_axis(Axis::new().label("log2(TPM + 1)").grid(true))
+        .spines(Spines::new().top(false).right(false))
+        .reference_line(ReferenceLine::hline_dashed(5.0, Color::DarkGray));
 
     loop {
         terminal.draw(|frame| {

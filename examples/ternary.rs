@@ -92,6 +92,8 @@ fn main() -> color_eyre::Result<()> {
         .dataset(clay)
         .dataset(silt_loam)
         .corner_labels("Sand", "Silt", "Clay")
+        .grid_divisions(4)
+        .show_tick_labels(true)
         .title("Soil Texture Classification (q to quit)");
 
     loop {

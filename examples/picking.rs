@@ -47,8 +47,8 @@ fn main() -> color_eyre::Result<()> {
                 })
                 .collect(),
         )
-        .color(Color::Cyan)
-        .marker(MarkerShape::Dot);
+        .color(Color::Rgb(80, 200, 255))
+        .marker(MarkerShape::FilledCircle);
 
     let s2 = Series::new("cos(x)")
         .data(
@@ -59,8 +59,8 @@ fn main() -> color_eyre::Result<()> {
                 })
                 .collect(),
         )
-        .color(Color::Yellow)
-        .marker(MarkerShape::Dot);
+        .color(Color::Rgb(255, 180, 50))
+        .marker(MarkerShape::FilledCircle);
 
     let all_series = vec![s1.clone(), s2.clone()];
 

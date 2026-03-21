@@ -467,13 +467,22 @@ impl<'a> PlotFrame<'a> {
         // Draw reference lines and spans
         self.draw_reference_lines(buf, px, py, aw, ah, x_lo, x_hi, y_lo, y_hi);
 
-        // Draw x tick labels
+        // Draw x tick labels with overlap detection
         let x_ticks = self.x_axis.tick_positions(x_lo, x_hi);
+        let mut last_label_end: u16 = 0;
         for &tv in &x_ticks {
             let sx = data_to_screen(tv, x_lo, x_hi, px as f64, (px + aw - 1) as f64);
             let label = self.x_axis.format_tick(tv);
             let xi = sx.round() as u16;
-            let label_start = xi.saturating_sub(label.len() as u16 / 2);
+            let label_len = label.len() as u16;
+            let label_start = xi.saturating_sub(label_len / 2);
+            let label_end = label_start + label_len;
+
+            // Skip this label if it would overlap with the previous one
+            if label_start < last_label_end + 1 && last_label_end > 0 {
+                continue;
+            }
+
             let y = py + ah;
             if y < area.y + area.height {
                 for (j, ch) in label.chars().enumerate() {
@@ -482,6 +491,7 @@ impl<'a> PlotFrame<'a> {
                         buf[(lx, y)].set_char(ch).set_fg(self.theme.axis_color);
                     }
                 }
+                last_label_end = label_end;
             }
         }
 
@@ -514,13 +524,19 @@ impl<'a> PlotFrame<'a> {
             }
         }
         if let Some(ref label) = self.y_axis.label {
-            let x = area.x;
-            let start_y = py + (ah.saturating_sub(label.len() as u16)) / 2;
+            // Render y-axis label horizontally, centered vertically at the left edge
+            let label_len = label.len() as u16;
+            let mid_y = py + ah / 2;
+            let x_start = area.x;
             for (i, ch) in label.chars().enumerate() {
-                let y = start_y + i as u16;
-                if y < py + ah {
-                    buf[(x, y)].set_char(ch).set_fg(self.theme.foreground);
+                let x = x_start + i as u16;
+                if x < px && mid_y < py + ah {
+                    buf[(x, mid_y)].set_char(ch).set_fg(self.theme.foreground);
                 }
+            }
+            // If label is too long, try placing it one row above the tick labels area
+            if label_len > self.y_label_width {
+                // Already handled above — it will clip to available space
             }
         }
 

@@ -50,7 +50,7 @@ fn main() -> color_eyre::Result<()> {
 
     let main_plot = LinePlot::new()
         .series(main_series)
-        .title("Damped Sine with Inset Zoom (q to quit)")
+        .title("Damped Sine + Inset (q to quit)")
         .x_axis(Axis::new().label("x").grid(true))
         .y_axis(Axis::new().label("y").grid(true))
         .reference_line(ReferenceLine::hline_dashed(0.0, Color::DarkGray))
@@ -63,16 +63,17 @@ fn main() -> color_eyre::Result<()> {
         .copied()
         .collect();
 
-    let inset_series = Series::new("Zoom").data(inset_data).color(Color::Yellow);
+    let inset_series = Series::new("Peak").data(inset_data).color(Color::Yellow);
 
     let inset_plot = LinePlot::new()
         .series(inset_series)
-        .title("Zoom: x=[1,3]")
+        .title("x=[1,3]")
         .x_axis(Axis::new().bounds(Bounds::Manual(1.0, 3.0)).grid(true))
         .y_axis(Axis::new().grid(true))
         .show_legend(false);
 
-    let inset = InsetAxes::new(0.55, 0.08, 0.42, 0.45)
+    // Place inset in the right half, below the title, with enough room for labels
+    let inset = InsetAxes::new(0.55, 0.10, 0.40, 0.42)
         .border(true)
         .border_color(Color::Yellow);
 

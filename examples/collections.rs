@@ -1,7 +1,7 @@
-//! Collections example: LineCollection and PathCollection for batch rendering.
+//! Collections example: LineCollection and PathCollection with Braille rendering.
 //!
-//! Left: a colorful line collection (100 random segments colored by angle).
-//! Right: a path collection drawing several closed polygons.
+//! Left: a radial burst of 12 colored line segments from the center.
+//! Right: a path collection drawing three distinct closed polygons.
 
 use std::io;
 
@@ -36,39 +36,42 @@ fn main() -> color_eyre::Result<()> {
     enable_raw_mode()?;
     let mut terminal = Terminal::new(CrosstermBackend::new(io::stdout()))?;
 
-    // Build a line collection: radial burst of colored segments from center
+    // Build a line collection: 12 radial segments, each with a distinct color
+    let segment_colors = [
+        Color::Red,
+        Color::Rgb(255, 127, 0), // orange
+        Color::Yellow,
+        Color::Rgb(127, 255, 0), // lime
+        Color::Green,
+        Color::Rgb(0, 255, 127), // spring
+        Color::Cyan,
+        Color::Rgb(0, 127, 255), // azure
+        Color::Blue,
+        Color::Rgb(127, 0, 255), // violet
+        Color::Magenta,
+        Color::Rgb(255, 0, 127), // rose
+    ];
     let mut lc = LineCollection::new();
-    for i in 0..60 {
-        let theta = i as f64 * std::f64::consts::TAU / 60.0;
-        let r_inner = 0.5;
-        let r_outer = 2.0 + 0.8 * (3.0 * theta).sin();
-        let x0 = r_inner * theta.cos();
-        let y0 = r_inner * theta.sin();
-        let x1 = r_outer * theta.cos();
-        let y1 = r_outer * theta.sin();
-        // Color by angle using HSV-like mapping
-        let hue = i as f64 / 60.0;
-        let r = ((hue * 6.0).sin() * 127.0 + 128.0) as u8;
-        let g = (((hue * 6.0 + 2.0).sin()) * 127.0 + 128.0) as u8;
-        let b = (((hue * 6.0 + 4.0).sin()) * 127.0 + 128.0) as u8;
-        lc = lc.segment((x0, y0), (x1, y1), Color::Rgb(r, g, b));
+    for (i, &color) in segment_colors.iter().enumerate() {
+        let theta = i as f64 * std::f64::consts::TAU / 12.0;
+        let x0 = 0.3 * theta.cos();
+        let y0 = 0.3 * theta.sin();
+        let x1 = 2.5 * theta.cos();
+        let y1 = 2.5 * theta.sin();
+        lc = lc.segment((x0, y0), (x1, y1), color);
     }
 
-    // Build a path collection: concentric regular polygons
+    // Build a path collection: triangle, square, hexagon
     let mut pc = PathCollection::new();
-    let colors = [
-        Color::Cyan,
-        Color::Yellow,
-        Color::Magenta,
-        Color::Green,
-        Color::Red,
+    let shapes: [(usize, f64, Color); 3] = [
+        (3, 1.0, Color::Cyan),    // triangle
+        (4, 1.8, Color::Yellow),  // square
+        (6, 2.5, Color::Magenta), // hexagon
     ];
-    for (k, &color) in colors.iter().enumerate() {
-        let n_sides = k + 3; // triangle, square, pentagon, hexagon, heptagon
-        let radius = 0.5 + k as f64 * 0.5;
+    for (n_sides, radius, color) in shapes {
         let verts: Vec<(f64, f64)> = (0..=n_sides)
             .map(|i| {
-                let theta = i as f64 * std::f64::consts::TAU / n_sides as f64 + k as f64 * 0.2; // slight rotation
+                let theta = i as f64 * std::f64::consts::TAU / n_sides as f64;
                 (radius * theta.cos(), radius * theta.sin())
             })
             .collect();

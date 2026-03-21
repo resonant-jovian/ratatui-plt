@@ -8,6 +8,7 @@ use ratatui::widgets::Widget;
 use crate::annotation::Annotation;
 use crate::axis::{AspectRatio, Axis};
 use crate::colormap::{Colormap, Viridis};
+use crate::drawing::draw_braille_line;
 use crate::frame::{PlotFrame, ReferenceLine};
 use crate::norm::{LinearNorm, Normalize};
 use crate::series::GridData;
@@ -310,16 +311,14 @@ impl Widget for &ContourPlot {
                                 Some(((dx0 + dx1) / 2.0, (dy0 + dy1) / 2.0));
                         }
 
-                        // Draw each segment using Bresenham
+                        // Draw each segment using Braille sub-pixel rendering
                         for ((dx0, dy0), (dx1, dy1)) in segments {
                             let sx0 = pa.screen_x(dx0);
                             let sy0 = pa.screen_y(dy0);
                             let sx1 = pa.screen_x(dx1);
                             let sy1 = pa.screen_y(dy1);
 
-                            draw_contour_line(
-                                buf, sx0, sy0, sx1, sy1, color, pa.x, pa.y, pa.width, pa.height,
-                            );
+                            draw_braille_line(buf, sx0, sy0, sx1, sy1, color, &pa);
                         }
                     }
                 }
@@ -352,48 +351,3 @@ impl Widget for &ContourPlot {
     }
 }
 
-/// Draw a line between two screen-space points using Bresenham's algorithm.
-#[allow(clippy::too_many_arguments)]
-fn draw_contour_line(
-    buf: &mut Buffer,
-    x0: f64,
-    y0: f64,
-    x1: f64,
-    y1: f64,
-    color: Color,
-    clip_x: u16,
-    clip_y: u16,
-    clip_w: u16,
-    clip_h: u16,
-) {
-    let mut ix0 = x0.round() as i32;
-    let mut iy0 = y0.round() as i32;
-    let ix1 = x1.round() as i32;
-    let iy1 = y1.round() as i32;
-
-    let dx = (ix1 - ix0).abs();
-    let dy = -(iy1 - iy0).abs();
-    let sx = if ix0 < ix1 { 1 } else { -1 };
-    let sy = if iy0 < iy1 { 1 } else { -1 };
-    let mut err = dx + dy;
-
-    loop {
-        let px = ix0 as u16;
-        let py = iy0 as u16;
-        if px >= clip_x && px < clip_x + clip_w && py >= clip_y && py < clip_y + clip_h {
-            buf[(px, py)].set_char('·').set_fg(color);
-        }
-        if ix0 == ix1 && iy0 == iy1 {
-            break;
-        }
-        let e2 = 2 * err;
-        if e2 >= dy {
-            err += dy;
-            ix0 += sx;
-        }
-        if e2 <= dx {
-            err += dx;
-            iy0 += sy;
-        }
-    }
-}

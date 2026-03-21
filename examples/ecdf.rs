@@ -1,8 +1,9 @@
-//! ECDF example: Gaussian vs Exponential distribution comparison.
+//! ECDF example: Three-distribution comparison.
 //!
-//! Two pseudo-distributions generated deterministically:
-//! - Pseudo-Gaussian: sum of 6 sine waves at incommensurate frequencies (CLT-like)
-//! - Pseudo-Exponential: reciprocal transform of uniform-like sequence
+//! Three pseudo-distributions generated deterministically (n=1000 each):
+//! - Pseudo-Gaussian: sum of 10 sine/cosine waves at incommensurate frequencies (CLT-like)
+//! - Pseudo-Exponential: reciprocal transform of uniform-like LCG sequence
+//! - Pseudo-Uniform: scaled LCG output over [-2, 6]
 
 use std::io;
 
@@ -40,17 +41,22 @@ fn main() -> color_eyre::Result<()> {
     // Generate pseudo-Gaussian data using sum of sines at incommensurate frequencies.
     // By the Central Limit Theorem, summing independent oscillations yields an
     // approximately Gaussian distribution centred at 0 with spread ~1.2.
-    let n = 300;
+    // Using 1000 points for smooth step transitions.
+    let n = 1000;
     let gaussian_data: Vec<f64> = (0..n)
         .map(|i| {
-            let t = i as f64 * 0.1;
+            let t = i as f64 * 0.03; // finer sampling for more unique values
             let sum = (t * 1.0).sin()
                 + (t * std::f64::consts::SQRT_2).sin()
                 + (t * std::f64::consts::PI).sin()
                 + (t * std::f64::consts::E).sin()
                 + (t * 2.2360679).sin()  // sqrt(5)
-                + (t * 3.3166248).sin(); // sqrt(11)
-            sum * 0.5 // scale to roughly [-3, 3]
+                + (t * 3.3166248).sin()  // sqrt(11)
+                + (t * 0.577).cos()      // Euler-Mascheroni
+                + (t * 1.414).cos()      // sqrt(2)
+                + (t * 4.669).sin()      // Feigenbaum
+                + (t * 0.693).cos();     // ln(2)
+            sum * 0.3 // scale to roughly [-3, 3]
         })
         .collect();
 
@@ -71,17 +77,29 @@ fn main() -> color_eyre::Result<()> {
             .collect()
     };
 
-    let gaussian_ds = EcdfDataset::new("Gaussian (sum of sines)", gaussian_data, Color::Cyan);
-    let exponential_ds = EcdfDataset::new(
-        "Exponential (LCG reciprocal)",
-        exponential_data,
-        Color::Yellow,
-    );
+    // Generate pseudo-Uniform data for a third comparison curve
+    let uniform_data: Vec<f64> = {
+        let mut state: u64 = 0xCAFE_BABE;
+        (0..n)
+            .map(|_| {
+                state = state
+                    .wrapping_mul(6364136223846793005)
+                    .wrapping_add(1442695040888963407);
+                let u = ((state >> 33) as f64) / (u32::MAX as f64);
+                u * 8.0 - 2.0 // range [-2, 6]
+            })
+            .collect()
+    };
+
+    let gaussian_ds = EcdfDataset::new("Gaussian (n=1000)", gaussian_data, Color::Cyan);
+    let exponential_ds = EcdfDataset::new("Exponential (n=1000)", exponential_data, Color::Yellow);
+    let uniform_ds = EcdfDataset::new("Uniform (n=1000)", uniform_data, Color::Green);
 
     let plot = EcdfPlot::new()
         .dataset(gaussian_ds)
         .dataset(exponential_ds)
-        .title("ECDF: Gaussian vs Exponential (q to quit)")
+        .dataset(uniform_ds)
+        .title("ECDF: Distribution Comparison (q to quit)")
         .x_axis(Axis::new().label("Value").grid(true))
         .y_axis(Axis::new().label("F(x)").grid(true))
         .show_legend(true)

@@ -38,16 +38,17 @@ fn main() -> color_eyre::Result<()> {
     let mut terminal = Terminal::new(CrosstermBackend::new(io::stdout()))?;
 
     // Same surface as surface3d: sin(sqrt(x^2 + y^2))
-    let data = GridData::from_fn((-6.0, 6.0), (-6.0, 6.0), 60, 60, |x, y| {
+    // Higher grid resolution (80x80) for denser, smoother contour lines
+    let data = GridData::from_fn((-6.0, 6.0), (-6.0, 6.0), 80, 80, |x, y| {
         let r = (x * x + y * y).sqrt();
         r.sin()
     });
 
     let contour = Contour3D::new(data)
-        .levels(10)
+        .levels(16)
         .colormap(Plasma)
-        .camera(Camera3D::new().azimuth(-40.0).elevation(30.0))
-        .title("3D Contour Lines on Surface - Arrow keys: rotate, +/-: zoom, q: quit");
+        .camera(Camera3D::new().azimuth(-55.0).elevation(25.0).distance(4.0))
+        .title("3D Contour Lines - Arrows: rotate, +/-: zoom, q: quit");
 
     let mut camera_state = Camera3DState::default();
 

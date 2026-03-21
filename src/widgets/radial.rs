@@ -4,6 +4,7 @@ use ratatui::buffer::Buffer;
 use ratatui::layout::Rect;
 use ratatui::widgets::Widget;
 
+use crate::drawing::{write_braille, BRAILLE_BITS};
 use crate::series::Series;
 use crate::theme::Theme;
 
@@ -194,23 +195,25 @@ impl Widget for &RadialPlot {
             }
         };
 
-        // Draw concentric rings
+        // Draw concentric rings using Braille sub-pixel rendering
         for ring in 1..=self.n_rings {
             let r_frac = ring as f64 / self.n_rings as f64;
-            let rx = (r_frac * r_screen_x).round();
-            let ry = (r_frac * r_screen_y).round();
+            let rx = r_frac * r_screen_x;
+            let ry = r_frac * r_screen_y;
 
-            // Draw ring using approximation
-            let n_points = (2.0 * std::f64::consts::PI * rx.max(ry)).round().max(20.0) as usize;
-            for k in 0..n_points {
-                let theta = 2.0 * std::f64::consts::PI * k as f64 / n_points as f64;
-                let dx = (rx * theta.cos()).round() as i16;
-                let dy = (ry * theta.sin()).round() as i16;
-                let sx = (cx as i16 + dx) as u16;
-                let sy = (cy as i16 + dy) as u16;
-                if sx >= area.x && sx < area.x + area.width && sy >= py && sy < py + ph {
-                    buf[(sx, sy)].set_char('·').set_fg(self.theme.grid_color);
-                }
+            // Draw ring as connected Braille line segments
+            let n_seg = (2.0 * std::f64::consts::PI * rx.max(ry)).round().max(40.0) as usize;
+            for k in 0..n_seg {
+                let theta0 = 2.0 * std::f64::consts::PI * k as f64 / n_seg as f64;
+                let theta1 = 2.0 * std::f64::consts::PI * (k + 1) as f64 / n_seg as f64;
+                let sx0 = cx as f64 + rx * theta0.cos();
+                let sy0 = cy as f64 + ry * theta0.sin();
+                let sx1 = cx as f64 + rx * theta1.cos();
+                let sy1 = cy as f64 + ry * theta1.sin();
+                draw_braille_line_clipped(
+                    buf, sx0, sy0, sx1, sy1, self.theme.grid_color,
+                    area.x, py, area.width, ph,
+                );
             }
 
             // Ring label
@@ -227,20 +230,15 @@ impl Widget for &RadialPlot {
             }
         }
 
-        // Draw spokes
+        // Draw spokes using Braille sub-pixel rendering
         for spoke in 0..self.n_spokes {
             let theta = 2.0 * std::f64::consts::PI * spoke as f64 / self.n_spokes as f64;
             let dx = r_screen_x * theta.cos();
             let dy = r_screen_y * theta.sin();
-            let steps = (dx.abs().max(dy.abs())).round() as usize;
-            for s in 0..=steps {
-                let frac = s as f64 / steps.max(1) as f64;
-                let sx = (cx as f64 + dx * frac).round() as u16;
-                let sy = (cy as f64 + dy * frac).round() as u16;
-                if sx >= area.x && sx < area.x + area.width && sy >= py && sy < py + ph {
-                    buf[(sx, sy)].set_char('·').set_fg(self.theme.grid_color);
-                }
-            }
+            draw_braille_line_clipped(
+                buf, cx as f64, cy as f64, cx as f64 + dx, cy as f64 + dy,
+                self.theme.grid_color, area.x, py, area.width, ph,
+            );
 
             // Angle label
             let deg = (theta.to_degrees()).round() as i32;
@@ -263,6 +261,8 @@ impl Widget for &RadialPlot {
         // Draw series data
         for s in &self.series {
             let mut prev: Option<(u16, u16)> = None;
+            // For Bar mode: track previous transformed theta and r_frac for gap filling
+            let mut prev_bar: Option<(f64, f64)> = None;
             for &(theta, r) in &s.data {
                 let t = transform_theta(theta);
                 let r_frac = ((r - r_min) / (r_max - r_min)).clamp(0.0, 1.0);
@@ -290,6 +290,27 @@ impl Widget for &RadialPlot {
                                 buf[(bx, by)].set_char('█').set_fg(s.color);
                             }
                         }
+                        // Fill gap to previous bar by sweeping the arc at each radius level
+                        if let Some((prev_t, prev_rf)) = prev_bar {
+                            let min_rf = r_frac.min(prev_rf);
+                            let outer_r = min_rf * r_screen_y;
+                            let n_rad = outer_r.round().max(1.0) as usize;
+                            for ri in 1..=n_rad {
+                                let frac = ri as f64 / n_rad as f64 * min_rf;
+                                let arc_r = frac * r_screen_x.max(r_screen_y);
+                                let n_interp = arc_r.round().max(2.0) as usize;
+                                for ai in 0..=n_interp {
+                                    let a_frac = ai as f64 / n_interp as f64;
+                                    let interp_t = prev_t + (t - prev_t) * a_frac;
+                                    let bx = (cx as f64 + frac * r_screen_x * interp_t.cos()).round() as u16;
+                                    let by = (cy as f64 + frac * r_screen_y * interp_t.sin()).round() as u16;
+                                    if bx >= area.x && bx < area.x + area.width && by >= py && by < py + ph {
+                                        buf[(bx, by)].set_char('█').set_fg(s.color);
+                                    }
+                                }
+                            }
+                        }
+                        prev_bar = Some((t, r_frac));
                     }
                     PolarPlotType::FillBetween => {
                         // Fill from r_min to r
@@ -311,30 +332,78 @@ impl Widget for &RadialPlot {
                             let ch = s.marker.map_or('●', |m| m.char());
                             buf[(sx, sy)].set_char(ch).set_fg(s.color);
                         }
-                        // Connect to previous point
+                        // Connect to previous point using Braille sub-pixel rendering
                         if let Some((px, py_prev)) = prev
                             && (sx != px || sy != py_prev)
                         {
-                            let dx = sx as i32 - px as i32;
-                            let dy = sy as i32 - py_prev as i32;
-                            let steps = dx.abs().max(dy.abs());
-                            for step in 1..steps {
-                                let frac = step as f64 / steps as f64;
-                                let ix = (px as f64 + dx as f64 * frac).round() as u16;
-                                let iy = (py_prev as f64 + dy as f64 * frac).round() as u16;
-                                if ix >= area.x
-                                    && ix < area.x + area.width
-                                    && iy >= py
-                                    && iy < py + ph
-                                {
-                                    buf[(ix, iy)].set_char('·').set_fg(s.color);
-                                }
-                            }
+                            draw_braille_line_clipped(
+                                buf, px as f64, py_prev as f64, sx as f64, sy as f64,
+                                s.color, area.x, py, area.width, ph,
+                            );
                         }
                     }
                 }
                 prev = Some((sx, sy));
             }
+        }
+    }
+}
+
+/// Draw a Braille sub-pixel line clipped to a rectangular region.
+///
+/// Coordinates are in terminal cell space (floating point). The line is
+/// rendered at 2x4 sub-pixel resolution using Unicode Braille characters.
+#[allow(clippy::too_many_arguments)]
+fn draw_braille_line_clipped(
+    buf: &mut Buffer,
+    x0: f64,
+    y0: f64,
+    x1: f64,
+    y1: f64,
+    color: ratatui::style::Color,
+    clip_x: u16,
+    clip_y: u16,
+    clip_w: u16,
+    clip_h: u16,
+) {
+    let mut ix0 = (x0 * 2.0).round() as i32;
+    let mut iy0 = (y0 * 4.0).round() as i32;
+    let ix1 = (x1 * 2.0).round() as i32;
+    let iy1 = (y1 * 4.0).round() as i32;
+
+    let dx = (ix1 - ix0).abs();
+    let dy = -(iy1 - iy0).abs();
+    let sx = if ix0 < ix1 { 1 } else { -1 };
+    let sy = if iy0 < iy1 { 1 } else { -1 };
+    let mut err = dx + dy;
+
+    loop {
+        if ix0 >= 0 && iy0 >= 0 {
+            let cell_x = (ix0 / 2) as u16;
+            let cell_y = (iy0 / 4) as u16;
+            if cell_x >= clip_x
+                && cell_x < clip_x + clip_w
+                && cell_y >= clip_y
+                && cell_y < clip_y + clip_h
+            {
+                let dot_col = (ix0 % 2) as usize;
+                let dot_row = (iy0 % 4) as usize;
+                let bit = BRAILLE_BITS[dot_col][dot_row];
+                write_braille(buf, cell_x, cell_y, bit, color);
+            }
+        }
+
+        if ix0 == ix1 && iy0 == iy1 {
+            break;
+        }
+        let e2 = 2 * err;
+        if e2 >= dy {
+            err += dy;
+            ix0 += sx;
+        }
+        if e2 <= dx {
+            err += dx;
+            iy0 += sy;
         }
     }
 }

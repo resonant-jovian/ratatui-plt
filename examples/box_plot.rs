@@ -53,17 +53,17 @@ fn main() -> color_eyre::Result<()> {
 
     let make_groups = || {
         vec![
-            BoxData::new("Control", generate_data(42, 500, 5.0, 2.0), Color::Cyan),
-            BoxData::new("Drug A", generate_data(123, 500, 7.5, 3.0), Color::Yellow),
-            BoxData::new("Drug B", generate_data(999, 500, 6.0, 1.5), Color::Magenta),
-            BoxData::new("Drug C", generate_data(7777, 500, 8.0, 2.5), Color::Green),
+            BoxData::new("Ctrl", generate_data(42, 500, 5.0, 2.0), Color::Cyan),
+            BoxData::new("DrA", generate_data(123, 500, 7.5, 3.0), Color::Yellow),
+            BoxData::new("DrB", generate_data(999, 500, 6.0, 1.5), Color::Magenta),
+            BoxData::new("DrC", generate_data(7777, 500, 8.0, 2.5), Color::Green),
         ]
     };
 
     // Standard box plot with means
     let standard = {
         let mut p = BoxPlot::new()
-            .title("Standard + Means")
+            .title("Standard")
             .y_axis(Axis::new().label("Value").grid(true))
             .show_means(true)
             .reference_line(ReferenceLine::hline_dashed(6.5, Color::DarkGray));
@@ -76,7 +76,7 @@ fn main() -> color_eyre::Result<()> {
     // Notched box plot (1.57*IQR/sqrt(n))
     let notched = {
         let mut p = BoxPlot::new()
-            .title("Notched (IQR)")
+            .title("Notched")
             .y_axis(Axis::new().label("Value").grid(true))
             .notch(true)
             .show_means(true);
@@ -89,7 +89,7 @@ fn main() -> color_eyre::Result<()> {
     // Bootstrap CI box plot
     let bootstrap = {
         let mut p = BoxPlot::new()
-            .title("Bootstrap 95% CI")
+            .title("Bootstrap CI")
             .y_axis(Axis::new().label("Value").grid(true))
             .bootstrap_ci(true)
             .bootstrap_n(1000)

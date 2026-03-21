@@ -83,6 +83,7 @@ pub struct TernaryPlot {
     title: Option<String>,
     show_grid: bool,
     grid_divisions: usize,
+    show_tick_labels: bool,
     theme: Theme,
 }
 
@@ -94,6 +95,7 @@ impl Default for TernaryPlot {
             title: None,
             show_grid: true,
             grid_divisions: 5,
+            show_tick_labels: false,
             theme: Theme::get_default(),
         }
     }
@@ -143,6 +145,12 @@ impl TernaryPlot {
     /// Number of grid divisions along each edge.
     pub fn grid_divisions(mut self, n: usize) -> Self {
         self.grid_divisions = n.max(2);
+        self
+    }
+
+    /// Whether to show percentage tick labels along triangle edges.
+    pub fn show_tick_labels(mut self, show: bool) -> Self {
+        self.show_tick_labels = show;
         self
     }
 
@@ -289,6 +297,64 @@ impl Widget for &TernaryPlot {
                 let (sx0, sy0) = to_screen(x0, y0);
                 let (sx1, sy1) = to_screen(x1, y1);
                 draw_screen_line(buf, sx0, sy0, sx1, sy1, self.theme.grid_color, &clip);
+            }
+        }
+
+        // Draw tick labels along triangle edges
+        if self.show_tick_labels && self.show_grid {
+            let n = self.grid_divisions;
+            for i in 1..n {
+                let frac = i as f64 / n as f64;
+                let pct = (frac * 100.0).round() as u32;
+                let label = format!("{pct}%");
+
+                // Bottom edge: ticks for component A (bottom-left corner value decreases left to right)
+                // Position along the bottom edge at fraction frac from bottom-left
+                let (bx, by) = ternary_to_cartesian(1.0 - frac, frac, 0.0);
+                let (sbx, sby) = to_screen(bx, by);
+                // Place label below the bottom edge
+                let lx = (sbx - label.len() as f64 / 2.0)
+                    .round()
+                    .max(area.x as f64) as u16;
+                let ly = (sby + 1.0).round() as u16;
+                if ly < area.y + area.height {
+                    for (j, ch) in label.chars().enumerate() {
+                        let x = lx + j as u16;
+                        if x >= area.x && x < area.x + area.width {
+                            buf[(x, ly)].set_char(ch).set_fg(self.theme.grid_color);
+                        }
+                    }
+                }
+
+                // Left edge: ticks for component C (top corner value increases upward)
+                let (lx2, ly2) = ternary_to_cartesian(1.0 - frac, 0.0, frac);
+                let (slx, sly) = to_screen(lx2, ly2);
+                let lx_pos = (slx - label.len() as f64 - 1.0)
+                    .round()
+                    .max(area.x as f64) as u16;
+                let ly_pos = sly.round() as u16;
+                if ly_pos >= area.y && ly_pos < area.y + area.height {
+                    for (j, ch) in label.chars().enumerate() {
+                        let x = lx_pos + j as u16;
+                        if x >= area.x && x < area.x + area.width {
+                            buf[(x, ly_pos)].set_char(ch).set_fg(self.theme.grid_color);
+                        }
+                    }
+                }
+
+                // Right edge: ticks for component B (bottom-right corner value increases upward)
+                let (rx, ry) = ternary_to_cartesian(0.0, 1.0 - frac, frac);
+                let (srx, sry) = to_screen(rx, ry);
+                let rx_pos = (srx + 1.0).round() as u16;
+                let ry_pos = sry.round() as u16;
+                if ry_pos >= area.y && ry_pos < area.y + area.height {
+                    for (j, ch) in label.chars().enumerate() {
+                        let x = rx_pos + j as u16;
+                        if x >= area.x && x < area.x + area.width {
+                            buf[(x, ry_pos)].set_char(ch).set_fg(self.theme.grid_color);
+                        }
+                    }
+                }
             }
         }
 

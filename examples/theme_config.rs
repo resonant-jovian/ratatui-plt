@@ -1,7 +1,11 @@
-//! Theme & config example: ThemeGuard and PlotConfig context managers.
+//! Theme demonstration: all five built-in themes rendered side by side.
 //!
-//! Shows all five built-in themes side by side in a grid, demonstrating
-//! how Theme::activate() scopes theme changes via RAII guards.
+//! Each panel shows the same sin/cos data with a different theme applied,
+//! illustrating colors, grid styles, and axis appearance.
+//!
+//! Tip: try switching your terminal between a light and dark background
+//! to see how each theme adapts. The "Light" and "Publication" themes
+//! work best on light terminal backgrounds; "Dark" and "Solarized" on dark.
 
 use std::io;
 
@@ -67,18 +71,34 @@ fn main() -> color_eyre::Result<()> {
 
     let plots: Vec<LinePlot> = themes
         .iter()
-        .map(|(t, name)| make_plot(t, &format!("{name} (minor grid)")))
+        .map(|(t, name)| make_plot(t, &format!("Theme: {name}")))
         .collect();
 
     loop {
         terminal.draw(|frame| {
             let area = frame.area();
 
-            // 2 rows: top has 3, bottom has 2
-            let rows = Layout::default()
+            // Header + 2 rows of plots
+            let outer = Layout::default()
                 .direction(Direction::Vertical)
-                .constraints([Constraint::Percentage(50), Constraint::Percentage(50)])
+                .constraints([
+                    Constraint::Length(1),
+                    Constraint::Percentage(50),
+                    Constraint::Percentage(50),
+                ])
                 .split(area);
+
+            // Render header line
+            let header = ratatui::widgets::Paragraph::new(
+                "Built-in Theme Gallery  |  q to quit  |  Tip: try light/dark terminal backgrounds",
+            )
+            .style(
+                ratatui::style::Style::default()
+                    .fg(Color::Cyan)
+                    .add_modifier(ratatui::style::Modifier::BOLD),
+            )
+            .alignment(ratatui::layout::Alignment::Center);
+            frame.render_widget(header, outer[0]);
 
             let top = Layout::default()
                 .direction(Direction::Horizontal)
@@ -87,12 +107,12 @@ fn main() -> color_eyre::Result<()> {
                     Constraint::Ratio(1, 3),
                     Constraint::Ratio(1, 3),
                 ])
-                .split(rows[0]);
+                .split(outer[1]);
 
             let bot = Layout::default()
                 .direction(Direction::Horizontal)
                 .constraints([Constraint::Ratio(1, 2), Constraint::Ratio(1, 2)])
-                .split(rows[1]);
+                .split(outer[2]);
 
             frame.render_widget(&plots[0], top[0]);
             frame.render_widget(&plots[1], top[1]);

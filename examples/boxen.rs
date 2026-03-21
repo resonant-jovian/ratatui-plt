@@ -41,7 +41,7 @@ fn lcg_next(state: &mut u64) -> f64 {
 /// Generate pseudo-normal samples using sum of 6 LCG draws (CLT approximation).
 fn lcg_normal(state: &mut u64, mean: f64, stddev: f64) -> f64 {
     let sum: f64 = (0..6).map(|_| lcg_next(state)).sum();
-    mean + stddev * (sum - 3.0) / 0.7071
+    mean + stddev * (sum - 3.0) / std::f64::consts::FRAC_1_SQRT_2
 }
 
 /// Generate pseudo-exponential tail values: -ln(u) * scale.

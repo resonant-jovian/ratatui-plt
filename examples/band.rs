@@ -38,9 +38,9 @@ fn main() -> color_eyre::Result<()> {
     let mut terminal = Terminal::new(CrosstermBackend::new(io::stdout()))?;
 
     // Model: damped oscillation  y(t) = sin(2*pi*t/3) * exp(-t/8)
-    // Uncertainty grows with time: sigma(t) = 0.05 + 0.12*t
-    let n = 200;
-    let t_max = 12.0;
+    // Uncertainty grows with time: sigma(t) = 0.08 + 0.10*t
+    let n = 150;
+    let t_max = 10.0;
     let x: Vec<f64> = (0..n).map(|i| i as f64 * t_max / (n - 1) as f64).collect();
 
     let y_center: Vec<f64> = x
@@ -51,7 +51,7 @@ fn main() -> color_eyre::Result<()> {
         })
         .collect();
 
-    let sigma: Vec<f64> = x.iter().map(|&t| 0.05 + 0.12 * t).collect();
+    let sigma: Vec<f64> = x.iter().map(|&t| 0.08 + 0.10 * t).collect();
 
     // +/- 2 sigma band (outer)
     let y_2sig_lo: Vec<f64> = y_center

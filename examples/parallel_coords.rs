@@ -76,10 +76,10 @@ fn main() -> color_eyre::Result<()> {
     // Axes: Sepal Length, Sepal Width, Petal Length, Petal Width
     // Ranges approximate the real Iris dataset bounds
     let axes = vec![
-        ParallelAxis::new("Sepal Len", 4.0, 8.0),
-        ParallelAxis::new("Sepal Wid", 2.0, 4.5),
-        ParallelAxis::new("Petal Len", 1.0, 7.0),
-        ParallelAxis::new("Petal Wid", 0.0, 2.6),
+        ParallelAxis::new("Sep.L", 4.0, 8.0),
+        ParallelAxis::new("Sep.W", 2.0, 4.5),
+        ParallelAxis::new("Pet.L", 1.0, 7.0),
+        ParallelAxis::new("Pet.W", 0.0, 2.6),
     ];
 
     // Approximate species statistics from the real Iris dataset:

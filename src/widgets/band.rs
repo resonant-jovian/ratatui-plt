@@ -213,28 +213,34 @@ impl Widget for &BandPlot {
         for band in &self.bands {
             let n = band.x.len().min(band.y_lower.len()).min(band.y_upper.len());
 
-            // Fill the region between y_lower and y_upper for each x
-            for i in 0..n {
-                let x = band.x[i];
-                let yl = band.y_lower[i];
-                let yu = band.y_upper[i];
+            // Fill the region between y_lower and y_upper using column interpolation.
+            // Instead of filling only at data point x-coordinates, iterate over every
+            // screen column and interpolate the bounds for gap-free rendering.
+            if n >= 2 {
+                for col_offset in 0..pa.width {
+                    let screen_x = pa.x + col_offset;
+                    // Map screen column to data x coordinate
+                    let data_x = pa.x_lo
+                        + (col_offset as f64 / (pa.width - 1).max(1) as f64)
+                            * (pa.x_hi - pa.x_lo);
 
-                if !x.is_finite() || !yl.is_finite() || !yu.is_finite() {
-                    continue;
-                }
+                    // Find the data segment containing this x and interpolate
+                    let yl_interp = interpolate_at(&band.x[..n], &band.y_lower[..n], data_x);
+                    let yu_interp = interpolate_at(&band.x[..n], &band.y_upper[..n], data_x);
 
-                let sx = pa.screen_x(x).round() as u16;
-                let sy_lower = pa.screen_y(yl).round() as u16;
-                let sy_upper = pa.screen_y(yu).round() as u16;
+                    if let (Some(yl), Some(yu)) = (yl_interp, yu_interp) {
+                        let sy_lower = pa.screen_y(yl).round() as u16;
+                        let sy_upper = pa.screen_y(yu).round() as u16;
 
-                // screen_y inverts: lower data y -> higher screen y
-                let y_top = sy_upper.min(sy_lower);
-                let y_bot = sy_upper.max(sy_lower);
+                        let y_top = sy_upper.min(sy_lower);
+                        let y_bot = sy_upper.max(sy_lower);
 
-                if sx >= pa.x && sx < pa.x + pa.width {
-                    for y in y_top..=y_bot {
-                        if pa.contains(sx, y) {
-                            buf[(sx, y)].set_char(band.alpha_char).set_fg(band.color);
+                        for y in y_top..=y_bot {
+                            if pa.contains(screen_x, y) {
+                                buf[(screen_x, y)]
+                                    .set_char(band.alpha_char)
+                                    .set_fg(band.color);
+                            }
                         }
                     }
                 }
@@ -325,7 +331,33 @@ impl BandPlot {
     }
 }
 
-/// Draw a boundary line segment between two data points using Bresenham's algorithm.
+/// Linearly interpolate a y value at a given x from sorted (xs, ys) arrays.
+/// Returns `None` if x is outside the data range.
+fn interpolate_at(xs: &[f64], ys: &[f64], x: f64) -> Option<f64> {
+    if xs.len() < 2 || x < xs[0] || x > xs[xs.len() - 1] {
+        return None;
+    }
+    // Binary search for the segment containing x
+    let idx = match xs.binary_search_by(|v| v.partial_cmp(&x).unwrap_or(std::cmp::Ordering::Equal))
+    {
+        Ok(i) => return Some(ys[i]),
+        Err(i) => i,
+    };
+    if idx == 0 || idx >= xs.len() {
+        return None;
+    }
+    let x0 = xs[idx - 1];
+    let x1 = xs[idx];
+    let y0 = ys[idx - 1];
+    let y1 = ys[idx];
+    if (x1 - x0).abs() < f64::EPSILON {
+        return Some(y0);
+    }
+    let t = (x - x0) / (x1 - x0);
+    Some(y0 + t * (y1 - y0))
+}
+
+/// Draw a boundary line segment between two data points using Braille sub-pixel rendering.
 fn draw_boundary_line(
     buf: &mut Buffer,
     pa: &crate::frame::PlotArea,
@@ -335,39 +367,9 @@ fn draw_boundary_line(
     y1: f64,
     color: Color,
 ) {
-    let sx0 = pa.screen_x(x0).round() as i32;
-    let sy0 = pa.screen_y(y0).round() as i32;
-    let sx1 = pa.screen_x(x1).round() as i32;
-    let sy1 = pa.screen_y(y1).round() as i32;
-
-    let dx = (sx1 - sx0).abs();
-    let dy = -(sy1 - sy0).abs();
-    let step_x = if sx0 < sx1 { 1 } else { -1 };
-    let step_y = if sy0 < sy1 { 1 } else { -1 };
-    let mut err = dx + dy;
-    let mut cx = sx0;
-    let mut cy = sy0;
-
-    loop {
-        let ux = cx as u16;
-        let uy = cy as u16;
-        if pa.contains(ux, uy) {
-            // Choose line character based on direction
-            let ch = if dx > dy.abs() { '─' } else { '│' };
-            buf[(ux, uy)].set_char(ch).set_fg(color);
-        }
-
-        if cx == sx1 && cy == sy1 {
-            break;
-        }
-        let e2 = 2 * err;
-        if e2 >= dy {
-            err += dy;
-            cx += step_x;
-        }
-        if e2 <= dx {
-            err += dx;
-            cy += step_y;
-        }
-    }
+    let sx0 = pa.screen_x(x0);
+    let sy0 = pa.screen_y(y0);
+    let sx1 = pa.screen_x(x1);
+    let sy1 = pa.screen_y(y1);
+    crate::drawing::draw_braille_line(buf, sx0, sy0, sx1, sy1, color, pa);
 }

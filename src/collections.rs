@@ -6,6 +6,7 @@
 use ratatui::buffer::Buffer;
 use ratatui::style::Color;
 
+use crate::drawing::draw_braille_line;
 use crate::frame::PlotArea;
 use crate::style::LineStyle;
 
@@ -65,14 +66,14 @@ impl LineCollection {
         self
     }
 
-    /// Render the line collection onto a buffer using Bresenham's algorithm.
+    /// Render the line collection onto a buffer using Braille sub-pixel line drawing.
     pub fn render(&self, pa: &PlotArea, buf: &mut Buffer) {
         for &((x0, y0), (x1, y1), color) in &self.segments {
-            let sx0 = pa.screen_x(x0).round() as i32;
-            let sy0 = pa.screen_y(y0).round() as i32;
-            let sx1 = pa.screen_x(x1).round() as i32;
-            let sy1 = pa.screen_y(y1).round() as i32;
-            draw_bresenham(buf, sx0, sy0, sx1, sy1, color, pa);
+            let sx0 = pa.screen_x(x0);
+            let sy0 = pa.screen_y(y0);
+            let sx1 = pa.screen_x(x1);
+            let sy1 = pa.screen_y(y1);
+            draw_braille_line(buf, sx0, sy0, sx1, sy1, color, pa);
         }
     }
 }
@@ -112,7 +113,7 @@ impl PathCollection {
         self
     }
 
-    /// Render all paths onto a buffer.
+    /// Render all paths onto a buffer using Braille sub-pixel line drawing.
     pub fn render(&self, pa: &PlotArea, buf: &mut Buffer) {
         for (vertices, color, closed) in &self.paths {
             if vertices.len() < 2 {
@@ -121,62 +122,21 @@ impl PathCollection {
             for i in 0..vertices.len() - 1 {
                 let (x0, y0) = vertices[i];
                 let (x1, y1) = vertices[i + 1];
-                let sx0 = pa.screen_x(x0).round() as i32;
-                let sy0 = pa.screen_y(y0).round() as i32;
-                let sx1 = pa.screen_x(x1).round() as i32;
-                let sy1 = pa.screen_y(y1).round() as i32;
-                draw_bresenham(buf, sx0, sy0, sx1, sy1, *color, pa);
+                let sx0 = pa.screen_x(x0);
+                let sy0 = pa.screen_y(y0);
+                let sx1 = pa.screen_x(x1);
+                let sy1 = pa.screen_y(y1);
+                draw_braille_line(buf, sx0, sy0, sx1, sy1, *color, pa);
             }
             if *closed && vertices.len() > 2 {
                 let (x0, y0) = vertices[vertices.len() - 1];
                 let (x1, y1) = vertices[0];
-                let sx0 = pa.screen_x(x0).round() as i32;
-                let sy0 = pa.screen_y(y0).round() as i32;
-                let sx1 = pa.screen_x(x1).round() as i32;
-                let sy1 = pa.screen_y(y1).round() as i32;
-                draw_bresenham(buf, sx0, sy0, sx1, sy1, *color, pa);
+                let sx0 = pa.screen_x(x0);
+                let sy0 = pa.screen_y(y0);
+                let sx1 = pa.screen_x(x1);
+                let sy1 = pa.screen_y(y1);
+                draw_braille_line(buf, sx0, sy0, sx1, sy1, *color, pa);
             }
-        }
-    }
-}
-
-/// Simple Bresenham line drawing at cell resolution.
-fn draw_bresenham(
-    buf: &mut Buffer,
-    x0: i32,
-    y0: i32,
-    x1: i32,
-    y1: i32,
-    color: Color,
-    pa: &PlotArea,
-) {
-    let mut x = x0;
-    let mut y = y0;
-    let dx = (x1 - x0).abs();
-    let dy = -(y1 - y0).abs();
-    let sx = if x0 < x1 { 1 } else { -1 };
-    let sy = if y0 < y1 { 1 } else { -1 };
-    let mut err = dx + dy;
-
-    loop {
-        if x >= 0 && y >= 0 {
-            let ux = x as u16;
-            let uy = y as u16;
-            if pa.contains(ux, uy) {
-                buf[(ux, uy)].set_char('•').set_fg(color);
-            }
-        }
-        if x == x1 && y == y1 {
-            break;
-        }
-        let e2 = 2 * err;
-        if e2 >= dy {
-            err += dy;
-            x += sx;
-        }
-        if e2 <= dx {
-            err += dx;
-            y += sy;
         }
     }
 }

@@ -203,6 +203,119 @@ fn level_char(level: usize) -> char {
     LEVEL_CHARS[level.min(LEVEL_CHARS.len() - 1)]
 }
 
+/// Compute a depth-based color gradient for letter-value levels.
+///
+/// Level 0 (innermost / IQR) gets the brightest/most saturated color.
+/// Deeper levels get progressively darker, creating a visual gradient
+/// that emphasizes the center of the distribution.
+fn depth_gradient_color(base: Color, level_idx: usize, total_levels: usize) -> Color {
+    match base {
+        Color::Rgb(r, g, b) => {
+            // Scale brightness: level 0 = full brightness, deepest = ~30%
+            let t = if total_levels > 1 {
+                level_idx as f64 / (total_levels - 1) as f64
+            } else {
+                0.0
+            };
+            let scale = 1.0 - 0.7 * t;
+            Color::Rgb(
+                (r as f64 * scale).round() as u8,
+                (g as f64 * scale).round() as u8,
+                (b as f64 * scale).round() as u8,
+            )
+        }
+        Color::Indexed(idx) => {
+            // For indexed colors, map to an RGB approximation and darken
+            let (r, g, b) = indexed_to_rgb(idx);
+            let t = if total_levels > 1 {
+                level_idx as f64 / (total_levels - 1) as f64
+            } else {
+                0.0
+            };
+            let scale = 1.0 - 0.7 * t;
+            Color::Rgb(
+                (r as f64 * scale).round() as u8,
+                (g as f64 * scale).round() as u8,
+                (b as f64 * scale).round() as u8,
+            )
+        }
+        // Named ANSI colors: convert to RGB, darken
+        named => {
+            let (r, g, b) = named_color_to_rgb(named);
+            let t = if total_levels > 1 {
+                level_idx as f64 / (total_levels - 1) as f64
+            } else {
+                0.0
+            };
+            let scale = 1.0 - 0.7 * t;
+            Color::Rgb(
+                (r as f64 * scale).round() as u8,
+                (g as f64 * scale).round() as u8,
+                (b as f64 * scale).round() as u8,
+            )
+        }
+    }
+}
+
+/// Convert a named ratatui Color to approximate RGB values.
+fn named_color_to_rgb(color: Color) -> (u8, u8, u8) {
+    match color {
+        Color::Black => (0, 0, 0),
+        Color::Red => (205, 49, 49),
+        Color::Green => (13, 188, 121),
+        Color::Yellow => (229, 229, 16),
+        Color::Blue => (36, 114, 200),
+        Color::Magenta => (188, 63, 188),
+        Color::Cyan => (17, 168, 205),
+        Color::Gray => (170, 170, 170),
+        Color::DarkGray => (118, 118, 118),
+        Color::LightRed => (241, 76, 76),
+        Color::LightGreen => (35, 209, 139),
+        Color::LightYellow => (245, 245, 67),
+        Color::LightBlue => (59, 142, 234),
+        Color::LightMagenta => (214, 112, 214),
+        Color::LightCyan => (41, 184, 219),
+        Color::White => (255, 255, 255),
+        _ => (200, 200, 200),
+    }
+}
+
+/// Convert a 256-color indexed value to approximate RGB.
+fn indexed_to_rgb(idx: u8) -> (u8, u8, u8) {
+    match idx {
+        0 => (0, 0, 0),
+        1 => (205, 49, 49),
+        2 => (13, 188, 121),
+        3 => (229, 229, 16),
+        4 => (36, 114, 200),
+        5 => (188, 63, 188),
+        6 => (17, 168, 205),
+        7 => (170, 170, 170),
+        8 => (118, 118, 118),
+        9 => (241, 76, 76),
+        10 => (35, 209, 139),
+        11 => (245, 245, 67),
+        12 => (59, 142, 234),
+        13 => (214, 112, 214),
+        14 => (41, 184, 219),
+        15 => (255, 255, 255),
+        // 6x6x6 color cube (16-231)
+        16..=231 => {
+            let c = idx - 16;
+            let r = c / 36;
+            let g = (c % 36) / 6;
+            let b = c % 6;
+            let to_val = |v: u8| if v == 0 { 0u8 } else { 55 + 40 * v };
+            (to_val(r), to_val(g), to_val(b))
+        }
+        // Grayscale ramp (232-255)
+        232..=255 => {
+            let v = 8 + 10 * (idx - 232);
+            (v, v, v)
+        }
+    }
+}
+
 impl Widget for &BoxenPlot {
     fn render(self, area: Rect, buf: &mut Buffer) {
         if area.width < 4 || area.height < 4 || self.groups.is_empty() {
@@ -287,31 +400,52 @@ impl Widget for &BoxenPlot {
                 let top = sy_upper.min(sy_lower);
                 let bottom = sy_upper.max(sy_lower);
 
+                // Compute depth-based color for fill: deeper levels use more saturated/darker colors
+                let fill_color = depth_gradient_color(group.color, level_idx, k);
+
                 // Fill the box
                 for y in top..=bottom {
                     for x in box_left..box_right {
                         if pa.contains(x, y) {
-                            buf[(x, y)].set_char(fill_ch).set_fg(group.color);
+                            buf[(x, y)].set_char(fill_ch).set_fg(fill_color);
                         }
                     }
                 }
 
-                // Draw box outline: top and bottom edges
-                for x in box_left..box_right {
+                // Compute depth-based color: deeper levels get more saturated/darker
+                let depth_color = depth_gradient_color(group.color, level_idx, k);
+
+                // Draw box outline: top edge with corners
+                if pa.contains(box_left, top) {
+                    buf[(box_left, top)].set_char('┌').set_fg(depth_color);
+                }
+                for x in (box_left + 1)..box_right.saturating_sub(1) {
                     if pa.contains(x, top) {
-                        buf[(x, top)].set_char('─').set_fg(group.color);
-                    }
-                    if pa.contains(x, bottom) {
-                        buf[(x, bottom)].set_char('─').set_fg(group.color);
+                        buf[(x, top)].set_char('─').set_fg(depth_color);
                     }
                 }
-                // Side edges
-                for y in top..=bottom {
+                if box_right > box_left + 1 && pa.contains(box_right - 1, top) {
+                    buf[(box_right - 1, top)].set_char('┐').set_fg(depth_color);
+                }
+                // Bottom edge with corners
+                if pa.contains(box_left, bottom) {
+                    buf[(box_left, bottom)].set_char('└').set_fg(depth_color);
+                }
+                for x in (box_left + 1)..box_right.saturating_sub(1) {
+                    if pa.contains(x, bottom) {
+                        buf[(x, bottom)].set_char('─').set_fg(depth_color);
+                    }
+                }
+                if box_right > box_left + 1 && pa.contains(box_right - 1, bottom) {
+                    buf[(box_right - 1, bottom)].set_char('┘').set_fg(depth_color);
+                }
+                // Side edges — skip corner rows
+                for y in (top + 1)..bottom {
                     if pa.contains(box_left, y) {
-                        buf[(box_left, y)].set_char('│').set_fg(group.color);
+                        buf[(box_left, y)].set_char('│').set_fg(depth_color);
                     }
                     if box_right > 0 && pa.contains(box_right - 1, y) {
-                        buf[(box_right - 1, y)].set_char('│').set_fg(group.color);
+                        buf[(box_right - 1, y)].set_char('│').set_fg(depth_color);
                     }
                 }
             }

@@ -5,6 +5,8 @@ use ratatui::layout::Rect;
 use ratatui::style::{Color, Style};
 use ratatui::widgets::{StatefulWidget, Widget};
 
+use crate::drawing::draw_braille_line;
+use crate::frame::PlotArea;
 use crate::theme::Theme;
 use crate::transform::{Camera3D, Camera3DState, data_to_screen};
 
@@ -358,6 +360,61 @@ impl Bar3D {
                     }
                 }
             }
+        }
+
+        // Draw 3D axis lines at the edges of the data bounding box
+        let pa = PlotArea {
+            x: px,
+            y: py,
+            width: pw,
+            height: ph,
+            x_lo: 0.0,
+            x_hi: 0.0,
+            y_lo: 0.0,
+            y_hi: 0.0,
+            area: Rect::new(px, py, pw, ph),
+        };
+
+        // Project axis origin and tips from normalized [-1,1] space
+        let origin = camera.project(-1.0, -1.0, -0.8);
+        let x_tip = camera.project(1.0, -1.0, -0.8);
+        let y_tip = camera.project(-1.0, 1.0, -0.8);
+        let z_tip = camera.project(-1.0, -1.0, 0.8);
+
+        let to_sx = |v: f64| data_to_screen(v, sx_min, sx_max, px as f64, (px + pw - 1) as f64);
+        let to_sy = |v: f64| data_to_screen(v, sy_min, sy_max, py as f64, (py + ph - 1) as f64);
+
+        let ox = to_sx(origin.0);
+        let oy = to_sy(origin.1);
+
+        // X axis line and label
+        let xx = to_sx(x_tip.0);
+        let xy = to_sy(x_tip.1);
+        draw_braille_line(buf, ox, oy, xx, xy, Color::Red, &pa);
+        let xxi = xx.round() as u16;
+        let xyi = xy.round() as u16;
+        if xxi >= px && xxi < px + pw && xyi >= py && xyi < py + ph {
+            buf[(xxi, xyi)].set_char('X').set_fg(Color::Red);
+        }
+
+        // Y axis line and label
+        let yx = to_sx(y_tip.0);
+        let yy = to_sy(y_tip.1);
+        draw_braille_line(buf, ox, oy, yx, yy, Color::Green, &pa);
+        let yxi = yx.round() as u16;
+        let yyi = yy.round() as u16;
+        if yxi >= px && yxi < px + pw && yyi >= py && yyi < py + ph {
+            buf[(yxi, yyi)].set_char('Y').set_fg(Color::Green);
+        }
+
+        // Z axis line and label
+        let zx = to_sx(z_tip.0);
+        let zy = to_sy(z_tip.1);
+        draw_braille_line(buf, ox, oy, zx, zy, Color::Blue, &pa);
+        let zxi = zx.round() as u16;
+        let zyi = zy.round() as u16;
+        if zxi >= px && zxi < px + pw && zyi >= py && zyi < py + ph {
+            buf[(zxi, zyi)].set_char('Z').set_fg(Color::Blue);
         }
     }
 }

@@ -42,7 +42,7 @@ fn lcg_next(state: &mut u64) -> f64 {
 fn lcg_normal(state: &mut u64, mean: f64, stddev: f64) -> f64 {
     let sum: f64 = (0..6).map(|_| lcg_next(state)).sum();
     // sum of 6 uniform [0,1) has mean 3, stddev sqrt(6/12) = sqrt(0.5) ~ 0.707
-    mean + stddev * (sum - 3.0) / 0.7071
+    mean + stddev * (sum - 3.0) / std::f64::consts::FRAC_1_SQRT_2
 }
 
 fn main() -> color_eyre::Result<()> {
@@ -83,11 +83,12 @@ fn main() -> color_eyre::Result<()> {
         .collect();
 
     let plot = SwarmPlot::new()
-        .group(SwarmGroup::new("Chrome", chrome, Color::Cyan))
-        .group(SwarmGroup::new("Firefox", firefox, Color::Yellow))
-        .group(SwarmGroup::new("Safari", safari, Color::Magenta))
-        .group(SwarmGroup::new("Edge", edge, Color::Green))
+        .group(SwarmGroup::new("Chrome", chrome, Color::Rgb(80, 200, 255)))
+        .group(SwarmGroup::new("Firefox", firefox, Color::Rgb(255, 160, 40)))
+        .group(SwarmGroup::new("Safari", safari, Color::Rgb(220, 100, 255)))
+        .group(SwarmGroup::new("Edge", edge, Color::Rgb(100, 220, 100)))
         .title("Beeswarm: Response Times by Browser (q to quit)")
+        .point_size(2)
         .y_axis(Axis::new().label("Response Time (ms)").grid(true));
 
     loop {

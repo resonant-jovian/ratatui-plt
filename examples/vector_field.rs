@@ -32,14 +32,15 @@ fn main() -> color_eyre::Result<()> {
     let mut terminal = Terminal::new(CrosstermBackend::new(io::stdout()))?;
 
     // Circular flow field: (-y, x)
-    let field = VectorFieldData::from_fn((-3.0, 3.0), (-3.0, 3.0), 45, 45, |x, y| (-y, x));
+    let field = VectorFieldData::from_fn((-3.0, 3.0), (-3.0, 3.0), 16, 16, |x, y| (-y, x));
 
     let plot = VectorField::new(field)
         .title("Circular Flow Field (-y, x) - q to quit")
         .color_by_magnitude(true)
         .colormap(Viridis)
-        .x_axis(Axis::new().label("x"))
-        .y_axis(Axis::new().label("y"))
+        .arrow_scale(2.0)
+        .x_axis(Axis::new().label("x").grid(true))
+        .y_axis(Axis::new().label("y").grid(true))
         .aspect_ratio(AspectRatio::Equal);
 
     loop {

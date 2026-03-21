@@ -404,17 +404,29 @@ impl Widget for &BoxPlot {
                 };
 
             // Draw box (Q1 to Q3), with notch if enabled
-            // Top edge (Q3)
-            for x in box_left..box_right {
+            // Top edge (Q3) with corners
+            if pa.contains(box_left, sy_q3) {
+                buf[(box_left, sy_q3)].set_char('┌').set_fg(d.color);
+            }
+            for x in (box_left + 1)..box_right.saturating_sub(1) {
                 if pa.contains(x, sy_q3) {
                     buf[(x, sy_q3)].set_char('─').set_fg(d.color);
                 }
             }
-            // Bottom edge (Q1)
-            for x in box_left..box_right {
+            if box_right > box_left + 1 && pa.contains(box_right - 1, sy_q3) {
+                buf[(box_right - 1, sy_q3)].set_char('┐').set_fg(d.color);
+            }
+            // Bottom edge (Q1) with corners
+            if pa.contains(box_left, sy_q1) {
+                buf[(box_left, sy_q1)].set_char('└').set_fg(d.color);
+            }
+            for x in (box_left + 1)..box_right.saturating_sub(1) {
                 if pa.contains(x, sy_q1) {
                     buf[(x, sy_q1)].set_char('─').set_fg(d.color);
                 }
+            }
+            if box_right > box_left + 1 && pa.contains(box_right - 1, sy_q1) {
+                buf[(box_right - 1, sy_q1)].set_char('┘').set_fg(d.color);
             }
 
             if self.notch || self.bootstrap_ci {
@@ -461,13 +473,13 @@ impl Widget for &BoxPlot {
                     }
                 }
             } else {
-                // Standard box sides (no notch)
-                for y in sy_q3..=sy_q1 {
+                // Standard box sides (no notch) — skip corner rows
+                for y in (sy_q3 + 1)..sy_q1 {
                     if pa.contains(box_left, y) {
                         buf[(box_left, y)].set_char('│').set_fg(d.color);
                     }
-                    if pa.contains(box_right, y) {
-                        buf[(box_right, y)].set_char('│').set_fg(d.color);
+                    if box_right > 0 && pa.contains(box_right - 1, y) {
+                        buf[(box_right - 1, y)].set_char('│').set_fg(d.color);
                     }
                 }
             }
@@ -485,12 +497,12 @@ impl Widget for &BoxPlot {
             // Whiskers
             for y in sy_whi..sy_q3 {
                 if pa.contains(center_x, y) {
-                    buf[(center_x, y)].set_char('╎').set_fg(d.color);
+                    buf[(center_x, y)].set_char('│').set_fg(d.color);
                 }
             }
-            for y in sy_q1..=sy_wlo {
+            for y in (sy_q1 + 1)..=sy_wlo {
                 if pa.contains(center_x, y) {
-                    buf[(center_x, y)].set_char('╎').set_fg(d.color);
+                    buf[(center_x, y)].set_char('│').set_fg(d.color);
                 }
             }
 

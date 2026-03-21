@@ -143,7 +143,7 @@ impl Histogram {
             hist_mode: HistMode::Single,
             histtype: HistType::Bar,
             bin_method: None,
-            rwidth: 0.9,
+            rwidth: 1.0,
             show_legend: true,
             legend_position: LegendPosition::TopRight,
         }

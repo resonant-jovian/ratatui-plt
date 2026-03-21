@@ -252,8 +252,22 @@ impl Widget for &SankeyDiagram {
             col_nodes[col].push(i);
         }
 
+        // Compute label margins: reserve space for left-column and right-column labels
+        let left_label_width = col_nodes[0]
+            .iter()
+            .map(|&i| self.nodes[i].label.len() as u16 + 1)
+            .max()
+            .unwrap_or(1);
+        let right_label_width = col_nodes[num_columns - 1]
+            .iter()
+            .map(|&i| self.nodes[i].label.len() as u16 + 1)
+            .max()
+            .unwrap_or(1);
+        let left_margin = left_label_width.min(area.width / 4);
+        let right_margin = right_label_width.min(area.width / 4);
+
         // Compute horizontal layout: evenly space columns across the width
-        let usable_width = area.width.saturating_sub(2); // 1-char margin each side
+        let usable_width = area.width.saturating_sub(left_margin + right_margin);
         let col_spacing = if num_columns > 1 {
             (usable_width.saturating_sub(self.node_width * num_columns as u16))
                 / (num_columns as u16 - 1).max(1)
@@ -264,7 +278,7 @@ impl Widget for &SankeyDiagram {
 
         // Compute column x positions
         let col_x: Vec<u16> = (0..num_columns)
-            .map(|c| area.x + 1 + c as u16 * col_step)
+            .map(|c| area.x + left_margin + c as u16 * col_step)
             .collect();
 
         // Compute vertical layout for each column
@@ -318,32 +332,59 @@ impl Widget for &SankeyDiagram {
             let t_top = node_y[flow.target] + target_offsets[flow.target];
             target_offsets[flow.target] += t_h;
 
-            // Draw flow band using density characters
+            // Draw flow band using half-block characters for smooth edges
             if tx > sx {
                 let band_width = tx - sx;
                 for dx in 0..band_width {
-                    let frac = dx as f64 / band_width as f64;
+                    // Use smooth cubic interpolation (ease in-out) for the band path
+                    let raw_frac = dx as f64 / band_width as f64;
+                    let frac = 3.0 * raw_frac * raw_frac - 2.0 * raw_frac * raw_frac * raw_frac;
                     let x = sx + dx;
 
                     // Interpolate top and bottom edges
                     let top = s_top + (t_top - s_top) * frac;
                     let bot = (s_top + s_h) + ((t_top + t_h) - (s_top + s_h)) * frac;
 
-                    // Choose density character based on position in the band
-                    let density_char = if !(0.15..=0.85).contains(&frac) {
-                        '░'
-                    } else if !(0.35..=0.65).contains(&frac) {
-                        '▒'
-                    } else {
-                        '▓'
-                    };
+                    let y_first = top.floor() as u16;
+                    let y_last = bot.floor() as u16;
 
-                    let y_start = top.round() as u16;
-                    let y_end = bot.round() as u16;
-
-                    for y in y_start..=y_end {
-                        if x < area.x + area.width && y >= py && y < py + ph {
-                            buf[(x, y)].set_char(density_char).set_fg(flow_color);
+                    for y in y_first..=y_last {
+                        if x >= area.x + area.width || y < py || y >= py + ph {
+                            continue;
+                        }
+                        if y == y_first && y == y_last {
+                            // Band fits within a single cell: use half-block for sub-cell edge
+                            let top_half = top - y as f64;
+                            if top_half > 0.5 {
+                                // Band starts in lower half: use ▄ in foreground color
+                                buf[(x, y)].set_char('▄').set_fg(flow_color);
+                            } else {
+                                // Band starts in upper half: use ▀ in foreground color
+                                buf[(x, y)].set_char('▀').set_fg(flow_color);
+                            }
+                        } else if y == y_first {
+                            // Top edge cell: use half-block for sub-pixel top edge
+                            let top_frac = top - y as f64; // 0.0 = top of cell, 1.0 = bottom
+                            if top_frac > 0.5 {
+                                // Band starts in lower half: use ▄ with fg = flow color
+                                buf[(x, y)].set_char('▄').set_fg(flow_color);
+                            } else {
+                                // Band starts in upper half: fill the whole cell
+                                buf[(x, y)].set_char('█').set_fg(flow_color);
+                            }
+                        } else if y == y_last {
+                            // Bottom edge cell: use half-block for sub-pixel bottom edge
+                            let bot_frac = bot - y as f64; // how far into this cell the band extends
+                            if bot_frac < 0.5 {
+                                // Band ends in upper half: use ▀ with fg = flow color
+                                buf[(x, y)].set_char('▀').set_fg(flow_color);
+                            } else {
+                                // Band extends past midpoint: fill the whole cell
+                                buf[(x, y)].set_char('█').set_fg(flow_color);
+                            }
+                        } else {
+                            // Interior cell: fully filled
+                            buf[(x, y)].set_char('█').set_fg(flow_color);
                         }
                     }
                 }
