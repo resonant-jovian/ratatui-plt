@@ -7,7 +7,7 @@ use ratatui::widgets::Widget;
 
 use crate::annotation::Annotation;
 use crate::axis::Axis;
-use crate::frame::{PlotFrame, ReferenceLine};
+use crate::frame::{DataBounds, PlotFrame, ReferenceLine};
 use crate::spines::Spines;
 use crate::theme::Theme;
 use crate::ticker::NullLocator;
@@ -321,7 +321,7 @@ impl Widget for &BoxPlot {
             .spines(self.spines.clone())
             .reference_lines(&self.reference_lines);
 
-        let Some(pa) = frame.render(area, buf, x_lo, x_hi, y_lo, y_hi) else {
+        let Some(pa) = frame.render(area, buf, DataBounds { x_lo, x_hi, y_lo, y_hi }) else {
             return;
         };
 
@@ -430,13 +430,15 @@ impl Widget for &BoxPlot {
             }
 
             if self.notch || self.bootstrap_ci {
-                // Box sides with notch: narrower in the notch region
-                for y in sy_q3..=sy_q1 {
+                // Box sides with notch: narrower in the notch region.
+                // The right side column is box_right - 1 (matching corners)
+                // and notch_right - 1 in the notch region.
+                for y in (sy_q3 + 1)..sy_q1 {
                     let (left_x, right_x) = if y >= notch_hi_y && y <= notch_lo_y {
                         // Inside the notch region: use narrower sides
-                        (notch_left, notch_right)
+                        (notch_left, notch_right.saturating_sub(1))
                     } else {
-                        (box_left, box_right)
+                        (box_left, box_right.saturating_sub(1))
                     };
                     if pa.contains(left_x, y) {
                         buf[(left_x, y)].set_char('│').set_fg(d.color);
@@ -445,30 +447,36 @@ impl Widget for &BoxPlot {
                         buf[(right_x, y)].set_char('│').set_fg(d.color);
                     }
                 }
-                // Draw notch transition lines (diagonal connections)
-                // Upper notch edge
+                // Draw notch transition lines connecting the wider box edges
+                // to the narrower notch edges.
+                // Upper notch edge: horizontal from box_left to notch_left
+                // and from notch_right-1 to box_right-1
                 if notch_hi_y > sy_q3 {
-                    for x in notch_left..box_left {
+                    for x in box_left..=notch_left {
                         if pa.contains(x, notch_hi_y) {
                             buf[(x, notch_hi_y)].set_char('─').set_fg(d.color);
                         }
                     }
-                    for x in box_right..=notch_right {
-                        if pa.contains(x, notch_hi_y) {
-                            buf[(x, notch_hi_y)].set_char('─').set_fg(d.color);
+                    if notch_right > 0 {
+                        for x in (notch_right - 1)..box_right {
+                            if pa.contains(x, notch_hi_y) {
+                                buf[(x, notch_hi_y)].set_char('─').set_fg(d.color);
+                            }
                         }
                     }
                 }
                 // Lower notch edge
                 if notch_lo_y < sy_q1 {
-                    for x in notch_left..box_left {
+                    for x in box_left..=notch_left {
                         if pa.contains(x, notch_lo_y) {
                             buf[(x, notch_lo_y)].set_char('─').set_fg(d.color);
                         }
                     }
-                    for x in box_right..=notch_right {
-                        if pa.contains(x, notch_lo_y) {
-                            buf[(x, notch_lo_y)].set_char('─').set_fg(d.color);
+                    if notch_right > 0 {
+                        for x in (notch_right - 1)..box_right {
+                            if pa.contains(x, notch_lo_y) {
+                                buf[(x, notch_lo_y)].set_char('─').set_fg(d.color);
+                            }
                         }
                     }
                 }
@@ -484,10 +492,14 @@ impl Widget for &BoxPlot {
                 }
             }
 
-            // Median line
+            // Median line — draw within the box boundaries (inclusive on both ends)
             let use_notch = self.notch || self.bootstrap_ci;
             let median_left = if use_notch { notch_left } else { box_left };
-            let median_right = if use_notch { notch_right } else { box_right };
+            let median_right = if use_notch {
+                notch_right.saturating_sub(1)
+            } else {
+                box_right.saturating_sub(1)
+            };
             for x in median_left..=median_right {
                 if pa.contains(x, sy_median) {
                     buf[(x, sy_median)].set_char('━').set_fg(d.color);

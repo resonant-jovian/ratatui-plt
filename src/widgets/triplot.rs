@@ -1,6 +1,6 @@
 //! Triangle mesh edge plot widget.
 //!
-//! Renders the edges of a triangulation as lines using Bresenham's algorithm.
+//! Renders the edges of a triangulation as Braille sub-pixel lines.
 //! Not feature-gated — works with explicit triangulations.
 
 use ratatui::buffer::Buffer;
@@ -9,7 +9,8 @@ use ratatui::style::Color;
 use ratatui::widgets::Widget;
 
 use crate::axis::Axis;
-use crate::frame::{PlotFrame, ReferenceLine};
+use crate::drawing::draw_braille_line;
+use crate::frame::{DataBounds, PlotFrame, ReferenceLine};
 use crate::spines::Spines;
 use crate::theme::Theme;
 use crate::triangulation::Triangulation;
@@ -123,7 +124,7 @@ impl Widget for &TriPlot {
             .spines(self.spines.clone())
             .reference_lines(&self.reference_lines);
 
-        let Some(pa) = frame.render(area, buf, x_lo, x_hi, y_lo, y_hi) else {
+        let Some(pa) = frame.render(area, buf, DataBounds { x_lo, x_hi, y_lo, y_hi }) else {
             return;
         };
 
@@ -138,49 +139,7 @@ impl Widget for &TriPlot {
             let sx1 = pa.screen_x(x1);
             let sy1 = pa.screen_y(y1);
 
-            draw_bresenham_line(buf, sx0, sy0, sx1, sy1, self.edge_color, &pa);
-        }
-    }
-}
-
-/// Draw a line between two screen-space points using Bresenham's algorithm.
-fn draw_bresenham_line(
-    buf: &mut Buffer,
-    x0: f64,
-    y0: f64,
-    x1: f64,
-    y1: f64,
-    color: Color,
-    pa: &crate::frame::PlotArea,
-) {
-    let mut ix0 = x0.round() as i32;
-    let mut iy0 = y0.round() as i32;
-    let ix1 = x1.round() as i32;
-    let iy1 = y1.round() as i32;
-
-    let dx = (ix1 - ix0).abs();
-    let dy = -(iy1 - iy0).abs();
-    let sx = if ix0 < ix1 { 1 } else { -1 };
-    let sy = if iy0 < iy1 { 1 } else { -1 };
-    let mut err = dx + dy;
-
-    loop {
-        let px = ix0 as u16;
-        let py = iy0 as u16;
-        if pa.contains(px, py) {
-            buf[(px, py)].set_char('\u{00b7}').set_fg(color);
-        }
-        if ix0 == ix1 && iy0 == iy1 {
-            break;
-        }
-        let e2 = 2 * err;
-        if e2 >= dy {
-            err += dy;
-            ix0 += sx;
-        }
-        if e2 <= dx {
-            err += dx;
-            iy0 += sy;
+            draw_braille_line(buf, sx0, sy0, sx1, sy1, self.edge_color, &pa);
         }
     }
 }

@@ -26,7 +26,8 @@ use ratatui::style::Color;
 use ratatui::widgets::Widget;
 
 use crate::axis::{AspectRatio, Axis};
-use crate::frame::{PlotFrame, ReferenceLine};
+use crate::drawing::draw_braille_line;
+use crate::frame::{DataBounds, PlotFrame, ReferenceLine};
 use crate::spines::Spines;
 use crate::style::MarkerShape;
 use crate::theme::Theme;
@@ -420,7 +421,7 @@ impl Widget for &NetworkPlot {
             .spines(self.spines.clone())
             .reference_lines(&self.reference_lines);
 
-        let Some(pa) = frame.render(area, buf, x_lo, x_hi, y_lo, y_hi) else {
+        let Some(pa) = frame.render(area, buf, DataBounds { x_lo, x_hi, y_lo, y_hi }) else {
             return;
         };
 
@@ -439,7 +440,7 @@ impl Widget for &NetworkPlot {
 
             let edge_color = edge.color.unwrap_or(self.theme.grid_color);
 
-            draw_edge(buf, sx0, sy0, sx1, sy1, edge_color, &pa);
+            draw_braille_line(buf, sx0, sy0, sx1, sy1, edge_color, &pa);
         }
 
         // Draw nodes on top of edges
@@ -478,64 +479,3 @@ impl Widget for &NetworkPlot {
     }
 }
 
-/// Draw an edge between two screen coordinates using Bresenham with direction characters.
-fn draw_edge(
-    buf: &mut Buffer,
-    x0: f64,
-    y0: f64,
-    x1: f64,
-    y1: f64,
-    color: Color,
-    pa: &crate::frame::PlotArea,
-) {
-    let mut ix = x0.round() as i32;
-    let mut iy = y0.round() as i32;
-    let ix1 = x1.round() as i32;
-    let iy1 = y1.round() as i32;
-
-    let dx = (ix1 - ix).abs();
-    let dy = -(iy1 - iy).abs();
-    let sx = if ix < ix1 { 1 } else { -1 };
-    let sy = if iy < iy1 { 1 } else { -1 };
-    let mut err = dx + dy;
-
-    // Overall line direction for character selection
-    let abs_dx = (ix1 - ix).abs();
-    let abs_dy = (iy1 - iy).abs();
-
-    loop {
-        if ix >= 0 && iy >= 0 {
-            let ux = ix as u16;
-            let uy = iy as u16;
-            if pa.contains(ux, uy) {
-                let ch = if abs_dy == 0 {
-                    '─'
-                } else if abs_dx == 0 {
-                    '│'
-                } else if abs_dx > abs_dy * 2 {
-                    '─'
-                } else if abs_dy > abs_dx * 2 {
-                    '│'
-                } else if (ix1 > ix) == (iy1 > iy) {
-                    '╲'
-                } else {
-                    '╱'
-                };
-                buf[(ux, uy)].set_char(ch).set_fg(color);
-            }
-        }
-
-        if ix == ix1 && iy == iy1 {
-            break;
-        }
-        let e2 = 2 * err;
-        if e2 >= dy {
-            err += dy;
-            ix += sx;
-        }
-        if e2 <= dx {
-            err += dx;
-            iy += sy;
-        }
-    }
-}

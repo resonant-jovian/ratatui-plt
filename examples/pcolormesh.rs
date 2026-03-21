@@ -64,14 +64,14 @@ fn main() -> color_eyre::Result<()> {
 
     // Cell values: evaluate function at cell centers (average of the 4 base positions)
     let mut values = vec![vec![0.0_f64; ncols]; nrows];
-    for i in 0..nrows {
-        for j in 0..ncols {
+    for (i, row) in values.iter_mut().enumerate() {
+        for (j, val) in row.iter_mut().enumerate() {
             let u = (j as f64 + 0.5) / ncols as f64;
             let v = (i as f64 + 0.5) / nrows as f64;
             let cx = -2.0 + 4.0 * u;
             let cy = -2.0 + 4.0 * v;
             // Gaussian-like function
-            values[i][j] = (-(cx * cx + cy * cy) / 2.0).exp();
+            *val = (-(cx * cx + cy * cy) / 2.0).exp();
         }
     }
 

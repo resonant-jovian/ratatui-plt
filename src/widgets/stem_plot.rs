@@ -7,7 +7,8 @@ use ratatui::widgets::Widget;
 
 use crate::annotation::Annotation;
 use crate::axis::Axis;
-use crate::frame::{PlotFrame, ReferenceLine};
+use crate::drawing::draw_braille_line;
+use crate::frame::{DataBounds, PlotFrame, ReferenceLine};
 use crate::spines::Spines;
 use crate::style::MarkerShape;
 use crate::theme::Theme;
@@ -154,7 +155,7 @@ impl Widget for &StemPlot {
             .spines(self.spines.clone())
             .reference_lines(&self.reference_lines);
 
-        let Some(pa) = frame.render(area, buf, x_lo, x_hi, y_lo, y_hi) else {
+        let Some(pa) = frame.render(area, buf, DataBounds { x_lo, x_hi, y_lo, y_hi }) else {
             return;
         };
 
@@ -180,17 +181,8 @@ impl Widget for &StemPlot {
                 continue;
             }
 
-            // Draw stem line
-            let (y_top, y_bot) = if yi < base_yi {
-                (yi, base_yi)
-            } else {
-                (base_yi, yi)
-            };
-            for sy in y_top..=y_bot {
-                if sy >= pa.y && sy < pa.y + pa.height {
-                    buf[(xi, sy)].set_char('│').set_fg(self.color);
-                }
-            }
+            // Draw stem line using Braille sub-pixel rendering
+            draw_braille_line(buf, sx, base_sy, sx, sy, self.color, &pa);
 
             // Draw marker at data point
             if pa.contains(xi, yi) {

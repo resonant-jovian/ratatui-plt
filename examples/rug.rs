@@ -75,13 +75,10 @@ fn main() -> color_eyre::Result<()> {
     // Inspired by realistic Gutenberg-Richter magnitude-frequency distribution:
     // many small quakes, exponentially fewer large ones
     let magnitudes: Vec<f64> = vec![
-        2.1, 2.1, 2.2, 2.3, 2.3, 2.4, 2.4, 2.5, 2.5, 2.6, 2.6, 2.7, 2.7, 2.8, 2.9, 2.9,
-        3.0, 3.0, 3.1, 3.1, 3.2, 3.2, 3.3, 3.3, 3.4, 3.5, 3.5, 3.6, 3.7, 3.8, 3.9,
-        4.0, 4.1, 4.2, 4.3, 4.4, 4.5, 4.7, 4.9,
-        5.0, 5.1, 5.3, 5.5, 5.6, 5.8,
-        6.0, 6.2, 6.5, 6.7,
-        7.0, 7.1, 7.3, 7.5, 7.8,
-        8.0, 8.1,
+        2.1, 2.1, 2.2, 2.3, 2.3, 2.4, 2.4, 2.5, 2.5, 2.6, 2.6, 2.7, 2.7, 2.8, 2.9, 2.9, 3.0,
+        3.0, 3.1, 3.1, 3.2, 3.2, 3.3, 3.3, 3.4, 3.5, 3.5, 3.6, 3.7, 3.8, 3.9, 4.0, 4.1, 4.2,
+        4.3, 4.4, 4.5, 4.7, 4.9, 5.0, 5.1, 5.3, 5.5, 5.6, 5.8, 6.0, 6.2, 6.5, 6.7, 7.0, 7.1,
+        7.3, 7.5, 7.8, 8.0, 8.1,
     ];
 
     // Compute KDE curve
@@ -90,6 +87,12 @@ fn main() -> color_eyre::Result<()> {
         .iter()
         .map(|&(_, y)| y)
         .fold(0.0_f64, f64::max);
+
+    // Shared axis bounds for histogram and KDE overlay
+    let x_lo = 1.5;
+    let x_hi = 9.0;
+    let y_lo = 0.0;
+    let y_hi = kde_y_max * 1.1;
 
     // Build density-normalized histogram
     let hist = Histogram::new(magnitudes.clone())
@@ -100,13 +103,13 @@ fn main() -> color_eyre::Result<()> {
         .x_axis(
             Axis::new()
                 .label("Magnitude (Richter)")
-                .bounds(Bounds::Manual(1.5, 9.0))
+                .bounds(Bounds::Manual(x_lo, x_hi))
                 .grid(true),
         )
         .y_axis(
             Axis::new()
                 .label("Density")
-                .bounds(Bounds::Manual(0.0, kde_y_max * 1.1))
+                .bounds(Bounds::Manual(y_lo, y_hi))
                 .grid(true),
         );
 
@@ -119,7 +122,7 @@ fn main() -> color_eyre::Result<()> {
         .x_axis(
             Axis::new()
                 .label("Magnitude (Richter)")
-                .bounds(Bounds::Manual(1.5, 9.0))
+                .bounds(Bounds::Manual(x_lo, x_hi))
                 .grid(true),
         )
         .y_axis(Axis::new());
@@ -137,25 +140,48 @@ fn main() -> color_eyre::Result<()> {
             // Draw histogram in the main area
             frame.render_widget(&hist, chunks[0]);
 
-            // Overlay KDE curve on top of the histogram
-            // We use PlotFrame to get the same coordinate mapping, then draw
-            // the line without re-drawing axes/chrome.
-            let theme = Theme::get_default();
-            let x_axis_kde = Axis::new().bounds(Bounds::Manual(1.5, 9.0));
-            let y_axis_kde = Axis::new().bounds(Bounds::Manual(0.0, kde_y_max * 1.1));
-            let pf = PlotFrame::new(&x_axis_kde, &y_axis_kde, &theme);
+            // Overlay KDE curve on top of the histogram.
+            // We compute a PlotArea matching the histogram's layout to map
+            // data coordinates to screen positions without rendering a second
+            // set of axis tick labels (which would overwrite the histogram's).
+            let hist_area = chunks[0];
+            let y_label_width: u16 = 8;
+            let title_height: u16 = 1; // histogram has a title
+            let tick_height: u16 = 1;
+            let x_label_height: u16 = 1; // histogram has an x-axis label
 
-            let buf = frame.buffer_mut();
-            if let Some(pa) = pf.render(chunks[0], buf, 1.5, 9.0, 0.0, kde_y_max * 1.1) {
+            let plot_x = hist_area.x + y_label_width;
+            let plot_y = hist_area.y + title_height;
+            let plot_width = hist_area
+                .width
+                .saturating_sub(y_label_width + 1);
+            let plot_height = hist_area
+                .height
+                .saturating_sub(title_height + tick_height + x_label_height);
+
+            if plot_width >= 2 && plot_height >= 2 {
+                let pa = PlotArea {
+                    x: plot_x,
+                    y: plot_y,
+                    width: plot_width,
+                    height: plot_height,
+                    x_lo,
+                    x_hi,
+                    y_lo,
+                    y_hi,
+                    area: hist_area,
+                };
+
+                let buf = frame.buffer_mut();
                 // Draw KDE line by connecting consecutive points with Bresenham lines
                 for pair in kde_points.windows(2) {
-                    let (x0, y0) = pair[0];
-                    let (x1, y1) = pair[1];
+                    let (kx0, ky0) = pair[0];
+                    let (kx1, ky1) = pair[1];
 
-                    let sx0 = pa.screen_x(x0).round() as i32;
-                    let sy0 = pa.screen_y(y0).round() as i32;
-                    let sx1 = pa.screen_x(x1).round() as i32;
-                    let sy1 = pa.screen_y(y1).round() as i32;
+                    let sx0 = pa.screen_x(kx0).round() as i32;
+                    let sy0 = pa.screen_y(ky0).round() as i32;
+                    let sx1 = pa.screen_x(kx1).round() as i32;
+                    let sy1 = pa.screen_y(ky1).round() as i32;
 
                     let dx = (sx1 - sx0).abs();
                     let dy = (sy1 - sy0).abs();

@@ -19,7 +19,7 @@ fn lcg_events(seed: u64, count: usize, range: f64) -> Vec<f64> {
         let normalized = (state >> 33) as f64 / u32::MAX as f64;
         values.push(normalized * range);
     }
-    values.sort_by(|a, b| a.partial_cmp(b).unwrap());
+    values.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
     values
 }
 

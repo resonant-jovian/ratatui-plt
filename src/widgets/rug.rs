@@ -19,7 +19,7 @@ use ratatui::widgets::Widget;
 
 use crate::annotation::Annotation;
 use crate::axis::Axis;
-use crate::frame::{PlotFrame, ReferenceLine};
+use crate::frame::{DataBounds, PlotFrame, ReferenceLine};
 use crate::spines::Spines;
 use crate::theme::Theme;
 
@@ -220,7 +220,7 @@ impl Widget for &RugPlot {
             .spines(self.spines.clone())
             .reference_lines(&self.reference_lines);
 
-        let Some(pa) = frame.render(area, buf, x_lo, x_hi, y_lo, y_hi) else {
+        let Some(pa) = frame.render(area, buf, DataBounds { x_lo, x_hi, y_lo, y_hi }) else {
             return;
         };
 

@@ -48,20 +48,38 @@ fn main() -> color_eyre::Result<()> {
         .data(data.clone())
         .color(Color::Cyan);
 
+    // Inset: zoomed into x=[1,3] region around the first peak
+    let inset_data: Vec<(f64, f64)> = data
+        .iter()
+        .filter(|&&(x, _)| (1.0..=3.0).contains(&x))
+        .copied()
+        .collect();
+
+    // Compute the Y extent of the inset data for the highlighted span
+    let inset_y_min = inset_data
+        .iter()
+        .map(|&(_, y)| y)
+        .fold(f64::INFINITY, f64::min);
+    let inset_y_max = inset_data
+        .iter()
+        .map(|&(_, y)| y)
+        .fold(f64::NEG_INFINITY, f64::max);
+    // Add a small margin around the Y extent
+    let y_margin = (inset_y_max - inset_y_min) * 0.05;
+
     let main_plot = LinePlot::new()
         .series(main_series)
         .title("Damped Sine + Inset (q to quit)")
         .x_axis(Axis::new().label("x").grid(true))
         .y_axis(Axis::new().label("y").grid(true))
         .reference_line(ReferenceLine::hline_dashed(0.0, Color::DarkGray))
-        .reference_line(ReferenceLine::vspan(1.0, 3.0, Color::Rgb(40, 40, 60)));
-
-    // Inset: zoomed into x=[1,3] region around the first peak
-    let inset_data: Vec<(f64, f64)> = data
-        .iter()
-        .filter(|&&(x, _)| x >= 1.0 && x <= 3.0)
-        .copied()
-        .collect();
+        .reference_line(ReferenceLine::vspan_bounded(
+            1.0,
+            3.0,
+            inset_y_min - y_margin,
+            inset_y_max + y_margin,
+            Color::Rgb(40, 40, 60),
+        ));
 
     let inset_series = Series::new("Peak").data(inset_data).color(Color::Yellow);
 

@@ -27,6 +27,8 @@ use ratatui::style::Color;
 use ratatui::widgets::Widget;
 
 use crate::annotation::Annotation;
+use crate::drawing::draw_braille_line;
+use crate::frame::PlotArea;
 use crate::legend::{Legend, LegendEntry, LegendPosition};
 use crate::spines::Spines;
 use crate::theme::Theme;
@@ -295,7 +297,20 @@ impl Widget for &ParallelCoords {
             }
         }
 
-        // Draw polylines for each record using Bresenham line drawing
+        // Build a PlotArea covering the plot region so draw_braille_line can clip.
+        let pa = PlotArea {
+            x: area.x,
+            y: plot_top,
+            width: area.width,
+            height: plot_bottom - plot_top + 1,
+            x_lo: 0.0,
+            x_hi: 0.0,
+            y_lo: 0.0,
+            y_hi: 0.0,
+            area,
+        };
+
+        // Draw polylines for each record using Braille line drawing
         for rec in &self.records {
             let n_values = rec.values.len().min(n_axes);
             if n_values < 2 {
@@ -313,16 +328,13 @@ impl Widget for &ParallelCoords {
                 let ax0 = &self.axes[i];
                 let ax1 = &self.axes[i + 1];
 
-                let sx0 = axis_positions[i] as i32;
-                let sy0 = data_to_screen(v0, ax0.min, ax0.max, plot_bottom as f64, plot_top as f64)
-                    .round() as i32;
+                let sx0 = axis_positions[i] as f64;
+                let sy0 = data_to_screen(v0, ax0.min, ax0.max, plot_bottom as f64, plot_top as f64);
 
-                let sx1 = axis_positions[i + 1] as i32;
-                let sy1 = data_to_screen(v1, ax1.min, ax1.max, plot_bottom as f64, plot_top as f64)
-                    .round() as i32;
+                let sx1 = axis_positions[i + 1] as f64;
+                let sy1 = data_to_screen(v1, ax1.min, ax1.max, plot_bottom as f64, plot_top as f64);
 
-                // Bresenham line drawing
-                bresenham_line(buf, sx0, sy0, sx1, sy1, rec.color, area);
+                draw_braille_line(buf, sx0, sy0, sx1, sy1, rec.color, &pa);
             }
 
             // Draw value markers on each axis
@@ -384,44 +396,6 @@ impl Widget for &ParallelCoords {
                 let legend_area = Rect::new(area.x + margin, plot_top, usable_width, plot_height);
                 (&legend).render(legend_area, buf);
             }
-        }
-    }
-}
-
-/// Draw a line between two screen points using Bresenham's algorithm.
-fn bresenham_line(buf: &mut Buffer, x0: i32, y0: i32, x1: i32, y1: i32, color: Color, area: Rect) {
-    let mut cx = x0;
-    let mut cy = y0;
-    let dx = (x1 - x0).abs();
-    let dy = -(y1 - y0).abs();
-    let sx = if x0 < x1 { 1 } else { -1 };
-    let sy = if y0 < y1 { 1 } else { -1 };
-    let mut err = dx + dy;
-
-    loop {
-        let ux = cx as u16;
-        let uy = cy as u16;
-        if ux >= area.x && ux < area.x + area.width && uy >= area.y && uy < area.y + area.height {
-            // Pick character based on slope: vertical if steep, horizontal otherwise
-            let ch = if dx > 0 && dx >= dy.unsigned_abs() as i32 {
-                '\u{2500}' // ─ horizontal or mostly horizontal
-            } else {
-                '\u{2502}' // │ vertical or mostly vertical
-            };
-            buf[(ux, uy)].set_char(ch).set_fg(color);
-        }
-
-        if cx == x1 && cy == y1 {
-            break;
-        }
-        let e2 = 2 * err;
-        if e2 >= dy {
-            err += dy;
-            cx += sx;
-        }
-        if e2 <= dx {
-            err += dx;
-            cy += sy;
         }
     }
 }

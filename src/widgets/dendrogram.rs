@@ -7,7 +7,7 @@ use ratatui::widgets::Widget;
 
 use crate::annotation::Annotation;
 use crate::axis::Axis;
-use crate::frame::{PlotFrame, ReferenceLine};
+use crate::frame::{DataBounds, PlotFrame, ReferenceLine};
 use crate::spines::Spines;
 use crate::theme::Theme;
 
@@ -269,7 +269,7 @@ impl Widget for &Dendrogram {
             .spines(self.spines.clone())
             .reference_lines(&self.reference_lines);
 
-        let Some(pa) = frame.render(area, buf, x_lo, x_hi, y_lo, y_hi) else {
+        let Some(pa) = frame.render(area, buf, DataBounds { x_lo, x_hi, y_lo, y_hi }) else {
             return;
         };
 
@@ -302,63 +302,27 @@ impl Widget for &Dendrogram {
                 DendroOrientation::Bottom => {
                     // Vertical from left child up to merge height
                     draw_vertical_segment(
-                        buf,
-                        &pa,
-                        left_pos,
-                        left_height,
-                        merge_height,
-                        color,
-                        true,
+                        buf, &pa, left_pos, left_height, merge_height, color,
                     );
                     // Vertical from right child up to merge height
                     draw_vertical_segment(
-                        buf,
-                        &pa,
-                        right_pos,
-                        right_height,
-                        merge_height,
-                        color,
-                        true,
+                        buf, &pa, right_pos, right_height, merge_height, color,
                     );
                     // Horizontal connecting at merge height
                     draw_horizontal_segment(
-                        buf,
-                        &pa,
-                        left_pos,
-                        right_pos,
-                        merge_height,
-                        color,
-                        true,
+                        buf, &pa, left_pos, right_pos, merge_height, color,
                     );
                 }
                 DendroOrientation::Top => {
                     let flip_h = |h: f64| height_hi - h;
                     draw_vertical_segment(
-                        buf,
-                        &pa,
-                        left_pos,
-                        flip_h(left_height),
-                        flip_h(merge_height),
-                        color,
-                        true,
+                        buf, &pa, left_pos, flip_h(left_height), flip_h(merge_height), color,
                     );
                     draw_vertical_segment(
-                        buf,
-                        &pa,
-                        right_pos,
-                        flip_h(right_height),
-                        flip_h(merge_height),
-                        color,
-                        true,
+                        buf, &pa, right_pos, flip_h(right_height), flip_h(merge_height), color,
                     );
                     draw_horizontal_segment(
-                        buf,
-                        &pa,
-                        left_pos,
-                        right_pos,
-                        flip_h(merge_height),
-                        color,
-                        true,
+                        buf, &pa, left_pos, right_pos, flip_h(merge_height), color,
                     );
                 }
                 DendroOrientation::Left => {
@@ -445,7 +409,6 @@ use crate::frame::PlotArea;
 
 /// Draw a vertical line segment (for Bottom/Top orientation).
 /// `cat` is the category-axis position, `h0` and `h1` are height-axis values.
-#[allow(clippy::too_many_arguments)]
 fn draw_vertical_segment(
     buf: &mut Buffer,
     pa: &PlotArea,
@@ -453,7 +416,6 @@ fn draw_vertical_segment(
     h0: f64,
     h1: f64,
     color: Color,
-    _is_vertical_orient: bool,
 ) {
     let sx = pa.screen_x(cat).round() as u16;
     let sy0 = pa.screen_y(h0).round() as i32;
@@ -472,7 +434,6 @@ fn draw_vertical_segment(
 
 /// Draw a horizontal line segment (for Bottom/Top orientation).
 /// `cat0` and `cat1` are category-axis endpoints, `h` is the height.
-#[allow(clippy::too_many_arguments)]
 fn draw_horizontal_segment(
     buf: &mut Buffer,
     pa: &PlotArea,
@@ -480,7 +441,6 @@ fn draw_horizontal_segment(
     cat1: f64,
     h: f64,
     color: Color,
-    _is_vertical_orient: bool,
 ) {
     let sy = pa.screen_y(h).round() as u16;
     let sx0 = pa.screen_x(cat0).round() as i32;

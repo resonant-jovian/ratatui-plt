@@ -5,6 +5,8 @@ use ratatui::layout::Rect;
 use ratatui::style::Color;
 use ratatui::widgets::{StatefulWidget, Widget};
 
+use crate::drawing::draw_braille_line;
+use crate::frame::PlotArea;
 use crate::theme::Theme;
 use crate::transform::{Camera3D, Camera3DState, data_to_screen};
 
@@ -235,6 +237,19 @@ impl Quiver3D {
             data_to_screen(sy, sy_min, sy_max, py as f64, (py + ph - 1) as f64)
         };
 
+        // Build PlotArea for Braille line drawing
+        let pa = PlotArea {
+            x: px,
+            y: py,
+            width: pw,
+            height: ph,
+            x_lo: 0.0,
+            x_hi: 0.0,
+            y_lo: 0.0,
+            y_hi: 0.0,
+            area: Rect::new(px, py, pw, ph),
+        };
+
         // Draw arrows back-to-front
         for &idx in &indices {
             let arrow = &projected[idx];
@@ -243,8 +258,8 @@ impl Quiver3D {
             let scx1 = map_x(arrow.sx1);
             let scy1 = map_y(arrow.sy1);
 
-            // Draw line using Bresenham
-            draw_line(buf, scx0, scy0, scx1, scy1, arrow.color, px, py, pw, ph);
+            // Draw line using Braille characters for higher resolution
+            draw_braille_line(buf, scx0, scy0, scx1, scy1, arrow.color, &pa);
 
             // Draw arrowhead at end
             let xi = scx1.round() as u16;
@@ -276,52 +291,6 @@ fn arrow_head_char(dx: f64, dy: f64) -> char {
         6 => '↑',
         7 => '↖',
         _ => '→',
-    }
-}
-
-/// Draw a line between two screen-space points using Bresenham's algorithm.
-#[allow(clippy::too_many_arguments)]
-fn draw_line(
-    buf: &mut Buffer,
-    x0: f64,
-    y0: f64,
-    x1: f64,
-    y1: f64,
-    color: Color,
-    clip_x: u16,
-    clip_y: u16,
-    clip_w: u16,
-    clip_h: u16,
-) {
-    let mut ix0 = x0.round() as i32;
-    let mut iy0 = y0.round() as i32;
-    let ix1 = x1.round() as i32;
-    let iy1 = y1.round() as i32;
-
-    let dx = (ix1 - ix0).abs();
-    let dy = -(iy1 - iy0).abs();
-    let sx = if ix0 < ix1 { 1 } else { -1 };
-    let sy = if iy0 < iy1 { 1 } else { -1 };
-    let mut err = dx + dy;
-
-    loop {
-        let px = ix0 as u16;
-        let py = iy0 as u16;
-        if px >= clip_x && px < clip_x + clip_w && py >= clip_y && py < clip_y + clip_h {
-            buf[(px, py)].set_char('·').set_fg(color);
-        }
-        if ix0 == ix1 && iy0 == iy1 {
-            break;
-        }
-        let e2 = 2 * err;
-        if e2 >= dy {
-            err += dy;
-            ix0 += sx;
-        }
-        if e2 <= dx {
-            err += dx;
-            iy0 += sy;
-        }
     }
 }
 

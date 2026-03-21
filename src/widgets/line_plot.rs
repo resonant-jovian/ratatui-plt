@@ -21,7 +21,7 @@ use ratatui::widgets::Widget;
 
 use crate::annotation::Annotation;
 use crate::axis::{AspectRatio, Axis};
-use crate::frame::{PlotArea, PlotFrame, ReferenceLine};
+use crate::frame::{DataBounds, PlotArea, PlotFrame, ReferenceLine};
 use crate::legend::{Legend, LegendPosition};
 use crate::series::{Series, is_valid_point};
 use crate::spines::Spines;
@@ -184,7 +184,7 @@ impl Widget for &LinePlot {
             .spines(self.spines.clone())
             .reference_lines(&self.reference_lines);
 
-        let Some(pa) = frame.render(area, buf, x_lo, x_hi, y_lo, y_hi) else {
+        let Some(pa) = frame.render(area, buf, DataBounds { x_lo, x_hi, y_lo, y_hi }) else {
             return;
         };
 
@@ -286,16 +286,7 @@ impl Widget for &LinePlot {
                         let sy0 = pa.screen_y(y0);
                         let sx1 = pa.screen_x(x1);
                         let sy1 = pa.screen_y(y1);
-                        draw_line(
-                            buf,
-                            sx0,
-                            sy0,
-                            sx1,
-                            sy1,
-                            s.color,
-                            &s.line_style.pattern,
-                            &clip,
-                        );
+                        draw_line(buf, &LineSegment { x0: sx0, y0: sy0, x1: sx1, y1: sy1 }, s.color, &s.line_style.pattern, &clip);
                     }
                     StepMode::Pre => {
                         // Horizontal then vertical: (x0,y0) -> (x1,y0) -> (x1,y1)
@@ -304,27 +295,9 @@ impl Widget for &LinePlot {
                         let sx1 = pa.screen_x(x1);
                         let sy1 = pa.screen_y(y1);
                         // Horizontal segment at y0
-                        draw_line(
-                            buf,
-                            sx0,
-                            sy0,
-                            sx1,
-                            sy0,
-                            s.color,
-                            &s.line_style.pattern,
-                            &clip,
-                        );
+                        draw_line(buf, &LineSegment { x0: sx0, y0: sy0, x1: sx1, y1: sy0 }, s.color, &s.line_style.pattern, &clip);
                         // Vertical segment at x1
-                        draw_line(
-                            buf,
-                            sx1,
-                            sy0,
-                            sx1,
-                            sy1,
-                            s.color,
-                            &s.line_style.pattern,
-                            &clip,
-                        );
+                        draw_line(buf, &LineSegment { x0: sx1, y0: sy0, x1: sx1, y1: sy1 }, s.color, &s.line_style.pattern, &clip);
                     }
                     StepMode::Post => {
                         // Vertical then horizontal: (x0,y0) -> (x0,y1) -> (x1,y1)
@@ -333,27 +306,9 @@ impl Widget for &LinePlot {
                         let sx1 = pa.screen_x(x1);
                         let sy1 = pa.screen_y(y1);
                         // Vertical segment at x0
-                        draw_line(
-                            buf,
-                            sx0,
-                            sy0,
-                            sx0,
-                            sy1,
-                            s.color,
-                            &s.line_style.pattern,
-                            &clip,
-                        );
+                        draw_line(buf, &LineSegment { x0: sx0, y0: sy0, x1: sx0, y1: sy1 }, s.color, &s.line_style.pattern, &clip);
                         // Horizontal segment at y1
-                        draw_line(
-                            buf,
-                            sx0,
-                            sy1,
-                            sx1,
-                            sy1,
-                            s.color,
-                            &s.line_style.pattern,
-                            &clip,
-                        );
+                        draw_line(buf, &LineSegment { x0: sx0, y0: sy1, x1: sx1, y1: sy1 }, s.color, &s.line_style.pattern, &clip);
                     }
                     StepMode::Mid => {
                         // Step at midpoint: (x0,y0) -> (mid_x,y0) -> (mid_x,y1) -> (x1,y1)
@@ -364,38 +319,11 @@ impl Widget for &LinePlot {
                         let sx1 = pa.screen_x(x1);
                         let sy1 = pa.screen_y(y1);
                         // Horizontal at y0 from x0 to mid
-                        draw_line(
-                            buf,
-                            sx0,
-                            sy0,
-                            smx,
-                            sy0,
-                            s.color,
-                            &s.line_style.pattern,
-                            &clip,
-                        );
+                        draw_line(buf, &LineSegment { x0: sx0, y0: sy0, x1: smx, y1: sy0 }, s.color, &s.line_style.pattern, &clip);
                         // Vertical at mid from y0 to y1
-                        draw_line(
-                            buf,
-                            smx,
-                            sy0,
-                            smx,
-                            sy1,
-                            s.color,
-                            &s.line_style.pattern,
-                            &clip,
-                        );
+                        draw_line(buf, &LineSegment { x0: smx, y0: sy0, x1: smx, y1: sy1 }, s.color, &s.line_style.pattern, &clip);
                         // Horizontal at y1 from mid to x1
-                        draw_line(
-                            buf,
-                            smx,
-                            sy1,
-                            sx1,
-                            sy1,
-                            s.color,
-                            &s.line_style.pattern,
-                            &clip,
-                        );
+                        draw_line(buf, &LineSegment { x0: smx, y0: sy1, x1: sx1, y1: sy1 }, s.color, &s.line_style.pattern, &clip);
                     }
                 }
             }
@@ -510,18 +438,23 @@ fn write_braille(buf: &mut Buffer, x: u16, y: u16, bits: u8, color: Color) {
     }
 }
 
-#[allow(clippy::too_many_arguments)]
-/// Draw a line between two screen points using Bresenham's at braille sub-pixel resolution (2x4 per cell).
-fn draw_line(
-    buf: &mut Buffer,
+/// Screen-space line segment endpoints.
+struct LineSegment {
     x0: f64,
     y0: f64,
     x1: f64,
     y1: f64,
+}
+
+/// Draw a line between two screen points using Bresenham's at braille sub-pixel resolution (2x4 per cell).
+fn draw_line(
+    buf: &mut Buffer,
+    seg: &LineSegment,
     color: Color,
     pattern: &DashPattern,
     clip: &ClipRect,
 ) {
+    let LineSegment { x0, y0, x1, y1 } = *seg;
     // Scale to braille sub-pixel coordinates (2x horizontal, 4x vertical)
     let mut ix0 = (x0 * 2.0).round() as i32;
     let mut iy0 = (y0 * 4.0).round() as i32;

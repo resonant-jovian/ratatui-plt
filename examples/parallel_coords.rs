@@ -92,7 +92,7 @@ fn main() -> color_eyre::Result<()> {
         15,
         [5.0, 3.4, 1.5, 0.25],
         [0.35, 0.35, 0.18, 0.10],
-        Color::Cyan,
+        Color::Rgb(0, 255, 255), // bright cyan
         "Setosa",
     );
 
@@ -101,7 +101,7 @@ fn main() -> color_eyre::Result<()> {
         15,
         [5.9, 2.8, 4.3, 1.3],
         [0.50, 0.30, 0.45, 0.20],
-        Color::Yellow,
+        Color::Rgb(255, 255, 0), // bright yellow
         "Versicolor",
     );
 
@@ -110,7 +110,7 @@ fn main() -> color_eyre::Result<()> {
         15,
         [6.6, 3.0, 5.6, 2.0],
         [0.60, 0.30, 0.50, 0.25],
-        Color::Magenta,
+        Color::Rgb(255, 100, 255), // bright magenta
         "Virginica",
     );
 

@@ -323,46 +323,7 @@ impl Bar3D {
             sy_max = cy + hy;
         }
 
-        // Rasterize each face
-        for face in &faces {
-            let screen_quad: Vec<(i32, i32)> = face
-                .corners
-                .iter()
-                .map(|&(qx, qy)| {
-                    let scx = data_to_screen(qx, sx_min, sx_max, px as f64, (px + pw - 1) as f64)
-                        .round() as i32;
-                    let scy = data_to_screen(qy, sy_min, sy_max, py as f64, (py + ph - 1) as f64)
-                        .round() as i32;
-                    (scx, scy)
-                })
-                .collect();
-
-            // Bounding box
-            let bb_min_x = screen_quad.iter().map(|c| c.0).min().unwrap();
-            let bb_max_x = screen_quad.iter().map(|c| c.0).max().unwrap();
-            let bb_min_y = screen_quad.iter().map(|c| c.1).min().unwrap();
-            let bb_max_y = screen_quad.iter().map(|c| c.1).max().unwrap();
-
-            // Fill using point-in-quad test
-            for sy in bb_min_y..=bb_max_y {
-                for sx in bb_min_x..=bb_max_x {
-                    let ux = sx as u16;
-                    let uy = sy as u16;
-                    if ux >= px
-                        && ux < px + pw
-                        && uy >= py
-                        && uy < py + ph
-                        && point_in_quad(sx, sy, &screen_quad)
-                    {
-                        buf[(ux, uy)]
-                            .set_char(face.char_fill)
-                            .set_style(Style::default().fg(face.color));
-                    }
-                }
-            }
-        }
-
-        // Draw 3D axis lines at the edges of the data bounding box
+        // Draw 3D axis lines BEFORE bars so the painter's algorithm occludes them
         let pa = PlotArea {
             x: px,
             y: py,
@@ -415,6 +376,53 @@ impl Bar3D {
         let zyi = zy.round() as u16;
         if zxi >= px && zxi < px + pw && zyi >= py && zyi < py + ph {
             buf[(zxi, zyi)].set_char('Z').set_fg(Color::Blue);
+        }
+
+        // Rasterize each face (after axis lines, so bars occlude axes)
+        for face in &faces {
+            let screen_quad: Vec<(i32, i32)> = face
+                .corners
+                .iter()
+                .map(|&(qx, qy)| {
+                    let scx = data_to_screen(qx, sx_min, sx_max, px as f64, (px + pw - 1) as f64)
+                        .round() as i32;
+                    let scy = data_to_screen(qy, sy_min, sy_max, py as f64, (py + ph - 1) as f64)
+                        .round() as i32;
+                    (scx, scy)
+                })
+                .collect();
+
+            // Bounding box
+            let Some(bb_min_x) = screen_quad.iter().map(|c| c.0).min() else {
+                continue;
+            };
+            let Some(bb_max_x) = screen_quad.iter().map(|c| c.0).max() else {
+                continue;
+            };
+            let Some(bb_min_y) = screen_quad.iter().map(|c| c.1).min() else {
+                continue;
+            };
+            let Some(bb_max_y) = screen_quad.iter().map(|c| c.1).max() else {
+                continue;
+            };
+
+            // Fill using point-in-quad test
+            for sy in bb_min_y..=bb_max_y {
+                for sx in bb_min_x..=bb_max_x {
+                    let ux = sx as u16;
+                    let uy = sy as u16;
+                    if ux >= px
+                        && ux < px + pw
+                        && uy >= py
+                        && uy < py + ph
+                        && point_in_quad(sx, sy, &screen_quad)
+                    {
+                        buf[(ux, uy)]
+                            .set_char(face.char_fill)
+                            .set_style(Style::default().fg(face.color));
+                    }
+                }
+            }
         }
     }
 }

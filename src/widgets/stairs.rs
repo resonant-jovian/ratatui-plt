@@ -23,7 +23,8 @@ use ratatui::widgets::Widget;
 
 use crate::annotation::Annotation;
 use crate::axis::Axis;
-use crate::frame::{PlotFrame, ReferenceLine};
+use crate::drawing::draw_braille_line;
+use crate::frame::{DataBounds, PlotFrame, ReferenceLine};
 use crate::legend::{Legend, LegendEntry, LegendPosition};
 use crate::spines::Spines;
 use crate::theme::Theme;
@@ -238,7 +239,7 @@ impl Widget for &StairsPlot {
             .spines(self.spines.clone())
             .reference_lines(&self.reference_lines);
 
-        let Some(pa) = frame.render(area, buf, x_lo, x_hi, y_lo, y_hi) else {
+        let Some(pa) = frame.render(area, buf, DataBounds { x_lo, x_hi, y_lo, y_hi }) else {
             return;
         };
 
@@ -280,29 +281,12 @@ impl Widget for &StairsPlot {
                 let sy = pa.screen_y(ds.values[i]);
 
                 // Horizontal segment at current value
-                let xi_start = sx_left.round() as u16;
-                let xi_end = sx_right.round() as u16;
-                let yi = sy.round() as u16;
-
-                let x_from = xi_start.min(xi_end);
-                let x_to = xi_start.max(xi_end);
-                for x in x_from..=x_to {
-                    if pa.contains(x, yi) {
-                        buf[(x, yi)].set_char('─').set_fg(ds.color);
-                    }
-                }
+                draw_braille_line(buf, sx_left, sy, sx_right, sy, ds.color, &pa);
 
                 // Vertical segment at the right edge connecting to next value
                 if i + 1 < n {
                     let sy_next = pa.screen_y(ds.values[i + 1]);
-                    let xi = sx_right.round() as u16;
-                    let yi_from = sy.round().min(sy_next.round()) as u16;
-                    let yi_to = sy.round().max(sy_next.round()) as u16;
-                    for y in yi_from..=yi_to {
-                        if pa.contains(xi, y) {
-                            buf[(xi, y)].set_char('│').set_fg(ds.color);
-                        }
-                    }
+                    draw_braille_line(buf, sx_right, sy, sx_right, sy_next, ds.color, &pa);
                 }
             }
         }

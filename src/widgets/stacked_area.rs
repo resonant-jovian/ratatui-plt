@@ -11,7 +11,7 @@ use ratatui::widgets::Widget;
 
 use crate::annotation::Annotation;
 use crate::axis::Axis;
-use crate::frame::{PlotFrame, ReferenceLine};
+use crate::frame::{DataBounds, PlotFrame, ReferenceLine};
 use crate::legend::{Legend, LegendEntry, LegendPosition};
 use crate::series::Series;
 use crate::spines::Spines;
@@ -192,7 +192,7 @@ impl Widget for &StackedArea {
 
         // Determine axis bounds
         let x_lo_data = all_x[0];
-        let x_hi_data = *all_x.last().unwrap();
+        let x_hi_data = *all_x.last().unwrap_or(&0.0);
         let (x_lo, x_hi) = self.x_axis.resolve_bounds(x_lo_data, x_hi_data);
 
         let y_max_data = cumulative
@@ -207,7 +207,7 @@ impl Widget for &StackedArea {
             .spines(self.spines.clone())
             .reference_lines(&self.reference_lines);
 
-        let Some(pa) = frame.render(area, buf, x_lo, x_hi, y_lo, y_hi) else {
+        let Some(pa) = frame.render(area, buf, DataBounds { x_lo, x_hi, y_lo, y_hi }) else {
             return;
         };
 

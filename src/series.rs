@@ -467,7 +467,7 @@ impl VectorFieldData {
             let dsq = (vx - x) * (vx - x) + (vy - y) * (vy - y);
             if dsq < best[3].0 {
                 best[3] = (dsq, i);
-                best.sort_by(|a, b| a.0.partial_cmp(&b.0).unwrap());
+                best.sort_by(|a, b| a.0.partial_cmp(&b.0).unwrap_or(std::cmp::Ordering::Equal));
             }
         }
         if best[0].0 < 1e-12 {

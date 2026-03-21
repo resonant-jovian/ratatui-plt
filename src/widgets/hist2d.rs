@@ -10,7 +10,7 @@ use ratatui::widgets::Widget;
 use crate::annotation::Annotation;
 use crate::axis::Axis;
 use crate::colormap::{Colorbar, Colormap, Viridis};
-use crate::frame::{PlotFrame, ReferenceLine};
+use crate::frame::{DataBounds, PlotFrame, ReferenceLine};
 use crate::norm::{LinearNorm, Normalize};
 use crate::spines::Spines;
 use crate::theme::Theme;
@@ -219,7 +219,7 @@ impl Widget for &Hist2D {
             .y_label_width(7)
             .reference_lines(&self.reference_lines);
 
-        let Some(pa) = frame.render(area, buf, x_min, x_max, y_min, y_max) else {
+        let Some(pa) = frame.render(area, buf, DataBounds { x_lo: x_min, x_hi: x_max, y_lo: y_min, y_hi: y_max }) else {
             return;
         };
 

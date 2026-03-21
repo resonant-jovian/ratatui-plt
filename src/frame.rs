@@ -15,6 +15,21 @@ use crate::spines::Spines;
 use crate::theme::Theme;
 use crate::transform::{apply_aspect_ratio, data_to_screen};
 
+/// Resolved data bounds for a 2D plot (x and y range).
+///
+/// Used by [`PlotFrame::render`] to pass the four axis limits as a single argument.
+#[derive(Clone, Debug, Copy)]
+pub struct DataBounds {
+    /// Minimum x data value.
+    pub x_lo: f64,
+    /// Maximum x data value.
+    pub x_hi: f64,
+    /// Minimum y data value.
+    pub y_lo: f64,
+    /// Maximum y data value.
+    pub y_hi: f64,
+}
+
 /// Dash style for reference lines.
 #[derive(Clone, Debug, Default)]
 pub enum RefLineDash {
@@ -52,7 +67,14 @@ pub enum ReferenceLine {
     /// Horizontal filled span between two y values (`axhspan`).
     HorizontalSpan { y1: f64, y2: f64, color: Color },
     /// Vertical filled span between two x values (`axvspan`).
-    VerticalSpan { x1: f64, x2: f64, color: Color },
+    /// Optional y bounds limit the vertical extent of the span.
+    VerticalSpan {
+        x1: f64,
+        x2: f64,
+        color: Color,
+        y_lo: Option<f64>,
+        y_hi: Option<f64>,
+    },
 }
 
 impl ReferenceLine {
@@ -97,9 +119,26 @@ impl ReferenceLine {
         Self::HorizontalSpan { y1, y2, color }
     }
 
-    /// Vertical filled span between x1 and x2.
+    /// Vertical filled span between x1 and x2, covering the full Y range.
     pub fn vspan(x1: f64, x2: f64, color: Color) -> Self {
-        Self::VerticalSpan { x1, x2, color }
+        Self::VerticalSpan {
+            x1,
+            x2,
+            color,
+            y_lo: None,
+            y_hi: None,
+        }
+    }
+
+    /// Vertical filled span between x1 and x2, limited to the given Y range.
+    pub fn vspan_bounded(x1: f64, x2: f64, y_lo: f64, y_hi: f64, color: Color) -> Self {
+        Self::VerticalSpan {
+            x1,
+            x2,
+            color,
+            y_lo: Some(y_lo),
+            y_hi: Some(y_hi),
+        }
     }
 }
 
@@ -238,7 +277,8 @@ impl PlotArea {
 ///     .aspect_ratio(self.aspect_ratio.clone())
 ///     .spines(self.spines.clone());
 ///
-/// let Some(pa) = frame.render(area, buf, x_lo, x_hi, y_lo, y_hi) else {
+/// let bounds = DataBounds { x_lo, x_hi, y_lo, y_hi };
+/// let Some(pa) = frame.render(area, buf, bounds) else {
 ///     return;
 /// };
 /// // Draw widget-specific data using pa.screen_x(), pa.screen_y()...
@@ -309,18 +349,20 @@ impl<'a> PlotFrame<'a> {
 
     /// Render all plot chrome and return the inner drawing area.
     ///
-    /// `x_lo`..`x_hi` and `y_lo`..`y_hi` are already-resolved data bounds
+    /// `bounds` contains the already-resolved data bounds
     /// (after axis bounds resolution). Returns `None` if the area is too small.
-    #[allow(clippy::too_many_arguments)]
     pub fn render(
         &self,
         area: Rect,
         buf: &mut Buffer,
-        x_lo: f64,
-        x_hi: f64,
-        y_lo: f64,
-        y_hi: f64,
+        bounds: DataBounds,
     ) -> Option<PlotArea> {
+        let DataBounds {
+            x_lo,
+            x_hi,
+            y_lo,
+            y_hi,
+        } = bounds;
         if area.width < 4 || area.height < 4 {
             return None;
         }
@@ -465,7 +507,17 @@ impl<'a> PlotFrame<'a> {
         }
 
         // Draw reference lines and spans
-        self.draw_reference_lines(buf, px, py, aw, ah, x_lo, x_hi, y_lo, y_hi);
+        self.draw_reference_lines(buf, &PlotArea {
+            x: px,
+            y: py,
+            width: aw,
+            height: ah,
+            x_lo,
+            x_hi,
+            y_lo,
+            y_hi,
+            area,
+        });
 
         // Draw x tick labels with overlap detection
         let x_ticks = self.x_axis.tick_positions(x_lo, x_hi);
@@ -524,19 +576,15 @@ impl<'a> PlotFrame<'a> {
             }
         }
         if let Some(ref label) = self.y_axis.label {
-            // Render y-axis label horizontally, centered vertically at the left edge
-            let label_len = label.len() as u16;
-            let mid_y = py + ah / 2;
+            // Render y-axis label horizontally, placed at the top-left of the y-axis
+            // just above the first tick label, so it never overlaps with tick values.
+            let label_y = py.saturating_sub(1).max(area.y);
             let x_start = area.x;
             for (i, ch) in label.chars().enumerate() {
                 let x = x_start + i as u16;
-                if x < px && mid_y < py + ah {
-                    buf[(x, mid_y)].set_char(ch).set_fg(self.theme.foreground);
+                if x < area.x + area.width && label_y < area.y + area.height {
+                    buf[(x, label_y)].set_char(ch).set_fg(self.theme.foreground);
                 }
-            }
-            // If label is too long, try placing it one row above the tick labels area
-            if label_len > self.y_label_width {
-                // Already handled above — it will clip to available space
             }
         }
 
@@ -586,19 +634,13 @@ impl<'a> PlotFrame<'a> {
         }
     }
 
-    #[allow(clippy::too_many_arguments)]
     fn draw_reference_lines(
         &self,
         buf: &mut Buffer,
-        px: u16,
-        py: u16,
-        aw: u16,
-        ah: u16,
-        x_lo: f64,
-        x_hi: f64,
-        y_lo: f64,
-        y_hi: f64,
+        pa: &PlotArea,
     ) {
+        let (px, py, aw, ah) = (pa.x, pa.y, pa.width, pa.height);
+        let (x_lo, x_hi, y_lo, y_hi) = (pa.x_lo, pa.x_hi, pa.y_lo, pa.y_hi);
         for refline in self.reference_lines {
             match refline {
                 ReferenceLine::Horizontal { y, color, dash } => {
@@ -646,15 +688,31 @@ impl<'a> PlotFrame<'a> {
                         }
                     }
                 }
-                ReferenceLine::VerticalSpan { x1, x2, color } => {
+                ReferenceLine::VerticalSpan {
+                    x1,
+                    x2,
+                    color,
+                    y_lo: span_y_lo,
+                    y_hi: span_y_hi,
+                } => {
                     let sx1 = data_to_screen(*x1, x_lo, x_hi, px as f64, (px + aw - 1) as f64)
                         .round() as u16;
                     let sx2 = data_to_screen(*x2, x_lo, x_hi, px as f64, (px + aw - 1) as f64)
                         .round() as u16;
                     let left = sx1.min(sx2).max(px);
                     let right = sx1.max(sx2).min(px + aw);
+                    // Determine vertical extent: use bounded Y range if provided
+                    let (y_top, y_bottom) = if let (Some(yl), Some(yh)) = (span_y_lo, span_y_hi) {
+                        let sy_lo = data_to_screen(*yl, y_lo, y_hi, (py + ah - 1) as f64, py as f64)
+                            .round() as u16;
+                        let sy_hi = data_to_screen(*yh, y_lo, y_hi, (py + ah - 1) as f64, py as f64)
+                            .round() as u16;
+                        (sy_hi.min(sy_lo).max(py), sy_hi.max(sy_lo).min(py + ah))
+                    } else {
+                        (py, py + ah)
+                    };
                     for x in left..right {
-                        for y in py..py + ah {
+                        for y in y_top..y_bottom {
                             buf[(x, y)].set_char('░').set_fg(*color);
                         }
                     }

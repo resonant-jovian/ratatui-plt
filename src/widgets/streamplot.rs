@@ -27,7 +27,7 @@ use ratatui::widgets::Widget;
 use crate::annotation::Annotation;
 use crate::axis::Axis;
 use crate::colormap::{Colormap, Viridis};
-use crate::frame::{PlotFrame, ReferenceLine};
+use crate::frame::{DataBounds, PlotFrame, ReferenceLine};
 use crate::norm::{LinearNorm, Normalize};
 use crate::series::VectorFieldData;
 use crate::spines::Spines;
@@ -170,20 +170,25 @@ fn interpolate_field(field: &VectorFieldData, x: f64, y: f64) -> (f64, f64) {
     field.interpolate(x, y)
 }
 
-/// Integrate a single streamline using 4th-order Runge-Kutta.
-/// Returns a list of (x, y) points along the streamline.
-#[allow(clippy::too_many_arguments)]
-fn trace_streamline(
-    field: &VectorFieldData,
-    x0: f64,
-    y0: f64,
+/// Bounding box for streamline integration.
+struct StreamBounds {
     x_lo: f64,
     x_hi: f64,
     y_lo: f64,
     y_hi: f64,
+}
+
+/// Integrate a single streamline using 4th-order Runge-Kutta.
+/// Returns a list of (x, y) points along the streamline.
+fn trace_streamline(
+    field: &VectorFieldData,
+    x0: f64,
+    y0: f64,
+    bounds: &StreamBounds,
     max_steps: usize,
     dt: f64,
 ) -> Vec<(f64, f64)> {
+    let StreamBounds { x_lo, x_hi, y_lo, y_hi } = *bounds;
     let mut points = Vec::with_capacity(max_steps);
     let mut x = x0;
     let mut y = y0;
@@ -347,7 +352,7 @@ impl Widget for &StreamPlot {
             .spines(self.spines.clone())
             .reference_lines(&self.reference_lines);
 
-        let Some(pa) = frame.render(area, buf, x_lo, x_hi, y_lo, y_hi) else {
+        let Some(pa) = frame.render(area, buf, DataBounds { x_lo, x_hi, y_lo, y_hi }) else {
             return;
         };
 
@@ -377,12 +382,13 @@ impl Widget for &StreamPlot {
                 let sy = y_lo + y_range * (si as f64 + 0.5) / n_seeds_y as f64;
 
                 // Trace forward
+                let sb = StreamBounds { x_lo, x_hi, y_lo, y_hi };
                 let forward =
-                    trace_streamline(&self.field, sx, sy, x_lo, x_hi, y_lo, y_hi, max_steps, dt);
+                    trace_streamline(&self.field, sx, sy, &sb, max_steps, dt);
 
                 // Trace backward
                 let backward =
-                    trace_streamline(&self.field, sx, sy, x_lo, x_hi, y_lo, y_hi, max_steps, -dt);
+                    trace_streamline(&self.field, sx, sy, &sb, max_steps, -dt);
 
                 // Combine: reverse of backward (excluding seed) + forward
                 let mut points: Vec<(f64, f64)> = Vec::new();

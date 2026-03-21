@@ -178,10 +178,18 @@ impl MultiPanel {
         let mut mosaic_panels = Vec::new();
 
         for (&ch, cells) in &char_cells {
-            let min_r = cells.iter().map(|&(r, _)| r).min().unwrap();
-            let max_r = cells.iter().map(|&(r, _)| r).max().unwrap();
-            let min_c = cells.iter().map(|&(_, c)| c).min().unwrap();
-            let max_c = cells.iter().map(|&(_, c)| c).max().unwrap();
+            let Some(min_r) = cells.iter().map(|&(r, _)| r).min() else {
+                continue;
+            };
+            let Some(max_r) = cells.iter().map(|&(r, _)| r).max() else {
+                continue;
+            };
+            let Some(min_c) = cells.iter().map(|&(_, c)| c).min() else {
+                continue;
+            };
+            let Some(max_c) = cells.iter().map(|&(_, c)| c).max() else {
+                continue;
+            };
 
             let rowspan = max_r - min_r + 1;
             let colspan = max_c - min_c + 1;
@@ -467,21 +475,22 @@ impl Widget for &MultiPanel {
         let mut covered = vec![false; self.rows * self.cols];
 
         // Render span panels first
-        #[allow(clippy::needless_range_loop)]
         for sp in &self.span_panels {
             let x = col_offsets[sp.col];
             let y = row_offsets[sp.row];
+            let col_count = sp.colspan.min(self.cols - sp.col);
             let mut w: u16 = 0;
-            for c in sp.col..sp.col + sp.colspan.min(self.cols - sp.col) {
-                w += col_widths[c];
-                if c > sp.col {
+            for (i, &cw) in col_widths.iter().enumerate().skip(sp.col).take(col_count) {
+                w += cw;
+                if i > sp.col {
                     w += self.gap;
                 }
             }
+            let row_count = sp.rowspan.min(self.rows - sp.row);
             let mut h: u16 = 0;
-            for r in sp.row..sp.row + sp.rowspan.min(self.rows - sp.row) {
-                h += row_heights[r];
-                if r > sp.row {
+            for (i, &rh) in row_heights.iter().enumerate().skip(sp.row).take(row_count) {
+                h += rh;
+                if i > sp.row {
                     h += self.gap;
                 }
             }
@@ -502,7 +511,6 @@ impl Widget for &MultiPanel {
         }
 
         // Render regular (non-spanned) panels
-        #[allow(clippy::needless_range_loop)]
         for row in 0..self.rows {
             for col in 0..self.cols {
                 let idx = row * self.cols + col;

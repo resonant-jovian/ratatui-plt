@@ -48,3 +48,14 @@ optional = true
 crossterm = "0.29"
 color-eyre = "0.6"
 rand = "0.10"
+
+[lints.rust]
+unsafe_code = "forbid"
+warnings = "forbid"
+
+[lints.clippy]
+unwrap_used = "forbid"
+expect_used = "forbid"
+unwrap_in_result = "forbid"
+get_unwrap = "forbid"
+panic = "forbid"

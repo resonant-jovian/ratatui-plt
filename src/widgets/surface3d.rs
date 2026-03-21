@@ -274,10 +274,18 @@ impl Surface3D {
                 .collect();
 
             // Bounding box of the expanded quad
-            let bb_min_x = expanded_quad.iter().map(|c| c.0).min().unwrap();
-            let bb_max_x = expanded_quad.iter().map(|c| c.0).max().unwrap();
-            let bb_min_y = expanded_quad.iter().map(|c| c.1).min().unwrap();
-            let bb_max_y = expanded_quad.iter().map(|c| c.1).max().unwrap();
+            let Some(bb_min_x) = expanded_quad.iter().map(|c| c.0).min() else {
+                continue;
+            };
+            let Some(bb_max_x) = expanded_quad.iter().map(|c| c.0).max() else {
+                continue;
+            };
+            let Some(bb_min_y) = expanded_quad.iter().map(|c| c.1).min() else {
+                continue;
+            };
+            let Some(bb_max_y) = expanded_quad.iter().map(|c| c.1).max() else {
+                continue;
+            };
 
             // Fill using half-block characters for doubled vertical resolution.
             // Process rows in pairs: for each pair (row, row+1), use '▀' with
@@ -361,7 +369,7 @@ impl Surface3D {
         }
 
         // Draw 3D axis lines at the edges of the data bounding box
-        draw_axis_lines(camera, buf, &pa, sx_min, sx_max, sy_min, sy_max, px, pw, py, ph);
+        draw_axis_lines(camera, buf, &pa, &ScreenBounds { sx_min, sx_max, sy_min, sy_max });
     }
 }
 
@@ -412,29 +420,31 @@ fn shade_surface_color(color: Color, factor: f64) -> Color {
     }
 }
 
-/// Draw 3D axis lines (X, Y, Z) at the edges of the data bounding box.
-#[allow(clippy::too_many_arguments)]
-fn draw_axis_lines(
-    camera: &Camera3D,
-    buf: &mut Buffer,
-    pa: &PlotArea,
+/// Projected screen coordinate bounds from 3D camera.
+struct ScreenBounds {
     sx_min: f64,
     sx_max: f64,
     sy_min: f64,
     sy_max: f64,
-    px: u16,
-    pw: u16,
-    py: u16,
-    ph: u16,
+}
+
+/// Draw 3D axis lines (X, Y, Z) at the edges of the data bounding box.
+fn draw_axis_lines(
+    camera: &Camera3D,
+    buf: &mut Buffer,
+    pa: &PlotArea,
+    sb: &ScreenBounds,
 ) {
+    let (px, pw, py, ph) = (pa.x, pa.width, pa.y, pa.height);
+
     // Project axis origin and tips from normalized [-1,1] space
     let origin = camera.project(-1.0, -1.0, -0.8);
     let x_tip = camera.project(1.0, -1.0, -0.8);
     let y_tip = camera.project(-1.0, 1.0, -0.8);
     let z_tip = camera.project(-1.0, -1.0, 0.8);
 
-    let to_sx = |v: f64| data_to_screen(v, sx_min, sx_max, px as f64, (px + pw - 1) as f64);
-    let to_sy = |v: f64| data_to_screen(v, sy_min, sy_max, py as f64, (py + ph - 1) as f64);
+    let to_sx = |v: f64| data_to_screen(v, sb.sx_min, sb.sx_max, px as f64, (px + pw - 1) as f64);
+    let to_sy = |v: f64| data_to_screen(v, sb.sy_min, sb.sy_max, py as f64, (py + ph - 1) as f64);
 
     let ox = to_sx(origin.0);
     let oy = to_sy(origin.1);

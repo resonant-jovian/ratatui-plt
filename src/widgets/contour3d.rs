@@ -2,7 +2,7 @@
 
 use ratatui::buffer::Buffer;
 use ratatui::layout::Rect;
-use ratatui::style::Color;
+use ratatui::style::{Color, Style};
 use ratatui::widgets::{StatefulWidget, Widget};
 
 use crate::colormap::{Colormap, Viridis};
@@ -147,187 +147,258 @@ impl Contour3D {
             self.levels.clone()
         };
 
-        // Closure to normalize and project a 3D data point
-        let normalize_and_project = |x: f64, y: f64, z: f64| -> (f64, f64, f64) {
-            let nx = if x_range > 0.0 {
-                2.0 * (x - x_lo) / x_range - 1.0
-            } else {
-                0.0
-            };
-            let ny = if y_range > 0.0 {
-                2.0 * (y - y_lo) / y_range - 1.0
-            } else {
-                0.0
-            };
-            let nz = if z_range > 0.0 {
-                2.0 * (z - vmin) / z_range - 1.0
-            } else {
-                0.0
-            };
-            camera.project(nx, ny, nz * 0.8)
-        };
+        // Project all grid points
+        let mut projected: Vec<(f64, f64, f64, f64)> = Vec::new(); // (sx, sy, depth, value)
+        for j in 0..nrows {
+            for i in 0..ncols {
+                let nx = if x_range > 0.0 {
+                    2.0 * (self.data.x[i] - x_lo) / x_range - 1.0
+                } else {
+                    0.0
+                };
+                let ny = if y_range > 0.0 {
+                    2.0 * (self.data.y[j] - y_lo) / y_range - 1.0
+                } else {
+                    0.0
+                };
+                let nz = if z_range > 0.0 {
+                    2.0 * (self.data.values[j][i] - vmin) / z_range - 1.0
+                } else {
+                    0.0
+                };
 
-        // Find screen bounds by projecting grid corners and extremes
+                let (sx, sy, depth) = camera.project(nx, ny, nz * 0.8);
+                projected.push((sx, sy, depth, self.data.values[j][i]));
+            }
+        }
+
+        // Find screen bounds of projected points
         let mut sx_min = f64::INFINITY;
         let mut sx_max = f64::NEG_INFINITY;
         let mut sy_min = f64::INFINITY;
         let mut sy_max = f64::NEG_INFINITY;
-
-        for j in 0..nrows {
-            for i in 0..ncols {
-                let (sx, sy, _) =
-                    normalize_and_project(self.data.x[i], self.data.y[j], self.data.values[j][i]);
-                sx_min = sx_min.min(sx);
-                sx_max = sx_max.max(sx);
-                sy_min = sy_min.min(sy);
-                sy_max = sy_max.max(sy);
-            }
+        for &(sx, sy, _, _) in &projected {
+            sx_min = sx_min.min(sx);
+            sx_max = sx_max.max(sx);
+            sy_min = sy_min.min(sy);
+            sy_max = sy_max.max(sy);
         }
 
-        // Apply zoom
+        // Apply zoom to viewport
         let zoom = 5.0 / camera.distance;
-        let (sx_min, sx_max, sy_min, sy_max) = {
+        {
             let cx = (sx_min + sx_max) / 2.0;
             let cy = (sy_min + sy_max) / 2.0;
             let hx = (sx_max - sx_min) / 2.0 / zoom;
             let hy = (sy_max - sy_min) / 2.0 / zoom;
-            (cx - hx, cx + hx, cy - hy, cy + hy)
+            sx_min = cx - hx;
+            sx_max = cx + hx;
+            sy_min = cy - hy;
+            sy_max = cy + hy;
+        }
+
+        // Collect quad faces with average depth for sorting
+        let mut faces: Vec<(usize, usize, f64)> = Vec::new();
+        for j in 0..nrows - 1 {
+            for i in 0..ncols - 1 {
+                let idx00 = j * ncols + i;
+                let idx10 = j * ncols + i + 1;
+                let idx01 = (j + 1) * ncols + i;
+                let idx11 = (j + 1) * ncols + i + 1;
+                let avg_depth = (projected[idx00].2
+                    + projected[idx10].2
+                    + projected[idx01].2
+                    + projected[idx11].2)
+                    / 4.0;
+                faces.push((j, i, avg_depth));
+            }
+        }
+
+        // Sort back-to-front (painter's algorithm)
+        faces.sort_by(|a, b| b.2.partial_cmp(&a.2).unwrap_or(std::cmp::Ordering::Equal));
+
+        // Determine which contour level each cell value falls into.
+        // For a cell with average value v, find the highest level <= v.
+        let cell_contour_color = |avg_val: f64| -> Color {
+            // Find the contour band: the index of the highest level that avg_val >= level
+            let mut band_idx: Option<usize> = None;
+            for (li, &lv) in levels.iter().enumerate() {
+                if avg_val >= lv {
+                    band_idx = Some(li);
+                }
+            }
+            // Map band index to colormap
+            let t = match band_idx {
+                Some(idx) => self.norm.normalize(levels[idx]),
+                None => self.norm.normalize(vmin),
+            };
+            self.colormap.color_at(t)
         };
 
-        let map_x = |sx: f64| -> f64 {
-            data_to_screen(sx, sx_min, sx_max, px as f64, (px + pw - 1) as f64)
-        };
-        let map_y = |sy: f64| -> f64 {
-            data_to_screen(sy, sy_min, sy_max, py as f64, (py + ph - 1) as f64)
-        };
+        // Draw faces with scanline rasterization using half-block shading
+        for &(j, i, _) in &faces {
+            let idx00 = j * ncols + i;
+            let idx10 = j * ncols + i + 1;
+            let idx01 = (j + 1) * ncols + i;
+            let idx11 = (j + 1) * ncols + i + 1;
 
-        // For each contour level, extract contour segments using marching squares,
-        // then project onto the 3D surface
-        for &level in &levels {
-            let t = self.norm.normalize(level);
-            let color = self.colormap.color_at(t);
+            // Compute contour-level color from average cell value
+            let avg_val =
+                (projected[idx00].3 + projected[idx10].3 + projected[idx01].3 + projected[idx11].3)
+                    / 4.0;
+            let color = cell_contour_color(avg_val);
 
-            for j in 0..nrows - 1 {
-                for i in 0..ncols - 1 {
-                    let v00 = self.data.values[j][i];
-                    let v10 = self.data.values[j][i + 1];
-                    let v01 = self.data.values[j + 1][i];
-                    let v11 = self.data.values[j + 1][i + 1];
+            // Quad corners in screen space
+            let quad = [
+                (projected[idx00].0, projected[idx00].1),
+                (projected[idx10].0, projected[idx10].1),
+                (projected[idx11].0, projected[idx11].1),
+                (projected[idx01].0, projected[idx01].1),
+            ];
 
-                    let case = ((v00 >= level) as u8)
-                        | (((v10 >= level) as u8) << 1)
-                        | (((v01 >= level) as u8) << 2)
-                        | (((v11 >= level) as u8) << 3);
+            // Map to pixel coords
+            let screen_quad: Vec<(i32, i32)> = quad
+                .iter()
+                .map(|&(qx, qy)| {
+                    let scx = data_to_screen(qx, sx_min, sx_max, px as f64, (px + pw - 1) as f64)
+                        .round() as i32;
+                    let scy = data_to_screen(qy, sy_min, sy_max, py as f64, (py + ph - 1) as f64)
+                        .round() as i32;
+                    (scx, scy)
+                })
+                .collect();
 
-                    if case == 0 || case == 15 {
-                        continue;
-                    }
+            // Expand quad slightly to eliminate gaps between adjacent faces
+            let centroid_x = screen_quad.iter().map(|c| c.0).sum::<i32>() / 4;
+            let centroid_y = screen_quad.iter().map(|c| c.1).sum::<i32>() / 4;
+            let expanded_quad: Vec<(i32, i32)> = screen_quad
+                .iter()
+                .map(|&(x, y)| {
+                    let dx = if x > centroid_x {
+                        1
+                    } else if x < centroid_x {
+                        -1
+                    } else {
+                        0
+                    };
+                    let dy = if y > centroid_y {
+                        1
+                    } else if y < centroid_y {
+                        -1
+                    } else {
+                        0
+                    };
+                    (x + dx, y + dy)
+                })
+                .collect();
 
-                    let interp = |va: f64, vb: f64| -> f64 {
-                        if (vb - va).abs() < 1e-12 {
-                            0.5
+            // Bounding box of the expanded quad
+            let Some(bb_min_x) = expanded_quad.iter().map(|c| c.0).min() else {
+                continue;
+            };
+            let Some(bb_max_x) = expanded_quad.iter().map(|c| c.0).max() else {
+                continue;
+            };
+            let Some(bb_min_y) = expanded_quad.iter().map(|c| c.1).min() else {
+                continue;
+            };
+            let Some(bb_max_y) = expanded_quad.iter().map(|c| c.1).max() else {
+                continue;
+            };
+
+            // Fill using half-block characters for doubled vertical resolution
+            let mut row = bb_min_y;
+            while row <= bb_max_y {
+                let upper_row = row;
+                let lower_row = row + 1;
+                for sx in bb_min_x..=bb_max_x {
+                    let ux = sx as u16;
+                    let uy_upper = upper_row as u16;
+                    let upper_in = ux >= px
+                        && ux < px + pw
+                        && uy_upper >= py
+                        && uy_upper < py + ph
+                        && point_in_quad(sx, upper_row, &expanded_quad);
+                    let lower_in = lower_row <= bb_max_y
+                        && ux >= px
+                        && ux < px + pw
+                        && (lower_row as u16) >= py
+                        && (lower_row as u16) < py + ph
+                        && point_in_quad(sx, lower_row, &expanded_quad);
+
+                    if upper_in && lower_in {
+                        let upper_frac = if bb_max_y != bb_min_y {
+                            (upper_row - bb_min_y) as f64 / (bb_max_y - bb_min_y) as f64
                         } else {
-                            (level - va) / (vb - va)
-                        }
-                    };
-
-                    let x0 = self.data.x[i];
-                    let x1 = self.data.x[i + 1];
-                    let y0 = self.data.y[j];
-                    let y1 = self.data.y[j + 1];
-
-                    // Edge crossing points in data coordinates (x, y)
-                    // The z value at each crossing is the contour level itself
-                    let top_edge = || {
-                        let f = interp(v00, v10);
-                        (x0 + f * (x1 - x0), y0)
-                    };
-                    let bottom_edge = || {
-                        let f = interp(v01, v11);
-                        (x0 + f * (x1 - x0), y1)
-                    };
-                    let left_edge = || {
-                        let f = interp(v00, v01);
-                        (x0, y0 + f * (y1 - y0))
-                    };
-                    let right_edge = || {
-                        let f = interp(v10, v11);
-                        (x1, y0 + f * (y1 - y0))
-                    };
-
-                    let segments: Vec<((f64, f64), (f64, f64))> = match case {
-                        1 | 14 => vec![(top_edge(), left_edge())],
-                        2 | 13 => vec![(top_edge(), right_edge())],
-                        3 | 12 => vec![(left_edge(), right_edge())],
-                        4 | 11 => vec![(bottom_edge(), left_edge())],
-                        5 => vec![(top_edge(), left_edge()), (bottom_edge(), right_edge())],
-                        6 | 9 => vec![(top_edge(), bottom_edge())],
-                        7 | 8 => vec![(bottom_edge(), right_edge())],
-                        10 => vec![(top_edge(), right_edge()), (bottom_edge(), left_edge())],
-                        _ => vec![],
-                    };
-
-                    // Project each segment endpoint to 3D (z = contour level) then to screen
-                    for ((dx0, dy0), (dx1, dy1)) in segments {
-                        let (p0x, p0y, _) = normalize_and_project(dx0, dy0, level);
-                        let (p1x, p1y, _) = normalize_and_project(dx1, dy1, level);
-
-                        let scx0 = map_x(p0x);
-                        let scy0 = map_y(p0y);
-                        let scx1 = map_x(p1x);
-                        let scy1 = map_y(p1y);
-
-                        draw_line(buf, scx0, scy0, scx1, scy1, color, px, py, pw, ph);
+                            0.5
+                        };
+                        let lower_frac = if bb_max_y != bb_min_y {
+                            (lower_row - bb_min_y) as f64 / (bb_max_y - bb_min_y) as f64
+                        } else {
+                            0.5
+                        };
+                        let upper_color = shade_color(color, 1.0 - upper_frac * 0.2);
+                        let lower_color = shade_color(color, 1.0 - lower_frac * 0.2);
+                        buf[(ux, uy_upper)]
+                            .set_char('\u{2580}') // ▀
+                            .set_style(Style::default().fg(upper_color).bg(lower_color));
+                    } else if upper_in {
+                        let upper_frac = if bb_max_y != bb_min_y {
+                            (upper_row - bb_min_y) as f64 / (bb_max_y - bb_min_y) as f64
+                        } else {
+                            0.5
+                        };
+                        let upper_color = shade_color(color, 1.0 - upper_frac * 0.2);
+                        buf[(ux, uy_upper)]
+                            .set_char('\u{2580}') // ▀
+                            .set_style(Style::default().fg(upper_color));
+                    } else if lower_in {
+                        let lower_frac = if bb_max_y != bb_min_y {
+                            (lower_row - bb_min_y) as f64 / (bb_max_y - bb_min_y) as f64
+                        } else {
+                            0.5
+                        };
+                        let lower_color = shade_color(color, 1.0 - lower_frac * 0.2);
+                        buf[(ux, uy_upper)]
+                            .set_char('\u{2584}') // ▄
+                            .set_style(Style::default().fg(lower_color));
                     }
                 }
+                row += 2;
             }
         }
     }
 }
 
-/// Draw a line between two screen-space points using Bresenham's algorithm.
-#[allow(clippy::too_many_arguments)]
-fn draw_line(
-    buf: &mut Buffer,
-    x0: f64,
-    y0: f64,
-    x1: f64,
-    y1: f64,
-    color: Color,
-    clip_x: u16,
-    clip_y: u16,
-    clip_w: u16,
-    clip_h: u16,
-) {
-    let mut ix0 = x0.round() as i32;
-    let mut iy0 = y0.round() as i32;
-    let ix1 = x1.round() as i32;
-    let iy1 = y1.round() as i32;
+/// Test if a point is inside a convex quad using cross-product winding.
+fn point_in_quad(px: i32, py: i32, quad: &[(i32, i32)]) -> bool {
+    let n = quad.len();
+    let mut sign = 0i32;
+    for i in 0..n {
+        let (x0, y0) = quad[i];
+        let (x1, y1) = quad[(i + 1) % n];
+        let cross = (x1 - x0) as i64 * (py - y0) as i64 - (y1 - y0) as i64 * (px - x0) as i64;
+        if cross != 0 {
+            let s = if cross > 0 { 1 } else { -1 };
+            if sign == 0 {
+                sign = s;
+            } else if sign != s {
+                return false;
+            }
+        }
+    }
+    true
+}
 
-    let dx = (ix1 - ix0).abs();
-    let dy = -(iy1 - iy0).abs();
-    let sx = if ix0 < ix1 { 1 } else { -1 };
-    let sy = if iy0 < iy1 { 1 } else { -1 };
-    let mut err = dx + dy;
-
-    loop {
-        let cx = ix0 as u16;
-        let cy = iy0 as u16;
-        if cx >= clip_x && cx < clip_x + clip_w && cy >= clip_y && cy < clip_y + clip_h {
-            buf[(cx, cy)].set_char('·').set_fg(color);
-        }
-        if ix0 == ix1 && iy0 == iy1 {
-            break;
-        }
-        let e2 = 2 * err;
-        if e2 >= dy {
-            err += dy;
-            ix0 += sx;
-        }
-        if e2 <= dx {
-            err += dx;
-            iy0 += sy;
-        }
+/// Apply a shading factor to a color for half-block rendering.
+fn shade_color(color: Color, factor: f64) -> Color {
+    match color {
+        Color::Rgb(r, g, b) => Color::Rgb(
+            (r as f64 * factor).round().clamp(0.0, 255.0) as u8,
+            (g as f64 * factor).round().clamp(0.0, 255.0) as u8,
+            (b as f64 * factor).round().clamp(0.0, 255.0) as u8,
+        ),
+        other => other,
     }
 }
 

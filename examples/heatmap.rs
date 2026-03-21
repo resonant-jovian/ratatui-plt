@@ -52,21 +52,24 @@ fn main() -> color_eyre::Result<()> {
     let labels = ["A", "B", "C", "D", "E", "F", "G", "H"];
     let _ = labels; // Labels for context; actual axis ticks use numeric coords
 
-    // Generate a deterministic pseudo-correlation matrix.
-    // Cross-indexing (corr[i][j] and corr[j][i]) requires range-based loops.
-    let mut corr = vec![vec![0.0_f64; size]; size];
-    #[allow(clippy::needless_range_loop)]
+    // Generate a deterministic pseudo-correlation matrix (symmetric).
+    // Compute upper triangle pairs, then scatter into the matrix.
+    let mut pairs: Vec<(usize, usize, f64)> = Vec::new();
     for i in 0..size {
-        for j in 0..size {
-            if i == j {
-                corr[i][j] = 1.0;
-            } else {
-                let seed = (i * 31 + j * 17) as f64;
-                let val = ((seed * 0.7).sin() * 0.6 + (seed * 1.3).cos() * 0.3).clamp(-0.95, 0.95);
-                corr[i][j] = val;
-                corr[j][i] = val;
-            }
+        for j in (i + 1)..size {
+            let seed = (i * 31 + j * 17) as f64;
+            let val =
+                ((seed * 0.7).sin() * 0.6 + (seed * 1.3).cos() * 0.3).clamp(-0.95, 0.95);
+            pairs.push((i, j, val));
         }
+    }
+    let mut corr = vec![vec![0.0_f64; size]; size];
+    for (i, row) in corr.iter_mut().enumerate() {
+        row[i] = 1.0; // diagonal
+    }
+    for &(i, j, val) in &pairs {
+        corr[i][j] = val;
+        corr[j][i] = val;
     }
 
     // Build GridData from the correlation matrix

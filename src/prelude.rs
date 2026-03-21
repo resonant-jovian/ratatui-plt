@@ -82,7 +82,7 @@ pub use crate::config::{ConfigGuard, PlotConfig};
 pub use crate::export::{
     buffer_to_ansi, buffer_to_svg, buffer_to_text, render_to_buffer, save_ansi, save_svg, save_text,
 };
-pub use crate::frame::{PlotArea, PlotFrame, RefLineDash, ReferenceLine};
+pub use crate::frame::{DataBounds, PlotArea, PlotFrame, RefLineDash, ReferenceLine};
 pub use crate::legend::{Legend, LegendPosition};
 pub use crate::norm::{
     AsinhNorm, BoundaryNorm, CenteredNorm, FuncNorm, LinearNorm, LogNorm, Normalize, PowerNorm,

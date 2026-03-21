@@ -316,7 +316,28 @@ impl Widget for &SankeyDiagram {
                 continue;
             }
 
-            let flow_color = flow.color.unwrap_or(self.nodes[flow.source].color);
+            let flow_color = flow.color.unwrap_or_else(|| {
+                // Derive a saturated flow color from the source node color at ~65% brightness.
+                // This avoids near-white flow bands that lack contrast against the background.
+                match self.nodes[flow.source].color {
+                    Color::Rgb(r, g, b) => {
+                        // Scale to ~65% brightness for better visibility
+                        Color::Rgb(
+                            (r as f64 * 0.65) as u8,
+                            (g as f64 * 0.65) as u8,
+                            (b as f64 * 0.65) as u8,
+                        )
+                    }
+                    Color::White => Color::Rgb(170, 170, 170),
+                    Color::Yellow => Color::Rgb(200, 200, 50),
+                    Color::Cyan => Color::Rgb(50, 200, 200),
+                    Color::Red | Color::LightRed => Color::Rgb(200, 60, 60),
+                    Color::Green | Color::LightGreen => Color::Rgb(60, 200, 60),
+                    Color::Blue | Color::LightBlue => Color::Rgb(60, 60, 200),
+                    Color::Magenta | Color::LightMagenta => Color::Rgb(200, 60, 200),
+                    other => other,
+                }
+            });
 
             // Source and target screen coordinates
             let sx = col_x[columns[flow.source]] + self.node_width;

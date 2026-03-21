@@ -7,7 +7,7 @@ use ratatui::widgets::Widget;
 
 use crate::annotation::Annotation;
 use crate::axis::Axis;
-use crate::frame::{PlotFrame, ReferenceLine};
+use crate::frame::{DataBounds, PlotFrame, ReferenceLine};
 use crate::legend::{Legend, LegendEntry, LegendPosition};
 use crate::spines::Spines;
 use crate::theme::Theme;
@@ -494,7 +494,7 @@ impl Histogram {
         }
 
         let x_lo = edges[0];
-        let x_hi = *edges.last().unwrap();
+        let x_hi = *edges.last().unwrap_or(&x_lo);
         let y_max = heights.iter().cloned().fold(0.0f64, f64::max);
         let y_lo = 0.0;
         let y_hi = if y_max == 0.0 { 1.0 } else { y_max * 1.1 };
@@ -505,12 +505,12 @@ impl Histogram {
             .spines(self.spines.clone())
             .reference_lines(&self.reference_lines);
 
-        let Some(pa) = frame.render(area, buf, x_lo, x_hi, y_lo, y_hi) else {
+        let Some(pa) = frame.render(area, buf, DataBounds { x_lo, x_hi, y_lo, y_hi }) else {
             return;
         };
 
         // Draw bars
-        self.draw_bars(&pa, &edges, &heights, self.color, buf, 0, 1);
+        self.draw_bars(&pa, &edges, &heights, self.color, buf, BarSlotLayout { ds_index: 0, n_datasets: 1 });
 
         // Draw annotations
         PlotFrame::draw_annotations(&pa, &self.annotations, buf);
@@ -566,7 +566,7 @@ impl Histogram {
         };
 
         let x_lo = edges[0];
-        let x_hi = *edges.last().unwrap();
+        let x_hi = *edges.last().unwrap_or(&x_lo);
         let y_lo = 0.0;
         let y_hi = if y_max == 0.0 { 1.0 } else { y_max * 1.1 };
 
@@ -575,7 +575,7 @@ impl Histogram {
             .spines(self.spines.clone())
             .reference_lines(&self.reference_lines);
 
-        let Some(pa) = frame.render(area, buf, x_lo, x_hi, y_lo, y_hi) else {
+        let Some(pa) = frame.render(area, buf, DataBounds { x_lo, x_hi, y_lo, y_hi }) else {
             return;
         };
 
@@ -591,8 +591,7 @@ impl Histogram {
                         &all_heights[0],
                         self.datasets[0].color,
                         buf,
-                        0,
-                        1,
+                        BarSlotLayout { ds_index: 0, n_datasets: 1 },
                     );
                 }
             }
@@ -616,12 +615,13 @@ impl Histogram {
                         let bar_top_y = pa.screen_y(top);
                         let bar_bottom_y = pa.screen_y(bottom);
 
-                        let x_start = (bar_left + offset).round() as u16;
-                        let x_end = (bar_right - offset).round() as u16;
+                        // Use floor/ceil to match draw_bars and avoid inter-bin gaps
+                        let x_start = (bar_left + offset).floor() as u16;
+                        let x_end = (bar_right - offset).ceil() as u16;
                         let y_top = bar_top_y.round() as u16;
                         let y_bot = bar_bottom_y.round() as u16;
 
-                        self.draw_bar_region(&pa, x_start, x_end, y_top, y_bot, ds.color, buf);
+                        self.draw_bar_region(&pa, &BarRect { x_start, x_end, y_top, y_bot }, ds.color, buf);
                         bottoms[i] = top;
                     }
                 }
@@ -629,13 +629,13 @@ impl Histogram {
             HistMode::Layered => {
                 // Draw overlaid bars (back to front)
                 for (ds_i, ds) in self.datasets.iter().enumerate().rev() {
-                    self.draw_bars(&pa, edges, &all_heights[ds_i], ds.color, buf, 0, 1);
+                    self.draw_bars(&pa, edges, &all_heights[ds_i], ds.color, buf, BarSlotLayout { ds_index: 0, n_datasets: 1 });
                 }
             }
             HistMode::SideBySide => {
                 // Draw side-by-side bars
                 for (ds_i, ds) in self.datasets.iter().enumerate() {
-                    self.draw_bars(&pa, edges, &all_heights[ds_i], ds.color, buf, ds_i, n_ds);
+                    self.draw_bars(&pa, edges, &all_heights[ds_i], ds.color, buf, BarSlotLayout { ds_index: ds_i, n_datasets: n_ds });
                 }
             }
         }
@@ -663,7 +663,6 @@ impl Histogram {
     }
 
     /// Draw bars for one dataset within a bin set, supporting side-by-side offset.
-    #[allow(clippy::too_many_arguments)]
     fn draw_bars(
         &self,
         pa: &crate::frame::PlotArea,
@@ -671,8 +670,7 @@ impl Histogram {
         heights: &[f64],
         color: Color,
         buf: &mut Buffer,
-        ds_index: usize,
-        n_datasets: usize,
+        slot: BarSlotLayout,
     ) {
         for i in 0..heights.len() {
             let bar_left = pa.screen_x(edges[i]);
@@ -684,40 +682,44 @@ impl Histogram {
             let rwidth_offset = (bin_width_px - effective_width) / 2.0;
 
             // For side-by-side, subdivide the effective width
-            let sub_width = effective_width / n_datasets as f64;
-            let x_start_f = bar_left + rwidth_offset + ds_index as f64 * sub_width;
+            let sub_width = effective_width / slot.n_datasets as f64;
+            let x_start_f = bar_left + rwidth_offset + slot.ds_index as f64 * sub_width;
             let x_end_f = x_start_f + sub_width;
 
             let bar_top = pa.screen_y(heights[i]);
             let bar_bottom = pa.screen_y(0.0);
 
-            let x_start = x_start_f.round() as u16;
-            let x_end = x_end_f.round() as u16;
-            let y_top = bar_top.round() as u16;
-            let y_bot = bar_bottom.round() as u16;
+            // Use floor for left edge and ceil for right edge so that
+            // adjacent bins share the boundary pixel without gaps.
+            let rect = BarRect {
+                x_start: x_start_f.floor() as u16,
+                x_end: x_end_f.ceil() as u16,
+                y_top: bar_top.round() as u16,
+                y_bot: bar_bottom.round() as u16,
+            };
 
             match self.histtype {
                 HistType::Bar => {
-                    self.draw_bar_region(pa, x_start, x_end, y_top, y_bot, color, buf);
+                    self.draw_bar_region(pa, &rect, color, buf);
                 }
                 HistType::Step => {
                     // Draw only the outline (top edge + sides)
                     // Top edge
-                    for x in x_start..x_end {
-                        if pa.contains(x, y_top) {
-                            buf[(x, y_top)].set_char('─').set_fg(color);
+                    for x in rect.x_start..rect.x_end {
+                        if pa.contains(x, rect.y_top) {
+                            buf[(x, rect.y_top)].set_char('─').set_fg(color);
                         }
                     }
                     // Left side
-                    for y in y_top..y_bot {
-                        if pa.contains(x_start, y) {
-                            buf[(x_start, y)].set_char('│').set_fg(color);
+                    for y in rect.y_top..rect.y_bot {
+                        if pa.contains(rect.x_start, y) {
+                            buf[(rect.x_start, y)].set_char('│').set_fg(color);
                         }
                     }
                     // Right side
-                    if x_end > 0 {
-                        let rx = x_end.saturating_sub(1);
-                        for y in y_top..y_bot {
+                    if rect.x_end > 0 {
+                        let rx = rect.x_end.saturating_sub(1);
+                        for y in rect.y_top..rect.y_bot {
                             if pa.contains(rx, y) {
                                 buf[(rx, y)].set_char('│').set_fg(color);
                             }
@@ -726,11 +728,11 @@ impl Histogram {
                 }
                 HistType::StepFilled => {
                     // Fill the bar
-                    self.draw_bar_region(pa, x_start, x_end, y_top, y_bot, color, buf);
+                    self.draw_bar_region(pa, &rect, color, buf);
                     // Draw outline on top
-                    for x in x_start..x_end {
-                        if pa.contains(x, y_top) {
-                            buf[(x, y_top)].set_char('▀').set_fg(color);
+                    for x in rect.x_start..rect.x_end {
+                        if pa.contains(x, rect.y_top) {
+                            buf[(x, rect.y_top)].set_char('▀').set_fg(color);
                         }
                     }
                 }
@@ -739,23 +741,33 @@ impl Histogram {
     }
 
     /// Fill a rectangular bar region.
-    #[allow(clippy::too_many_arguments)]
     fn draw_bar_region(
         &self,
         pa: &crate::frame::PlotArea,
-        x_start: u16,
-        x_end: u16,
-        y_top: u16,
-        y_bot: u16,
+        rect: &BarRect,
         color: Color,
         buf: &mut Buffer,
     ) {
-        for x in x_start..x_end {
-            for y in y_top..y_bot {
+        for x in rect.x_start..rect.x_end {
+            for y in rect.y_top..rect.y_bot {
                 if pa.contains(x, y) {
                     buf[(x, y)].set_char('█').set_fg(color);
                 }
             }
         }
     }
+}
+
+/// Pixel bounds for a histogram bar rectangle.
+struct BarRect {
+    x_start: u16,
+    x_end: u16,
+    y_top: u16,
+    y_bot: u16,
+}
+
+/// Layout parameters for side-by-side bar positioning.
+struct BarSlotLayout {
+    ds_index: usize,
+    n_datasets: usize,
 }

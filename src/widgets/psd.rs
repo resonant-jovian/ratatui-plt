@@ -8,7 +8,7 @@ use ratatui::style::Color;
 use ratatui::widgets::Widget;
 
 use crate::axis::Axis;
-use crate::frame::{PlotArea, PlotFrame, ReferenceLine};
+use crate::frame::{DataBounds, PlotArea, PlotFrame, ReferenceLine};
 use crate::legend::{Legend, LegendPosition};
 use crate::series::{Series, is_valid_point};
 use crate::spines::Spines;
@@ -179,7 +179,7 @@ impl Widget for &PsdPlot {
             .spines(self.spines.clone())
             .reference_lines(&self.reference_lines);
 
-        let Some(pa) = frame.render(area, buf, x_lo, x_hi, y_lo, y_hi) else {
+        let Some(pa) = frame.render(area, buf, DataBounds { x_lo, x_hi, y_lo, y_hi }) else {
             return;
         };
 
@@ -212,16 +212,7 @@ impl Widget for &PsdPlot {
                 let sy0 = pa.screen_y(y0);
                 let sx1 = pa.screen_x(x1);
                 let sy1 = pa.screen_y(y1);
-                draw_line(
-                    buf,
-                    sx0,
-                    sy0,
-                    sx1,
-                    sy1,
-                    s.color,
-                    &s.line_style.pattern,
-                    &clip,
-                );
+                draw_line(buf, &LineSegment { x0: sx0, y0: sy0, x1: sx1, y1: sy1 }, s.color, &s.line_style.pattern, &clip);
             }
 
             // Draw markers
@@ -292,18 +283,23 @@ fn write_braille(buf: &mut Buffer, x: u16, y: u16, bits: u8, color: Color) {
     }
 }
 
-#[allow(clippy::too_many_arguments)]
-/// Draw a line between two screen points using Bresenham's at braille sub-pixel resolution.
-fn draw_line(
-    buf: &mut Buffer,
+/// Screen-space line segment endpoints.
+struct LineSegment {
     x0: f64,
     y0: f64,
     x1: f64,
     y1: f64,
+}
+
+/// Draw a line between two screen points using Bresenham's at braille sub-pixel resolution.
+fn draw_line(
+    buf: &mut Buffer,
+    seg: &LineSegment,
     color: Color,
     pattern: &DashPattern,
     clip: &ClipRect,
 ) {
+    let LineSegment { x0, y0, x1, y1 } = *seg;
     let mut ix0 = (x0 * 2.0).round() as i32;
     let mut iy0 = (y0 * 4.0).round() as i32;
     let ix1 = (x1 * 2.0).round() as i32;

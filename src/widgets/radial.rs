@@ -212,7 +212,7 @@ impl Widget for &RadialPlot {
                 let sy1 = cy as f64 + ry * theta1.sin();
                 draw_braille_line_clipped(
                     buf, sx0, sy0, sx1, sy1, self.theme.grid_color,
-                    area.x, py, area.width, ph,
+                    &ClipRect { x: area.x, y: py, w: area.width, h: ph },
                 );
             }
 
@@ -237,7 +237,7 @@ impl Widget for &RadialPlot {
             let dy = r_screen_y * theta.sin();
             draw_braille_line_clipped(
                 buf, cx as f64, cy as f64, cx as f64 + dx, cy as f64 + dy,
-                self.theme.grid_color, area.x, py, area.width, ph,
+                self.theme.grid_color, &ClipRect { x: area.x, y: py, w: area.width, h: ph },
             );
 
             // Angle label
@@ -338,7 +338,7 @@ impl Widget for &RadialPlot {
                         {
                             draw_braille_line_clipped(
                                 buf, px as f64, py_prev as f64, sx as f64, sy as f64,
-                                s.color, area.x, py, area.width, ph,
+                                s.color, &ClipRect { x: area.x, y: py, w: area.width, h: ph },
                             );
                         }
                     }
@@ -349,11 +349,18 @@ impl Widget for &RadialPlot {
     }
 }
 
+/// Clipping rectangle for Braille line drawing.
+struct ClipRect {
+    x: u16,
+    y: u16,
+    w: u16,
+    h: u16,
+}
+
 /// Draw a Braille sub-pixel line clipped to a rectangular region.
 ///
 /// Coordinates are in terminal cell space (floating point). The line is
 /// rendered at 2x4 sub-pixel resolution using Unicode Braille characters.
-#[allow(clippy::too_many_arguments)]
 fn draw_braille_line_clipped(
     buf: &mut Buffer,
     x0: f64,
@@ -361,10 +368,7 @@ fn draw_braille_line_clipped(
     x1: f64,
     y1: f64,
     color: ratatui::style::Color,
-    clip_x: u16,
-    clip_y: u16,
-    clip_w: u16,
-    clip_h: u16,
+    clip: &ClipRect,
 ) {
     let mut ix0 = (x0 * 2.0).round() as i32;
     let mut iy0 = (y0 * 4.0).round() as i32;
@@ -381,10 +385,10 @@ fn draw_braille_line_clipped(
         if ix0 >= 0 && iy0 >= 0 {
             let cell_x = (ix0 / 2) as u16;
             let cell_y = (iy0 / 4) as u16;
-            if cell_x >= clip_x
-                && cell_x < clip_x + clip_w
-                && cell_y >= clip_y
-                && cell_y < clip_y + clip_h
+            if cell_x >= clip.x
+                && cell_x < clip.x + clip.w
+                && cell_y >= clip.y
+                && cell_y < clip.y + clip.h
             {
                 let dot_col = (ix0 % 2) as usize;
                 let dot_row = (iy0 % 4) as usize;
