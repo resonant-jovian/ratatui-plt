@@ -173,7 +173,8 @@ impl Widget for &Heatmap {
     fn render(self, area: Rect, buf: &mut Buffer) {
         let nrows = self.data.nrows();
         let ncols = self.data.ncols();
-        if nrows == 0 || ncols == 0 {
+        if nrows == 0 || ncols == 0 || self.data.values.is_empty() || self.data.values[0].is_empty()
+        {
             return;
         }
 
