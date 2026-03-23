@@ -284,6 +284,8 @@ impl Widget for &JointPlot {
 
         pb.composite(buf);
 
+        frame.draw_end_labels(buf, area, &pa);
+
         // Draw legend (after composite)
         if self.show_legend && !self.series.is_empty() {
             let legend = Legend::from_series(&self.series)

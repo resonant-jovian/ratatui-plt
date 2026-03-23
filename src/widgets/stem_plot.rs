@@ -203,5 +203,7 @@ impl Widget for &StemPlot {
 
         // Composite to buffer
         pb.composite(buf);
+
+        frame.draw_end_labels(buf, area, &pa);
     }
 }

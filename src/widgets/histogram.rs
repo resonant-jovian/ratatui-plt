@@ -539,6 +539,8 @@ impl Histogram {
 
         // Composite
         pb.composite(buf);
+
+        frame.draw_end_labels(buf, area, &pa);
     }
 
     /// Render multiple datasets according to hist_mode.
@@ -708,6 +710,8 @@ impl Histogram {
 
         // Composite before legend
         pb.composite(buf);
+
+        frame.draw_end_labels(buf, area, &pa);
 
         // Draw legend
         if self.show_legend && !self.datasets.is_empty() {

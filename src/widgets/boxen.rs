@@ -445,5 +445,8 @@ impl Widget for &BoxenPlot {
 
         // Composite
         pb.composite(buf);
+
+        // Draw End-positioned labels after composite
+        frame.draw_end_labels(buf, area, &pa);
     }
 }

@@ -117,7 +117,7 @@ fn main() -> color_eyre::Result<()> {
         .bear_color(Color::Red)
         .title("OHLC Price Action (q to quit)")
         .x_axis(Axis::new().label("Session").grid(true))
-        .y_axis(Axis::new().label("Price [$]").grid(true));
+        .y_axis(Axis::new().label("Price [$]").grid(true).label_position(LabelPosition::End));
 
     loop {
         terminal.draw(|frame| {

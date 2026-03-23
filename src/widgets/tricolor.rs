@@ -200,6 +200,8 @@ impl Widget for &TriColor {
         }
 
         pb.composite(buf);
+
+        frame.draw_end_labels(buf, area, &pa);
     }
 }
 

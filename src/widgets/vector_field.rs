@@ -291,5 +291,7 @@ impl Widget for &VectorField {
         PlotFrame::draw_annotations_pb(&pa, &self.annotations, &mut pb);
 
         pb.composite(buf);
+
+        frame.draw_end_labels(buf, area, &pa);
     }
 }

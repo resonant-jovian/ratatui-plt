@@ -379,6 +379,8 @@ impl Widget for &ScatterPlot {
         // Composite to buffer before legend
         pb.composite(buf);
 
+        frame.draw_end_labels(buf, area, &pa);
+
         // Draw legend (directly to buf, after composite)
         if self.show_legend && !self.series.is_empty() && self.color_values.is_none() {
             let legend = Legend::from_series(&self.series)

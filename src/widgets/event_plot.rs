@@ -321,6 +321,8 @@ impl EventPlot {
 
         // Composite
         pb.composite(buf);
+
+        frame.draw_end_labels(buf, area, &pa);
     }
 
     /// Render in vertical orientation: groups as vertical lines, events as horizontal ticks.
@@ -426,5 +428,7 @@ impl EventPlot {
 
         // Composite
         pb.composite(buf);
+
+        frame.draw_end_labels(buf, area, &pa);
     }
 }

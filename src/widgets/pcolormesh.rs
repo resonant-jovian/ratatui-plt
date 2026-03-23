@@ -373,6 +373,8 @@ impl Widget for &Pcolormesh {
 
         pb.composite(buf);
 
+        frame.draw_end_labels(buf, area, &pa);
+
         // Draw colorbar (after composite, as it manages its own rendering)
         if self.show_colorbar {
             let (vmin, vmax) = value_bounds(&self.values);

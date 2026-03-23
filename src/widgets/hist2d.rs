@@ -274,6 +274,8 @@ impl Widget for &Hist2D {
 
         pb.composite(buf);
 
+        frame.draw_end_labels(buf, area, &pa);
+
         // Colorbar (after composite, as it manages its own rendering)
         if self.show_colorbar {
             let cb = Colorbar::new(self.colormap.as_ref(), 0.0, vmax);

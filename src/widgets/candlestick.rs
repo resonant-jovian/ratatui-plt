@@ -27,7 +27,7 @@ use ratatui::widgets::Widget;
 use crate::annotation::Annotation;
 use crate::axis::Axis;
 use crate::frame::{DataBounds, PlotFrame, ReferenceLine};
-use crate::plot_buffer::{PlotBuffer, Z_DATA, Z_FILL};
+use crate::plot_buffer::{PlotBuffer, Z_DATA, Z_FILL, Z_MARKER};
 use crate::spines::Spines;
 use crate::theme::Theme;
 
@@ -264,14 +264,14 @@ impl Widget for &CandlestickChart {
                 }
             }
 
-            // 3. Draw wicks on center column (AFTER body)
+            // 3. Draw wicks on center column at Z_MARKER (on top of body fill)
             if wick_top < body_top {
                 if pa.contains(sx, wick_top) {
-                    pb.set_char(sx, wick_top, '┬', color, Z_DATA);
+                    pb.set_char(sx, wick_top, '┬', color, Z_MARKER);
                 }
                 for y in (wick_top + 1)..body_top {
                     if pa.contains(sx, y) {
-                        pb.set_char(sx, y, '│', color, Z_DATA);
+                        pb.set_char(sx, y, '│', color, Z_MARKER);
                     }
                 }
             }
@@ -279,12 +279,12 @@ impl Widget for &CandlestickChart {
                 if wick_bot > body_bot + 1 {
                     for y in (body_bot + 1)..wick_bot {
                         if pa.contains(sx, y) {
-                            pb.set_char(sx, y, '│', color, Z_DATA);
+                            pb.set_char(sx, y, '│', color, Z_MARKER);
                         }
                     }
                 }
                 if pa.contains(sx, wick_bot) {
-                    pb.set_char(sx, wick_bot, '┴', color, Z_DATA);
+                    pb.set_char(sx, wick_bot, '┴', color, Z_MARKER);
                 }
             }
         }
@@ -294,6 +294,8 @@ impl Widget for &CandlestickChart {
 
         // Composite
         pb.composite(buf);
+
+        frame.draw_end_labels(buf, area, &pa);
     }
 }
 

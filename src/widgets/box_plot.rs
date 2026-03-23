@@ -349,10 +349,10 @@ impl Widget for &BoxPlot {
         // Force odd width so the center cell is exactly the whisker position
         let box_width = if self.fill_boxes {
             let w = ((pa.width * 3) / (n as u16 * 4)).max(3);
-            if w % 2 == 0 { w + 1 } else { w }
+            if w.is_multiple_of(2) { w + 1 } else { w }
         } else {
             let w = ((pa.width * 4) / (n as u16 * 5)).max(5);
-            if w % 2 == 0 { w + 1 } else { w }
+            if w.is_multiple_of(2) { w + 1 } else { w }
         };
 
         for (i, d) in self.data.iter().enumerate() {

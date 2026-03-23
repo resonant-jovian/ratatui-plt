@@ -269,5 +269,7 @@ impl Widget for &SwarmPlot {
 
         // Composite
         pb.composite(buf);
+
+        frame.draw_end_labels(buf, area, &pa);
     }
 }

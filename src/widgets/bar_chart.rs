@@ -328,6 +328,8 @@ impl Widget for &BarChart {
         // Composite before legend
         pb.composite(buf);
 
+        frame.draw_end_labels(buf, area, &pa);
+
         // Draw legend
         if self.show_legend && !self.datasets.is_empty() {
             let entries: Vec<LegendEntry> = self

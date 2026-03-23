@@ -424,6 +424,8 @@ impl Widget for &ImagePlot {
 
         pb.composite(buf);
 
+        frame.draw_end_labels(buf, area, &pa);
+
         // Draw colorbar (only for scalar data, after composite)
         if self.show_colorbar && is_scalar {
             let (vmin, vmax) = scalar_value_bounds(&self.data);

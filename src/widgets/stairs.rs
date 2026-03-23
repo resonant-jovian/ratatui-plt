@@ -309,6 +309,8 @@ impl Widget for &StairsPlot {
         // Composite to buffer before legend
         pb.composite(buf);
 
+        frame.draw_end_labels(buf, area, &pa);
+
         // Draw legend (directly to buf, after composite)
         if self.show_legend && !self.datasets.is_empty() {
             let entries: Vec<LegendEntry> = self

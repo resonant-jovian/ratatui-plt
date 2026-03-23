@@ -336,6 +336,8 @@ impl Widget for &Heatmap {
 
         pb.composite(buf);
 
+        frame.draw_end_labels(buf, area, &pa);
+
         // Draw colorbar (after composite, as it manages its own rendering)
         if self.show_colorbar {
             let (vmin, vmax) = self.data.value_bounds();

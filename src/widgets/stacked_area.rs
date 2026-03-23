@@ -285,6 +285,8 @@ impl Widget for &StackedArea {
         // Composite before legend
         pb.composite(buf);
 
+        frame.draw_end_labels(buf, area, &pa);
+
         // Draw legend
         if self.show_legend && !filtered.is_empty() {
             let entries: Vec<LegendEntry> = filtered

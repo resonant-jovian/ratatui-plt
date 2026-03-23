@@ -289,6 +289,8 @@ impl Widget for &ErrorBarPlot {
         // Composite to buffer before legend
         pb.composite(buf);
 
+        frame.draw_end_labels(buf, area, &pa);
+
         // Draw legend (directly to buf, after composite)
         if self.show_legend
             && let Some(ref name) = self.name
