@@ -34,6 +34,16 @@ fn parse_theme() -> Theme {
 fn main() -> color_eyre::Result<()> {
     color_eyre::install()?;
     Theme::set_default(parse_theme());
+
+    // Auto-detect terminal cell aspect ratio for accurate visual scaling.
+    if let Ok(size) = crossterm::terminal::window_size() {
+        if size.width > 0 && size.height > 0 && size.columns > 0 && size.rows > 0 {
+            let cell_w = size.width as f64 / size.columns as f64;
+            let cell_h = size.height as f64 / size.rows as f64;
+            set_cell_aspect(cell_w / cell_h);
+        }
+    }
+
     io::stdout().execute(EnterAlternateScreen)?;
     enable_raw_mode()?;
     let mut terminal = Terminal::new(CrosstermBackend::new(io::stdout()))?;
@@ -112,15 +122,19 @@ fn main() -> color_eyre::Result<()> {
     let mut cursor_y = 5.0_f64;
     let step = 0.5;
 
+    // Store the last PlotArea for snapping cursor to pixel-exact coordinates
+    let mut last_pa: Option<PlotArea> = None;
+
     loop {
         terminal.draw(|frame| {
-            let area = square_area(frame.area());
+            let area = frame.area();
 
             // Render the scatter plot into the frame buffer using PlotFrame directly
             // so we can obtain the PlotArea for the crosshair overlay.
             let theme = Theme::get_default();
             let pf = PlotFrame::new(&x_axis, &y_axis, &theme)
-                .title(Some("Galaxy Crosshair (arrows to move, q to quit)"));
+                .title(Some("Galaxy Crosshair (arrows to move, q to quit)"))
+                .aspect_ratio(AspectRatio::Equal);
 
             // Compute data bounds
             let x_lo = -4.0_f64;
@@ -139,6 +153,13 @@ fn main() -> color_eyre::Result<()> {
                     y_hi,
                 },
             ) {
+                // Snap cursor to pixel-exact coordinates so the label
+                // always matches the visual crosshair position.
+                let sx = pa.screen_x(cursor_x).round() as u16;
+                let sy = pa.screen_y(cursor_y).round() as u16;
+                cursor_x = pa.data_x_from_screen(sx);
+                cursor_y = pa.data_y_from_screen(sy);
+
                 // Draw scatter points with colormap
                 let cmap = Viridis;
                 let norm = LinearNorm::new(0.0, 1.0);
@@ -165,6 +186,8 @@ fn main() -> color_eyre::Result<()> {
 
                 // Draw axis labels after all rendering
                 pf.draw_end_labels(buf, area, &pa);
+
+                last_pa = Some(pa);
             }
         })?;
 
@@ -179,6 +202,14 @@ fn main() -> color_eyre::Result<()> {
                 KeyCode::Right => cursor_x += step,
                 KeyCode::Left => cursor_x -= step,
                 _ => {}
+            }
+
+            // Snap to pixel-exact coordinates immediately after movement
+            if let Some(ref pa) = last_pa {
+                let sx = pa.screen_x(cursor_x).round() as u16;
+                let sy = pa.screen_y(cursor_y).round() as u16;
+                cursor_x = pa.data_x_from_screen(sx);
+                cursor_y = pa.data_y_from_screen(sy);
             }
         }
     }

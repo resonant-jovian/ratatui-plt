@@ -437,25 +437,7 @@ impl<'a> PlotFrame<'a> {
             return None;
         }
 
-        // Apply aspect ratio
-        let (ax_off, ay_off, mut aw, mut ah) = apply_aspect_ratio(
-            &self.aspect_ratio,
-            (x_hi - x_lo).abs(),
-            (y_hi - y_lo).abs(),
-            plot_width,
-            plot_height,
-        );
-        let mut px = plot_x + ax_off;
-        let mut py = plot_y + ay_off;
-
-        if aw < 2 || ah < 2 {
-            return None;
-        }
-
-        // Snap Auto bounds to tick positions and align pixel grid for uniform cells.
-        // data_to_screen maps to [px, px + aw - 1], so the effective screen range
-        // is (aw - 1). We align (aw - 1) to be divisible by n_intervals so that
-        // each tick interval maps to an exact integer number of pixels.
+        // Snap Auto bounds to tick positions first (data-range snapping only).
         {
             let x_ticks_snap = self.x_axis.tick_positions(x_lo, x_hi);
             let x_is_linear = matches!(self.x_axis.scale, crate::axis::Scale::Linear);
@@ -466,18 +448,6 @@ impl<'a> PlotFrame<'a> {
                 x_lo = x_ticks_snap[0];
                 x_hi = x_ticks_snap[x_ticks_snap.len() - 1];
             }
-            if x_is_linear && x_ticks_snap.len() >= 2 {
-                let n_intervals = (x_ticks_snap.len() - 1) as u16;
-                let screen_range = aw - 1;
-                if let Some(cell_w) = screen_range.checked_div(n_intervals)
-                    && cell_w > 0
-                {
-                    let aligned_w = cell_w * n_intervals + 1;
-                    let pad = aw - aligned_w;
-                    px += pad / 2;
-                    aw = aligned_w;
-                }
-            }
             let y_ticks_snap = self.y_axis.tick_positions(y_lo, y_hi);
             let y_is_linear = matches!(self.y_axis.scale, crate::axis::Scale::Linear);
             if matches!(self.y_axis.bounds, crate::axis::Bounds::Auto)
@@ -487,18 +457,109 @@ impl<'a> PlotFrame<'a> {
                 y_lo = y_ticks_snap[0];
                 y_hi = y_ticks_snap[y_ticks_snap.len() - 1];
             }
-            if y_is_linear && y_ticks_snap.len() >= 2 {
-                let n_intervals = (y_ticks_snap.len() - 1) as u16;
-                let screen_range = ah - 1;
-                if let Some(cell_h) = screen_range.checked_div(n_intervals)
-                    && cell_h > 0
-                {
-                    let aligned_h = cell_h * n_intervals + 1;
-                    let pad = ah - aligned_h;
-                    py += pad / 2;
-                    ah = aligned_h;
+        }
+
+        // Apply aspect ratio and pixel grid alignment.
+        // For Equal aspect with linear grids, we compute coupled cell sizes
+        // directly from the full plot dimensions so that the alignment and
+        // aspect ratio are solved together (not sequentially).
+        let n_x = {
+            let x_is_linear = matches!(self.x_axis.scale, crate::axis::Scale::Linear);
+            let x_ticks = self.x_axis.tick_positions(x_lo, x_hi);
+            if x_is_linear && x_ticks.len() >= 2 {
+                (x_ticks.len() - 1) as u16
+            } else {
+                0
+            }
+        };
+        let n_y = {
+            let y_is_linear = matches!(self.y_axis.scale, crate::axis::Scale::Linear);
+            let y_ticks = self.y_axis.tick_positions(y_lo, y_hi);
+            if y_is_linear && y_ticks.len() >= 2 {
+                (y_ticks.len() - 1) as u16
+            } else {
+                0
+            }
+        };
+
+        let (mut px, mut py, mut aw, mut ah);
+
+        if matches!(self.aspect_ratio, AspectRatio::Equal) && n_x > 0 && n_y > 0 {
+            // Coupled alignment: compute cell_w and cell_h from the full
+            // plot dimensions so that grid alignment and equal visual
+            // scaling are solved simultaneously.
+            let cell_aspect = crate::axis::terminal_cell_aspect();
+            let max_cw = (plot_width - 1) / n_x;
+            let max_ch = (plot_height - 1) / n_y;
+            let mut best_cw = 0u16;
+            let mut best_ch = 0u16;
+            for cw in (1..=max_cw).rev() {
+                let ch = (cw as f64 * cell_aspect).round().max(1.0) as u16;
+                if ch <= max_ch {
+                    best_cw = cw;
+                    best_ch = ch;
+                    break;
                 }
             }
+            if best_cw > 0 {
+                aw = best_cw * n_x + 1;
+                ah = best_ch * n_y + 1;
+            } else {
+                // Fallback: use aspect ratio without alignment
+                let (_, _, w, h) = apply_aspect_ratio(
+                    &self.aspect_ratio,
+                    (x_hi - x_lo).abs(),
+                    (y_hi - y_lo).abs(),
+                    plot_width,
+                    plot_height,
+                );
+                aw = w;
+                ah = h;
+            }
+            px = plot_x + (plot_width - aw) / 2;
+            py = plot_y + (plot_height - ah) / 2;
+        } else {
+            // Standard path: apply aspect ratio, then independent alignment.
+            let (ax_off, ay_off, w, h) = apply_aspect_ratio(
+                &self.aspect_ratio,
+                (x_hi - x_lo).abs(),
+                (y_hi - y_lo).abs(),
+                plot_width,
+                plot_height,
+            );
+            aw = w;
+            ah = h;
+            px = plot_x + ax_off;
+            py = plot_y + ay_off;
+
+            if aw >= 2 && ah >= 2 {
+                if n_x > 0 {
+                    let screen_range = aw - 1;
+                    if let Some(cell_w) = screen_range.checked_div(n_x)
+                        && cell_w > 0
+                    {
+                        let aligned_w = cell_w * n_x + 1;
+                        let pad = aw - aligned_w;
+                        px += pad / 2;
+                        aw = aligned_w;
+                    }
+                }
+                if n_y > 0 {
+                    let screen_range = ah - 1;
+                    if let Some(cell_h) = screen_range.checked_div(n_y)
+                        && cell_h > 0
+                    {
+                        let aligned_h = cell_h * n_y + 1;
+                        let pad = ah - aligned_h;
+                        py += pad / 2;
+                        ah = aligned_h;
+                    }
+                }
+            }
+        }
+
+        if aw < 2 || ah < 2 {
+            return None;
         }
 
         // Draw title
@@ -1026,66 +1087,117 @@ impl<'a> PlotFrame<'a> {
             return None;
         }
 
-        // Apply aspect ratio
-        let (ax_off, ay_off, mut aw, mut ah) = apply_aspect_ratio(
-            &self.aspect_ratio,
-            (x_hi - x_lo).abs(),
-            (y_hi - y_lo).abs(),
-            plot_width,
-            plot_height,
-        );
-        let mut px = plot_x + ax_off;
-        let mut py = plot_y + ay_off;
-
-        if aw < 2 || ah < 2 {
-            return None;
-        }
-
-        // Snap Auto bounds to tick positions and align pixel grid for uniform cells.
-        // See the primary render() method for detailed comments on the alignment math.
+        // Snap Auto bounds to tick positions (data-range snapping only).
         {
             let x_ticks_snap = self.x_axis.tick_positions(x_lo, x_hi);
-            let x_is_linear = matches!(self.x_axis.scale, crate::axis::Scale::Linear);
             if matches!(self.x_axis.bounds, crate::axis::Bounds::Auto)
-                && x_is_linear
+                && matches!(self.x_axis.scale, crate::axis::Scale::Linear)
                 && x_ticks_snap.len() >= 2
             {
                 x_lo = x_ticks_snap[0];
                 x_hi = x_ticks_snap[x_ticks_snap.len() - 1];
             }
-            if x_is_linear && x_ticks_snap.len() >= 2 {
-                let n_intervals = (x_ticks_snap.len() - 1) as u16;
-                let screen_range = aw - 1;
-                if let Some(cell_w) = screen_range.checked_div(n_intervals)
-                    && cell_w > 0
-                {
-                    let aligned_w = cell_w * n_intervals + 1;
-                    let pad = aw - aligned_w;
-                    px += pad / 2;
-                    aw = aligned_w;
-                }
-            }
             let y_ticks_snap = self.y_axis.tick_positions(y_lo, y_hi);
-            let y_is_linear = matches!(self.y_axis.scale, crate::axis::Scale::Linear);
             if matches!(self.y_axis.bounds, crate::axis::Bounds::Auto)
-                && y_is_linear
+                && matches!(self.y_axis.scale, crate::axis::Scale::Linear)
                 && y_ticks_snap.len() >= 2
             {
                 y_lo = y_ticks_snap[0];
                 y_hi = y_ticks_snap[y_ticks_snap.len() - 1];
             }
-            if y_is_linear && y_ticks_snap.len() >= 2 {
-                let n_intervals = (y_ticks_snap.len() - 1) as u16;
-                let screen_range = ah - 1;
-                if let Some(cell_h) = screen_range.checked_div(n_intervals)
-                    && cell_h > 0
-                {
-                    let aligned_h = cell_h * n_intervals + 1;
-                    let pad = ah - aligned_h;
-                    py += pad / 2;
-                    ah = aligned_h;
+        }
+
+        // See the primary render() method for detailed comments.
+        let n_x = {
+            let x_ticks = self.x_axis.tick_positions(x_lo, x_hi);
+            if matches!(self.x_axis.scale, crate::axis::Scale::Linear) && x_ticks.len() >= 2 {
+                (x_ticks.len() - 1) as u16
+            } else {
+                0
+            }
+        };
+        let n_y = {
+            let y_ticks = self.y_axis.tick_positions(y_lo, y_hi);
+            if matches!(self.y_axis.scale, crate::axis::Scale::Linear) && y_ticks.len() >= 2 {
+                (y_ticks.len() - 1) as u16
+            } else {
+                0
+            }
+        };
+
+        let (mut px, mut py, mut aw, mut ah);
+
+        if matches!(self.aspect_ratio, AspectRatio::Equal) && n_x > 0 && n_y > 0 {
+            let cell_aspect = crate::axis::terminal_cell_aspect();
+            let max_cw = (plot_width - 1) / n_x;
+            let max_ch = (plot_height - 1) / n_y;
+            let mut best_cw = 0u16;
+            let mut best_ch = 0u16;
+            for cw in (1..=max_cw).rev() {
+                let ch = (cw as f64 * cell_aspect).round().max(1.0) as u16;
+                if ch <= max_ch {
+                    best_cw = cw;
+                    best_ch = ch;
+                    break;
                 }
             }
+            if best_cw > 0 {
+                aw = best_cw * n_x + 1;
+                ah = best_ch * n_y + 1;
+            } else {
+                let (_, _, w, h) = apply_aspect_ratio(
+                    &self.aspect_ratio,
+                    (x_hi - x_lo).abs(),
+                    (y_hi - y_lo).abs(),
+                    plot_width,
+                    plot_height,
+                );
+                aw = w;
+                ah = h;
+            }
+            px = plot_x + (plot_width - aw) / 2;
+            py = plot_y + (plot_height - ah) / 2;
+        } else {
+            let (ax_off, ay_off, w, h) = apply_aspect_ratio(
+                &self.aspect_ratio,
+                (x_hi - x_lo).abs(),
+                (y_hi - y_lo).abs(),
+                plot_width,
+                plot_height,
+            );
+            aw = w;
+            ah = h;
+            px = plot_x + ax_off;
+            py = plot_y + ay_off;
+
+            if aw >= 2 && ah >= 2 {
+                if n_x > 0 {
+                    let screen_range = aw - 1;
+                    if let Some(cell_w) = screen_range.checked_div(n_x)
+                        && cell_w > 0
+                    {
+                        let aligned_w = cell_w * n_x + 1;
+                        let pad = aw - aligned_w;
+                        px += pad / 2;
+                        aw = aligned_w;
+                    }
+                }
+                if n_y > 0 {
+                    let screen_range = ah - 1;
+                    if let Some(cell_h) = screen_range.checked_div(n_y)
+                        && cell_h > 0
+                    {
+                        let aligned_h = cell_h * n_y + 1;
+                        let pad = ah - aligned_h;
+                        py += pad / 2;
+                        ah = aligned_h;
+                    }
+                }
+            }
+        }
+
+        if aw < 2 || ah < 2 {
+            return None;
         }
 
         // Draw title
