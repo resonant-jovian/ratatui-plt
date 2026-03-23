@@ -21,7 +21,8 @@ fn parse_theme() -> Theme {
         Some("minimal") => Theme::minimal(),
         Some("publication") => Theme::publication(),
         Some("solarized") => Theme::solarized(),
-        Some("dark") | None => Theme::dark(),
+        Some("dark") => Theme::dark(),
+        None => Theme::auto(),
         Some(other) => {
             eprintln!(
                 "Unknown theme '{other}'. Available: dark, light, minimal, publication, solarized"
@@ -101,13 +102,13 @@ fn main() -> color_eyre::Result<()> {
         .dataset(uniform_ds)
         .title("ECDF: Distribution Comparison (q to quit)")
         .x_axis(Axis::new().label("Value").grid(true))
-        .y_axis(Axis::new().label("F(x)").grid(true))
+        .y_axis(Axis::new().label("F(x)").grid(true).label_position(LabelPosition::End))
         .show_legend(true)
         .legend_position(LegendPosition::BottomRight);
 
     loop {
         terminal.draw(|frame| {
-            frame.render_widget(&plot, frame.area());
+            frame.render_widget(&plot, square_area(frame.area()));
         })?;
 
         if let Event::Key(key) = event::read()?

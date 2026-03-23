@@ -55,6 +55,7 @@ pub mod macros;
 pub mod mathtext;
 pub mod norm;
 pub mod picking;
+pub mod plot_buffer;
 pub mod prelude;
 pub mod series;
 pub mod spines;
@@ -64,6 +65,11 @@ pub mod ticker;
 pub mod transform;
 pub mod triangulation;
 pub mod widgets;
+
+pub mod linked_view;
+
+#[cfg(feature = "statistics")]
+pub mod statistics;
 
 #[cfg(feature = "fft")]
 pub mod fft;

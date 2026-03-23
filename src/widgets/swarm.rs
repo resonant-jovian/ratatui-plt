@@ -10,6 +10,7 @@ use ratatui::widgets::Widget;
 use crate::annotation::Annotation;
 use crate::axis::Axis;
 use crate::frame::{DataBounds, PlotFrame, ReferenceLine};
+use crate::plot_buffer::{PlotBuffer, Z_CHROME, Z_MARKER};
 use crate::spines::Spines;
 use crate::theme::Theme;
 use crate::ticker::NullLocator;
@@ -169,15 +170,17 @@ impl Widget for &SwarmPlot {
         let x_lo = 0.0;
         let x_hi = n as f64;
 
+        let mut pb = PlotBuffer::new(area);
+
         // Create and render the plot frame
         let frame = PlotFrame::new(&x_axis, &self.y_axis, &self.theme)
             .title(self.title.as_deref())
             .spines(self.spines.clone())
             .reference_lines(&self.reference_lines);
 
-        let Some(pa) = frame.render(
+        let Some(pa) = frame.render_to_pb(
+            &mut pb,
             area,
-            buf,
             DataBounds {
                 x_lo,
                 x_hi,
@@ -220,7 +223,6 @@ impl Widget for &SwarmPlot {
                 // Try placing at center, then shift outward
                 let mut placed = false;
                 for offset in 0..=max_displacement {
-                    // Try center, then right, then left, alternating outward
                     let candidates: Vec<u16> = if offset == 0 {
                         vec![center_x]
                     } else {
@@ -236,7 +238,7 @@ impl Widget for &SwarmPlot {
 
                     for &cx in &candidates {
                         if cx >= pa.x && cx < pa.x + pa.width && !occupied.contains(&(cx, sy)) {
-                            buf[(cx, sy)].set_char(marker).set_fg(group.color);
+                            pb.set_char(cx, sy, marker, group.color, Z_MARKER);
                             occupied.insert((cx, sy));
                             placed = true;
                             break;
@@ -256,15 +258,18 @@ impl Widget for &SwarmPlot {
                 for (j, ch) in label.chars().enumerate() {
                     let lx = label_start + j as u16;
                     if lx >= area.x && lx < area.x + area.width {
-                        buf[(lx, label_y)]
-                            .set_char(ch)
-                            .set_fg(self.theme.axis_color);
+                        pb.set_char(lx, label_y, ch, self.theme.axis_color, Z_CHROME);
                     }
                 }
             }
         }
 
         // Draw annotations
-        PlotFrame::draw_annotations(&pa, &self.annotations, buf);
+        PlotFrame::draw_annotations_pb(&pa, &self.annotations, &mut pb);
+
+        // Composite
+        pb.composite(buf);
+
+        frame.draw_end_labels(buf, area, &pa);
     }
 }

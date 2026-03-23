@@ -27,6 +27,7 @@ use ratatui::widgets::Widget;
 use crate::annotation::Annotation;
 use crate::axis::Axis;
 use crate::frame::{DataBounds, PlotFrame, ReferenceLine};
+use crate::plot_buffer::{PlotBuffer, Z_DATA, Z_FILL, Z_MARKER};
 use crate::spines::Spines;
 use crate::theme::Theme;
 
@@ -186,15 +187,17 @@ impl Widget for &CandlestickChart {
         let (x_lo, x_hi) = self.x_axis.resolve_bounds(data_x_min, data_x_max);
         let (y_lo, y_hi) = self.y_axis.resolve_bounds(data_y_min, data_y_max);
 
+        let mut pb = PlotBuffer::new(area);
+
         // Create and render the plot frame
         let frame = PlotFrame::new(&self.x_axis, &self.y_axis, &self.theme)
             .title(self.title.as_deref())
             .spines(self.spines.clone())
             .reference_lines(&self.reference_lines);
 
-        let Some(pa) = frame.render(
+        let Some(pa) = frame.render_to_pb(
+            &mut pb,
             area,
-            buf,
             DataBounds {
                 x_lo,
                 x_hi,
@@ -204,6 +207,14 @@ impl Widget for &CandlestickChart {
         ) else {
             return;
         };
+
+        // Compute dynamic candle body width with gap between candles
+        let n_candles = self.candles.len().max(1) as u16;
+        let slot_width = pa.width / n_candles.max(1);
+        // Body takes ~60% of slot, rest is gap. Force odd for centered wick.
+        let body_w = (slot_width * 3 / 5).max(1);
+        let body_width = if body_w.is_multiple_of(2) { body_w + 1 } else { body_w };
+        let half_body = body_width / 2;
 
         // Draw each candle
         for candle in &self.candles {
@@ -228,54 +239,71 @@ impl Widget for &CandlestickChart {
                 self.bear_color
             };
 
-            // Wick: vertical line from low to high
+            // Compute screen positions
             let sy_high = pa.screen_y(candle.high).round() as u16;
             let sy_low = pa.screen_y(candle.low).round() as u16;
             let wick_top = sy_high.min(sy_low);
             let wick_bot = sy_high.max(sy_low);
 
-            for y in wick_top..=wick_bot {
-                if pa.contains(sx, y) {
-                    buf[(sx, y)].set_char('\u{2502}').set_fg(color); // │
-                }
-            }
-
-            // Body: filled region from open to close
             let sy_open = pa.screen_y(candle.open).round() as u16;
             let sy_close = pa.screen_y(candle.close).round() as u16;
             let body_top = sy_open.min(sy_close);
-            let body_bot = sy_open.max(sy_close);
+            let body_bot = sy_open.max(sy_close).max(body_top);
 
-            // Use solid block for bull, light shade for bear
-            let body_char = if is_bull { '\u{2588}' } else { '\u{2591}' }; // █ or ░
+            // Body width is dynamic based on number of candles
+            let body_left = sx.saturating_sub(half_body).max(pa.x);
+            let body_right = (sx + half_body).min(pa.x + pa.width - 1);
 
-            if body_top == body_bot {
-                // Doji or very small body: draw a horizontal dash
-                if pa.contains(sx, body_top) {
-                    buf[(sx, body_top)].set_char('\u{2500}').set_fg(color); // ─
-                }
-            } else {
-                for y in body_top..=body_bot {
-                    if pa.contains(sx, y) {
-                        buf[(sx, y)].set_char(body_char).set_fg(color);
+            // 1. Clear the full candle area with a reset background
+            for y in wick_top..=wick_bot {
+                for x in body_left..=body_right {
+                    if pa.contains(x, y) {
+                        pb.set_bg(x, y, Color::Reset, Z_FILL);
                     }
                 }
             }
 
-            // Draw wider body if there is room (one column on each side)
-            if sx > pa.x && sx + 1 < pa.x + pa.width {
-                for &col in &[sx - 1, sx + 1] {
-                    for y in body_top..=body_bot {
-                        if pa.contains(col, y) {
-                            buf[(col, y)].set_char(body_char).set_fg(color);
+            // 2. Draw body (solid filled block, 3 columns wide)
+            for y in body_top..=body_bot {
+                for x in body_left..=body_right {
+                    if pa.contains(x, y) {
+                        pb.set_char(x, y, '█', color, Z_DATA);
+                    }
+                }
+            }
+
+            // 3. Draw wicks on center column at Z_MARKER (on top of body fill)
+            if wick_top < body_top {
+                if pa.contains(sx, wick_top) {
+                    pb.set_char(sx, wick_top, '┬', color, Z_MARKER);
+                }
+                for y in (wick_top + 1)..body_top {
+                    if pa.contains(sx, y) {
+                        pb.set_char(sx, y, '│', color, Z_MARKER);
+                    }
+                }
+            }
+            if wick_bot > body_bot {
+                if wick_bot > body_bot + 1 {
+                    for y in (body_bot + 1)..wick_bot {
+                        if pa.contains(sx, y) {
+                            pb.set_char(sx, y, '│', color, Z_MARKER);
                         }
                     }
+                }
+                if pa.contains(sx, wick_bot) {
+                    pb.set_char(sx, wick_bot, '┴', color, Z_MARKER);
                 }
             }
         }
 
         // Draw annotations
-        PlotFrame::draw_annotations(&pa, &self.annotations, buf);
+        PlotFrame::draw_annotations_pb(&pa, &self.annotations, &mut pb);
+
+        // Composite
+        pb.composite(buf);
+
+        frame.draw_end_labels(buf, area, &pa);
     }
 }
 

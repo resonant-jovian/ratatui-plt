@@ -27,9 +27,10 @@ use ratatui::style::Color;
 use ratatui::widgets::Widget;
 
 use crate::annotation::Annotation;
-use crate::drawing::draw_braille_line;
+use crate::drawing::draw_braille_line_pb;
 use crate::frame::PlotArea;
 use crate::legend::{Legend, LegendEntry, LegendPosition};
+use crate::plot_buffer::{PlotBuffer, Z_ANNOTATION, Z_CHROME, Z_MARKER};
 use crate::spines::Spines;
 use crate::theme::Theme;
 use crate::transform::data_to_screen;
@@ -199,6 +200,8 @@ impl Widget for &ParallelCoords {
             return;
         }
 
+        let mut pb = PlotBuffer::new(area);
+
         // Layout: title row, axis label row, plot area, tick label row
         let title_height: u16 = if self.title.is_some() { 1 } else { 0 };
         let label_row = area.y + title_height; // axis names
@@ -217,7 +220,7 @@ impl Widget for &ParallelCoords {
             for (i, ch) in title.chars().enumerate() {
                 let x = start + i as u16;
                 if x < area.x + area.width {
-                    buf[(x, area.y)].set_char(ch).set_fg(self.theme.foreground);
+                    pb.set_char(x, area.y, ch, self.theme.foreground, Z_CHROME);
                 }
             }
         }
@@ -245,29 +248,19 @@ impl Widget for &ParallelCoords {
             for (j, ch) in ax.name.chars().enumerate() {
                 let x = label_start + j as u16;
                 if x >= area.x && x < area.x + area.width {
-                    buf[(x, label_row)]
-                        .set_char(ch)
-                        .set_fg(self.theme.foreground);
+                    pb.set_char(x, label_row, ch, self.theme.foreground, Z_CHROME);
                 }
             }
 
             // Vertical axis line
-            if self.spines.left || self.spines.right || i == 0 || i == n_axes - 1 {
-                for y in plot_top..=plot_bottom {
-                    if ax_x >= area.x && ax_x < area.x + area.width {
-                        buf[(ax_x, y)]
-                            .set_char('\u{2502}')
-                            .set_fg(self.theme.axis_color); // │
-                    }
-                }
+            let axis_color = if self.spines.left || self.spines.right || i == 0 || i == n_axes - 1 {
+                self.theme.axis_color
             } else {
-                // Inner axes: draw light line
-                for y in plot_top..=plot_bottom {
-                    if ax_x >= area.x && ax_x < area.x + area.width {
-                        buf[(ax_x, y)]
-                            .set_char('\u{2502}')
-                            .set_fg(self.theme.grid_color); // │
-                    }
+                self.theme.grid_color
+            };
+            for y in plot_top..=plot_bottom {
+                if ax_x >= area.x && ax_x < area.x + area.width {
+                    pb.set_char(ax_x, y, '\u{2502}', axis_color, Z_CHROME); // │
                 }
             }
 
@@ -281,7 +274,7 @@ impl Widget for &ParallelCoords {
             for (j, ch) in max_label.chars().enumerate() {
                 let x = max_start + j as u16;
                 if x >= area.x && x < area.x + area.width && max_row >= area.y {
-                    buf[(x, max_row)].set_char(ch).set_fg(self.theme.axis_color);
+                    pb.set_char(x, max_row, ch, self.theme.axis_color, Z_CHROME);
                 }
             }
 
@@ -290,14 +283,12 @@ impl Widget for &ParallelCoords {
             for (j, ch) in min_label.chars().enumerate() {
                 let x = min_start + j as u16;
                 if x >= area.x && x < area.x + area.width && tick_row < area.y + area.height {
-                    buf[(x, tick_row)]
-                        .set_char(ch)
-                        .set_fg(self.theme.axis_color);
+                    pb.set_char(x, tick_row, ch, self.theme.axis_color, Z_CHROME);
                 }
             }
         }
 
-        // Build a PlotArea covering the plot region so draw_braille_line can clip.
+        // Build a PlotArea covering the plot region so draw_braille_line_pb can clip.
         let pa = PlotArea {
             x: area.x,
             y: plot_top,
@@ -334,7 +325,7 @@ impl Widget for &ParallelCoords {
                 let sx1 = axis_positions[i + 1] as f64;
                 let sy1 = data_to_screen(v1, ax1.min, ax1.max, plot_bottom as f64, plot_top as f64);
 
-                draw_braille_line(buf, sx0, sy0, sx1, sy1, rec.color, &pa);
+                draw_braille_line_pb(&mut pb, sx0, sy0, sx1, sy1, rec.color, &pa);
             }
 
             // Draw value markers on each axis
@@ -357,7 +348,7 @@ impl Widget for &ParallelCoords {
                     && *ax_x >= area.x
                     && *ax_x < area.x + area.width
                 {
-                    buf[(*ax_x, sy)].set_char('\u{25CF}').set_fg(rec.color); // ●
+                    pb.set_char(*ax_x, sy, '\u{25CF}', rec.color, Z_MARKER); // ●
                 }
             }
         }
@@ -371,13 +362,16 @@ impl Widget for &ParallelCoords {
                 for (j, ch) in ann.text.chars().enumerate() {
                     let x = xi + j as u16;
                     if x >= area.x && x < area.x + area.width {
-                        buf[(x, yi)].set_char(ch).set_fg(ann.color);
+                        pb.set_char(x, yi, ch, ann.color, Z_ANNOTATION);
                     }
                 }
             }
         }
 
-        // Draw legend
+        // Composite to buffer before legend
+        pb.composite(buf);
+
+        // Draw legend (directly to buf, after composite)
         if self.show_legend {
             let named: Vec<&ParallelRecord> =
                 self.records.iter().filter(|r| r.name.is_some()).collect();

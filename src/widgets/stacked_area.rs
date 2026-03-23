@@ -6,13 +6,14 @@
 
 use ratatui::buffer::Buffer;
 use ratatui::layout::Rect;
-use ratatui::style::{Color, Style};
+use ratatui::style::Color;
 use ratatui::widgets::Widget;
 
 use crate::annotation::Annotation;
 use crate::axis::Axis;
 use crate::frame::{DataBounds, PlotFrame, ReferenceLine};
 use crate::legend::{Legend, LegendEntry, LegendPosition};
+use crate::plot_buffer::{PlotBuffer, Z_FILL};
 use crate::series::Series;
 use crate::spines::Spines;
 use crate::theme::Theme;
@@ -201,15 +202,17 @@ impl Widget for &StackedArea {
             .unwrap_or(1.0);
         let (y_lo, y_hi) = self.y_axis.resolve_bounds(0.0, y_max_data);
 
+        let mut pb = PlotBuffer::new(area);
+
         // Create and render the plot frame
         let frame = PlotFrame::new(&self.x_axis, &self.y_axis, &self.theme)
             .title(self.title.as_deref())
             .spines(self.spines.clone())
             .reference_lines(&self.reference_lines);
 
-        let Some(pa) = frame.render(
+        let Some(pa) = frame.render_to_pb(
+            &mut pb,
             area,
-            buf,
             DataBounds {
                 x_lo,
                 x_hi,
@@ -265,24 +268,24 @@ impl Widget for &StackedArea {
                     COLOR_CYCLE[si % COLOR_CYCLE.len()]
                 };
 
-                // Pick fill character based on series index for visual distinction
-                let fill_ch = FILL_CHARS[si % FILL_CHARS.len()];
-
                 let y_top = sy_upper.max(pa.y);
                 let y_bot = sy_lower.min(pa.y + pa.height - 1);
 
                 for y in y_top..=y_bot {
                     if pa.contains(screen_x, y) {
-                        buf[(screen_x, y)]
-                            .set_char(fill_ch)
-                            .set_style(Style::default().fg(color));
+                        pb.set_bg(screen_x, y, color, Z_FILL);
                     }
                 }
             }
         }
 
         // Draw annotations
-        PlotFrame::draw_annotations(&pa, &self.annotations, buf);
+        PlotFrame::draw_annotations_pb(&pa, &self.annotations, &mut pb);
+
+        // Composite before legend
+        pb.composite(buf);
+
+        frame.draw_end_labels(buf, area, &pa);
 
         // Draw legend
         if self.show_legend && !filtered.is_empty() {

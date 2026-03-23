@@ -10,9 +10,28 @@ use crate::axis::{AspectRatio, Axis};
 use crate::colormap::{Colormap, Viridis};
 use crate::frame::{DataBounds, PlotFrame, ReferenceLine};
 use crate::norm::{LinearNorm, Normalize};
+use crate::plot_buffer::{PlotBuffer, Z_DATA};
 use crate::series::VectorFieldData;
 use crate::spines::Spines;
 use crate::theme::Theme;
+
+/// Character set for rendering vector field arrows.
+///
+/// Controls the Unicode characters used to represent arrow directions.
+/// Each variant maps the 8 compass directions to a different set of
+/// Unicode arrows.
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub enum ArrowCharSet {
+    /// Standard Unicode arrows: ←↑→↓↗↘↙↖
+    #[default]
+    Standard,
+    /// Heavy/bold arrows: ⬅⬆➡⬇⬉⬈⬊⬋
+    Heavy,
+    /// Harpoon arrows (half-barbed): ↼↾⇀⇂↿⇁↽⇃
+    Harpoon,
+    /// Double-stroke arrows: ⇐⇑⇒⇓⇖⇗⇘⇙
+    Double,
+}
 
 /// A 2D vector field (quiver) plot widget.
 ///
@@ -41,6 +60,7 @@ pub struct VectorField {
     colormap: Box<dyn Colormap>,
     norm: Box<dyn Normalize>,
     arrow_scale: f64,
+    arrow_char_set: ArrowCharSet,
     theme: Theme,
     spines: Spines,
     reference_lines: Vec<ReferenceLine>,
@@ -64,6 +84,7 @@ impl VectorField {
                 if max_mag == 0.0 { 1.0 } else { max_mag },
             )),
             arrow_scale: 1.0,
+            arrow_char_set: ArrowCharSet::default(),
             theme: Theme::get_default(),
             spines: Spines::default(),
             reference_lines: Vec::new(),
@@ -109,6 +130,12 @@ impl VectorField {
         self
     }
 
+    /// Set the arrow character set for rendering directions.
+    pub fn arrow_char_set(mut self, char_set: ArrowCharSet) -> Self {
+        self.arrow_char_set = char_set;
+        self
+    }
+
     /// Set the theme.
     pub fn theme(mut self, theme: Theme) -> Self {
         self.theme = theme;
@@ -140,23 +167,58 @@ impl VectorField {
     }
 }
 
-/// Choose an arrow character based on the direction angle.
-fn arrow_char(dx: f64, dy: f64) -> char {
+/// Choose an arrow character based on the direction angle and character set.
+fn arrow_char(dx: f64, dy: f64, char_set: &ArrowCharSet) -> char {
     if dx == 0.0 && dy == 0.0 {
         return '·';
     }
     let angle = dy.atan2(dx);
     let octant = ((angle + std::f64::consts::PI) / (std::f64::consts::PI / 4.0)).round() as i32 % 8;
-    match octant {
-        0 => '←',
-        1 => '↙',
-        2 => '↓',
-        3 => '↘',
-        4 => '→',
-        5 => '↗',
-        6 => '↑',
-        7 => '↖',
-        _ => '→',
+    match char_set {
+        ArrowCharSet::Standard => match octant {
+            0 => '←',
+            1 => '↙',
+            2 => '↓',
+            3 => '↘',
+            4 => '→',
+            5 => '↗',
+            6 => '↑',
+            7 => '↖',
+            _ => '→',
+        },
+        ArrowCharSet::Heavy => match octant {
+            0 => '⬅',
+            1 => '⬋',
+            2 => '⬇',
+            3 => '⬊',
+            4 => '➡',
+            5 => '⬈',
+            6 => '⬆',
+            7 => '⬉',
+            _ => '➡',
+        },
+        ArrowCharSet::Harpoon => match octant {
+            0 => '↼',
+            1 => '⇃',
+            2 => '⇂',
+            3 => '⇁',
+            4 => '⇀',
+            5 => '↾',
+            6 => '↿',
+            7 => '↽',
+            _ => '⇀',
+        },
+        ArrowCharSet::Double => match octant {
+            0 => '⇐',
+            1 => '⇙',
+            2 => '⇓',
+            3 => '⇘',
+            4 => '⇒',
+            5 => '⇗',
+            6 => '⇑',
+            7 => '⇖',
+            _ => '⇒',
+        },
     }
 }
 
@@ -181,6 +243,8 @@ impl Widget for &VectorField {
         let (x_lo, x_hi) = self.x_axis.resolve_bounds(x_min, x_max);
         let (y_lo, y_hi) = self.y_axis.resolve_bounds(y_min, y_max);
 
+        let mut pb = PlotBuffer::new(area);
+
         // Create and render the plot frame (title, axes, grid, ticks, labels, spines, ref lines)
         let frame = PlotFrame::new(&self.x_axis, &self.y_axis, &self.theme)
             .title(self.title.as_deref())
@@ -188,9 +252,9 @@ impl Widget for &VectorField {
             .spines(self.spines.clone())
             .reference_lines(&self.reference_lines);
 
-        let Some(pa) = frame.render(
+        let Some(pa) = frame.render_to_pb(
+            &mut pb,
             area,
-            buf,
             DataBounds {
                 x_lo,
                 x_hi,
@@ -218,12 +282,16 @@ impl Widget for &VectorField {
                     self.color
                 };
 
-                let ch = arrow_char(dx, -dy); // Negate dy because screen y is inverted
-                buf[(xi, yi)].set_char(ch).set_fg(color);
+                let ch = arrow_char(dx, -dy, &self.arrow_char_set); // Negate dy because screen y is inverted
+                pb.set_char(xi, yi, ch, color, Z_DATA);
             }
         }
 
         // Draw annotations
-        PlotFrame::draw_annotations(&pa, &self.annotations, buf);
+        PlotFrame::draw_annotations_pb(&pa, &self.annotations, &mut pb);
+
+        pb.composite(buf);
+
+        frame.draw_end_labels(buf, area, &pa);
     }
 }

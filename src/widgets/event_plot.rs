@@ -24,6 +24,7 @@ use ratatui::widgets::Widget;
 use crate::annotation::Annotation;
 use crate::axis::Axis;
 use crate::frame::{DataBounds, PlotFrame, ReferenceLine};
+use crate::plot_buffer::{PlotBuffer, Z_CHROME, Z_DATA, Z_GRID};
 use crate::spines::Spines;
 use crate::theme::Theme;
 use crate::ticker::NullLocator;
@@ -211,6 +212,7 @@ impl Widget for &EventPlot {
 impl EventPlot {
     /// Render in horizontal orientation: groups as horizontal lines, events as vertical ticks.
     fn render_horizontal(&self, area: Rect, buf: &mut Buffer) {
+        let mut pb = PlotBuffer::new(area);
         // Compute data bounds from all event positions
         let mut d_min = f64::INFINITY;
         let mut d_max = f64::NEG_INFINITY;
@@ -251,9 +253,9 @@ impl EventPlot {
             .y_label_width(label_width)
             .reference_lines(&self.reference_lines);
 
-        let Some(pa) = frame.render(
+        let Some(pa) = frame.render_to_pb(
+            &mut pb,
             area,
-            buf,
             DataBounds {
                 x_lo,
                 x_hi,
@@ -282,14 +284,14 @@ impl EventPlot {
                 for (j, ch) in label.chars().enumerate() {
                     let lx = label_start + j as u16;
                     if lx >= area.x && lx < pa.x.saturating_sub(1) {
-                        buf[(lx, lane_y)].set_char(ch).set_fg(group.color);
+                        pb.set_char(lx, lane_y, ch, group.color, Z_CHROME);
                     }
                 }
 
                 // Draw the horizontal baseline for this group
                 for x in pa.x..pa.x + pa.width {
                     if x < area.x + area.width {
-                        buf[(x, lane_y)].set_char('·').set_fg(self.theme.grid_color);
+                        pb.set_char(x, lane_y, '─', self.theme.grid_color, Z_GRID);
                     }
                 }
             }
@@ -304,23 +306,29 @@ impl EventPlot {
                     continue;
                 }
 
-                // Draw a short vertical tick centred on the lane
                 let y_top = lane_y.saturating_sub(tick_half);
                 let y_bot = (lane_y + tick_half).min(pa.y + pa.height - 1);
                 for ty in y_top..=y_bot {
                     if ty >= pa.y && ty < pa.y + pa.height && xi < area.x + area.width {
-                        buf[(xi, ty)].set_char('│').set_fg(group.color);
+                        pb.set_char(xi, ty, '│', group.color, Z_DATA);
                     }
                 }
             }
         }
 
         // Draw annotations
-        PlotFrame::draw_annotations(&pa, &self.annotations, buf);
+        PlotFrame::draw_annotations_pb(&pa, &self.annotations, &mut pb);
+
+        // Composite
+        pb.composite(buf);
+
+        frame.draw_end_labels(buf, area, &pa);
     }
 
     /// Render in vertical orientation: groups as vertical lines, events as horizontal ticks.
     fn render_vertical(&self, area: Rect, buf: &mut Buffer) {
+        let mut pb = PlotBuffer::new(area);
+
         // Compute data bounds from all event positions
         let mut d_min = f64::INFINITY;
         let mut d_max = f64::NEG_INFINITY;
@@ -350,9 +358,9 @@ impl EventPlot {
             .spines(self.spines.clone())
             .reference_lines(&self.reference_lines);
 
-        let Some(pa) = frame.render(
+        let Some(pa) = frame.render_to_pb(
+            &mut pb,
             area,
-            buf,
             DataBounds {
                 x_lo,
                 x_hi,
@@ -370,7 +378,7 @@ impl EventPlot {
             let lane_center_x = pa.x as f64 + (gi as f64 + 0.5) * lane_width;
             let lane_x = lane_center_x.round() as u16;
 
-            // Draw the group label below the plot area (in the x-axis tick row)
+            // Draw the group label below the plot area
             let label = if group.label.len() > lane_width as usize {
                 &group.label[..lane_width as usize]
             } else {
@@ -382,7 +390,7 @@ impl EventPlot {
                 for (j, ch) in label.chars().enumerate() {
                     let lx = label_start + j as u16;
                     if lx >= pa.x && lx < pa.x + pa.width {
-                        buf[(lx, label_y)].set_char(ch).set_fg(group.color);
+                        pb.set_char(lx, label_y, ch, group.color, Z_CHROME);
                     }
                 }
             }
@@ -390,7 +398,7 @@ impl EventPlot {
             // Draw the vertical baseline for this group
             if lane_x >= pa.x && lane_x < pa.x + pa.width {
                 for y in pa.y..pa.y + pa.height {
-                    buf[(lane_x, y)].set_char('·').set_fg(self.theme.grid_color);
+                    pb.set_char(lane_x, y, '│', self.theme.grid_color, Z_GRID);
                 }
             }
 
@@ -405,18 +413,22 @@ impl EventPlot {
                     continue;
                 }
 
-                // Draw a short horizontal tick centred on the lane
                 let x_left = lane_x.saturating_sub(tick_half);
                 let x_right = (lane_x + tick_half).min(pa.x + pa.width - 1);
                 for tx in x_left..=x_right {
                     if tx >= pa.x && tx < pa.x + pa.width && yi < area.y + area.height {
-                        buf[(tx, yi)].set_char('─').set_fg(group.color);
+                        pb.set_char(tx, yi, '─', group.color, Z_DATA);
                     }
                 }
             }
         }
 
         // Draw annotations
-        PlotFrame::draw_annotations(&pa, &self.annotations, buf);
+        PlotFrame::draw_annotations_pb(&pa, &self.annotations, &mut pb);
+
+        // Composite
+        pb.composite(buf);
+
+        frame.draw_end_labels(buf, area, &pa);
     }
 }

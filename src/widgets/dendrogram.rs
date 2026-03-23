@@ -8,6 +8,7 @@ use ratatui::widgets::Widget;
 use crate::annotation::Annotation;
 use crate::axis::Axis;
 use crate::frame::{DataBounds, PlotFrame, ReferenceLine};
+use crate::plot_buffer::{PlotBuffer, Z_CHROME, Z_DATA};
 use crate::spines::Spines;
 use crate::theme::Theme;
 
@@ -264,21 +265,21 @@ impl Widget for &Dendrogram {
         let x_axis = Axis::new();
         let y_axis = Axis::new();
 
+        let mut pb = PlotBuffer::new(area);
+
         let frame = PlotFrame::new(&x_axis, &y_axis, &self.theme)
             .title(self.title.as_deref())
             .spines(self.spines.clone())
             .reference_lines(&self.reference_lines);
 
-        let Some(pa) = frame.render(
-            area,
-            buf,
-            DataBounds {
-                x_lo,
-                x_hi,
-                y_lo,
-                y_hi,
-            },
-        ) else {
+        let bounds = DataBounds {
+            x_lo,
+            x_hi,
+            y_lo,
+            y_hi,
+        };
+
+        let Some(pa) = frame.render_to_pb(&mut pb, area, bounds) else {
             return;
         };
 
@@ -309,33 +310,30 @@ impl Widget for &Dendrogram {
 
             match self.orientation {
                 DendroOrientation::Bottom => {
-                    // Vertical from left child up to merge height
-                    draw_vertical_segment(buf, &pa, left_pos, left_height, merge_height, color);
-                    // Vertical from right child up to merge height
-                    draw_vertical_segment(buf, &pa, right_pos, right_height, merge_height, color);
-                    // Horizontal connecting at merge height
-                    draw_horizontal_segment(buf, &pa, left_pos, right_pos, merge_height, color);
+                    draw_vertical_segment_pb(&mut pb, &pa, left_pos, left_height, merge_height, color);
+                    draw_vertical_segment_pb(&mut pb, &pa, right_pos, right_height, merge_height, color);
+                    draw_horizontal_segment_pb(&mut pb, &pa, left_pos, right_pos, merge_height, color);
                 }
                 DendroOrientation::Top => {
                     let flip_h = |h: f64| height_hi - h;
-                    draw_vertical_segment(
-                        buf,
+                    draw_vertical_segment_pb(
+                        &mut pb,
                         &pa,
                         left_pos,
                         flip_h(left_height),
                         flip_h(merge_height),
                         color,
                     );
-                    draw_vertical_segment(
-                        buf,
+                    draw_vertical_segment_pb(
+                        &mut pb,
                         &pa,
                         right_pos,
                         flip_h(right_height),
                         flip_h(merge_height),
                         color,
                     );
-                    draw_horizontal_segment(
-                        buf,
+                    draw_horizontal_segment_pb(
+                        &mut pb,
                         &pa,
                         left_pos,
                         right_pos,
@@ -344,38 +342,37 @@ impl Widget for &Dendrogram {
                     );
                 }
                 DendroOrientation::Left => {
-                    // Category axis is Y, height axis is X
-                    draw_horizontal_segment_h(buf, &pa, left_pos, left_height, merge_height, color);
-                    draw_horizontal_segment_h(
-                        buf,
+                    draw_horizontal_segment_h_pb(&mut pb, &pa, left_pos, left_height, merge_height, color);
+                    draw_horizontal_segment_h_pb(
+                        &mut pb,
                         &pa,
                         right_pos,
                         right_height,
                         merge_height,
                         color,
                     );
-                    draw_vertical_segment_h(buf, &pa, left_pos, right_pos, merge_height, color);
+                    draw_vertical_segment_h_pb(&mut pb, &pa, left_pos, right_pos, merge_height, color);
                 }
                 DendroOrientation::Right => {
                     let flip_h = |h: f64| height_hi - h;
-                    draw_horizontal_segment_h(
-                        buf,
+                    draw_horizontal_segment_h_pb(
+                        &mut pb,
                         &pa,
                         left_pos,
                         flip_h(left_height),
                         flip_h(merge_height),
                         color,
                     );
-                    draw_horizontal_segment_h(
-                        buf,
+                    draw_horizontal_segment_h_pb(
+                        &mut pb,
                         &pa,
                         right_pos,
                         flip_h(right_height),
                         flip_h(merge_height),
                         color,
                     );
-                    draw_vertical_segment_h(
-                        buf,
+                    draw_vertical_segment_h_pb(
+                        &mut pb,
                         &pa,
                         left_pos,
                         right_pos,
@@ -396,9 +393,7 @@ impl Widget for &Dendrogram {
                     for (j, ch) in label.chars().enumerate() {
                         let lx = start + j as u16;
                         if lx >= pa.area.x && lx < pa.area.x + pa.area.width {
-                            buf[(lx, label_y)]
-                                .set_char(ch)
-                                .set_fg(self.theme.axis_color);
+                            pb.set_char(lx, label_y, ch, self.theme.axis_color, Z_CHROME);
                         }
                     }
                 }
@@ -411,7 +406,7 @@ impl Widget for &Dendrogram {
                     for (j, ch) in label.chars().enumerate() {
                         let lx = label_x + j as u16;
                         if lx >= pa.area.x && lx < pa.x {
-                            buf[(lx, sy)].set_char(ch).set_fg(self.theme.axis_color);
+                            pb.set_char(lx, sy, ch, self.theme.axis_color, Z_CHROME);
                         }
                     }
                 }
@@ -419,16 +414,20 @@ impl Widget for &Dendrogram {
         }
 
         // Draw annotations
-        PlotFrame::draw_annotations(&pa, &self.annotations, buf);
+        PlotFrame::draw_annotations_pb(&pa, &self.annotations, &mut pb);
+
+        // Composite to buffer
+        pb.composite(buf);
+
+        frame.draw_end_labels(buf, area, &pa);
     }
 }
 
 use crate::frame::PlotArea;
 
-/// Draw a vertical line segment (for Bottom/Top orientation).
-/// `cat` is the category-axis position, `h0` and `h1` are height-axis values.
-fn draw_vertical_segment(
-    buf: &mut Buffer,
+/// Draw a vertical line segment (for Bottom/Top orientation) into a PlotBuffer.
+fn draw_vertical_segment_pb(
+    pb: &mut PlotBuffer,
     pa: &PlotArea,
     cat: f64,
     h0: f64,
@@ -444,16 +443,15 @@ fn draw_vertical_segment(
         for sy in top..=bot {
             let y = sy as u16;
             if y >= pa.y && y < pa.y + pa.height {
-                buf[(sx, y)].set_char('│').set_fg(color);
+                pb.set_char(sx, y, '│', color, Z_DATA);
             }
         }
     }
 }
 
-/// Draw a horizontal line segment (for Bottom/Top orientation).
-/// `cat0` and `cat1` are category-axis endpoints, `h` is the height.
-fn draw_horizontal_segment(
-    buf: &mut Buffer,
+/// Draw a horizontal line segment (for Bottom/Top orientation) into a PlotBuffer.
+fn draw_horizontal_segment_pb(
+    pb: &mut PlotBuffer,
     pa: &PlotArea,
     cat0: f64,
     cat1: f64,
@@ -469,25 +467,24 @@ fn draw_horizontal_segment(
         for sx in left..=right {
             let x = sx as u16;
             if x >= pa.x && x < pa.x + pa.width {
-                buf[(x, sy)].set_char('─').set_fg(color);
+                pb.set_char(x, sy, '─', color, Z_DATA);
             }
         }
         // Draw corner connectors
         let lx = left as u16;
         let rx = right as u16;
         if lx >= pa.x && lx < pa.x + pa.width {
-            buf[(lx, sy)].set_char('┌').set_fg(color);
+            pb.set_char(lx, sy, '┌', color, Z_DATA);
         }
         if rx >= pa.x && rx < pa.x + pa.width {
-            buf[(rx, sy)].set_char('┐').set_fg(color);
+            pb.set_char(rx, sy, '┐', color, Z_DATA);
         }
     }
 }
 
-/// Draw a horizontal segment in Left/Right orientation (height axis is X).
-/// `cat` is the category-axis (Y) position, `h0` and `h1` are X positions.
-fn draw_horizontal_segment_h(
-    buf: &mut Buffer,
+/// Draw a horizontal segment in Left/Right orientation into a PlotBuffer.
+fn draw_horizontal_segment_h_pb(
+    pb: &mut PlotBuffer,
     pa: &PlotArea,
     cat: f64,
     h0: f64,
@@ -503,16 +500,15 @@ fn draw_horizontal_segment_h(
         for sx in left..=right {
             let x = sx as u16;
             if x >= pa.x && x < pa.x + pa.width {
-                buf[(x, sy)].set_char('─').set_fg(color);
+                pb.set_char(x, sy, '─', color, Z_DATA);
             }
         }
     }
 }
 
-/// Draw a vertical segment in Left/Right orientation (category axis is Y).
-/// `cat0` and `cat1` are Y positions, `h` is the X position.
-fn draw_vertical_segment_h(
-    buf: &mut Buffer,
+/// Draw a vertical segment in Left/Right orientation into a PlotBuffer.
+fn draw_vertical_segment_h_pb(
+    pb: &mut PlotBuffer,
     pa: &PlotArea,
     cat0: f64,
     cat1: f64,
@@ -528,17 +524,17 @@ fn draw_vertical_segment_h(
         for sy in top..=bot {
             let y = sy as u16;
             if y >= pa.y && y < pa.y + pa.height {
-                buf[(sx, y)].set_char('│').set_fg(color);
+                pb.set_char(sx, y, '│', color, Z_DATA);
             }
         }
         // Draw corner connectors
         let ty = top as u16;
         let by = bot as u16;
         if ty >= pa.y && ty < pa.y + pa.height {
-            buf[(sx, ty)].set_char('┌').set_fg(color);
+            pb.set_char(sx, ty, '┌', color, Z_DATA);
         }
         if by >= pa.y && by < pa.y + pa.height {
-            buf[(sx, by)].set_char('└').set_fg(color);
+            pb.set_char(sx, by, '└', color, Z_DATA);
         }
     }
 }

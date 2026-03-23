@@ -9,6 +9,7 @@ use crate::annotation::Annotation;
 use crate::axis::Axis;
 use crate::frame::{DataBounds, PlotFrame, ReferenceLine};
 use crate::legend::{Legend, LegendEntry, LegendPosition};
+use crate::plot_buffer::{PlotBuffer, Z_DATA, Z_FILL};
 use crate::spines::Spines;
 use crate::theme::Theme;
 
@@ -477,17 +478,19 @@ impl Widget for &Histogram {
         // Determine if we're in multi-dataset mode
         let has_datasets = !self.datasets.is_empty();
 
+        let mut pb = PlotBuffer::new(area);
+
         if has_datasets {
-            self.render_multi(area, buf);
+            self.render_multi(area, buf, &mut pb);
         } else {
-            self.render_single(area, buf);
+            self.render_single(area, buf, &mut pb);
         }
     }
 }
 
 impl Histogram {
     /// Render the single-dataset histogram (legacy path).
-    fn render_single(&self, area: Rect, buf: &mut Buffer) {
+    fn render_single(&self, area: Rect, buf: &mut Buffer, pb: &mut PlotBuffer) {
         let (edges, heights) = self.compute_bins();
         if edges.len() < 2 || heights.is_empty() {
             return;
@@ -499,15 +502,15 @@ impl Histogram {
         let y_lo = 0.0;
         let y_hi = if y_max == 0.0 { 1.0 } else { y_max * 1.1 };
 
-        // Create and render the plot frame (title, axes, grid, ticks, labels, spines, ref lines)
+        // Create and render the plot frame
         let frame = PlotFrame::new(&self.x_axis, &self.y_axis, &self.theme)
             .title(self.title.as_deref())
             .spines(self.spines.clone())
             .reference_lines(&self.reference_lines);
 
-        let Some(pa) = frame.render(
+        let Some(pa) = frame.render_to_pb(
+            pb,
             area,
-            buf,
             DataBounds {
                 x_lo,
                 x_hi,
@@ -524,7 +527,7 @@ impl Histogram {
             &edges,
             &heights,
             self.color,
-            buf,
+            pb,
             BarSlotLayout {
                 ds_index: 0,
                 n_datasets: 1,
@@ -532,11 +535,16 @@ impl Histogram {
         );
 
         // Draw annotations
-        PlotFrame::draw_annotations(&pa, &self.annotations, buf);
+        PlotFrame::draw_annotations_pb(&pa, &self.annotations, pb);
+
+        // Composite
+        pb.composite(buf);
+
+        frame.draw_end_labels(buf, area, &pa);
     }
 
     /// Render multiple datasets according to hist_mode.
-    fn render_multi(&self, area: Rect, buf: &mut Buffer) {
+    fn render_multi(&self, area: Rect, buf: &mut Buffer, pb: &mut PlotBuffer) {
         let (global_lo, global_hi) = self.compute_global_range();
 
         // Resolve bin count from all data combined
@@ -571,7 +579,6 @@ impl Histogram {
                 .cloned()
                 .fold(0.0f64, f64::max),
             HistMode::Stacked => {
-                // Sum per bin
                 let n = all_heights.first().map_or(0, |h| h.len());
                 (0..n)
                     .map(|i| {
@@ -594,9 +601,9 @@ impl Histogram {
             .spines(self.spines.clone())
             .reference_lines(&self.reference_lines);
 
-        let Some(pa) = frame.render(
+        let Some(pa) = frame.render_to_pb(
+            pb,
             area,
-            buf,
             DataBounds {
                 x_lo,
                 x_hi,
@@ -611,14 +618,13 @@ impl Histogram {
 
         match self.hist_mode {
             HistMode::Single => {
-                // Just render the first dataset
                 if !all_heights.is_empty() {
                     self.draw_bars(
                         &pa,
                         edges,
                         &all_heights[0],
                         self.datasets[0].color,
-                        buf,
+                        pb,
                         BarSlotLayout {
                             ds_index: 0,
                             n_datasets: 1,
@@ -627,7 +633,6 @@ impl Histogram {
                 }
             }
             HistMode::Stacked => {
-                // Draw stacked bars (bottom to top)
                 let n = all_heights.first().map_or(0, |h| h.len());
                 let mut bottoms = vec![0.0f64; n];
 
@@ -646,10 +651,9 @@ impl Histogram {
                         let bar_top_y = pa.screen_y(top);
                         let bar_bottom_y = pa.screen_y(bottom);
 
-                        // Use floor/ceil to match draw_bars and avoid inter-bin gaps
                         let x_start = (bar_left + offset).floor() as u16;
                         let x_end = (bar_right - offset).ceil() as u16;
-                        let y_top = bar_top_y.round() as u16;
+                        let y_top = bar_top_y.floor() as u16;
                         let y_bot = bar_bottom_y.round() as u16;
 
                         self.draw_bar_region(
@@ -659,23 +663,24 @@ impl Histogram {
                                 x_end,
                                 y_top,
                                 y_bot,
+                                #[cfg(feature = "unicode-extended")]
+                                top_frac: bar_top_y.fract(),
                             },
                             ds.color,
-                            buf,
+                            pb,
                         );
                         bottoms[i] = top;
                     }
                 }
             }
             HistMode::Layered => {
-                // Draw overlaid bars (back to front)
                 for (ds_i, ds) in self.datasets.iter().enumerate().rev() {
                     self.draw_bars(
                         &pa,
                         edges,
                         &all_heights[ds_i],
                         ds.color,
-                        buf,
+                        pb,
                         BarSlotLayout {
                             ds_index: 0,
                             n_datasets: 1,
@@ -684,14 +689,13 @@ impl Histogram {
                 }
             }
             HistMode::SideBySide => {
-                // Draw side-by-side bars
                 for (ds_i, ds) in self.datasets.iter().enumerate() {
                     self.draw_bars(
                         &pa,
                         edges,
                         &all_heights[ds_i],
                         ds.color,
-                        buf,
+                        pb,
                         BarSlotLayout {
                             ds_index: ds_i,
                             n_datasets: n_ds,
@@ -702,7 +706,12 @@ impl Histogram {
         }
 
         // Draw annotations
-        PlotFrame::draw_annotations(&pa, &self.annotations, buf);
+        PlotFrame::draw_annotations_pb(&pa, &self.annotations, pb);
+
+        // Composite before legend
+        pb.composite(buf);
+
+        frame.draw_end_labels(buf, area, &pa);
 
         // Draw legend
         if self.show_legend && !self.datasets.is_empty() {
@@ -730,7 +739,7 @@ impl Histogram {
         edges: &[f64],
         heights: &[f64],
         color: Color,
-        buf: &mut Buffer,
+        pb: &mut PlotBuffer,
         slot: BarSlotLayout,
     ) {
         for i in 0..heights.len() {
@@ -755,45 +764,42 @@ impl Histogram {
             let rect = BarRect {
                 x_start: x_start_f.floor() as u16,
                 x_end: x_end_f.ceil() as u16,
-                y_top: bar_top.round() as u16,
+                y_top: bar_top.floor() as u16,
                 y_bot: bar_bottom.round() as u16,
+                #[cfg(feature = "unicode-extended")]
+                top_frac: bar_top.fract(),
             };
 
             match self.histtype {
                 HistType::Bar => {
-                    self.draw_bar_region(pa, &rect, color, buf);
+                    self.draw_bar_region(pa, &rect, color, pb);
                 }
                 HistType::Step => {
                     // Draw only the outline (top edge + sides)
-                    // Top edge
                     for x in rect.x_start..rect.x_end {
                         if pa.contains(x, rect.y_top) {
-                            buf[(x, rect.y_top)].set_char('─').set_fg(color);
+                            pb.set_char(x, rect.y_top, '─', color, Z_DATA);
                         }
                     }
-                    // Left side
                     for y in rect.y_top..rect.y_bot {
                         if pa.contains(rect.x_start, y) {
-                            buf[(rect.x_start, y)].set_char('│').set_fg(color);
+                            pb.set_char(rect.x_start, y, '│', color, Z_DATA);
                         }
                     }
-                    // Right side
                     if rect.x_end > 0 {
                         let rx = rect.x_end.saturating_sub(1);
                         for y in rect.y_top..rect.y_bot {
                             if pa.contains(rx, y) {
-                                buf[(rx, y)].set_char('│').set_fg(color);
+                                pb.set_char(rx, y, '│', color, Z_DATA);
                             }
                         }
                     }
                 }
                 HistType::StepFilled => {
-                    // Fill the bar
-                    self.draw_bar_region(pa, &rect, color, buf);
-                    // Draw outline on top
+                    self.draw_bar_region(pa, &rect, color, pb);
                     for x in rect.x_start..rect.x_end {
                         if pa.contains(x, rect.y_top) {
-                            buf[(x, rect.y_top)].set_char('▀').set_fg(color);
+                            pb.set_char(x, rect.y_top, '▀', color, Z_DATA);
                         }
                     }
                 }
@@ -802,17 +808,43 @@ impl Histogram {
     }
 
     /// Fill a rectangular bar region.
+    ///
+    /// When the `unicode-extended` feature is enabled, the topmost row of each bar
+    /// uses a vertical eighth-block character to represent the fractional fill,
+    /// giving 8x vertical sub-cell precision at the bar edge.
     fn draw_bar_region(
         &self,
         pa: &crate::frame::PlotArea,
         rect: &BarRect,
         color: Color,
-        buf: &mut Buffer,
+        pb: &mut PlotBuffer,
     ) {
-        for x in rect.x_start..rect.x_end {
-            for y in rect.y_top..rect.y_bot {
-                if pa.contains(x, y) {
-                    buf[(x, y)].set_char('█').set_fg(color);
+        #[cfg(feature = "unicode-extended")]
+        {
+            let fill_fraction = 1.0 - rect.top_frac;
+            let fill_char = crate::drawing::vertical_fill_char(fill_fraction);
+
+            for x in rect.x_start..rect.x_end {
+                // Draw the fractional top row
+                if pa.contains(x, rect.y_top) && fill_char != ' ' {
+                    pb.set_char(x, rect.y_top, fill_char, color, Z_DATA);
+                }
+                // Fill solid rows below the top
+                for y in (rect.y_top + 1)..rect.y_bot {
+                    if pa.contains(x, y) {
+                        pb.set_bg(x, y, color, Z_FILL);
+                    }
+                }
+            }
+        }
+
+        #[cfg(not(feature = "unicode-extended"))]
+        {
+            for x in rect.x_start..rect.x_end {
+                for y in rect.y_top..rect.y_bot {
+                    if pa.contains(x, y) {
+                        pb.set_bg(x, y, color, Z_FILL);
+                    }
                 }
             }
         }
@@ -825,6 +857,10 @@ struct BarRect {
     x_end: u16,
     y_top: u16,
     y_bot: u16,
+    /// Fractional part of the top position within its cell (0.0 = cell top, 1.0 = cell bottom).
+    /// Used by unicode-extended rendering for sub-cell bar-top precision.
+    #[cfg(feature = "unicode-extended")]
+    top_frac: f64,
 }
 
 /// Layout parameters for side-by-side bar positioning.

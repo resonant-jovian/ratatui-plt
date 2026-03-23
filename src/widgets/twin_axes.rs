@@ -193,18 +193,6 @@ impl Widget for &TwinAxes {
         // Draw grid
         let x_grid = self.x_axis.grid || self.theme.grid_visible;
         let y_grid = self.primary_y_axis.grid || self.theme.grid_visible;
-        if x_grid {
-            let gx_ticks = self.x_axis.tick_positions(x_lo, x_hi);
-            for &tv in &gx_ticks {
-                let sx = data_to_screen(tv, x_lo, x_hi, px as f64, (px + pw - 1) as f64);
-                let xi = sx.round() as u16;
-                if xi >= px && xi < px + pw {
-                    for y in py..py + ph {
-                        buf[(xi, y)].set_char('·').set_fg(self.theme.grid_color);
-                    }
-                }
-            }
-        }
         if y_grid {
             let gy_ticks = self.primary_y_axis.tick_positions(py_lo, py_hi);
             for &tv in &gy_ticks {
@@ -212,7 +200,20 @@ impl Widget for &TwinAxes {
                 let yi = sy.round() as u16;
                 if yi >= py && yi < py + ph {
                     for x in px..px + pw {
-                        buf[(x, yi)].set_char('·').set_fg(self.theme.grid_color);
+                        buf[(x, yi)].set_char('─').set_fg(self.theme.grid_color);
+                    }
+                }
+            }
+        }
+        if x_grid {
+            let gx_ticks = self.x_axis.tick_positions(x_lo, x_hi);
+            for &tv in &gx_ticks {
+                let sx = data_to_screen(tv, x_lo, x_hi, px as f64, (px + pw - 1) as f64);
+                let xi = sx.round() as u16;
+                if xi >= px && xi < px + pw {
+                    for y in py..py + ph {
+                        let ch = if buf[(xi, y)].symbol() == "─" { '┼' } else { '│' };
+                        buf[(xi, y)].set_char(ch).set_fg(self.theme.grid_color);
                     }
                 }
             }
@@ -349,18 +350,25 @@ const BRAILLE_BITS: [[u8; 4]; 2] = [[0x01, 0x02, 0x04, 0x40], [0x08, 0x10, 0x20,
 const BRAILLE_BASE: u32 = 0x2800;
 
 fn write_braille(buf: &mut Buffer, x: u16, y: u16, bits: u8, color: Color) {
-    let existing = {
-        let ch = buf[(x, y)].symbol().chars().next().unwrap_or(' ');
+    let (existing_bits, existing_bg) = {
+        let cell = &buf[(x, y)];
+        let ch = cell.symbol().chars().next().unwrap_or(' ');
+        let bg = cell.bg;
         let code = ch as u32;
-        if (BRAILLE_BASE..=0x28FF).contains(&code) {
+        if code == 0x2580 || code == 0x2584 {
+            return;
+        }
+        let bits = if (BRAILLE_BASE..=0x28FF).contains(&code) {
             (code - BRAILLE_BASE) as u8
         } else {
             0
-        }
+        };
+        (bits, bg)
     };
-    let combined = existing | bits;
+    let combined = existing_bits | bits;
     if let Some(ch) = char::from_u32(BRAILLE_BASE + combined as u32) {
-        buf[(x, y)].set_char(ch).set_fg(color);
+        let fg = if crate::drawing::colors_match(color, existing_bg) { crate::drawing::contrasting_color(color) } else { color };
+        buf[(x, y)].set_char(ch).set_fg(fg).set_bg(existing_bg);
     }
 }
 

@@ -1974,7 +1974,7 @@ fn test_violin_plot_split_mode_renders() {
 #[test]
 fn test_minor_grid_color_theme() {
     let theme = Theme::dark();
-    assert!(matches!(theme.minor_grid_color, Color::Rgb(40, 40, 40)));
+    assert!(matches!(theme.minor_grid_color, Color::Rgb(50, 50, 50)));
 }
 
 #[test]
@@ -2331,4 +2331,1288 @@ fn test_box_plot_bootstrap_ci() {
     let area = Rect::new(0, 0, 40, 20);
     let mut buf = Buffer::empty(area);
     (&plot).render(area, &mut buf);
+}
+
+// ── FacetGrid tests ──
+
+#[test]
+fn test_facet_data_new_empty() {
+    let data = FacetData::new();
+    assert_eq!(data.len(), 0);
+    assert!(data.is_empty());
+    assert!(data.row_keys().is_empty());
+    assert!(data.col_keys().is_empty());
+    assert!(data.hue_keys().is_empty());
+}
+
+#[test]
+fn test_facet_data_row_col_keys() {
+    let data = FacetData::new()
+        .record(FacetRecord {
+            row_key: "B".into(),
+            col_key: "Y".into(),
+            hue_key: Some("h1".into()),
+            x: 1.0,
+            y: 2.0,
+        })
+        .record(FacetRecord {
+            row_key: "A".into(),
+            col_key: "X".into(),
+            hue_key: Some("h2".into()),
+            x: 3.0,
+            y: 4.0,
+        })
+        .record(FacetRecord {
+            row_key: "B".into(),
+            col_key: "X".into(),
+            hue_key: Some("h1".into()),
+            x: 5.0,
+            y: 6.0,
+        });
+
+    // Keys should be in order of first appearance
+    assert_eq!(data.row_keys(), vec!["B", "A"]);
+    assert_eq!(data.col_keys(), vec!["Y", "X"]);
+    assert_eq!(data.hue_keys(), vec!["h1", "h2"]);
+}
+
+#[test]
+fn test_facet_data_series_data() {
+    let data = FacetData::new()
+        .record(FacetRecord {
+            row_key: "R1".into(),
+            col_key: "C1".into(),
+            hue_key: Some("h".into()),
+            x: 1.0,
+            y: 10.0,
+        })
+        .record(FacetRecord {
+            row_key: "R1".into(),
+            col_key: "C1".into(),
+            hue_key: Some("h".into()),
+            x: 2.0,
+            y: 20.0,
+        })
+        .record(FacetRecord {
+            row_key: "R1".into(),
+            col_key: "C2".into(),
+            hue_key: None,
+            x: 3.0,
+            y: 30.0,
+        })
+        .record(FacetRecord {
+            row_key: "R2".into(),
+            col_key: "C1".into(),
+            hue_key: Some("h".into()),
+            x: 4.0,
+            y: 40.0,
+        });
+
+    // Filter by row + col + hue
+    let pts = data.series_data("R1", "C1", Some("h"));
+    assert_eq!(pts.len(), 2);
+    assert!((pts[0].0 - 1.0).abs() < 1e-10);
+    assert!((pts[1].1 - 20.0).abs() < 1e-10);
+
+    // Filter by row + col without hue (returns all matching row/col)
+    let pts_all = data.series_data("R1", "C1", None);
+    assert_eq!(pts_all.len(), 2);
+
+    // No match
+    let pts_empty = data.series_data("R2", "C2", None);
+    assert!(pts_empty.is_empty());
+}
+
+#[test]
+fn test_facet_grid_renders() {
+    let data = FacetData::new()
+        .record(FacetRecord {
+            row_key: "A".into(),
+            col_key: "X".into(),
+            hue_key: None,
+            x: 0.0,
+            y: 0.0,
+        })
+        .record(FacetRecord {
+            row_key: "A".into(),
+            col_key: "X".into(),
+            hue_key: None,
+            x: 1.0,
+            y: 1.0,
+        })
+        .record(FacetRecord {
+            row_key: "A".into(),
+            col_key: "Y".into(),
+            hue_key: None,
+            x: 0.0,
+            y: 2.0,
+        })
+        .record(FacetRecord {
+            row_key: "B".into(),
+            col_key: "X".into(),
+            hue_key: None,
+            x: 1.0,
+            y: 3.0,
+        })
+        .record(FacetRecord {
+            row_key: "B".into(),
+            col_key: "Y".into(),
+            hue_key: None,
+            x: 2.0,
+            y: 4.0,
+        });
+
+    let grid = FacetGrid::new(data)
+        .map_scatter()
+        .share_x(true)
+        .share_y(true)
+        .suptitle("Test Facet")
+        .col_titles(true)
+        .row_titles(true)
+        .gap(1);
+
+    let area = Rect::new(0, 0, 80, 40);
+    let mut buf = Buffer::empty(area);
+    (&grid).render(area, &mut buf);
+    // Just verify it doesn't panic
+}
+
+// ========================================================================
+// ImagePlot Tests
+// ========================================================================
+
+#[test]
+fn test_image_data_dimensions() {
+    // Scalar
+    let scalar = ImageData::Scalar(vec![vec![1.0, 2.0, 3.0], vec![4.0, 5.0, 6.0]]);
+    assert_eq!(scalar.nrows(), 2);
+    assert_eq!(scalar.ncols(), 3);
+
+    // RGB
+    let rgb = ImageData::Rgb(vec![
+        vec![(255, 0, 0), (0, 255, 0)],
+        vec![(0, 0, 255), (255, 255, 0)],
+        vec![(255, 0, 255), (0, 255, 255)],
+    ]);
+    assert_eq!(rgb.nrows(), 3);
+    assert_eq!(rgb.ncols(), 2);
+
+    // RGBA
+    let rgba = ImageData::Rgba(vec![vec![
+        (255, 0, 0, 255),
+        (0, 255, 0, 128),
+        (0, 0, 255, 0),
+        (255, 255, 0, 255),
+    ]]);
+    assert_eq!(rgba.nrows(), 1);
+    assert_eq!(rgba.ncols(), 4);
+
+    // Empty
+    let empty = ImageData::Scalar(vec![]);
+    assert_eq!(empty.nrows(), 0);
+    assert_eq!(empty.ncols(), 0);
+}
+
+#[test]
+fn test_image_plot_scalar_renders() {
+    let data: Vec<Vec<f64>> = (0..4)
+        .map(|r| (0..4).map(|c| (r * 4 + c) as f64).collect())
+        .collect();
+    let img = ImagePlot::new(ImageData::Scalar(data))
+        .title("Scalar Image")
+        .show_colorbar(true);
+
+    let area = Rect::new(0, 0, 40, 20);
+    let mut buf = Buffer::empty(area);
+    (&img).render(area, &mut buf);
+}
+
+#[test]
+fn test_image_plot_rgb_renders() {
+    let data: Vec<Vec<(u8, u8, u8)>> = (0..3)
+        .map(|r| {
+            (0..3)
+                .map(|c| ((r * 80) as u8, (c * 80) as u8, 128))
+                .collect()
+        })
+        .collect();
+    let img = ImagePlot::new(ImageData::Rgb(data))
+        .title("RGB Image")
+        .show_colorbar(false);
+
+    let area = Rect::new(0, 0, 40, 20);
+    let mut buf = Buffer::empty(area);
+    (&img).render(area, &mut buf);
+}
+
+#[test]
+fn test_spy_renders() {
+    // Banded sparse matrix
+    let size = 8;
+    let matrix: Vec<Vec<f64>> = (0..size)
+        .map(|r| {
+            (0..size)
+                .map(|c| {
+                    if r == c || r + 1 == c || (r > 0 && r - 1 == c) {
+                        1.0
+                    } else {
+                        0.0
+                    }
+                })
+                .collect()
+        })
+        .collect();
+    let plot = spy(&matrix);
+
+    let area = Rect::new(0, 0, 40, 20);
+    let mut buf = Buffer::empty(area);
+    (&plot).render(area, &mut buf);
+}
+
+#[test]
+fn test_matshow_renders() {
+    let matrix: Vec<Vec<f64>> = (0..5)
+        .map(|r| (0..5).map(|c| (r as f64 - 2.0) * (c as f64 - 2.0)).collect())
+        .collect();
+    let plot = matshow(matrix);
+
+    let area = Rect::new(0, 0, 40, 20);
+    let mut buf = Buffer::empty(area);
+    (&plot).render(area, &mut buf);
+}
+
+// ---------------------------------------------------------------------------
+// PNG / PDF export tests (behind `export` feature)
+// ---------------------------------------------------------------------------
+
+#[cfg(feature = "export")]
+mod export_tests {
+    use super::*;
+    use ratatui_plt::export::{ExportOptions, buffer_to_png};
+
+    #[test]
+    fn test_export_options_defaults() {
+        let opts = ExportOptions::new();
+        assert_eq!(opts.cell_width, 8);
+        assert_eq!(opts.cell_height, 16);
+    }
+
+    #[test]
+    fn test_buffer_to_png_valid() {
+        let s = Series::new("sin")
+            .data(
+                (0..100)
+                    .map(|i| {
+                        let x = i as f64 * 0.1;
+                        (x, x.sin())
+                    })
+                    .collect(),
+            )
+            .color(Color::Cyan);
+        let plot = LinePlot::new().series(s).title("PNG test");
+        let buf = ratatui_plt::export::render_to_buffer(&plot, 80, 24);
+        let opts = ExportOptions::new();
+        let png_bytes = buffer_to_png(&buf, &opts);
+        assert!(png_bytes.is_ok());
+        let data = png_bytes.unwrap_or_default();
+        // PNG magic bytes: 0x89 P N G
+        assert!(data.len() >= 4);
+        assert_eq!(&data[..4], &[0x89, 0x50, 0x4E, 0x47]);
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Statistics module tests (behind `statistics` feature)
+// ---------------------------------------------------------------------------
+
+#[cfg(feature = "statistics")]
+mod statistics_tests {
+    use ratatui_plt::statistics::{
+        Kde, bootstrap_ci, iqr, linear_regression, lowess, mean, mean_estimator,
+        median, median_estimator, percentile, poly_fit, std_dev, variance,
+    };
+
+    #[test]
+    fn test_mean_basic() {
+        let data = [1.0, 2.0, 3.0, 4.0, 5.0];
+        assert!((mean(&data) - 3.0).abs() < 1e-10);
+    }
+
+    #[test]
+    fn test_std_dev_basic() {
+        let data = [2.0, 4.0, 4.0, 4.0, 5.0, 5.0, 7.0, 9.0];
+        let v = variance(&data);
+        // population variance = 4.0
+        assert!((v - 4.0).abs() < 1e-10);
+        assert!((std_dev(&data) - 2.0).abs() < 1e-10);
+    }
+
+    #[test]
+    fn test_percentile_median() {
+        let sorted = [1.0, 2.0, 3.0, 4.0, 5.0];
+        assert!((percentile(&sorted, 50.0) - 3.0).abs() < 1e-10);
+        assert!((median(&sorted) - 3.0).abs() < 1e-10);
+    }
+
+    #[test]
+    fn test_iqr_basic() {
+        // IQR of [1,2,3,4,5,6,7]: Q1=2, Q3=6, IQR=4
+        let sorted = [1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0];
+        let q1 = percentile(&sorted, 25.0);
+        let q3 = percentile(&sorted, 75.0);
+        let data_iqr = iqr(&sorted);
+        assert!((data_iqr - (q3 - q1)).abs() < 1e-10);
+    }
+
+    #[test]
+    fn test_linear_regression_perfect() {
+        // y = 2x + 1
+        let x: Vec<f64> = (0..10).map(|i| i as f64).collect();
+        let y: Vec<f64> = x.iter().map(|&xi| 2.0 * xi + 1.0).collect();
+        let fit = linear_regression(&x, &y);
+        assert!(fit.is_some());
+        let fit = fit.unwrap();
+        assert!((fit.slope - 2.0).abs() < 1e-10);
+        assert!((fit.intercept - 1.0).abs() < 1e-10);
+        assert!((fit.r_squared - 1.0).abs() < 1e-10);
+    }
+
+    #[test]
+    fn test_poly_fit_quadratic() {
+        // y = x^2
+        let x: Vec<f64> = (-5..=5).map(|i| i as f64).collect();
+        let y: Vec<f64> = x.iter().map(|&xi| xi * xi).collect();
+        let fit = poly_fit(&x, &y, 2);
+        assert!(fit.is_some());
+        let fit = fit.unwrap();
+        // coefficients: [a2, a1, a0] for a2*x^2 + a1*x + a0
+        assert_eq!(fit.coefficients.len(), 3);
+        assert!((fit.coefficients[0] - 1.0).abs() < 1e-8, "leading coeff: {}", fit.coefficients[0]);
+        assert!(fit.coefficients[1].abs() < 1e-8, "linear coeff: {}", fit.coefficients[1]);
+        assert!(fit.coefficients[2].abs() < 1e-8, "constant coeff: {}", fit.coefficients[2]);
+        assert!((fit.r_squared - 1.0).abs() < 1e-8);
+    }
+
+    #[test]
+    fn test_poly_fit_eval_horner() {
+        // Verify Horner's method: p(x) = 2x^2 + 3x + 1
+        let fit = ratatui_plt::statistics::PolyFitResult {
+            coefficients: vec![2.0, 3.0, 1.0],
+            r_squared: 1.0,
+        };
+        assert!((fit.eval(0.0) - 1.0).abs() < 1e-10);
+        assert!((fit.eval(1.0) - 6.0).abs() < 1e-10);
+        assert!((fit.eval(2.0) - 15.0).abs() < 1e-10);
+    }
+
+    #[test]
+    fn test_poly_fit_to_series() {
+        let fit = ratatui_plt::statistics::PolyFitResult {
+            coefficients: vec![1.0, 0.0, 0.0],
+            r_squared: 1.0,
+        };
+        let s = fit.to_series(0.0, 10.0, 50, "x^2");
+        assert_eq!(s.data.len(), 50);
+        assert_eq!(s.name, "x^2");
+    }
+
+    #[test]
+    fn test_kde_produces_output() {
+        let data = vec![1.0, 2.0, 2.5, 3.0, 3.5, 4.0, 5.0];
+        let kde = Kde::new().n_points(50);
+        let (x_vals, densities) = kde.fit(&data);
+        assert_eq!(x_vals.len(), 50);
+        assert_eq!(densities.len(), 50);
+        // All densities should be non-negative
+        for &d in &densities {
+            assert!(d >= 0.0);
+        }
+        // At least some density should be positive
+        assert!(densities.iter().any(|&d| d > 0.0));
+    }
+
+    #[test]
+    fn test_kde_empty() {
+        let data: Vec<f64> = Vec::new();
+        let (x_vals, densities) = Kde::new().fit(&data);
+        assert!(x_vals.is_empty());
+        assert!(densities.is_empty());
+    }
+
+    #[test]
+    fn test_lowess_smooth() {
+        let x: Vec<f64> = (0..20).map(|i| i as f64 * 0.5).collect();
+        let y: Vec<f64> = x.iter().map(|&xi| xi.sin()).collect();
+        let result = lowess(&x, &y, 0.3);
+        assert!(result.is_some());
+        let result = result.unwrap();
+        assert_eq!(result.x.len(), x.len());
+        assert_eq!(result.y.len(), x.len());
+        // All values should be finite
+        for &v in &result.y {
+            assert!(v.is_finite());
+        }
+    }
+
+    #[test]
+    fn test_lowess_to_series() {
+        let x: Vec<f64> = (0..10).map(|i| i as f64).collect();
+        let y: Vec<f64> = x.iter().map(|&xi| xi * 2.0).collect();
+        let result = lowess(&x, &y, 0.5);
+        assert!(result.is_some());
+        let s = result.unwrap().to_series("smooth", ratatui::style::Color::Cyan);
+        assert_eq!(s.name, "smooth");
+        assert_eq!(s.data.len(), 10);
+    }
+
+    #[test]
+    fn test_bootstrap_ci_basic() {
+        // Data centered around 5.0
+        let data: Vec<f64> = (0..50).map(|i| 4.0 + (i as f64) * 0.04).collect();
+        let true_mean = mean(&data);
+        let ci = bootstrap_ci(&data, mean_estimator, 500, 0.95, 12345);
+        // The CI should contain the true mean
+        assert!(ci.lower <= true_mean);
+        assert!(ci.upper >= true_mean);
+        // The estimate should be close to the true mean
+        assert!((ci.estimate - true_mean).abs() < 1e-10);
+    }
+
+    #[test]
+    fn test_bootstrap_ci_median() {
+        let data: Vec<f64> = (1..=21).map(|i| i as f64).collect();
+        let true_median = 11.0;
+        let ci = bootstrap_ci(&data, median_estimator, 500, 0.95, 42);
+        assert!(ci.lower <= true_median);
+        assert!(ci.upper >= true_median);
+    }
+
+    #[test]
+    fn test_linear_regression_edge_cases() {
+        // Too few points
+        assert!(linear_regression(&[1.0], &[2.0]).is_none());
+        // Length mismatch
+        assert!(linear_regression(&[1.0, 2.0], &[1.0]).is_none());
+        // All x identical
+        assert!(linear_regression(&[1.0, 1.0, 1.0], &[1.0, 2.0, 3.0]).is_none());
+    }
+
+    #[test]
+    fn test_poly_fit_edge_cases() {
+        // degree 0 not allowed
+        assert!(poly_fit(&[1.0, 2.0], &[1.0, 2.0], 0).is_none());
+        // data shorter than degree
+        assert!(poly_fit(&[1.0], &[1.0], 1).is_none());
+    }
+
+    #[test]
+    fn test_lowess_edge_cases() {
+        // Empty data
+        assert!(lowess(&[], &[], 0.5).is_none());
+        // frac out of range
+        assert!(lowess(&[1.0], &[1.0], 0.0).is_none());
+        assert!(lowess(&[1.0], &[1.0], 1.5).is_none());
+        // Length mismatch
+        assert!(lowess(&[1.0, 2.0], &[1.0], 0.5).is_none());
+    }
+
+    #[test]
+    fn test_mean_empty() {
+        assert!((mean(&[]) - 0.0).abs() < 1e-10);
+    }
+
+    #[test]
+    fn test_variance_empty() {
+        assert!((variance(&[]) - 0.0).abs() < 1e-10);
+    }
+
+    #[test]
+    fn test_hist_norm_ext_default() {
+        let norm = ratatui_plt::statistics::HistNormExt::default();
+        assert_eq!(norm, ratatui_plt::statistics::HistNormExt::Count);
+    }
+}
+
+// ===== JointPlot tests =====
+
+#[test]
+fn test_joint_plot_renders() {
+    use ratatui_plt::widgets::joint_plot::{JointPlot, MarginalType};
+
+    let s = Series::new("pts")
+        .data(vec![
+            (0.0, 0.0),
+            (1.0, 2.0),
+            (2.0, 1.0),
+            (3.0, 3.0),
+            (4.0, 2.5),
+        ])
+        .color(Color::Cyan)
+        .marker(MarkerShape::FilledCircle);
+    let plot = JointPlot::new()
+        .series(s)
+        .marginal_x(MarginalType::Histogram)
+        .marginal_y(MarginalType::Histogram)
+        .title("Joint Plot");
+
+    let area = Rect::new(0, 0, 60, 30);
+    let mut buf = Buffer::empty(area);
+    (&plot).render(area, &mut buf);
+}
+
+#[test]
+fn test_joint_plot_kde_marginals() {
+    use ratatui_plt::widgets::joint_plot::{JointPlot, MarginalType};
+
+    let s = Series::new("pts")
+        .data(vec![
+            (0.0, 0.0),
+            (1.0, 1.5),
+            (2.0, 1.0),
+            (3.0, 2.5),
+            (4.0, 3.0),
+            (5.0, 4.0),
+        ])
+        .color(Color::Green)
+        .marker(MarkerShape::Circle);
+    let plot = JointPlot::new()
+        .series(s)
+        .marginal_x(MarginalType::Kde)
+        .marginal_y(MarginalType::Kde)
+        .title("KDE Marginals");
+
+    let area = Rect::new(0, 0, 60, 30);
+    let mut buf = Buffer::empty(area);
+    (&plot).render(area, &mut buf);
+}
+
+#[test]
+fn test_joint_plot_rug_marginals() {
+    use ratatui_plt::widgets::joint_plot::{JointPlot, MarginalType};
+
+    let s = Series::new("pts")
+        .data(vec![
+            (1.0, 2.0),
+            (2.0, 3.0),
+            (3.0, 1.0),
+            (4.0, 4.0),
+        ])
+        .color(Color::Yellow)
+        .marker(MarkerShape::Dot);
+    let plot = JointPlot::new()
+        .series(s)
+        .marginal_x(MarginalType::Rug)
+        .marginal_y(MarginalType::Rug)
+        .title("Rug Marginals");
+
+    let area = Rect::new(0, 0, 60, 30);
+    let mut buf = Buffer::empty(area);
+    (&plot).render(area, &mut buf);
+}
+
+#[test]
+fn test_joint_plot_no_marginals() {
+    use ratatui_plt::widgets::joint_plot::{JointPlot, MarginalType};
+
+    let s = Series::new("pts")
+        .data(vec![(0.0, 0.0), (1.0, 1.0), (2.0, 2.0)])
+        .color(Color::Red)
+        .marker(MarkerShape::Cross);
+    let plot = JointPlot::new()
+        .series(s)
+        .marginal_x(MarginalType::None)
+        .marginal_y(MarginalType::None)
+        .title("No Marginals");
+
+    let area = Rect::new(0, 0, 40, 20);
+    let mut buf = Buffer::empty(area);
+    (&plot).render(area, &mut buf);
+}
+
+#[cfg(feature = "statistics")]
+#[test]
+fn test_scatter_trendline_linear() {
+    use ratatui_plt::widgets::scatter_plot::TrendlineType;
+
+    let s = Series::new("pts")
+        .data(vec![
+            (0.0, 0.5),
+            (1.0, 2.1),
+            (2.0, 3.8),
+            (3.0, 6.2),
+            (4.0, 7.9),
+        ])
+        .color(Color::Cyan)
+        .marker(MarkerShape::FilledCircle);
+    let plot = ScatterPlot::new()
+        .series(s)
+        .trendline(TrendlineType::Linear)
+        .trendline_color(Color::Yellow)
+        .title("Linear Trendline");
+
+    let area = Rect::new(0, 0, 60, 30);
+    let mut buf = Buffer::empty(area);
+    (&plot).render(area, &mut buf);
+}
+
+#[cfg(feature = "statistics")]
+#[test]
+fn test_scatter_trendline_polynomial() {
+    use ratatui_plt::widgets::scatter_plot::TrendlineType;
+
+    let s = Series::new("pts")
+        .data(vec![
+            (-2.0, 4.1),
+            (-1.0, 1.2),
+            (0.0, 0.1),
+            (1.0, 0.8),
+            (2.0, 4.3),
+            (3.0, 9.1),
+        ])
+        .color(Color::Green)
+        .marker(MarkerShape::Circle);
+    let plot = ScatterPlot::new()
+        .series(s)
+        .trendline(TrendlineType::Polynomial(2))
+        .title("Polynomial Trendline");
+
+    let area = Rect::new(0, 0, 60, 30);
+    let mut buf = Buffer::empty(area);
+    (&plot).render(area, &mut buf);
+}
+
+use ratatui_plt::legend::LegendEntry;
+
+// --- Interactive Legend ---
+
+#[test]
+fn test_interactive_legend_renders() {
+    let entries = vec![
+        LegendEntry {
+            name: "Visible".into(),
+            color: Color::Red,
+            marker: Some('●'),
+        },
+        LegendEntry {
+            name: "Hidden".into(),
+            color: Color::Blue,
+            marker: Some('■'),
+        },
+        LegendEntry {
+            name: "Also Visible".into(),
+            color: Color::Green,
+            marker: Some('▲'),
+        },
+    ];
+    let state = shared_legend_state(entries.len());
+    // Hide the second entry
+    state.borrow_mut()[1] = false;
+
+    let legend = InteractiveLegend::new(entries, state);
+    let area = Rect::new(0, 0, 30, 10);
+    let mut buf = Buffer::empty(area);
+    (&legend).render(area, &mut buf);
+}
+
+#[test]
+fn test_interactive_legend_toggle() {
+    let entries = vec![
+        LegendEntry {
+            name: "A".into(),
+            color: Color::Red,
+            marker: Some('●'),
+        },
+        LegendEntry {
+            name: "B".into(),
+            color: Color::Blue,
+            marker: Some('■'),
+        },
+    ];
+    let state = shared_legend_state(entries.len());
+    let legend = InteractiveLegend::new(entries, state);
+
+    // Initially all visible
+    assert!(legend.is_visible(0));
+    assert!(legend.is_visible(1));
+
+    // Toggle first entry
+    legend.toggle(0);
+    assert!(!legend.is_visible(0));
+    assert!(legend.is_visible(1));
+
+    // Toggle back
+    legend.toggle(0);
+    assert!(legend.is_visible(0));
+
+    // Out-of-range toggle is a no-op
+    legend.toggle(99);
+    assert!(!legend.is_visible(99));
+}
+
+// --- Span Selector ---
+
+#[test]
+fn test_span_selector_renders() {
+    let area = Rect::new(0, 0, 60, 30);
+    let pa = PlotArea {
+        x: 8,
+        y: 1,
+        width: 50,
+        height: 27,
+        x_lo: 0.0,
+        x_hi: 10.0,
+        y_lo: 0.0,
+        y_hi: 10.0,
+        area,
+    };
+    let mut buf = Buffer::empty(area);
+
+    let state = shared_span_state();
+    state.borrow_mut().start = Some(2.0);
+    state.borrow_mut().end = Some(5.0);
+
+    let selector = SpanSelector::new(state).color(Color::Cyan);
+    selector.render_on(&pa, &mut buf);
+}
+
+// --- Rectangle Selector ---
+
+#[test]
+fn test_rect_selector_renders() {
+    let area = Rect::new(0, 0, 60, 30);
+    let pa = PlotArea {
+        x: 8,
+        y: 1,
+        width: 50,
+        height: 27,
+        x_lo: 0.0,
+        x_hi: 10.0,
+        y_lo: 0.0,
+        y_hi: 10.0,
+        area,
+    };
+    let mut buf = Buffer::empty(area);
+
+    let brush = shared_brush();
+    brush.borrow_mut().set_selection(1.0, 2.0, 5.0, 8.0);
+
+    let selector = RectangleSelector::new(brush).color(Color::Yellow).border(true);
+    selector.render_on(&pa, &mut buf);
+}
+
+// --- Linked View ---
+
+#[test]
+fn test_shared_view_state() {
+    let sv = shared_view();
+    assert!(sv.borrow().x_bounds.is_none());
+    assert!(sv.borrow().y_bounds.is_none());
+
+    sv.borrow_mut().x_bounds = Some((0.0, 10.0));
+    sv.borrow_mut().y_bounds = Some((-1.0, 1.0));
+
+    let state = sv.borrow();
+    assert_eq!(state.x_bounds, Some((0.0, 10.0)));
+    assert_eq!(state.y_bounds, Some((-1.0, 1.0)));
+}
+
+#[test]
+fn test_line_plot_with_shared_view() {
+    let sv = shared_view();
+    sv.borrow_mut().x_bounds = Some((0.0, 5.0));
+    sv.borrow_mut().y_bounds = Some((-2.0, 2.0));
+
+    let s = Series::new("test")
+        .data(
+            (0..50)
+                .map(|i| {
+                    let x = i as f64 * 0.2;
+                    (x, x.sin())
+                })
+                .collect(),
+        )
+        .color(Color::Cyan);
+
+    let plot = LinePlot::new()
+        .series(s)
+        .title("Linked View Test")
+        .shared_view(sv);
+
+    let area = Rect::new(0, 0, 60, 30);
+    let mut buf = Buffer::empty(area);
+    (&plot).render(area, &mut buf);
+}
+
+#[test]
+fn test_waterfall_chart_renders() {
+    let chart = WaterfallChart::new()
+        .entry(WaterfallEntry::new("Revenue", 100.0))
+        .entry(WaterfallEntry::new("COGS", -40.0))
+        .entry(WaterfallEntry::new("Expenses", -30.0))
+        .entry(WaterfallEntry::total("Profit", 30.0))
+        .title("P&L Waterfall");
+
+    let area = Rect::new(0, 0, 60, 20);
+    let mut buf = Buffer::empty(area);
+    (&chart).render(area, &mut buf);
+}
+
+#[test]
+fn test_funnel_chart_renders() {
+    let chart = FunnelChart::new()
+        .entry(FunnelEntry::new("Visitors", 10000.0).color(Color::Cyan))
+        .entry(FunnelEntry::new("Leads", 6500.0).color(Color::Blue))
+        .entry(FunnelEntry::new("Qualified", 3200.0).color(Color::Yellow))
+        .entry(FunnelEntry::new("Sales", 950.0).color(Color::Green))
+        .show_percentages(true)
+        .show_values(true)
+        .title("Sales Funnel");
+
+    let area = Rect::new(0, 0, 60, 20);
+    let mut buf = Buffer::empty(area);
+    (&chart).render(area, &mut buf);
+}
+
+#[test]
+fn test_gauge_chart_renders() {
+    let gauge = GaugeChart::new(72.0)
+        .min(0.0)
+        .max(100.0)
+        .sector(GaugeSector::new(0.0, 33.0, Color::Green))
+        .sector(GaugeSector::new(33.0, 66.0, Color::Yellow))
+        .sector(GaugeSector::new(66.0, 100.0, Color::Red))
+        .title("CPU Usage");
+
+    let area = Rect::new(0, 0, 40, 20);
+    let mut buf = Buffer::empty(area);
+    (&gauge).render(area, &mut buf);
+}
+
+#[test]
+fn test_gauge_chart_default_sectors() {
+    let gauge = GaugeChart::new(50.0)
+        .min(0.0)
+        .max(100.0)
+        .title("Default Gauge");
+
+    let area = Rect::new(0, 0, 40, 20);
+    let mut buf = Buffer::empty(area);
+    (&gauge).render(area, &mut buf);
+}
+
+#[test]
+fn test_gantt_chart_renders() {
+    let chart = GanttChart::new()
+        .task(
+            GanttTask::new("Research")
+                .segment(0.0, 3.0)
+                .color(Color::Cyan),
+        )
+        .task(
+            GanttTask::new("Design")
+                .segment(2.0, 4.0)
+                .color(Color::Blue),
+        )
+        .task(
+            GanttTask::new("Develop")
+                .segment(5.0, 6.0)
+                .segment(12.0, 2.0)
+                .color(Color::Green),
+        )
+        .show_grid(true)
+        .title("Project Timeline");
+
+    let area = Rect::new(0, 0, 60, 20);
+    let mut buf = Buffer::empty(area);
+    (&chart).render(area, &mut buf);
+}
+#[cfg(feature = "kitty")]
+use ratatui_plt::export::{ExportOptions, buffer_to_kitty};
+#[cfg(feature = "sixel")]
+use ratatui_plt::export::{ExportOptions as SixelExportOptions, buffer_to_sixel};
+#[cfg(feature = "toml-themes")]
+use ratatui_plt::theme::theme_from_toml;
+
+// ---------------------------------------------------------------------------
+// Kitty graphics protocol tests
+// ---------------------------------------------------------------------------
+
+#[cfg(feature = "kitty")]
+#[test]
+fn test_buffer_to_kitty_valid() {
+    let s = Series::new("test")
+        .data(vec![(0.0, 0.0), (1.0, 1.0), (2.0, 0.5)])
+        .color(Color::Cyan);
+    let plot = LinePlot::new().series(s).title("Kitty test");
+    let area = Rect::new(0, 0, 20, 10);
+    let mut buf = Buffer::empty(area);
+    (&plot).render(area, &mut buf);
+
+    let options = ExportOptions::default();
+    let result = buffer_to_kitty(&buf, &options);
+    assert!(result.is_ok());
+    let kitty = result.unwrap_or_default();
+    // Kitty escape sequences start with ESC_G
+    assert!(kitty.starts_with("\x1b_G"));
+    // Must end with the string terminator
+    assert!(kitty.ends_with("\x1b\\"));
+    // Must contain base64 data (at minimum some alphanumeric chars)
+    assert!(kitty.len() > 20);
+}
+
+// ---------------------------------------------------------------------------
+// Sixel graphics protocol tests
+// ---------------------------------------------------------------------------
+
+#[cfg(feature = "sixel")]
+#[test]
+fn test_buffer_to_sixel_valid() {
+    let s = Series::new("test")
+        .data(vec![(0.0, 0.0), (1.0, 1.0), (2.0, 0.5)])
+        .color(Color::Magenta);
+    let plot = LinePlot::new().series(s).title("Sixel test");
+    let area = Rect::new(0, 0, 20, 10);
+    let mut buf = Buffer::empty(area);
+    (&plot).render(area, &mut buf);
+
+    let options = SixelExportOptions::default();
+    let result = buffer_to_sixel(&buf, &options);
+    assert!(result.is_ok());
+    let sixel = result.unwrap_or_default();
+    // Sixel starts with DCS (ESC P) followed by 'q'
+    assert!(sixel.starts_with("\x1bPq"));
+    // Must end with string terminator
+    assert!(sixel.ends_with("\x1b\\"));
+    // Must contain raster attributes
+    assert!(sixel.contains('"'));
+    // Must contain palette definitions
+    assert!(sixel.contains('#'));
+}
+
+// ---------------------------------------------------------------------------
+// TOML theme loading tests
+// ---------------------------------------------------------------------------
+
+#[cfg(feature = "toml-themes")]
+#[test]
+fn test_theme_from_toml_basic() {
+    let toml_str = r##"
+[colors]
+background = "#1a1a2e"
+foreground = "#e0e0e0"
+grid = "#333333"
+minor_grid = "#222222"
+axis = "gray"
+
+[grid]
+visible = true
+pattern = "dashed"
+bold_title = false
+
+[cycle]
+colors = ["#e94560", "#0f3460", "#16c79a"]
+"##;
+
+    let result = theme_from_toml(toml_str);
+    assert!(result.is_ok());
+    let theme = result.unwrap_or_default();
+    assert_eq!(theme.background, Color::Rgb(0x1a, 0x1a, 0x2e));
+    assert_eq!(theme.foreground, Color::Rgb(0xe0, 0xe0, 0xe0));
+    assert_eq!(theme.grid_color, Color::Rgb(0x33, 0x33, 0x33));
+    assert_eq!(theme.minor_grid_color, Color::Rgb(0x22, 0x22, 0x22));
+    assert_eq!(theme.axis_color, Color::Gray);
+    assert!(theme.grid_visible);
+    assert_eq!(theme.grid_pattern, DashPattern::Dashed);
+    assert!(!theme.bold_title);
+}
+
+#[cfg(feature = "toml-themes")]
+#[test]
+fn test_theme_from_toml_partial() {
+    // Only override some fields; the rest should use dark theme defaults.
+    let toml_str = r#"
+[colors]
+foreground = "red"
+"#;
+
+    let result = theme_from_toml(toml_str);
+    assert!(result.is_ok());
+    let theme = result.unwrap_or_default();
+    // Overridden field
+    assert_eq!(theme.foreground, Color::Red);
+    // Default fields from Theme::dark()
+    assert_eq!(theme.background, Color::Reset);
+    assert!(theme.grid_visible);
+    assert!(theme.bold_title);
+}
+
+#[cfg(feature = "toml-themes")]
+#[test]
+fn test_theme_from_toml_invalid_color() {
+    let toml_str = r##"
+[colors]
+background = "#xyz"
+"##;
+
+    let result = theme_from_toml(toml_str);
+    assert!(result.is_err());
+}
+
+// ---------------------------------------------------------------------------
+// Unicode-extended feature tests
+// ---------------------------------------------------------------------------
+
+#[cfg(feature = "unicode-extended")]
+mod unicode_extended {
+    use ratatui::buffer::Buffer;
+    use ratatui::layout::Rect;
+    use ratatui::style::Color;
+    use ratatui::widgets::Widget;
+
+    use ratatui_plt::drawing::{sextant_char, vertical_fill_char, VERTICAL_FILL_LEVELS};
+    use ratatui_plt::widgets::histogram::Histogram;
+
+    #[test]
+    fn test_sextant_char_empty() {
+        assert_eq!(sextant_char(0), ' ');
+    }
+
+    #[test]
+    fn test_sextant_char_full() {
+        assert_eq!(sextant_char(0x3F), '\u{2588}'); // █ FULL BLOCK
+    }
+
+    #[test]
+    fn test_sextant_char_top_left() {
+        let ch = sextant_char(1);
+        // Pattern 1 = top-left only → U+1FB00 BLOCK SEXTANT-1
+        assert_eq!(ch, '\u{1FB00}');
+        assert!(ch != ' ' && ch != '\u{2588}');
+    }
+
+    #[test]
+    fn test_sextant_char_upper_half() {
+        // Pattern 0b010101 = 21 → upper half block U+2580
+        assert_eq!(sextant_char(0b010101), '\u{2580}');
+    }
+
+    #[test]
+    fn test_sextant_char_lower_half() {
+        // Pattern 0b101010 = 42 → lower half block U+2584
+        assert_eq!(sextant_char(0b101010), '\u{2584}');
+    }
+
+    #[test]
+    fn test_sextant_char_high_bits_masked() {
+        // Bits above the lower 6 should be masked off
+        assert_eq!(sextant_char(0xFF), sextant_char(0x3F));
+        assert_eq!(sextant_char(0x80), sextant_char(0));
+    }
+
+    #[test]
+    fn test_sextant_char_all_patterns_valid() {
+        // Every 6-bit pattern should produce a valid, distinct character
+        let mut chars: Vec<char> = (0..64u8).map(sextant_char).collect();
+        // All should be valid Unicode
+        for &ch in &chars {
+            assert!(ch as u32 > 0 || ch == ' ');
+        }
+        // All 64 patterns should map to distinct characters
+        chars.sort();
+        chars.dedup();
+        assert_eq!(chars.len(), 64);
+    }
+
+    #[test]
+    fn test_vertical_fill_levels_length() {
+        assert_eq!(VERTICAL_FILL_LEVELS.len(), 9);
+    }
+
+    #[test]
+    fn test_vertical_fill_levels_endpoints() {
+        assert_eq!(VERTICAL_FILL_LEVELS[0], ' ');
+        assert_eq!(VERTICAL_FILL_LEVELS[8], '\u{2588}'); // █
+    }
+
+    #[test]
+    fn test_vertical_fill_levels_monotonic() {
+        // Each level should be a distinct character
+        for i in 0..8 {
+            assert_ne!(
+                VERTICAL_FILL_LEVELS[i], VERTICAL_FILL_LEVELS[i + 1],
+                "levels {} and {} should differ",
+                i,
+                i + 1,
+            );
+        }
+    }
+
+    #[test]
+    fn test_vertical_fill_char_boundaries() {
+        assert_eq!(vertical_fill_char(0.0), ' ');
+        assert_eq!(vertical_fill_char(1.0), '\u{2588}');
+        // Clamped outside range
+        assert_eq!(vertical_fill_char(-1.0), ' ');
+        assert_eq!(vertical_fill_char(2.0), '\u{2588}');
+    }
+
+    #[test]
+    fn test_vertical_fill_char_midpoint() {
+        // 0.5 should map to level 4 = ▄ lower half block
+        assert_eq!(vertical_fill_char(0.5), '\u{2584}');
+    }
+
+    #[test]
+    fn test_histogram_renders_unicode_extended() {
+        let data = vec![1.0, 1.5, 2.0, 2.5, 3.0, 3.5, 4.0, 4.5, 5.0];
+        let hist = Histogram::new(data)
+            .bins(5)
+            .color(Color::Cyan)
+            .title("Unicode Extended Histogram");
+        let area = Rect::new(0, 0, 60, 20);
+        let mut buf = Buffer::empty(area);
+        (&hist).render(area, &mut buf);
+        // Should not panic — rendering with unicode-extended bar tops
+    }
+}
+
+#[test]
+fn test_marker_shapes_extended() {
+    // Verify all new MarkerShape variants return valid, distinct chars
+    let extended_shapes = [
+        MarkerShape::TriangleDown,
+        MarkerShape::TriangleRight,
+        MarkerShape::TriangleLeft,
+        MarkerShape::FilledDiamond,
+        MarkerShape::CircleHalfLeft,
+        MarkerShape::CircleHalfRight,
+        MarkerShape::CircleHalfTop,
+        MarkerShape::CircleHalfBottom,
+        MarkerShape::Pentagon,
+        MarkerShape::Hexagon,
+    ];
+    let chars: Vec<char> = extended_shapes.iter().map(|s| s.char()).collect();
+    // All chars should be distinct
+    let mut unique = chars.clone();
+    unique.sort();
+    unique.dedup();
+    assert_eq!(
+        chars.len(),
+        unique.len(),
+        "Extended marker shapes must have distinct chars"
+    );
+    // None of them should collide with the original marker shapes
+    let original_shapes = [
+        MarkerShape::Dot,
+        MarkerShape::Cross,
+        MarkerShape::Plus,
+        MarkerShape::Circle,
+        MarkerShape::FilledCircle,
+        MarkerShape::Triangle,
+        MarkerShape::Square,
+        MarkerShape::FilledSquare,
+        MarkerShape::Diamond,
+        MarkerShape::Star,
+        MarkerShape::Braille,
+    ];
+    let original_chars: Vec<char> = original_shapes.iter().map(|s| s.char()).collect();
+    for c in &chars {
+        assert!(
+            !original_chars.contains(c),
+            "Extended marker char '{c}' collides with an original marker",
+        );
+    }
+}
+
+#[test]
+fn test_vector_field_arrow_styles() {
+    let field = VectorFieldData::from_fn((-1.0, 1.0), (-1.0, 1.0), 5, 5, |x, y| (-y, x));
+    let area = Rect::new(0, 0, 40, 20);
+
+    // Render with each ArrowCharSet variant — should not panic
+    let styles = [
+        ArrowCharSet::Standard,
+        ArrowCharSet::Heavy,
+        ArrowCharSet::Harpoon,
+        ArrowCharSet::Double,
+    ];
+    for style in styles {
+        let plot = VectorField::new(field.clone())
+            .arrow_char_set(style)
+            .title("Arrow Style Test");
+        let mut buf = Buffer::empty(area);
+        (&plot).render(area, &mut buf);
+    }
+}
+
+#[test]
+fn test_pie_chart_renders_with_unicode_extended() {
+    // Test that PieChart renders without panic (the arc quadrants
+    // are only active when the unicode-extended feature is enabled,
+    // but the test should pass either way).
+    use ratatui_plt::widgets::pie_chart::{PieChart, PieSlice};
+
+    let chart = PieChart::new()
+        .slice(PieSlice::new("A", 40.0).color(Color::Cyan))
+        .slice(PieSlice::new("B", 35.0).color(Color::Yellow))
+        .slice(PieSlice::new("C", 25.0).color(Color::Red))
+        .title("Unicode Pie")
+        .show_percentages(true);
+    let area = Rect::new(0, 0, 50, 25);
+    let mut buf = Buffer::empty(area);
+    (&chart).render(area, &mut buf);
+}
+
+#[cfg(feature = "unicode-extended")]
+#[test]
+fn test_horizontal_fill_levels() {
+    assert_eq!(ratatui_plt::drawing::HORIZONTAL_FILL_LEVELS.len(), 9);
+    assert_eq!(ratatui_plt::drawing::HORIZONTAL_FILL_LEVELS[0], ' ');
+    assert_eq!(ratatui_plt::drawing::HORIZONTAL_FILL_LEVELS[8], '\u{2588}');
+}
+
+#[cfg(feature = "unicode-extended")]
+#[test]
+fn test_quadrant_char() {
+    assert_eq!(ratatui_plt::drawing::quadrant_char(0), ' ');
+    assert_eq!(ratatui_plt::drawing::quadrant_char(0x0F), '\u{2588}');
+    assert_eq!(ratatui_plt::drawing::quadrant_char(0b0011), '\u{2580}'); // upper half
+    assert_eq!(ratatui_plt::drawing::quadrant_char(0b1100), '\u{2584}'); // lower half
+}
+
+#[test]
+fn test_marker_shapes_dingbats() {
+    use ratatui_plt::prelude::MarkerShape;
+    let dingbats = [
+        MarkerShape::FourPointedStar,
+        MarkerShape::SixPointedStar,
+        MarkerShape::EightPointedStar,
+        MarkerShape::Sparkle,
+        MarkerShape::SmallCircle,
+        MarkerShape::Ring,
+    ];
+    for m in &dingbats {
+        let c = m.char();
+        assert_ne!(c, ' ');
+    }
+}
+
+#[test]
+fn test_border_style_chars() {
+    use ratatui_plt::frame::BorderStyle;
+    let s = BorderStyle::Single;
+    assert_eq!(s.top_left(), '┌');
+    let r = BorderStyle::Rounded;
+    assert_eq!(r.top_left(), '╭');
+    let d = BorderStyle::Double;
+    assert_eq!(d.top_left(), '╔');
+}
+
+#[test]
+fn test_enclosed_numbers() {
+    use ratatui_plt::annotation::enclosed_number;
+    assert_eq!(enclosed_number(1), "①");
+    assert_eq!(enclosed_number(10), "⑩");
+    assert_eq!(enclosed_number(20), "⑳");
+    assert_eq!(enclosed_number(21), "21"); // falls back to string
 }

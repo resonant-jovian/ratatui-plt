@@ -7,8 +7,9 @@ use ratatui::widgets::Widget;
 
 use crate::annotation::Annotation;
 use crate::axis::Axis;
-use crate::drawing::draw_braille_line;
+use crate::drawing::draw_braille_line_pb;
 use crate::frame::{DataBounds, PlotFrame, ReferenceLine};
+use crate::plot_buffer::{PlotBuffer, Z_CHROME, Z_MARKER};
 use crate::spines::Spines;
 use crate::style::MarkerShape;
 use crate::theme::Theme;
@@ -149,22 +150,22 @@ impl Widget for &StemPlot {
         let (x_lo, x_hi) = self.x_axis.resolve_bounds(x_min, x_max);
         let (y_lo, y_hi) = self.y_axis.resolve_bounds(y_min, y_max);
 
+        let mut pb = PlotBuffer::new(area);
+
         // Create and render the plot frame (title, axes, grid, ticks, labels, spines, ref lines)
         let frame = PlotFrame::new(&self.x_axis, &self.y_axis, &self.theme)
             .title(self.title.as_deref())
             .spines(self.spines.clone())
             .reference_lines(&self.reference_lines);
 
-        let Some(pa) = frame.render(
-            area,
-            buf,
-            DataBounds {
-                x_lo,
-                x_hi,
-                y_lo,
-                y_hi,
-            },
-        ) else {
+        let bounds = DataBounds {
+            x_lo,
+            x_hi,
+            y_lo,
+            y_hi,
+        };
+
+        let Some(pa) = frame.render_to_pb(&mut pb, area, bounds) else {
             return;
         };
 
@@ -173,9 +174,7 @@ impl Widget for &StemPlot {
         let base_yi = base_sy.round() as u16;
         if base_yi >= pa.y && base_yi < pa.y + pa.height {
             for x in pa.x..pa.x + pa.width {
-                buf[(x, base_yi)]
-                    .set_char('─')
-                    .set_fg(self.theme.axis_color);
+                pb.set_char(x, base_yi, '─', self.theme.axis_color, Z_CHROME);
             }
         }
 
@@ -191,17 +190,20 @@ impl Widget for &StemPlot {
             }
 
             // Draw stem line using Braille sub-pixel rendering
-            draw_braille_line(buf, sx, base_sy, sx, sy, self.color, &pa);
+            draw_braille_line_pb(&mut pb, sx, base_sy, sx, sy, self.color, &pa);
 
             // Draw marker at data point
             if pa.contains(xi, yi) {
-                buf[(xi, yi)]
-                    .set_char(self.marker.char())
-                    .set_fg(self.color);
+                pb.set_char(xi, yi, self.marker.char(), self.color, Z_MARKER);
             }
         }
 
         // Draw annotations
-        PlotFrame::draw_annotations(&pa, &self.annotations, buf);
+        PlotFrame::draw_annotations_pb(&pa, &self.annotations, &mut pb);
+
+        // Composite to buffer
+        pb.composite(buf);
+
+        frame.draw_end_labels(buf, area, &pa);
     }
 }

@@ -29,6 +29,7 @@ use crate::annotation::Annotation;
 use crate::axis::Axis;
 use crate::frame::{DataBounds, PlotFrame, ReferenceLine};
 use crate::legend::{Legend, LegendEntry, LegendPosition};
+use crate::plot_buffer::{PlotBuffer, Z_DATA, Z_FILL};
 use crate::spines::Spines;
 use crate::theme::Theme;
 
@@ -199,15 +200,17 @@ impl Widget for &BandPlot {
         let (x_lo, x_hi) = self.x_axis.resolve_bounds(data_x_min, data_x_max);
         let (y_lo, y_hi) = self.y_axis.resolve_bounds(data_y_min, data_y_max);
 
+        let mut pb = PlotBuffer::new(area);
+
         // Create and render the plot frame
         let frame = PlotFrame::new(&self.x_axis, &self.y_axis, &self.theme)
             .title(self.title.as_deref())
             .spines(self.spines.clone())
             .reference_lines(&self.reference_lines);
 
-        let Some(pa) = frame.render(
+        let Some(pa) = frame.render_to_pb(
+            &mut pb,
             area,
-            buf,
             DataBounds {
                 x_lo,
                 x_hi,
@@ -226,57 +229,90 @@ impl Widget for &BandPlot {
             // Instead of filling only at data point x-coordinates, iterate over every
             // screen column and interpolate the bounds for gap-free rendering.
             if n >= 2 {
+                // Half-block fill for 2x vertical resolution.
+                // Edge cells use set_char ONLY (not set_cell) so the bg from
+                // underlying bands is preserved — overlapping bands composite
+                // correctly without overwriting each other's colors.
+                let mut prev_zero_y_draw: Option<f64> = None;
                 for col_offset in 0..pa.width {
                     let screen_x = pa.x + col_offset;
-                    // Map screen column to data x coordinate
                     let data_x = pa.x_lo
                         + (col_offset as f64 / (pa.width - 1).max(1) as f64) * (pa.x_hi - pa.x_lo);
 
-                    // Find the data segment containing this x and interpolate
                     let yl_interp = interpolate_at(&band.x[..n], &band.y_lower[..n], data_x);
                     let yu_interp = interpolate_at(&band.x[..n], &band.y_upper[..n], data_x);
 
                     if let (Some(yl), Some(yu)) = (yl_interp, yu_interp) {
-                        let sy_lower = pa.screen_y(yl).round() as u16;
-                        let sy_upper = pa.screen_y(yu).round() as u16;
+                        let sy_top_f = pa.screen_y(yu.max(yl));
+                        let sy_bot_f = pa.screen_y(yu.min(yl));
 
-                        let y_top = sy_upper.min(sy_lower);
-                        let y_bot = sy_upper.max(sy_lower);
+                        // Half-pixel resolution: each cell has top (even) and bottom (odd)
+                        let hp_top = (sy_top_f * 2.0).round() as i32;
+                        let hp_bot = (sy_bot_f * 2.0).round() as i32;
+                        if hp_top >= hp_bot {
+                            // Zero-width band: draw as a braille line segment
+                            // connecting this column to the next for a smooth curve.
+                            if let Some(prev_y) = prev_zero_y_draw {
+                                crate::drawing::draw_braille_line_pb(
+                                    &mut pb,
+                                    (screen_x - 1) as f64,
+                                    prev_y,
+                                    screen_x as f64,
+                                    sy_top_f,
+                                    band.color,
+                                    &pa,
+                                );
+                            }
+                            prev_zero_y_draw = Some(sy_top_f);
+                            continue;
+                        }
 
-                        for y in y_top..=y_bot {
-                            if pa.contains(screen_x, y) {
-                                buf[(screen_x, y)]
-                                    .set_char(band.alpha_char)
-                                    .set_fg(band.color);
+                        let cell_top = (hp_top.max(0) / 2) as u16;
+                        let cell_bot = ((hp_bot - 1).max(0) / 2) as u16;
+
+                        for cell_y in cell_top..=cell_bot {
+                            if !pa.contains(screen_x, cell_y) {
+                                continue;
+                            }
+                            let hp_cell_top = cell_y as i32 * 2;
+                            let hp_cell_bot = hp_cell_top + 1;
+
+                            let top_in = hp_top <= hp_cell_top && hp_bot > hp_cell_top;
+                            let bot_in = hp_top <= hp_cell_bot && hp_bot > hp_cell_bot;
+
+                            match (top_in, bot_in) {
+                                (true, true) => {
+                                    // Both halves: fully opaque
+                                    pb.set_cell(screen_x, cell_y, ' ', band.color, band.color, Z_DATA);
+                                }
+                                (true, false) => {
+                                    // Top half only: '▀' fg=band_color, bg inherited
+                                    pb.set_char(screen_x, cell_y, '▀', band.color, Z_DATA);
+                                    // Also set bg so outermost edges have a color
+                                    pb.set_bg(screen_x, cell_y, band.color, Z_FILL);
+                                }
+                                (false, true) => {
+                                    // Bottom half only: '▄' fg=band_color, bg inherited
+                                    pb.set_char(screen_x, cell_y, '▄', band.color, Z_DATA);
+                                    pb.set_bg(screen_x, cell_y, band.color, Z_FILL);
+                                }
+                                (false, false) => {}
                             }
                         }
                     }
                 }
             }
 
-            // Draw boundary lines (upper and lower edges)
-            for i in 0..n.saturating_sub(1) {
-                let x0 = band.x[i];
-                let x1 = band.x[i + 1];
-
-                // Upper boundary
-                let yu0 = band.y_upper[i];
-                let yu1 = band.y_upper[i + 1];
-                if x0.is_finite() && x1.is_finite() && yu0.is_finite() && yu1.is_finite() {
-                    draw_boundary_line(buf, &pa, x0, yu0, x1, yu1, band.color);
-                }
-
-                // Lower boundary
-                let yl0 = band.y_lower[i];
-                let yl1 = band.y_lower[i + 1];
-                if x0.is_finite() && x1.is_finite() && yl0.is_finite() && yl1.is_finite() {
-                    draw_boundary_line(buf, &pa, x0, yl0, x1, yl1, band.color);
-                }
-            }
         }
 
         // Draw annotations
-        PlotFrame::draw_annotations(&pa, &self.annotations, buf);
+        PlotFrame::draw_annotations_pb(&pa, &self.annotations, &mut pb);
+
+        // Composite before legend
+        pb.composite(buf);
+
+        // Draw End-positioned labels directly to buf (after composite to avoid PB clipping)
+        frame.draw_end_labels(buf, area, &pa);
 
         // Draw legend
         if self.show_legend && !self.bands.is_empty() {
@@ -286,7 +322,7 @@ impl Widget for &BandPlot {
                 .map(|b| LegendEntry {
                     name: b.name.clone(),
                     color: b.color,
-                    marker: Some(b.alpha_char),
+                    marker: Some('█'),
                 })
                 .collect();
             let legend = Legend::new(entries)
@@ -365,19 +401,3 @@ fn interpolate_at(xs: &[f64], ys: &[f64], x: f64) -> Option<f64> {
     Some(y0 + t * (y1 - y0))
 }
 
-/// Draw a boundary line segment between two data points using Braille sub-pixel rendering.
-fn draw_boundary_line(
-    buf: &mut Buffer,
-    pa: &crate::frame::PlotArea,
-    x0: f64,
-    y0: f64,
-    x1: f64,
-    y1: f64,
-    color: Color,
-) {
-    let sx0 = pa.screen_x(x0);
-    let sy0 = pa.screen_y(y0);
-    let sx1 = pa.screen_x(x1);
-    let sy1 = pa.screen_y(y1);
-    crate::drawing::draw_braille_line(buf, sx0, sy0, sx1, sy1, color, pa);
-}

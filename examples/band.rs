@@ -20,7 +20,8 @@ fn parse_theme() -> Theme {
         Some("minimal") => Theme::minimal(),
         Some("publication") => Theme::publication(),
         Some("solarized") => Theme::solarized(),
-        Some("dark") | None => Theme::dark(),
+        Some("dark") => Theme::dark(),
+        None => Theme::auto(),
         Some(other) => {
             eprintln!(
                 "Unknown theme '{other}'. Available: dark, light, minimal, publication, solarized"
@@ -98,14 +99,20 @@ fn main() -> color_eyre::Result<()> {
         .band(band_1sig)
         .band(center_line)
         .title("Model Uncertainty Band (q to quit)")
-        .x_axis(Axis::new().label("Time [s]").grid(true))
-        .y_axis(Axis::new().label("Amplitude").grid(true))
+        .x_axis(Axis::new().label("Time [s]").grid(true).label_position(LabelPosition::End))
+        .y_axis(Axis::new().label("Amplitude").grid(true).label_position(LabelPosition::End))
         .show_legend(true)
         .legend_position(LegendPosition::TopRight);
 
     loop {
         terminal.draw(|frame| {
-            frame.render_widget(&plot, frame.area());
+            // Leave right margin for the End-positioned x-label box
+            let fa = frame.area();
+            let margin = 14; // label box width ("Time [s]" + borders + padding)
+            let avail = ratatui::layout::Rect::new(
+                fa.x, fa.y, fa.width.saturating_sub(margin), fa.height,
+            );
+            frame.render_widget(&plot, square_area(avail));
         })?;
 
         if let Event::Key(key) = event::read()?

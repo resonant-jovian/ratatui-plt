@@ -26,8 +26,9 @@ use ratatui::style::Color;
 use ratatui::widgets::Widget;
 
 use crate::axis::{AspectRatio, Axis};
-use crate::drawing::draw_braille_line;
+use crate::drawing::draw_braille_line_pb;
 use crate::frame::{DataBounds, PlotFrame, ReferenceLine};
+use crate::plot_buffer::{PlotBuffer, Z_ANNOTATION, Z_MARKER};
 use crate::spines::Spines;
 use crate::style::MarkerShape;
 use crate::theme::Theme;
@@ -414,6 +415,8 @@ impl Widget for &NetworkPlot {
         let (x_lo, x_hi) = self.x_axis.resolve_bounds(x_min, x_max);
         let (y_lo, y_hi) = self.y_axis.resolve_bounds(y_min, y_max);
 
+        let mut pb = PlotBuffer::new(area);
+
         // Create and render the plot frame
         let frame = PlotFrame::new(&self.x_axis, &self.y_axis, &self.theme)
             .title(self.title.as_deref())
@@ -421,16 +424,14 @@ impl Widget for &NetworkPlot {
             .spines(self.spines.clone())
             .reference_lines(&self.reference_lines);
 
-        let Some(pa) = frame.render(
-            area,
-            buf,
-            DataBounds {
-                x_lo,
-                x_hi,
-                y_lo,
-                y_hi,
-            },
-        ) else {
+        let bounds = DataBounds {
+            x_lo,
+            x_hi,
+            y_lo,
+            y_hi,
+        };
+
+        let Some(pa) = frame.render_to_pb(&mut pb, area, bounds) else {
             return;
         };
 
@@ -449,7 +450,7 @@ impl Widget for &NetworkPlot {
 
             let edge_color = edge.color.unwrap_or(self.theme.grid_color);
 
-            draw_braille_line(buf, sx0, sy0, sx1, sy1, edge_color, &pa);
+            draw_braille_line_pb(&mut pb, sx0, sy0, sx1, sy1, edge_color, &pa);
         }
 
         // Draw nodes on top of edges
@@ -464,9 +465,7 @@ impl Widget for &NetworkPlot {
             let yi = sy.round() as u16;
 
             if pa.contains(xi, yi) {
-                buf[(xi, yi)]
-                    .set_char(node.marker.char())
-                    .set_fg(node.color);
+                pb.set_char(xi, yi, node.marker.char(), node.color, Z_MARKER);
             }
 
             // Draw label next to node
@@ -477,13 +476,16 @@ impl Widget for &NetworkPlot {
                     for (j, ch) in node.label.chars().enumerate() {
                         let lx = label_x + j as u16;
                         if lx < pa.x + pa.width {
-                            buf[(lx, label_y)]
-                                .set_char(ch)
-                                .set_fg(self.theme.foreground);
+                            pb.set_char(lx, label_y, ch, self.theme.foreground, Z_ANNOTATION);
                         }
                     }
                 }
             }
         }
+
+        // Composite to buffer
+        pb.composite(buf);
+
+        frame.draw_end_labels(buf, area, &pa);
     }
 }

@@ -11,6 +11,7 @@ use ratatui::style::Color;
 
 use crate::annotation::Annotation;
 use crate::axis::{AspectRatio, Axis};
+use crate::plot_buffer::{PlotBuffer, Z_ANNOTATION, Z_CHROME, Z_FILL, Z_GRID};
 use crate::spines::Spines;
 use crate::theme::Theme;
 use crate::transform::{apply_aspect_ratio, data_to_screen};
@@ -139,6 +140,47 @@ impl ReferenceLine {
             y_lo: Some(y_lo),
             y_hi: Some(y_hi),
         }
+    }
+}
+
+/// Border style for plot frames.
+#[derive(Clone, Debug, Default)]
+pub enum BorderStyle {
+    /// Standard single-line box drawing.
+    #[default]
+    Single,
+    /// Rounded corners.
+    Rounded,
+    /// Double-line box drawing.
+    Double,
+    /// No border.
+    None,
+}
+
+impl BorderStyle {
+    /// Top-left corner character.
+    pub fn top_left(&self) -> char {
+        match self { Self::Single => '┌', Self::Rounded => '╭', Self::Double => '╔', Self::None => ' ' }
+    }
+    /// Top-right corner character.
+    pub fn top_right(&self) -> char {
+        match self { Self::Single => '┐', Self::Rounded => '╮', Self::Double => '╗', Self::None => ' ' }
+    }
+    /// Bottom-left corner character.
+    pub fn bottom_left(&self) -> char {
+        match self { Self::Single => '└', Self::Rounded => '╰', Self::Double => '╚', Self::None => ' ' }
+    }
+    /// Bottom-right corner character.
+    pub fn bottom_right(&self) -> char {
+        match self { Self::Single => '┘', Self::Rounded => '╯', Self::Double => '╝', Self::None => ' ' }
+    }
+    /// Horizontal line character.
+    pub fn horizontal(&self) -> char {
+        match self { Self::Single | Self::Rounded => '─', Self::Double => '═', Self::None => ' ' }
+    }
+    /// Vertical line character.
+    pub fn vertical(&self) -> char {
+        match self { Self::Single | Self::Rounded => '│', Self::Double => '║', Self::None => ' ' }
     }
 }
 
@@ -288,6 +330,7 @@ pub struct PlotFrame<'a> {
     x_axis: &'a Axis,
     y_axis: &'a Axis,
     aspect_ratio: AspectRatio,
+    border_style: BorderStyle,
     spines: Spines,
     theme: &'a Theme,
     colorbar_width: u16,
@@ -303,6 +346,7 @@ impl<'a> PlotFrame<'a> {
             x_axis,
             y_axis,
             aspect_ratio: AspectRatio::Auto,
+            border_style: BorderStyle::default(),
             spines: Spines::default(),
             theme,
             colorbar_width: 0,
@@ -320,6 +364,12 @@ impl<'a> PlotFrame<'a> {
     /// Set the aspect ratio.
     pub fn aspect_ratio(mut self, ar: AspectRatio) -> Self {
         self.aspect_ratio = ar;
+        self
+    }
+
+    /// Set the border style (Single, Rounded, Double, None).
+    pub fn border_style(mut self, bs: BorderStyle) -> Self {
+        self.border_style = bs;
         self
     }
 
@@ -353,10 +403,10 @@ impl<'a> PlotFrame<'a> {
     /// (after axis bounds resolution). Returns `None` if the area is too small.
     pub fn render(&self, area: Rect, buf: &mut Buffer, bounds: DataBounds) -> Option<PlotArea> {
         let DataBounds {
-            x_lo,
-            x_hi,
-            y_lo,
-            y_hi,
+            mut x_lo,
+            mut x_hi,
+            mut y_lo,
+            mut y_hi,
         } = bounds;
         if area.width < 4 || area.height < 4 {
             return None;
@@ -364,7 +414,14 @@ impl<'a> PlotFrame<'a> {
 
         // Compute margins
         let title_height: u16 = if self.title.is_some() { 1 } else { 0 };
-        let x_label_height: u16 = if self.x_axis.label.is_some() { 1 } else { 0 };
+        let x_label_height: u16 = if self.x_axis.label.is_some() {
+            match self.x_axis.label_position {
+                crate::axis::LabelPosition::End => 1, // 1 row for bottom border of box
+                crate::axis::LabelPosition::Center => 0, // rendered after composite
+            }
+        } else {
+            0
+        };
         let tick_height: u16 = 1;
 
         let plot_x = area.x + self.y_label_width;
@@ -380,16 +437,128 @@ impl<'a> PlotFrame<'a> {
             return None;
         }
 
-        // Apply aspect ratio
-        let (ax_off, ay_off, aw, ah) = apply_aspect_ratio(
-            &self.aspect_ratio,
-            (x_hi - x_lo).abs(),
-            (y_hi - y_lo).abs(),
-            plot_width,
-            plot_height,
-        );
-        let px = plot_x + ax_off;
-        let py = plot_y + ay_off;
+        // Snap Auto bounds to tick positions with one extra step of margin.
+        // Snapping ensures each tick interval maps to the same number of pixels.
+        // The extra step on each side provides visual breathing room around data.
+        {
+            let x_ticks = self.x_axis.tick_positions(x_lo, x_hi);
+            if matches!(self.x_axis.bounds, crate::axis::Bounds::Auto)
+                && matches!(self.x_axis.scale, crate::axis::Scale::Linear)
+                && x_ticks.len() >= 2
+            {
+                let step = x_ticks[1] - x_ticks[0];
+                x_lo = x_ticks[0] - step;
+                x_hi = x_ticks[x_ticks.len() - 1] + step;
+            }
+            let y_ticks = self.y_axis.tick_positions(y_lo, y_hi);
+            if matches!(self.y_axis.bounds, crate::axis::Bounds::Auto)
+                && matches!(self.y_axis.scale, crate::axis::Scale::Linear)
+                && y_ticks.len() >= 2
+            {
+                let step = y_ticks[1] - y_ticks[0];
+                y_lo = y_ticks[0] - step;
+                y_hi = y_ticks[y_ticks.len() - 1] + step;
+            }
+        }
+
+        // Apply aspect ratio and pixel grid alignment.
+        // For Equal aspect with linear grids, we compute coupled cell sizes
+        // directly from the full plot dimensions so that the alignment and
+        // aspect ratio are solved together (not sequentially).
+        let n_x = {
+            let x_is_linear = matches!(self.x_axis.scale, crate::axis::Scale::Linear);
+            let x_ticks = self.x_axis.tick_positions(x_lo, x_hi);
+            if x_is_linear && x_ticks.len() >= 2 {
+                (x_ticks.len() - 1) as u16
+            } else {
+                0
+            }
+        };
+        let n_y = {
+            let y_is_linear = matches!(self.y_axis.scale, crate::axis::Scale::Linear);
+            let y_ticks = self.y_axis.tick_positions(y_lo, y_hi);
+            if y_is_linear && y_ticks.len() >= 2 {
+                (y_ticks.len() - 1) as u16
+            } else {
+                0
+            }
+        };
+
+        let (mut px, mut py, mut aw, mut ah);
+
+        if matches!(self.aspect_ratio, AspectRatio::Equal) && n_x > 0 && n_y > 0 {
+            // Coupled alignment: compute cell_w and cell_h from the full
+            // plot dimensions so that grid alignment and equal visual
+            // scaling are solved simultaneously.
+            let cell_aspect = crate::axis::terminal_cell_aspect();
+            let max_cw = (plot_width - 1) / n_x;
+            let max_ch = (plot_height - 1) / n_y;
+            let mut best_cw = 0u16;
+            let mut best_ch = 0u16;
+            for cw in (1..=max_cw).rev() {
+                let ch = (cw as f64 * cell_aspect).round().max(1.0) as u16;
+                if ch <= max_ch {
+                    best_cw = cw;
+                    best_ch = ch;
+                    break;
+                }
+            }
+            if best_cw > 0 {
+                aw = best_cw * n_x + 1;
+                ah = best_ch * n_y + 1;
+            } else {
+                // Fallback: use aspect ratio without alignment
+                let (_, _, w, h) = apply_aspect_ratio(
+                    &self.aspect_ratio,
+                    (x_hi - x_lo).abs(),
+                    (y_hi - y_lo).abs(),
+                    plot_width,
+                    plot_height,
+                );
+                aw = w;
+                ah = h;
+            }
+            px = plot_x + (plot_width - aw) / 2;
+            py = plot_y + (plot_height - ah) / 2;
+        } else {
+            // Standard path: apply aspect ratio, then independent alignment.
+            let (ax_off, ay_off, w, h) = apply_aspect_ratio(
+                &self.aspect_ratio,
+                (x_hi - x_lo).abs(),
+                (y_hi - y_lo).abs(),
+                plot_width,
+                plot_height,
+            );
+            aw = w;
+            ah = h;
+            px = plot_x + ax_off;
+            py = plot_y + ay_off;
+
+            if aw >= 2 && ah >= 2 {
+                if n_x > 0 {
+                    let screen_range = aw - 1;
+                    if let Some(cell_w) = screen_range.checked_div(n_x)
+                        && cell_w > 0
+                    {
+                        let aligned_w = cell_w * n_x + 1;
+                        let pad = aw - aligned_w;
+                        px += pad / 2;
+                        aw = aligned_w;
+                    }
+                }
+                if n_y > 0 {
+                    let screen_range = ah - 1;
+                    if let Some(cell_h) = screen_range.checked_div(n_y)
+                        && cell_h > 0
+                    {
+                        let aligned_h = cell_h * n_y + 1;
+                        let pad = ah - aligned_h;
+                        py += pad / 2;
+                        ah = aligned_h;
+                    }
+                }
+            }
+        }
 
         if aw < 2 || ah < 2 {
             return None;
@@ -406,12 +575,15 @@ impl<'a> PlotFrame<'a> {
             }
         }
 
-        // Draw spines (axis borders)
+        // Draw spines (axis borders) using the configured border style
+        let h_char = self.border_style.horizontal();
+        let v_char = self.border_style.vertical();
+
         if self.spines.bottom {
             for x in px..px + aw {
                 if x < area.x + area.width {
                     buf[(x, py + ah)]
-                        .set_char('─')
+                        .set_char(h_char)
                         .set_fg(self.theme.axis_color);
                 }
             }
@@ -419,7 +591,7 @@ impl<'a> PlotFrame<'a> {
         if self.spines.left && px > area.x {
             for y in py..py + ah {
                 buf[(px.saturating_sub(1), y)]
-                    .set_char('│')
+                    .set_char(v_char)
                     .set_fg(self.theme.axis_color);
             }
         }
@@ -428,7 +600,7 @@ impl<'a> PlotFrame<'a> {
                 if x < area.x + area.width {
                     let ty = py.saturating_sub(1);
                     if ty >= area.y {
-                        buf[(x, ty)].set_char('─').set_fg(self.theme.axis_color);
+                        buf[(x, ty)].set_char(h_char).set_fg(self.theme.axis_color);
                     }
                 }
             }
@@ -437,27 +609,16 @@ impl<'a> PlotFrame<'a> {
             let rx = px + aw;
             if rx < area.x + area.width {
                 for y in py..py + ah {
-                    buf[(rx, y)].set_char('│').set_fg(self.theme.axis_color);
+                    buf[(rx, y)].set_char(v_char).set_fg(self.theme.axis_color);
                 }
             }
         }
 
-        // Draw major grid lines
+        // Draw major grid lines using thin box-drawing characters.
+        // Horizontal lines use '─', vertical use '│', intersections use '┼'.
         let x_grid = self.x_axis.grid || self.theme.grid_visible;
         let y_grid = self.y_axis.grid || self.theme.grid_visible;
 
-        if x_grid {
-            let x_ticks = self.x_axis.tick_positions(x_lo, x_hi);
-            for &tv in &x_ticks {
-                let sx = data_to_screen(tv, x_lo, x_hi, px as f64, (px + aw - 1) as f64);
-                let xi = sx.round() as u16;
-                if xi >= px && xi < px + aw {
-                    for y in py..py + ah {
-                        buf[(xi, y)].set_char('·').set_fg(self.theme.grid_color);
-                    }
-                }
-            }
-        }
         if y_grid {
             let y_ticks = self.y_axis.tick_positions(y_lo, y_hi);
             for &tv in &y_ticks {
@@ -465,27 +626,26 @@ impl<'a> PlotFrame<'a> {
                 let yi = sy.round() as u16;
                 if yi >= py && yi < py + ah {
                     for x in px..px + aw {
-                        buf[(x, yi)].set_char('·').set_fg(self.theme.grid_color);
+                        buf[(x, yi)].set_char('─').set_fg(self.theme.grid_color);
+                    }
+                }
+            }
+        }
+        if x_grid {
+            let x_ticks = self.x_axis.tick_positions(x_lo, x_hi);
+            for &tv in &x_ticks {
+                let sx = data_to_screen(tv, x_lo, x_hi, px as f64, (px + aw - 1) as f64);
+                let xi = sx.round() as u16;
+                if xi >= px && xi < px + aw {
+                    for y in py..py + ah {
+                        let ch = if buf[(xi, y)].symbol() == "─" { '┼' } else { '│' };
+                        buf[(xi, y)].set_char(ch).set_fg(self.theme.grid_color);
                     }
                 }
             }
         }
 
-        // Draw minor grid lines
-        if self.x_axis.minor_grid {
-            let minor = self.x_axis.minor_tick_positions(x_lo, x_hi);
-            for &tv in &minor {
-                let sx = data_to_screen(tv, x_lo, x_hi, px as f64, (px + aw - 1) as f64);
-                let xi = sx.round() as u16;
-                if xi >= px && xi < px + aw {
-                    for y in py..py + ah {
-                        buf[(xi, y)]
-                            .set_char('⋅')
-                            .set_fg(self.theme.minor_grid_color);
-                    }
-                }
-            }
-        }
+        // Draw minor grid lines using light dashed box-drawing characters.
         if self.y_axis.minor_grid {
             let minor = self.y_axis.minor_tick_positions(y_lo, y_hi);
             for &tv in &minor {
@@ -494,7 +654,21 @@ impl<'a> PlotFrame<'a> {
                 if yi >= py && yi < py + ah {
                     for x in px..px + aw {
                         buf[(x, yi)]
-                            .set_char('⋅')
+                            .set_char('┄')
+                            .set_fg(self.theme.minor_grid_color);
+                    }
+                }
+            }
+        }
+        if self.x_axis.minor_grid {
+            let minor = self.x_axis.minor_tick_positions(x_lo, x_hi);
+            for &tv in &minor {
+                let sx = data_to_screen(tv, x_lo, x_hi, px as f64, (px + aw - 1) as f64);
+                let xi = sx.round() as u16;
+                if xi >= px && xi < px + aw {
+                    for y in py..py + ah {
+                        buf[(xi, y)]
+                            .set_char('┆')
                             .set_fg(self.theme.minor_grid_color);
                     }
                 }
@@ -562,29 +736,7 @@ impl<'a> PlotFrame<'a> {
             }
         }
 
-        // Draw axis labels
-        if let Some(ref label) = self.x_axis.label {
-            let y = area.y + area.height - 1;
-            let start = px + (aw.saturating_sub(label.len() as u16)) / 2;
-            for (i, ch) in label.chars().enumerate() {
-                let x = start + i as u16;
-                if x < area.x + area.width && y < area.y + area.height {
-                    buf[(x, y)].set_char(ch).set_fg(self.theme.foreground);
-                }
-            }
-        }
-        if let Some(ref label) = self.y_axis.label {
-            // Render y-axis label horizontally, placed at the top-left of the y-axis
-            // just above the first tick label, so it never overlaps with tick values.
-            let label_y = py.saturating_sub(1).max(area.y);
-            let x_start = area.x;
-            for (i, ch) in label.chars().enumerate() {
-                let x = x_start + i as u16;
-                if x < area.x + area.width && label_y < area.y + area.height {
-                    buf[(x, label_y)].set_char(ch).set_fg(self.theme.foreground);
-                }
-            }
-        }
+        // Axis labels are drawn by draw_end_labels() after rendering
 
         Some(PlotArea {
             x: px,
@@ -597,6 +749,173 @@ impl<'a> PlotFrame<'a> {
             y_hi,
             area,
         })
+    }
+
+    /// Draw the y-axis label, optionally in a box.
+    fn draw_y_label(&self, buf: &mut Buffer, area: Rect, py: u16, ah: u16) {
+        let Some(ref label) = self.y_axis.label else {
+            return;
+        };
+        let fg = self.theme.foreground;
+        let bc = self.theme.axis_color;
+        let label_len = label.chars().count() as u16;
+
+        match self.y_axis.label_position {
+            crate::axis::LabelPosition::End => {
+                // Horizontal text at the top of the y-axis, in a box
+                let y = py.max(area.y);
+                if self.y_axis.label_boxed {
+                    let box_x = area.x;
+                    Self::draw_boxed_label_h(buf, box_x, y, label, fg, bc, area);
+                } else {
+                    for (i, ch) in label.chars().enumerate() {
+                        let x = area.x + i as u16;
+                        if x < area.x + area.width && y < area.y + area.height {
+                            buf[(x, y)].set_char(ch).set_fg(fg);
+                        }
+                    }
+                }
+            }
+            crate::axis::LabelPosition::Center => {
+                // Bottom-to-top vertical stacking, centered along y-axis
+                let label_x = area.x;
+                let center_y = py + ah / 2;
+                let label_start_y = center_y.saturating_sub(label_len / 2);
+                if self.y_axis.label_boxed {
+                    // Box around vertical text: 3 chars wide, label_len+2 tall
+                    let box_top = label_start_y.saturating_sub(1);
+                    let box_bot = label_start_y + label_len;
+                    // Top border
+                    if box_top >= area.y && box_top < area.y + area.height {
+                        if label_x < area.x + area.width {
+                            buf[(label_x, box_top)].set_char('┌').set_fg(fg);
+                        }
+                        if label_x + 1 < area.x + area.width {
+                            buf[(label_x + 1, box_top)].set_char('─').set_fg(fg);
+                        }
+                        if label_x + 2 < area.x + area.width {
+                            buf[(label_x + 2, box_top)].set_char('┐').set_fg(fg);
+                        }
+                    }
+                    // Characters bottom-to-top
+                    for (i, ch) in label.chars().enumerate() {
+                        let y = label_start_y + i as u16;
+                        if y >= area.y && y < area.y + area.height {
+                            if label_x < area.x + area.width {
+                                buf[(label_x, y)].set_char('│').set_fg(fg);
+                            }
+                            if label_x + 1 < area.x + area.width {
+                                buf[(label_x + 1, y)].set_char(ch).set_fg(fg)
+                                    .set_style(ratatui::style::Style::default().add_modifier(ratatui::style::Modifier::BOLD));
+                            }
+                            if label_x + 2 < area.x + area.width {
+                                buf[(label_x + 2, y)].set_char('│').set_fg(fg);
+                            }
+                        }
+                    }
+                    // Bottom border
+                    if box_bot >= area.y && box_bot < area.y + area.height {
+                        if label_x < area.x + area.width {
+                            buf[(label_x, box_bot)].set_char('└').set_fg(fg);
+                        }
+                        if label_x + 1 < area.x + area.width {
+                            buf[(label_x + 1, box_bot)].set_char('─').set_fg(fg);
+                        }
+                        if label_x + 2 < area.x + area.width {
+                            buf[(label_x + 2, box_bot)].set_char('┘').set_fg(fg);
+                        }
+                    }
+                } else {
+                    // Bottom-to-top without box
+                    for (i, ch) in label.chars().enumerate() {
+                        let y = label_start_y + i as u16;
+                        if label_x < area.x + area.width && y >= area.y && y < area.y + area.height
+                        {
+                            buf[(label_x, y)].set_char(ch).set_fg(fg);
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    /// Draw a horizontal label in a bordered box (legend-style, 3 rows tall).
+    ///
+    /// ```text
+    /// ┌──────────┐
+    /// │  label   │
+    /// └──────────┘
+    /// ```
+    fn draw_boxed_label_h(
+        buf: &mut Buffer,
+        x: u16,
+        y: u16,
+        label: &str,
+        fg: Color,
+        border_color: Color,
+        area: Rect,
+    ) {
+        let label_len = label.chars().count() as u16;
+        let box_w = label_len + 4; // 1 border + 1 pad + label + 1 pad + 1 border
+        let top_y = y.saturating_sub(1);
+        let bot_y = y + 1;
+        let max_x = area.x + area.width;
+        let max_y = area.y + area.height;
+
+        // Top border row: ┌──┐
+        if top_y >= area.y && top_y < max_y {
+            if x < max_x {
+                buf[(x, top_y)].set_char('┌').set_fg(border_color);
+            }
+            for i in 1..box_w.saturating_sub(1) {
+                if x + i < max_x {
+                    buf[(x + i, top_y)].set_char('─').set_fg(border_color);
+                }
+            }
+            if x + box_w - 1 < max_x {
+                buf[(x + box_w - 1, top_y)].set_char('┐').set_fg(border_color);
+            }
+        }
+
+        // Middle row: │ label │ (bold text)
+        if y >= area.y && y < max_y {
+            if x < max_x {
+                buf[(x, y)].set_char('│').set_fg(border_color);
+            }
+            if x + 1 < max_x {
+                buf[(x + 1, y)].set_char(' ').set_fg(fg);
+            }
+            for (i, ch) in label.chars().enumerate() {
+                let cx = x + 2 + i as u16;
+                if cx < max_x {
+                    buf[(cx, y)]
+                        .set_char(ch)
+                        .set_fg(fg)
+                        .set_style(ratatui::style::Style::default().add_modifier(ratatui::style::Modifier::BOLD));
+                }
+            }
+            if x + label_len + 2 < max_x {
+                buf[(x + label_len + 2, y)].set_char(' ').set_fg(fg);
+            }
+            if x + box_w - 1 < max_x {
+                buf[(x + box_w - 1, y)].set_char('│').set_fg(border_color);
+            }
+        }
+
+        // Bottom border row: └──┘
+        if bot_y >= area.y && bot_y < max_y {
+            if x < max_x {
+                buf[(x, bot_y)].set_char('└').set_fg(border_color);
+            }
+            for i in 1..box_w.saturating_sub(1) {
+                if x + i < max_x {
+                    buf[(x + i, bot_y)].set_char('─').set_fg(border_color);
+                }
+            }
+            if x + box_w - 1 < max_x {
+                buf[(x + box_w - 1, bot_y)].set_char('┘').set_fg(border_color);
+            }
+        }
     }
 
     /// Draw annotations within the plot area.
@@ -678,7 +997,10 @@ impl<'a> PlotFrame<'a> {
                     let bot = sy1.max(sy2).min(py + ah);
                     for y in top..bot {
                         for x in px..px + aw {
-                            buf[(x, y)].set_char('░').set_fg(*color);
+                            buf[(x, y)]
+                                .set_char('░')
+                                .set_fg(*color)
+                                .set_bg(*color);
                         }
                     }
                 }
@@ -707,7 +1029,574 @@ impl<'a> PlotFrame<'a> {
                     };
                     for x in left..right {
                         for y in y_top..y_bottom {
-                            buf[(x, y)].set_char('░').set_fg(*color);
+                            buf[(x, y)]
+                                .set_char('░')
+                                .set_fg(*color)
+                                .set_bg(*color);
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    /// Render all plot chrome into a [`PlotBuffer`] and return the inner drawing area.
+    ///
+    /// This is the Z-buffered counterpart of [`PlotFrame::render`]. Every visual
+    /// element is written with an explicit Z-level so that compositing produces
+    /// correct layering (fills behind grids behind data, etc.).
+    ///
+    /// `bounds` contains the already-resolved data bounds (after axis bounds
+    /// resolution). Returns `None` if the area is too small.
+    pub fn render_to_pb(
+        &self,
+        pb: &mut PlotBuffer,
+        area: Rect,
+        bounds: DataBounds,
+    ) -> Option<PlotArea> {
+        let DataBounds {
+            mut x_lo,
+            mut x_hi,
+            mut y_lo,
+            mut y_hi,
+        } = bounds;
+        if area.width < 4 || area.height < 4 {
+            return None;
+        }
+
+        // Compute margins
+        let title_height: u16 = if self.title.is_some() { 1 } else { 0 };
+        let x_label_height: u16 = if self.x_axis.label.is_some() {
+            match self.x_axis.label_position {
+                crate::axis::LabelPosition::End => 1, // 1 row for bottom border of box
+                crate::axis::LabelPosition::Center => 0, // rendered after composite
+            }
+        } else {
+            0
+        };
+        let tick_height: u16 = 1;
+
+        let plot_x = area.x + self.y_label_width;
+        let plot_y = area.y + title_height;
+        let plot_width = area
+            .width
+            .saturating_sub(self.y_label_width + self.colorbar_width + 1);
+        let plot_height = area
+            .height
+            .saturating_sub(title_height + tick_height + x_label_height);
+
+        if plot_width < 2 || plot_height < 2 {
+            return None;
+        }
+
+        // Snap Auto bounds to tick positions with margin (see primary render).
+        {
+            let x_ticks = self.x_axis.tick_positions(x_lo, x_hi);
+            if matches!(self.x_axis.bounds, crate::axis::Bounds::Auto)
+                && matches!(self.x_axis.scale, crate::axis::Scale::Linear)
+                && x_ticks.len() >= 2
+            {
+                let step = x_ticks[1] - x_ticks[0];
+                x_lo = x_ticks[0] - step;
+                x_hi = x_ticks[x_ticks.len() - 1] + step;
+            }
+            let y_ticks = self.y_axis.tick_positions(y_lo, y_hi);
+            if matches!(self.y_axis.bounds, crate::axis::Bounds::Auto)
+                && matches!(self.y_axis.scale, crate::axis::Scale::Linear)
+                && y_ticks.len() >= 2
+            {
+                let step = y_ticks[1] - y_ticks[0];
+                y_lo = y_ticks[0] - step;
+                y_hi = y_ticks[y_ticks.len() - 1] + step;
+            }
+        }
+
+        // See the primary render() method for detailed comments.
+        let n_x = {
+            let x_ticks = self.x_axis.tick_positions(x_lo, x_hi);
+            if matches!(self.x_axis.scale, crate::axis::Scale::Linear) && x_ticks.len() >= 2 {
+                (x_ticks.len() - 1) as u16
+            } else {
+                0
+            }
+        };
+        let n_y = {
+            let y_ticks = self.y_axis.tick_positions(y_lo, y_hi);
+            if matches!(self.y_axis.scale, crate::axis::Scale::Linear) && y_ticks.len() >= 2 {
+                (y_ticks.len() - 1) as u16
+            } else {
+                0
+            }
+        };
+
+        let (mut px, mut py, mut aw, mut ah);
+
+        if matches!(self.aspect_ratio, AspectRatio::Equal) && n_x > 0 && n_y > 0 {
+            let cell_aspect = crate::axis::terminal_cell_aspect();
+            let max_cw = (plot_width - 1) / n_x;
+            let max_ch = (plot_height - 1) / n_y;
+            let mut best_cw = 0u16;
+            let mut best_ch = 0u16;
+            for cw in (1..=max_cw).rev() {
+                let ch = (cw as f64 * cell_aspect).round().max(1.0) as u16;
+                if ch <= max_ch {
+                    best_cw = cw;
+                    best_ch = ch;
+                    break;
+                }
+            }
+            if best_cw > 0 {
+                aw = best_cw * n_x + 1;
+                ah = best_ch * n_y + 1;
+            } else {
+                let (_, _, w, h) = apply_aspect_ratio(
+                    &self.aspect_ratio,
+                    (x_hi - x_lo).abs(),
+                    (y_hi - y_lo).abs(),
+                    plot_width,
+                    plot_height,
+                );
+                aw = w;
+                ah = h;
+            }
+            px = plot_x + (plot_width - aw) / 2;
+            py = plot_y + (plot_height - ah) / 2;
+        } else {
+            let (ax_off, ay_off, w, h) = apply_aspect_ratio(
+                &self.aspect_ratio,
+                (x_hi - x_lo).abs(),
+                (y_hi - y_lo).abs(),
+                plot_width,
+                plot_height,
+            );
+            aw = w;
+            ah = h;
+            px = plot_x + ax_off;
+            py = plot_y + ay_off;
+
+            if aw >= 2 && ah >= 2 {
+                if n_x > 0 {
+                    let screen_range = aw - 1;
+                    if let Some(cell_w) = screen_range.checked_div(n_x)
+                        && cell_w > 0
+                    {
+                        let aligned_w = cell_w * n_x + 1;
+                        let pad = aw - aligned_w;
+                        px += pad / 2;
+                        aw = aligned_w;
+                    }
+                }
+                if n_y > 0 {
+                    let screen_range = ah - 1;
+                    if let Some(cell_h) = screen_range.checked_div(n_y)
+                        && cell_h > 0
+                    {
+                        let aligned_h = cell_h * n_y + 1;
+                        let pad = ah - aligned_h;
+                        py += pad / 2;
+                        ah = aligned_h;
+                    }
+                }
+            }
+        }
+
+        if aw < 2 || ah < 2 {
+            return None;
+        }
+
+        // Draw title
+        if let Some(title) = self.title {
+            let start = area.x + (area.width.saturating_sub(title.len() as u16)) / 2;
+            for (i, ch) in title.chars().enumerate() {
+                let x = start + i as u16;
+                if x < area.x + area.width {
+                    pb.set_char(x, area.y, ch, self.theme.foreground, Z_CHROME);
+                }
+            }
+        }
+
+        // Draw spines (axis borders) using the configured border style
+        let h_char = self.border_style.horizontal();
+        let v_char = self.border_style.vertical();
+
+        if self.spines.bottom {
+            for x in px..px + aw {
+                if x < area.x + area.width {
+                    pb.set_char(x, py + ah, h_char, self.theme.axis_color, Z_CHROME);
+                }
+            }
+        }
+        if self.spines.left && px > area.x {
+            for y in py..py + ah {
+                pb.set_char(
+                    px.saturating_sub(1),
+                    y,
+                    v_char,
+                    self.theme.axis_color,
+                    Z_CHROME,
+                );
+            }
+        }
+        if self.spines.top && py > 0 {
+            for x in px..px + aw {
+                if x < area.x + area.width {
+                    let ty = py.saturating_sub(1);
+                    if ty >= area.y {
+                        pb.set_char(x, ty, h_char, self.theme.axis_color, Z_CHROME);
+                    }
+                }
+            }
+        }
+        if self.spines.right {
+            let rx = px + aw;
+            if rx < area.x + area.width {
+                for y in py..py + ah {
+                    pb.set_char(rx, y, v_char, self.theme.axis_color, Z_CHROME);
+                }
+            }
+        }
+
+        // Draw major grid lines
+        let x_grid = self.x_axis.grid || self.theme.grid_visible;
+        let y_grid = self.y_axis.grid || self.theme.grid_visible;
+
+        // Track horizontal grid row positions for intersection detection
+        let mut h_grid_rows: Vec<u16> = Vec::new();
+
+        if y_grid {
+            let y_ticks = self.y_axis.tick_positions(y_lo, y_hi);
+            for &tv in &y_ticks {
+                let sy = data_to_screen(tv, y_lo, y_hi, (py + ah - 1) as f64, py as f64);
+                let yi = sy.round() as u16;
+                if yi >= py && yi < py + ah {
+                    h_grid_rows.push(yi);
+                    for x in px..px + aw {
+                        pb.set_char(x, yi, '─', self.theme.grid_color, Z_GRID);
+                    }
+                }
+            }
+        }
+        if x_grid {
+            let x_ticks = self.x_axis.tick_positions(x_lo, x_hi);
+            for &tv in &x_ticks {
+                let sx = data_to_screen(tv, x_lo, x_hi, px as f64, (px + aw - 1) as f64);
+                let xi = sx.round() as u16;
+                if xi >= px && xi < px + aw {
+                    for y in py..py + ah {
+                        let ch = if h_grid_rows.contains(&y) { '┼' } else { '│' };
+                        pb.set_char(xi, y, ch, self.theme.grid_color, Z_GRID);
+                    }
+                }
+            }
+        }
+
+        // Draw minor grid lines
+        if self.y_axis.minor_grid {
+            let minor = self.y_axis.minor_tick_positions(y_lo, y_hi);
+            for &tv in &minor {
+                let sy = data_to_screen(tv, y_lo, y_hi, (py + ah - 1) as f64, py as f64);
+                let yi = sy.round() as u16;
+                if yi >= py && yi < py + ah {
+                    for x in px..px + aw {
+                        pb.set_char(x, yi, '┄', self.theme.minor_grid_color, Z_GRID);
+                    }
+                }
+            }
+        }
+        if self.x_axis.minor_grid {
+            let minor = self.x_axis.minor_tick_positions(x_lo, x_hi);
+            for &tv in &minor {
+                let sx = data_to_screen(tv, x_lo, x_hi, px as f64, (px + aw - 1) as f64);
+                let xi = sx.round() as u16;
+                if xi >= px && xi < px + aw {
+                    for y in py..py + ah {
+                        pb.set_char(xi, y, '┆', self.theme.minor_grid_color, Z_GRID);
+                    }
+                }
+            }
+        }
+
+        // Draw reference lines and spans
+        self.draw_reference_lines_pb(
+            pb,
+            &PlotArea {
+                x: px,
+                y: py,
+                width: aw,
+                height: ah,
+                x_lo,
+                x_hi,
+                y_lo,
+                y_hi,
+                area,
+            },
+        );
+
+        // Draw x tick labels with overlap detection
+        let x_ticks = self.x_axis.tick_positions(x_lo, x_hi);
+        let mut last_label_end: u16 = 0;
+        for &tv in &x_ticks {
+            let sx = data_to_screen(tv, x_lo, x_hi, px as f64, (px + aw - 1) as f64);
+            let label = self.x_axis.format_tick(tv);
+            let xi = sx.round() as u16;
+            let label_len = label.len() as u16;
+            let label_start = xi.saturating_sub(label_len / 2);
+            let label_end = label_start + label_len;
+
+            // Skip this label if it would overlap with the previous one
+            if label_start < last_label_end + 1 && last_label_end > 0 {
+                continue;
+            }
+
+            let y = py + ah;
+            if y < area.y + area.height {
+                for (j, ch) in label.chars().enumerate() {
+                    let lx = label_start + j as u16;
+                    if lx >= area.x && lx < area.x + area.width {
+                        pb.set_char(lx, y, ch, self.theme.axis_color, Z_CHROME);
+                    }
+                }
+                last_label_end = label_end;
+            }
+        }
+
+        // Draw y tick labels
+        let y_ticks = self.y_axis.tick_positions(y_lo, y_hi);
+        for &tv in &y_ticks {
+            let sy = data_to_screen(tv, y_lo, y_hi, (py + ah - 1) as f64, py as f64);
+            let label = self.y_axis.format_tick(tv);
+            let yi = sy.round() as u16;
+            if yi >= py && yi < py + ah {
+                let label_start = px.saturating_sub(label.len() as u16 + 1);
+                for (j, ch) in label.chars().enumerate() {
+                    let lx = label_start + j as u16;
+                    if lx >= area.x && lx < px {
+                        pb.set_char(lx, yi, ch, self.theme.axis_color, Z_CHROME);
+                    }
+                }
+            }
+        }
+
+        // Draw axis labels
+        self.draw_x_label_pb(pb, area, px, py, aw, ah);
+        self.draw_y_label_pb(pb, area, py, ah);
+
+        Some(PlotArea {
+            x: px,
+            y: py,
+            width: aw,
+            height: ah,
+            x_lo,
+            x_hi,
+            y_lo,
+            y_hi,
+            area,
+        })
+    }
+
+    /// Draw annotations into a [`PlotBuffer`] at [`Z_ANNOTATION`].
+    ///
+    /// This is the Z-buffered counterpart of [`PlotFrame::draw_annotations`].
+    /// Draw the x-axis label to PlotBuffer.
+    fn draw_x_label_pb(&self, _pb: &mut PlotBuffer, _area: Rect, _px: u16, _py: u16, _aw: u16, _ah: u16) {
+        // All x-axis labels are rendered after composite via draw_end_labels()
+        // for bold support and to avoid PB bounds clipping.
+    }
+
+    /// Draw End-positioned axis labels directly to the buffer.
+    ///
+    /// Call this AFTER `pb.composite(buf)` so the labels aren't clipped by
+    /// the PlotBuffer area bounds.
+    pub fn draw_end_labels(&self, buf: &mut Buffer, _area: Rect, pa: &PlotArea) {
+        // Use the full buffer area for bounds (not the widget area) so labels
+        // can extend beyond the plot's square_area.
+        let buf_area = buf.area;
+        if let Some(ref label) = self.x_axis.label {
+            let fg = self.theme.foreground;
+            let bc = self.theme.axis_color;
+            let label_len = label.chars().count() as u16;
+            match self.x_axis.label_position {
+                crate::axis::LabelPosition::End => {
+                    let y = pa.y + pa.height;
+                    let box_x = (pa.x + pa.width).saturating_sub(2);
+                    if self.x_axis.label_boxed {
+                        Self::draw_boxed_label_h(buf, box_x, y, label, fg, bc, buf_area);
+                    } else {
+                        for (i, ch) in label.chars().enumerate() {
+                            let x = box_x + i as u16;
+                            if x < buf_area.x + buf_area.width && y < buf_area.y + buf_area.height {
+                                buf[(x, y)].set_char(ch).set_fg(fg);
+                            }
+                        }
+                    }
+                }
+                crate::axis::LabelPosition::Center => {
+                    let y = pa.y + pa.height + 2;
+                    if self.x_axis.label_boxed {
+                        let box_w = label_len + 4;
+                        let box_x = pa.x + (pa.width.saturating_sub(box_w)) / 2;
+                        Self::draw_boxed_label_h(buf, box_x, y, label, fg, bc, buf_area);
+                    } else {
+                        let start = pa.x + (pa.width.saturating_sub(label_len)) / 2;
+                        for (i, ch) in label.chars().enumerate() {
+                            let x = start + i as u16;
+                            if x < buf_area.x + buf_area.width && y < buf_area.y + buf_area.height {
+                                buf[(x, y)].set_char(ch).set_fg(fg);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        // Y-axis label
+        if let Some(ref label) = self.y_axis.label {
+            let fg = self.theme.foreground;
+            let bc = self.theme.axis_color;
+            match self.y_axis.label_position {
+                crate::axis::LabelPosition::End => {
+                    let y = pa.y.saturating_sub(2).max(pa.area.y);
+                    let box_x = pa.area.x;
+                    if self.y_axis.label_boxed {
+                        Self::draw_boxed_label_h(buf, box_x, y, label, fg, bc, buf_area);
+                    } else {
+                        for (i, ch) in label.chars().enumerate() {
+                            let x = box_x + i as u16;
+                            if x < buf_area.x + buf_area.width && y < buf_area.y + buf_area.height {
+                                buf[(x, y)].set_char(ch).set_fg(fg);
+                            }
+                        }
+                    }
+                }
+                crate::axis::LabelPosition::Center => {
+                    // Position right next to the y-axis tick labels
+                    let label_area = Rect::new(
+                        pa.x.saturating_sub(self.y_label_width),
+                        pa.area.y,
+                        pa.area.width,
+                        pa.area.height,
+                    );
+                    self.draw_y_label(buf, label_area, pa.y, pa.height);
+                }
+            }
+        }
+    }
+
+    fn draw_y_label_pb(&self, _pb: &mut PlotBuffer, _area: Rect, _py: u16, _ah: u16) {
+        // All y-axis labels are rendered after composite via draw_end_labels()
+    }
+
+
+    pub fn draw_annotations_pb(pa: &PlotArea, annotations: &[Annotation], pb: &mut PlotBuffer) {
+        for ann in annotations {
+            let sx = pa.screen_x(ann.text_x);
+            let sy = pa.screen_y(ann.text_y);
+            let xi = sx.round() as u16;
+            let yi = sy.round() as u16;
+            if yi >= pa.y && yi < pa.y + pa.height {
+                for (j, ch) in ann.text.chars().enumerate() {
+                    let x = xi + j as u16;
+                    if x >= pa.x && x < pa.x + pa.width {
+                        pb.set_char(x, yi, ch, ann.color, Z_ANNOTATION);
+                    }
+                }
+            }
+            // Draw arrow if target is specified
+            if let Some((tx, ty)) = ann.target {
+                let target_sx = pa.screen_x(tx).round() as u16;
+                let target_sy = pa.screen_y(ty).round() as u16;
+                if pa.contains(target_sx, target_sy) {
+                    let dx = target_sx as f64 - xi as f64;
+                    let dy = target_sy as f64 - yi as f64;
+                    let arrow_ch = ann.arrow_char(dx, dy);
+                    if arrow_ch != ' ' {
+                        pb.set_char(target_sx, target_sy, arrow_ch, ann.color, Z_ANNOTATION);
+                    }
+                }
+            }
+        }
+    }
+
+    /// Draw reference lines and spans into a [`PlotBuffer`].
+    ///
+    /// Reference lines use [`Z_GRID`], reference spans/fills use [`Z_FILL`].
+    fn draw_reference_lines_pb(&self, pb: &mut PlotBuffer, pa: &PlotArea) {
+        let (px, py, aw, ah) = (pa.x, pa.y, pa.width, pa.height);
+        let (x_lo, x_hi, y_lo, y_hi) = (pa.x_lo, pa.x_hi, pa.y_lo, pa.y_hi);
+        for refline in self.reference_lines {
+            match refline {
+                ReferenceLine::Horizontal { y, color, dash } => {
+                    let sy = data_to_screen(*y, y_lo, y_hi, (py + ah - 1) as f64, py as f64);
+                    let yi = sy.round() as u16;
+                    if yi >= py && yi < py + ah {
+                        for x in px..px + aw {
+                            let draw = match dash {
+                                RefLineDash::Solid => true,
+                                RefLineDash::Dashed => ((x - px) / 3).is_multiple_of(2),
+                                RefLineDash::Dotted => (x - px).is_multiple_of(2),
+                            };
+                            if draw {
+                                pb.set_char(x, yi, '─', *color, Z_GRID);
+                            }
+                        }
+                    }
+                }
+                ReferenceLine::Vertical { x, color, dash } => {
+                    let sx = data_to_screen(*x, x_lo, x_hi, px as f64, (px + aw - 1) as f64);
+                    let xi = sx.round() as u16;
+                    if xi >= px && xi < px + aw {
+                        for y in py..py + ah {
+                            let draw = match dash {
+                                RefLineDash::Solid => true,
+                                RefLineDash::Dashed => ((y - py) / 2).is_multiple_of(2),
+                                RefLineDash::Dotted => (y - py).is_multiple_of(2),
+                            };
+                            if draw {
+                                pb.set_char(xi, y, '│', *color, Z_GRID);
+                            }
+                        }
+                    }
+                }
+                ReferenceLine::HorizontalSpan { y1, y2, color } => {
+                    let sy1 = data_to_screen(*y1, y_lo, y_hi, (py + ah - 1) as f64, py as f64)
+                        .round() as u16;
+                    let sy2 = data_to_screen(*y2, y_lo, y_hi, (py + ah - 1) as f64, py as f64)
+                        .round() as u16;
+                    let top = sy1.min(sy2).max(py);
+                    let bot = sy1.max(sy2).min(py + ah);
+                    for y in top..bot {
+                        for x in px..px + aw {
+                            pb.set_bg(x, y, *color, Z_FILL);
+                        }
+                    }
+                }
+                ReferenceLine::VerticalSpan {
+                    x1,
+                    x2,
+                    color,
+                    y_lo: span_y_lo,
+                    y_hi: span_y_hi,
+                } => {
+                    let sx1 = data_to_screen(*x1, x_lo, x_hi, px as f64, (px + aw - 1) as f64)
+                        .round() as u16;
+                    let sx2 = data_to_screen(*x2, x_lo, x_hi, px as f64, (px + aw - 1) as f64)
+                        .round() as u16;
+                    let left = sx1.min(sx2).max(px);
+                    let right = sx1.max(sx2).min(px + aw);
+                    // Determine vertical extent: use bounded Y range if provided
+                    let (y_top, y_bottom) = if let (Some(yl), Some(yh)) = (span_y_lo, span_y_hi) {
+                        let sy_lo =
+                            data_to_screen(*yl, y_lo, y_hi, (py + ah - 1) as f64, py as f64)
+                                .round() as u16;
+                        let sy_hi =
+                            data_to_screen(*yh, y_lo, y_hi, (py + ah - 1) as f64, py as f64)
+                                .round() as u16;
+                        (sy_hi.min(sy_lo).max(py), sy_hi.max(sy_lo).min(py + ah))
+                    } else {
+                        (py, py + ah)
+                    };
+                    for x in left..right {
+                        for y in y_top..y_bottom {
+                            pb.set_bg(x, y, *color, Z_FILL);
                         }
                     }
                 }

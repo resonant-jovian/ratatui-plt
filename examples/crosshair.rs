@@ -20,7 +20,8 @@ fn parse_theme() -> Theme {
         Some("minimal") => Theme::minimal(),
         Some("publication") => Theme::publication(),
         Some("solarized") => Theme::solarized(),
-        Some("dark") | None => Theme::dark(),
+        Some("dark") => Theme::dark(),
+        None => Theme::auto(),
         Some(other) => {
             eprintln!(
                 "Unknown theme '{other}'. Available: dark, light, minimal, publication, solarized"
@@ -33,6 +34,7 @@ fn parse_theme() -> Theme {
 fn main() -> color_eyre::Result<()> {
     color_eyre::install()?;
     Theme::set_default(parse_theme());
+
     io::stdout().execute(EnterAlternateScreen)?;
     enable_raw_mode()?;
     let mut terminal = Terminal::new(CrosstermBackend::new(io::stdout()))?;
@@ -94,13 +96,25 @@ fn main() -> color_eyre::Result<()> {
         .data(points)
         .marker(MarkerShape::FilledCircle);
 
-    let x_axis = Axis::new().label("RA offset (kpc)").grid(true);
-    let y_axis = Axis::new().label("Dec offset (kpc)").grid(true);
+    let x_axis = Axis::new()
+        .label("RA offset (kpc)")
+        .grid(true)
+        .bounds(Bounds::Manual(-4.0, 14.0))
+        .locator(MultipleLocator::new(1.0));
+    let y_axis = Axis::new()
+        .label("Dec offset (kpc)")
+        .grid(true)
+        .bounds(Bounds::Manual(-4.0, 14.0))
+        .locator(MultipleLocator::new(1.0))
+        .label_position(LabelPosition::End);
 
     // Crosshair position in data coordinates, start at galactic center
     let mut cursor_x = 5.0_f64;
     let mut cursor_y = 5.0_f64;
-    let step = 0.2;
+    let step = 0.5;
+
+    // Store the last PlotArea for snapping cursor to pixel-exact coordinates
+    let mut last_pa: Option<PlotArea> = None;
 
     loop {
         terminal.draw(|frame| {
@@ -110,7 +124,8 @@ fn main() -> color_eyre::Result<()> {
             // so we can obtain the PlotArea for the crosshair overlay.
             let theme = Theme::get_default();
             let pf = PlotFrame::new(&x_axis, &y_axis, &theme)
-                .title(Some("Galaxy Crosshair (arrows to move, q to quit)"));
+                .title(Some("Galaxy Crosshair (arrows to move, q to quit)"))
+                .aspect_ratio(AspectRatio::Equal);
 
             // Compute data bounds
             let x_lo = -4.0_f64;
@@ -129,6 +144,13 @@ fn main() -> color_eyre::Result<()> {
                     y_hi,
                 },
             ) {
+                // Snap cursor to pixel-exact coordinates so the label
+                // always matches the visual crosshair position.
+                let sx = pa.screen_x(cursor_x).round() as u16;
+                let sy = pa.screen_y(cursor_y).round() as u16;
+                cursor_x = pa.data_x_from_screen(sx);
+                cursor_y = pa.data_y_from_screen(sy);
+
                 // Draw scatter points with colormap
                 let cmap = Viridis;
                 let norm = LinearNorm::new(0.0, 1.0);
@@ -152,6 +174,11 @@ fn main() -> color_eyre::Result<()> {
                     .show_labels(true)
                     .format(|x, y| format!("({:.1}, {:.1})", x, y));
                 crosshair.render_on(&pa, buf);
+
+                // Draw axis labels after all rendering
+                pf.draw_end_labels(buf, area, &pa);
+
+                last_pa = Some(pa);
             }
         })?;
 
@@ -166,6 +193,14 @@ fn main() -> color_eyre::Result<()> {
                 KeyCode::Right => cursor_x += step,
                 KeyCode::Left => cursor_x -= step,
                 _ => {}
+            }
+
+            // Snap to pixel-exact coordinates immediately after movement
+            if let Some(ref pa) = last_pa {
+                let sx = pa.screen_x(cursor_x).round() as u16;
+                let sy = pa.screen_y(cursor_y).round() as u16;
+                cursor_x = pa.data_x_from_screen(sx);
+                cursor_y = pa.data_y_from_screen(sy);
             }
         }
     }

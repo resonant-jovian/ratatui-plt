@@ -34,7 +34,8 @@ fn parse_theme() -> Theme {
         Some("minimal") => Theme::minimal(),
         Some("publication") => Theme::publication(),
         Some("solarized") => Theme::solarized(),
-        Some("dark") | None => Theme::dark(),
+        Some("dark") => Theme::dark(),
+        None => Theme::auto(),
         Some(other) => {
             eprintln!(
                 "Unknown theme '{other}'. Available: dark, light, minimal, publication, solarized"
@@ -60,11 +61,11 @@ fn main() -> color_eyre::Result<()> {
         ]
     };
 
-    // Standard box plot with means
-    let standard = {
+    // Filled box plot with means
+    let filled = {
         let mut p = BoxPlot::new()
-            .title("Standard")
-            .y_axis(Axis::new().label("Value").grid(true))
+            .title("Filled")
+            .y_axis(Axis::new().label("Value").grid(true).label_position(LabelPosition::End))
             .show_means(true)
             .reference_line(ReferenceLine::hline_dashed(6.5, Color::DarkGray));
         for g in make_groups() {
@@ -73,26 +74,12 @@ fn main() -> color_eyre::Result<()> {
         p
     };
 
-    // Notched box plot (1.57*IQR/sqrt(n))
-    let notched = {
+    // Outline-only box plot
+    let outline = {
         let mut p = BoxPlot::new()
-            .title("Notched")
-            .y_axis(Axis::new().label("Value").grid(true))
-            .notch(true)
-            .show_means(true);
-        for g in make_groups() {
-            p = p.box_data(g);
-        }
-        p
-    };
-
-    // Bootstrap CI box plot
-    let bootstrap = {
-        let mut p = BoxPlot::new()
-            .title("Bootstrap CI")
-            .y_axis(Axis::new().label("Value").grid(true))
-            .bootstrap_ci(true)
-            .bootstrap_n(1000)
+            .title("Outline")
+            .y_axis(Axis::new().label("Value").grid(true).label_position(LabelPosition::End))
+            .fill_boxes(false)
             .show_means(true);
         for g in make_groups() {
             p = p.box_data(g);
@@ -102,19 +89,17 @@ fn main() -> color_eyre::Result<()> {
 
     loop {
         terminal.draw(|frame| {
-            let area = frame.area();
+            let area = square_area(frame.area());
             let cols = Layout::default()
                 .direction(Direction::Horizontal)
                 .constraints([
-                    Constraint::Ratio(1, 3),
-                    Constraint::Ratio(1, 3),
-                    Constraint::Ratio(1, 3),
+                    Constraint::Ratio(1, 2),
+                    Constraint::Ratio(1, 2),
                 ])
                 .split(area);
 
-            frame.render_widget(&standard, cols[0]);
-            frame.render_widget(&notched, cols[1]);
-            frame.render_widget(&bootstrap, cols[2]);
+            frame.render_widget(&filled, cols[0]);
+            frame.render_widget(&outline, cols[1]);
         })?;
 
         if let Event::Key(key) = event::read()?

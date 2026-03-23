@@ -1,6 +1,6 @@
 [package]
 name = "ratatui-plt"
-version = "0.0.1"
+version = "0.0.2"
 edition = "2024"
 description = "Scientific visualization widgets for ratatui — matplotlib for the terminal"
 authors = ["Albin <albin@sjoegren.se>"]
@@ -10,17 +10,24 @@ keywords = ["ratatui", "tui", "plotting", "scientific", "visualization"]
 categories = ["command-line-interface", "visualization", "science"]
 
 [features]
-default = []
+default = ["crossterm"]
 async = ["dep:tokio"]
 chrono = ["dep:chrono"]
 serde = ["dep:serde"]
 fft = ["dep:rustfft"]
 triangulation = ["dep:delaunator"]
+export = ["dep:resvg", "dep:usvg", "dep:tiny-skia", "dep:svg2pdf", "dep:image"]
+statistics = []
+kitty = ["export"]
+sixel = ["export", "dep:image"]
+toml-themes = ["dep:toml", "serde"]
+unicode-extended = []
 
 [dependencies]
 ratatui = "0.30"
 palette = "0.7"
 ordered-float = "5"
+crossterm = { version = "0.29", optional = true }
 
 [dependencies.tokio]
 version = "1"
@@ -44,6 +51,60 @@ optional = true
 version = "0.2"
 optional = true
 
+[dependencies.resvg]
+version = "0.44"
+optional = true
+
+[dependencies.usvg]
+version = "0.44"
+optional = true
+
+[dependencies.tiny-skia]
+version = "0.11"
+optional = true
+
+[dependencies.svg2pdf]
+version = "0.12"
+optional = true
+
+[[example]]
+name = "statistics"
+required-features = ["statistics"]
+
+[[example]]
+name = "trendline"
+required-features = ["statistics"]
+
+[[example]]
+name = "kitty_export"
+required-features = ["kitty"]
+
+[[example]]
+name = "sixel_export"
+required-features = ["sixel"]
+
+[[example]]
+name = "toml_theme"
+required-features = ["toml-themes"]
+
+[[example]]
+name = "showcase_unicode"
+required-features = ["unicode-extended"]
+
+[[example]]
+name = "showcase_features"
+required-features = ["statistics"]
+
+[dependencies.image]
+version = "0.25"
+optional = true
+default-features = false
+features = ["png"]
+
+[dependencies.toml]
+version = "0.8"
+optional = true
+
 [dev-dependencies]
 crossterm = "0.29"
 color-eyre = "0.6"
@@ -51,7 +112,7 @@ rand = "0.10"
 
 [lints.rust]
 unsafe_code = "forbid"
-warnings = "forbid"
+warnings = "deny"
 
 [lints.clippy]
 unwrap_used = "forbid"

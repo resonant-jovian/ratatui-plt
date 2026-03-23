@@ -358,6 +358,364 @@ fn write_ansi_bg(out: &mut String, color: Color) {
     }
 }
 
+// ---------------------------------------------------------------------------
+// Export feature: PNG generation, Kitty and Sixel graphics protocols
+// ---------------------------------------------------------------------------
+
+/// Options for image export.
+#[cfg(feature = "export")]
+#[derive(Clone, Debug)]
+pub struct ExportOptions {
+    /// Width of each cell in pixels.
+    pub cell_width: u32,
+    /// Height of each cell in pixels.
+    pub cell_height: u32,
+}
+
+#[cfg(feature = "export")]
+impl Default for ExportOptions {
+    fn default() -> Self {
+        Self {
+            cell_width: 8,
+            cell_height: 16,
+        }
+    }
+}
+
+#[cfg(feature = "export")]
+impl ExportOptions {
+    /// Create new export options with default cell dimensions.
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Set the cell width in pixels.
+    pub fn cell_width(mut self, w: u32) -> Self {
+        self.cell_width = w;
+        self
+    }
+
+    /// Set the cell height in pixels.
+    pub fn cell_height(mut self, h: u32) -> Self {
+        self.cell_height = h;
+        self
+    }
+}
+
+/// Errors that can occur during image export.
+#[cfg(feature = "export")]
+#[derive(Debug)]
+pub enum ExportError {
+    /// I/O error writing output.
+    Io(std::io::Error),
+    /// Image encoding error.
+    Image(String),
+}
+
+#[cfg(feature = "export")]
+impl std::fmt::Display for ExportError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Io(e) => write!(f, "I/O error: {e}"),
+            Self::Image(e) => write!(f, "Image error: {e}"),
+        }
+    }
+}
+
+#[cfg(feature = "export")]
+impl std::error::Error for ExportError {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        match self {
+            Self::Io(e) => Some(e),
+            Self::Image(_) => None,
+        }
+    }
+}
+
+#[cfg(feature = "export")]
+impl From<std::io::Error> for ExportError {
+    fn from(e: std::io::Error) -> Self {
+        Self::Io(e)
+    }
+}
+
+/// Convert a ratatui buffer to PNG image bytes.
+///
+/// Each terminal cell is rendered as a `cell_width x cell_height` pixel rectangle
+/// using the cell's background color (foreground color if no background set).
+#[cfg(feature = "export")]
+pub fn buffer_to_png(buf: &Buffer, options: &ExportOptions) -> Result<Vec<u8>, ExportError> {
+    let area = buf.area;
+    let img_w = area.width as u32 * options.cell_width;
+    let img_h = area.height as u32 * options.cell_height;
+
+    let mut img = image::RgbaImage::new(img_w, img_h);
+
+    for row in 0..area.height {
+        for col in 0..area.width {
+            let idx = (row * area.width + col) as usize;
+            let cell = &buf.content[idx];
+
+            // Use background color if set, otherwise use foreground for text cells.
+            let (r, g, b) = if cell.bg != Color::Reset {
+                color_to_rgb(cell.bg)
+            } else if cell.symbol() != " " {
+                color_to_rgb(cell.fg)
+            } else {
+                color_to_rgb(Color::Reset)
+            };
+
+            let px_x_start = col as u32 * options.cell_width;
+            let px_y_start = row as u32 * options.cell_height;
+
+            for py in 0..options.cell_height {
+                for px in 0..options.cell_width {
+                    img.put_pixel(
+                        px_x_start + px,
+                        px_y_start + py,
+                        image::Rgba([r, g, b, 255]),
+                    );
+                }
+            }
+        }
+    }
+
+    let mut png_bytes: Vec<u8> = Vec::new();
+    let mut cursor = std::io::Cursor::new(&mut png_bytes);
+    img.write_to(&mut cursor, image::ImageFormat::Png)
+        .map_err(|e| ExportError::Image(e.to_string()))?;
+    Ok(png_bytes)
+}
+
+// ---------------------------------------------------------------------------
+// Kitty graphics protocol
+// ---------------------------------------------------------------------------
+
+/// Encode bytes as base64.
+#[cfg(feature = "kitty")]
+fn base64_encode(data: &[u8]) -> String {
+    const TABLE: &[u8; 64] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+    let mut result = String::with_capacity(data.len().div_ceil(3) * 4);
+    for chunk in data.chunks(3) {
+        let b0 = chunk[0] as u32;
+        let b1 = chunk.get(1).copied().unwrap_or(0) as u32;
+        let b2 = chunk.get(2).copied().unwrap_or(0) as u32;
+        let triple = (b0 << 16) | (b1 << 8) | b2;
+        result.push(TABLE[((triple >> 18) & 0x3F) as usize] as char);
+        result.push(TABLE[((triple >> 12) & 0x3F) as usize] as char);
+        if chunk.len() > 1 {
+            result.push(TABLE[((triple >> 6) & 0x3F) as usize] as char);
+        } else {
+            result.push('=');
+        }
+        if chunk.len() > 2 {
+            result.push(TABLE[(triple & 0x3F) as usize] as char);
+        } else {
+            result.push('=');
+        }
+    }
+    result
+}
+
+/// Convert a ratatui buffer to a Kitty graphics protocol escape sequence.
+///
+/// The buffer is first rendered to PNG, then base64-encoded and wrapped in
+/// Kitty escape sequences with chunked transfer (4096-byte chunks).
+#[cfg(feature = "kitty")]
+pub fn buffer_to_kitty(buf: &Buffer, options: &ExportOptions) -> Result<String, ExportError> {
+    let png_bytes = buffer_to_png(buf, options)?;
+    let b64 = base64_encode(&png_bytes);
+    let chunk_size = 4096;
+    let mut output = String::new();
+
+    if b64.len() <= chunk_size {
+        // Single chunk: m=0 means no more data.
+        let _ = write!(output, "\x1b_Gf=100,a=T,t=d,m=0;{b64}\x1b\\");
+    } else {
+        let chunks: Vec<&str> = {
+            let mut v = Vec::new();
+            let mut start = 0;
+            while start < b64.len() {
+                let end = (start + chunk_size).min(b64.len());
+                v.push(&b64[start..end]);
+                start = end;
+            }
+            v
+        };
+        let last_idx = chunks.len() - 1;
+        for (i, chunk) in chunks.iter().enumerate() {
+            if i == 0 {
+                let _ = write!(output, "\x1b_Gf=100,a=T,t=d,m=1;{chunk}\x1b\\");
+            } else if i == last_idx {
+                let _ = write!(output, "\x1b_Gm=0;{chunk}\x1b\\");
+            } else {
+                let _ = write!(output, "\x1b_Gm=1;{chunk}\x1b\\");
+            }
+        }
+    }
+
+    Ok(output)
+}
+
+/// Render a widget and print it using the Kitty graphics protocol.
+///
+/// The widget is rendered into an off-screen buffer, converted to PNG,
+/// and output as a Kitty inline image to stdout.
+#[cfg(feature = "kitty")]
+pub fn print_kitty<W: Widget>(
+    widget: W,
+    width: u16,
+    height: u16,
+    options: &ExportOptions,
+) -> Result<(), ExportError> {
+    let buf = render_to_buffer(widget, width, height);
+    let kitty = buffer_to_kitty(&buf, options)?;
+    print!("{kitty}");
+    Ok(())
+}
+
+// ---------------------------------------------------------------------------
+// Sixel graphics protocol
+// ---------------------------------------------------------------------------
+
+/// Convert a ratatui buffer to a Sixel graphics escape sequence.
+///
+/// The buffer is rendered to PNG, decoded to RGBA pixels, quantized to a
+/// 256-color palette, and encoded as Sixel data.
+#[cfg(feature = "sixel")]
+pub fn buffer_to_sixel(buf: &Buffer, options: &ExportOptions) -> Result<String, ExportError> {
+    let png_bytes = buffer_to_png(buf, options)?;
+    let img = image::load_from_memory(&png_bytes)
+        .map_err(|e| ExportError::Image(e.to_string()))?;
+    let rgba = img.to_rgba8();
+    let (width, height) = (rgba.width(), rgba.height());
+
+    // Build color palette: collect unique RGB triples, limit to 256.
+    let mut palette: Vec<(u8, u8, u8)> = Vec::new();
+    let mut pixel_indices: Vec<u16> = Vec::with_capacity((width * height) as usize);
+
+    for pixel in rgba.pixels() {
+        let rgb = (pixel[0], pixel[1], pixel[2]);
+        let idx = if let Some(pos) = palette.iter().position(|c| *c == rgb) {
+            pos as u16
+        } else if palette.len() < 256 {
+            let pos = palette.len() as u16;
+            palette.push(rgb);
+            pos
+        } else {
+            // Find nearest color in palette.
+            nearest_palette_color(&palette, rgb)
+        };
+        pixel_indices.push(idx);
+    }
+
+    // Build sixel output.
+    let mut output = String::new();
+
+    // DCS: enter sixel mode.
+    output.push_str("\x1bPq");
+
+    // Raster attributes: pixel aspect 1:1, image dimensions.
+    let _ = write!(output, "\"1;1;{width};{height}");
+
+    // Define palette entries.
+    for (i, &(r, g, b)) in palette.iter().enumerate() {
+        let r_pct = (r as u32 * 100) / 255;
+        let g_pct = (g as u32 * 100) / 255;
+        let b_pct = (b as u32 * 100) / 255;
+        let _ = write!(output, "#{i};2;{r_pct};{g_pct};{b_pct}");
+    }
+
+    // Encode sixel bands (6 rows each).
+    let mut band_start: u32 = 0;
+    while band_start < height {
+        let band_end = (band_start + 6).min(height);
+
+        // Find which colors are present in this band.
+        let mut colors_in_band: Vec<u16> = Vec::new();
+        for row in band_start..band_end {
+            for col in 0..width {
+                let idx = pixel_indices[(row * width + col) as usize];
+                if !colors_in_band.contains(&idx) {
+                    colors_in_band.push(idx);
+                }
+            }
+        }
+
+        for (ci, &color_idx) in colors_in_band.iter().enumerate() {
+            // Select color.
+            let _ = write!(output, "#{color_idx}");
+
+            // For each column, compute 6-bit sixel value.
+            for col in 0..width {
+                let mut sixel_val: u8 = 0;
+                for bit in 0..6u32 {
+                    let row = band_start + bit;
+                    if row < height {
+                        let pi = pixel_indices[(row * width + col) as usize];
+                        if pi == color_idx {
+                            sixel_val |= 1 << bit;
+                        }
+                    }
+                }
+                // Sixel character = value + 63.
+                output.push((sixel_val + 63) as char);
+            }
+
+            // Carriage return after each color pass (except the last in the band).
+            if ci < colors_in_band.len() - 1 {
+                output.push('$');
+            }
+        }
+
+        // Newline / next band.
+        band_start += 6;
+        if band_start < height {
+            output.push('-');
+        }
+    }
+
+    // String terminator.
+    output.push_str("\x1b\\");
+
+    Ok(output)
+}
+
+/// Find the index of the nearest color in the palette to the given RGB value.
+#[cfg(feature = "sixel")]
+fn nearest_palette_color(palette: &[(u8, u8, u8)], rgb: (u8, u8, u8)) -> u16 {
+    let mut best_idx: u16 = 0;
+    let mut best_dist = u32::MAX;
+    for (i, &(pr, pg, pb)) in palette.iter().enumerate() {
+        let dr = (rgb.0 as i32 - pr as i32).unsigned_abs();
+        let dg = (rgb.1 as i32 - pg as i32).unsigned_abs();
+        let db = (rgb.2 as i32 - pb as i32).unsigned_abs();
+        let dist = dr * dr + dg * dg + db * db;
+        if dist < best_dist {
+            best_dist = dist;
+            best_idx = i as u16;
+        }
+    }
+    best_idx
+}
+
+/// Render a widget and print it using the Sixel graphics protocol.
+///
+/// The widget is rendered into an off-screen buffer, converted to a Sixel
+/// image, and printed to stdout.
+#[cfg(feature = "sixel")]
+pub fn print_sixel<W: Widget>(
+    widget: W,
+    width: u16,
+    height: u16,
+    options: &ExportOptions,
+) -> Result<(), ExportError> {
+    let buf = render_to_buffer(widget, width, height);
+    let sixel = buffer_to_sixel(&buf, options)?;
+    print!("{sixel}");
+    Ok(())
+}
+
 /// Escape a string for embedding in XML/SVG.
 fn xml_escape(s: &str) -> String {
     let mut out = String::with_capacity(s.len());

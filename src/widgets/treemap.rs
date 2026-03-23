@@ -23,6 +23,7 @@ use ratatui::style::Color;
 use ratatui::widgets::Widget;
 
 use crate::color_cycle::ColorCycle;
+use crate::plot_buffer::{PlotBuffer, Z_CHROME, Z_DATA};
 use crate::theme::Theme;
 
 /// A node in the treemap hierarchy.
@@ -336,13 +337,15 @@ impl Widget for &Treemap {
             return;
         }
 
+        let mut pb = PlotBuffer::new(area);
+
         // Draw title
         if let Some(ref title) = self.title {
             let start = area.x + (area.width.saturating_sub(title.len() as u16)) / 2;
             for (i, ch) in title.chars().enumerate() {
                 let x = start + i as u16;
                 if x < area.x + area.width {
-                    buf[(x, area.y)].set_char(ch).set_fg(self.theme.foreground);
+                    pb.set_char(x, area.y, ch, self.theme.foreground, Z_CHROME);
                 }
             }
         }
@@ -404,7 +407,16 @@ impl Widget for &Treemap {
                         r.color
                     };
 
-                    buf[(x, y)].set_char(ch).set_fg(color);
+                    let z = if dx == 0 || dx == r.w - 1 || dy == 0 || dy == r.h - 1 {
+                        Z_CHROME
+                    } else {
+                        Z_DATA
+                    };
+                    if ch == '█' {
+                        pb.set_cell(x, y, ch, color, color, z);
+                    } else {
+                        pb.set_char(x, y, ch, color, z);
+                    }
                 }
             }
 
@@ -420,11 +432,13 @@ impl Widget for &Treemap {
                     for (j, ch) in truncated.chars().enumerate() {
                         let x = label_x + j as u16;
                         if x < r.x + r.w && x < area.x + area.width {
-                            buf[(x, label_y)].set_char(ch).set_fg(self.theme.foreground);
+                            pb.set_char(x, label_y, ch, self.theme.foreground, Z_CHROME);
                         }
                     }
                 }
             }
         }
+
+        pb.composite(buf);
     }
 }

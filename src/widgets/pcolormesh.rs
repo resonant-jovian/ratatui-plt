@@ -2,7 +2,6 @@
 
 use ratatui::buffer::Buffer;
 use ratatui::layout::Rect;
-use ratatui::style::Style;
 use ratatui::widgets::Widget;
 
 use crate::annotation::Annotation;
@@ -10,6 +9,7 @@ use crate::axis::{AspectRatio, Axis};
 use crate::colormap::{Colorbar, Colormap, Viridis};
 use crate::frame::{DataBounds, PlotFrame, ReferenceLine};
 use crate::norm::{LinearNorm, Normalize};
+use crate::plot_buffer::{PlotBuffer, Z_DATA};
 use crate::spines::Spines;
 use crate::theme::Theme;
 
@@ -269,6 +269,8 @@ impl Widget for &Pcolormesh {
 
         let colorbar_width: u16 = if self.show_colorbar { 10 } else { 0 };
 
+        let mut pb = PlotBuffer::new(area);
+
         let frame = PlotFrame::new(&self.x_axis, &self.y_axis, &self.theme)
             .title(self.title.as_deref())
             .aspect_ratio(self.aspect_ratio.clone())
@@ -277,9 +279,9 @@ impl Widget for &Pcolormesh {
             .y_label_width(7)
             .reference_lines(&self.reference_lines);
 
-        let Some(pa) = frame.render(
+        let Some(pa) = frame.render_to_pb(
+            &mut pb,
             area,
-            buf,
             DataBounds {
                 x_lo,
                 x_hi,
@@ -359,9 +361,7 @@ impl Widget for &Pcolormesh {
                         if pa.contains(ux, uy)
                             && point_in_quad(sx as f64, sy as f64, &corners_screen)
                         {
-                            buf[(ux, uy)]
-                                .set_char('█')
-                                .set_style(Style::default().fg(color));
+                            pb.set_cell(ux, uy, '█', color, color, Z_DATA);
                         }
                     }
                 }
@@ -369,9 +369,13 @@ impl Widget for &Pcolormesh {
         }
 
         // Draw annotations
-        PlotFrame::draw_annotations(&pa, &self.annotations, buf);
+        PlotFrame::draw_annotations_pb(&pa, &self.annotations, &mut pb);
 
-        // Draw colorbar
+        pb.composite(buf);
+
+        frame.draw_end_labels(buf, area, &pa);
+
+        // Draw colorbar (after composite, as it manages its own rendering)
         if self.show_colorbar {
             let (vmin, vmax) = value_bounds(&self.values);
             let cb = Colorbar::new(self.colormap.as_ref(), vmin, vmax)

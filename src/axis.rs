@@ -135,8 +135,35 @@ pub enum Bounds {
 
 /// Aspect ratio control for plots.
 ///
-/// Terminal cells are typically ~2:1 (height:width in pixels), so `Equal`
-/// automatically compensates to produce visually square data units.
+/// Controls both the visual frame shape (via [`aspect_area`]) and data scaling
+/// (via per-widget `.aspect_ratio()` builders). Terminal cells are typically
+/// ~2:1 (height:width in pixels), and all variants compensate automatically.
+///
+/// # Named presets
+///
+/// | Variant       | Visual ratio (w:h) |
+/// |---------------|-------------------|
+/// | `Square`      | 1:1               |
+/// | `Wide`        | 2:1               |
+/// | `UltraWide`   | 3:1               |
+/// | `Tall`        | 1:2               |
+/// | `Golden`      | ~1.618:1          |
+/// | `Widescreen`  | 16:9              |
+/// | `Cinema`      | 21:9              |
+///
+/// # Custom ratios
+///
+/// ```rust
+/// use ratatui_plt::prelude::*;
+///
+/// // Using the Ratio variant directly
+/// let ar = AspectRatio::Ratio(2, 3);
+///
+/// // Using tuple conversion
+/// let ar: AspectRatio = (2, 3).into();
+/// ```
+///
+/// [`aspect_area`]: crate::transform::aspect_area
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[derive(Clone, Debug, Default)]
 pub enum AspectRatio {
@@ -146,13 +173,116 @@ pub enum AspectRatio {
     /// Equal scaling: one data unit in x equals one data unit in y visually.
     /// Compensates for terminal cell aspect ratio (~2:1).
     Equal,
-    /// Fixed ratio: x_scale / y_scale.
-    Fixed(f64),
+    /// Visually square frame (1:1).
+    Square,
+    /// Wide frame (2:1).
+    Wide,
+    /// Ultra-wide frame (3:1).
+    UltraWide,
+    /// Tall frame (1:2).
+    Tall,
+    /// Golden ratio frame (~1.618:1).
+    Golden,
+    /// Widescreen frame (16:9).
+    Widescreen,
+    /// Cinema frame (21:9).
+    Cinema,
+    /// Custom aspect ratio (width : height).
+    Ratio(u16, u16),
 }
 
-/// Terminal cell aspect ratio (width / height in pixels).
-/// Most terminals have cells approximately twice as tall as wide.
-pub const TERMINAL_CELL_ASPECT: f64 = 0.5;
+impl From<(u16, u16)> for AspectRatio {
+    fn from((w, h): (u16, u16)) -> Self {
+        AspectRatio::Ratio(w, h)
+    }
+}
+
+/// Default terminal cell aspect ratio (width / height in pixels).
+/// Most monospace fonts at typical sizes have cells ~2.2x taller than wide.
+const DEFAULT_CELL_ASPECT: f64 = 0.45;
+
+std::thread_local! {
+    static CELL_ASPECT: std::cell::Cell<f64> = const { std::cell::Cell::new(0.0) };
+}
+
+/// Get the terminal cell aspect ratio (width / height).
+///
+/// On the first call the value is resolved once and cached for the thread.
+/// Resolution order:
+/// 1. Value set by [`set_cell_aspect`]
+/// 2. `RATATUI_PLT_CELL_ASPECT` environment variable
+/// 3. Auto-detected from the terminal via `crossterm::terminal::window_size()`
+///    (requires the `crossterm` feature, enabled by default)
+/// 4. Fallback constant (0.45)
+pub fn terminal_cell_aspect() -> f64 {
+    CELL_ASPECT.with(|c| {
+        let v = c.get();
+        if v > 0.0 {
+            return v;
+        }
+        // Try env var
+        let detected = std::env::var("RATATUI_PLT_CELL_ASPECT")
+            .ok()
+            .and_then(|s| s.parse::<f64>().ok())
+            .filter(|&v| v > 0.0 && v < 2.0)
+            // Try auto-detection from the terminal
+            .or_else(detect_cell_aspect)
+            .unwrap_or(DEFAULT_CELL_ASPECT);
+        c.set(detected);
+        detected
+    })
+}
+
+/// Try to auto-detect the terminal cell aspect ratio using the terminal's
+/// reported pixel dimensions. Returns `None` if detection is unavailable
+/// or the terminal doesn't report pixel sizes.
+#[cfg(feature = "crossterm")]
+fn detect_cell_aspect() -> Option<f64> {
+    let size = crossterm::terminal::window_size().ok()?;
+    if size.width > 0 && size.height > 0 && size.columns > 0 && size.rows > 0 {
+        let cell_w = size.width as f64 / size.columns as f64;
+        let cell_h = size.height as f64 / size.rows as f64;
+        let ratio = cell_w / cell_h;
+        if ratio > 0.0 && ratio < 2.0 {
+            return Some(ratio);
+        }
+    }
+    None
+}
+
+#[cfg(not(feature = "crossterm"))]
+fn detect_cell_aspect() -> Option<f64> {
+    None
+}
+
+/// Set the terminal cell aspect ratio (width / height).
+///
+/// Call this at startup after detecting your terminal's actual cell size.
+/// For example, with crossterm:
+///
+/// ```no_run
+/// # fn example() {
+/// if let Ok(size) = crossterm::terminal::window_size() {
+///     if size.width > 0 && size.height > 0 && size.columns > 0 && size.rows > 0 {
+///         let cell_w = size.width as f64 / size.columns as f64;
+///         let cell_h = size.height as f64 / size.rows as f64;
+///         ratatui_plt::axis::set_cell_aspect(cell_w / cell_h);
+///     }
+/// }
+/// # }
+/// ```
+pub fn set_cell_aspect(ratio: f64) {
+    if ratio > 0.0 && ratio < 2.0 {
+        CELL_ASPECT.with(|c| c.set(ratio));
+    } else {
+        eprintln!(
+            "ratatui-plt: invalid cell aspect ratio {ratio:.3}, using default {DEFAULT_CELL_ASPECT}"
+        );
+    }
+}
+
+/// Legacy constant — use [`terminal_cell_aspect()`] instead.
+pub const TERMINAL_CELL_ASPECT: f64 = 0.45;
 
 /// Direction tick marks are drawn relative to the axis spine.
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
@@ -176,6 +306,19 @@ pub enum LabelRotation {
     Horizontal,
     /// Labels are drawn vertically (one character per row).
     Vertical,
+}
+
+/// Position of the axis label.
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub enum LabelPosition {
+    /// Centered along the axis (default for x-axis).
+    /// For y-axis, renders bottom-to-top vertical text.
+    #[default]
+    Center,
+    /// At the end of the axis: right for x-axis, top for y-axis.
+    /// Text is always horizontal.
+    End,
 }
 
 /// Axis configuration.
@@ -221,6 +364,10 @@ pub struct Axis {
     pub tick_padding: u16,
     /// Rotation for tick labels.
     pub label_rotation: LabelRotation,
+    /// Position of the axis label (Center or End).
+    pub label_position: LabelPosition,
+    /// Whether to draw a box around the axis label.
+    pub label_boxed: bool,
 }
 
 /// Configuration for major/minor grid lines.
@@ -263,6 +410,8 @@ impl Default for Axis {
             tick_size: 1,
             tick_padding: 1,
             label_rotation: LabelRotation::default(),
+            label_position: LabelPosition::default(),
+            label_boxed: true,
         }
     }
 }
@@ -354,6 +503,18 @@ impl Axis {
     /// Set the padding between tick marks and labels.
     pub fn tick_padding(mut self, padding: u16) -> Self {
         self.tick_padding = padding;
+        self
+    }
+
+    /// Set the position of the axis label (Center or End).
+    pub fn label_position(mut self, pos: LabelPosition) -> Self {
+        self.label_position = pos;
+        self
+    }
+
+    /// Set whether the axis label is drawn in a bordered box.
+    pub fn label_boxed(mut self, boxed: bool) -> Self {
+        self.label_boxed = boxed;
         self
     }
 
