@@ -417,9 +417,7 @@ impl<'a> PlotFrame<'a> {
         let x_label_height: u16 = if self.x_axis.label.is_some() {
             match self.x_axis.label_position {
                 crate::axis::LabelPosition::End => 1, // 1 row for bottom border of box
-                crate::axis::LabelPosition::Center => {
-                    if self.x_axis.label_boxed { 3 } else { 1 }
-                }
+                crate::axis::LabelPosition::Center => 0, // rendered after composite
             }
         } else {
             0
@@ -777,7 +775,8 @@ impl<'a> PlotFrame<'a> {
                                 buf[(label_x, y)].set_char('│').set_fg(fg);
                             }
                             if label_x + 1 < area.x + area.width {
-                                buf[(label_x + 1, y)].set_char(ch).set_fg(fg);
+                                buf[(label_x + 1, y)].set_char(ch).set_fg(fg)
+                                    .set_style(ratatui::style::Style::default().add_modifier(ratatui::style::Modifier::BOLD));
                             }
                             if label_x + 2 < area.x + area.width {
                                 buf[(label_x + 2, y)].set_char('│').set_fg(fg);
@@ -1040,9 +1039,7 @@ impl<'a> PlotFrame<'a> {
         let x_label_height: u16 = if self.x_axis.label.is_some() {
             match self.x_axis.label_position {
                 crate::axis::LabelPosition::End => 1, // 1 row for bottom border of box
-                crate::axis::LabelPosition::Center => {
-                    if self.x_axis.label_boxed { 3 } else { 1 }
-                }
+                crate::axis::LabelPosition::Center => 0, // rendered after composite
             }
         } else {
             0
@@ -1375,7 +1372,14 @@ impl<'a> PlotFrame<'a> {
                     }
                 }
                 crate::axis::LabelPosition::Center => {
-                    self.draw_y_label(buf, pa.area, pa.y, pa.height);
+                    // Position right next to the y-axis tick labels
+                    let label_area = Rect::new(
+                        pa.x.saturating_sub(self.y_label_width),
+                        pa.area.y,
+                        pa.area.width,
+                        pa.area.height,
+                    );
+                    self.draw_y_label(buf, label_area, pa.y, pa.height);
                 }
             }
         }
