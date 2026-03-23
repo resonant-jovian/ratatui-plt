@@ -135,6 +135,8 @@ pub struct BoxPlot {
     spines: Spines,
     reference_lines: Vec<ReferenceLine>,
     annotations: Vec<Annotation>,
+    /// Whether to fill box interiors with color.
+    fill_boxes: bool,
 }
 
 impl Default for BoxPlot {
@@ -152,6 +154,7 @@ impl Default for BoxPlot {
             spines: Spines::default(),
             reference_lines: Vec::new(),
             annotations: Vec::new(),
+            fill_boxes: true,
         }
     }
 }
@@ -184,6 +187,12 @@ impl BoxPlot {
     /// Show or hide mean markers (drawn as a diamond at the mean value).
     pub fn show_means(mut self, show: bool) -> Self {
         self.show_means = show;
+        self
+    }
+
+    /// Enable or disable filled box interiors (default: true).
+    pub fn fill_boxes(mut self, fill: bool) -> Self {
+        self.fill_boxes = fill;
         self
     }
 
@@ -340,9 +349,11 @@ impl Widget for &BoxPlot {
         let box_width = ((pa.width * 3) / (n as u16 * 4)).max(3);
 
         for (i, d) in self.data.iter().enumerate() {
-            let center_x = pa.x + (i as u16 * pa.width / n as u16) + pa.width / n as u16 / 2;
-            let box_left = center_x.saturating_sub(box_width / 2);
+            let slot_center = pa.x + (i as u16 * pa.width / n as u16) + pa.width / n as u16 / 2;
+            let box_left = slot_center.saturating_sub(box_width / 2);
             let box_right = box_left + box_width;
+            // Whisker center = true visual center of the box
+            let center_x = box_left + box_width / 2;
 
             let (q1, median, q3) = d.quartiles();
             let (whisker_lo, whisker_hi) = d.whiskers();
@@ -414,39 +425,47 @@ impl Widget for &BoxPlot {
                     (sy_median, sy_median, box_left, box_right)
                 };
 
-            // Fill box interior with background color
-            for y in sy_q3..=sy_q1 {
-                for x in (box_left + 1)..box_right.saturating_sub(1) {
-                    if pa.contains(x, y) {
-                        pb.set_cell(x, y, ' ', d.color, d.color, Z_FILL);
+            // Fill box interior if enabled
+            if self.fill_boxes {
+                for y in sy_q3..=sy_q1 {
+                    for x in box_left..box_right {
+                        if pa.contains(x, y) {
+                            pb.set_bg(x, y, d.color, Z_FILL);
+                        }
                     }
                 }
             }
+            // Border color: contrasts with fill (use theme fg if filled, box color if unfilled)
+            let border_fg = if self.fill_boxes {
+                self.theme.foreground
+            } else {
+                d.color
+            };
 
             // Draw box (Q1 to Q3), with notch if enabled
             // Top edge (Q3) with corners
             if pa.contains(box_left, sy_q3) {
-                pb.set_char(box_left, sy_q3, '┌', d.color, Z_DATA);
+                pb.set_char(box_left, sy_q3, '┌', border_fg, Z_DATA);
             }
             for x in (box_left + 1)..box_right.saturating_sub(1) {
                 if pa.contains(x, sy_q3) {
-                    pb.set_char(x, sy_q3, '─', d.color, Z_DATA);
+                    pb.set_char(x, sy_q3, '─', border_fg, Z_DATA);
                 }
             }
             if box_right > box_left + 1 && pa.contains(box_right - 1, sy_q3) {
-                pb.set_char(box_right - 1, sy_q3, '┐', d.color, Z_DATA);
+                pb.set_char(box_right - 1, sy_q3, '┐', border_fg, Z_DATA);
             }
             // Bottom edge (Q1) with corners
             if pa.contains(box_left, sy_q1) {
-                pb.set_char(box_left, sy_q1, '└', d.color, Z_DATA);
+                pb.set_char(box_left, sy_q1, '└', border_fg, Z_DATA);
             }
             for x in (box_left + 1)..box_right.saturating_sub(1) {
                 if pa.contains(x, sy_q1) {
-                    pb.set_char(x, sy_q1, '─', d.color, Z_DATA);
+                    pb.set_char(x, sy_q1, '─', border_fg, Z_DATA);
                 }
             }
             if box_right > box_left + 1 && pa.contains(box_right - 1, sy_q1) {
-                pb.set_char(box_right - 1, sy_q1, '┘', d.color, Z_DATA);
+                pb.set_char(box_right - 1, sy_q1, '┘', border_fg, Z_DATA);
             }
 
             if self.notch || self.bootstrap_ci {
@@ -457,22 +476,22 @@ impl Widget for &BoxPlot {
                         (box_left, box_right.saturating_sub(1))
                     };
                     if pa.contains(left_x, y) {
-                        pb.set_char(left_x, y, '│', d.color, Z_DATA);
+                        pb.set_char(left_x, y, '│', border_fg, Z_DATA);
                     }
                     if pa.contains(right_x, y) {
-                        pb.set_char(right_x, y, '│', d.color, Z_DATA);
+                        pb.set_char(right_x, y, '│', border_fg, Z_DATA);
                     }
                 }
                 if notch_hi_y > sy_q3 {
                     for x in box_left..=notch_left {
                         if pa.contains(x, notch_hi_y) {
-                            pb.set_char(x, notch_hi_y, '─', d.color, Z_DATA);
+                            pb.set_char(x, notch_hi_y, '─', border_fg, Z_DATA);
                         }
                     }
                     if notch_right > 0 {
                         for x in (notch_right - 1)..box_right {
                             if pa.contains(x, notch_hi_y) {
-                                pb.set_char(x, notch_hi_y, '─', d.color, Z_DATA);
+                                pb.set_char(x, notch_hi_y, '─', border_fg, Z_DATA);
                             }
                         }
                     }
@@ -480,13 +499,13 @@ impl Widget for &BoxPlot {
                 if notch_lo_y < sy_q1 {
                     for x in box_left..=notch_left {
                         if pa.contains(x, notch_lo_y) {
-                            pb.set_char(x, notch_lo_y, '─', d.color, Z_DATA);
+                            pb.set_char(x, notch_lo_y, '─', border_fg, Z_DATA);
                         }
                     }
                     if notch_right > 0 {
                         for x in (notch_right - 1)..box_right {
                             if pa.contains(x, notch_lo_y) {
-                                pb.set_char(x, notch_lo_y, '─', d.color, Z_DATA);
+                                pb.set_char(x, notch_lo_y, '─', border_fg, Z_DATA);
                             }
                         }
                     }
@@ -494,15 +513,15 @@ impl Widget for &BoxPlot {
             } else {
                 for y in (sy_q3 + 1)..sy_q1 {
                     if pa.contains(box_left, y) {
-                        pb.set_char(box_left, y, '│', d.color, Z_DATA);
+                        pb.set_char(box_left, y, '│', border_fg, Z_DATA);
                     }
                     if box_right > 0 && pa.contains(box_right - 1, y) {
-                        pb.set_char(box_right - 1, y, '│', d.color, Z_DATA);
+                        pb.set_char(box_right - 1, y, '│', border_fg, Z_DATA);
                     }
                 }
             }
 
-            // Median line
+            // Median line (bold, high Z to show on top of fill)
             let use_notch = self.notch || self.bootstrap_ci;
             let median_left = if use_notch { notch_left } else { box_left };
             let median_right = if use_notch {
@@ -512,19 +531,19 @@ impl Widget for &BoxPlot {
             };
             for x in median_left..=median_right {
                 if pa.contains(x, sy_median) {
-                    pb.set_char(x, sy_median, '━', d.color, Z_DATA);
+                    pb.set_char(x, sy_median, '━', border_fg, Z_MARKER);
                 }
             }
 
             // Whiskers (dashed style like matplotlib)
             for y in sy_whi..sy_q3 {
                 if pa.contains(center_x, y) {
-                    pb.set_char(center_x, y, '┆', d.color, Z_DATA);
+                    pb.set_char(center_x, y, '┆', border_fg, Z_DATA);
                 }
             }
             for y in (sy_q1 + 1)..=sy_wlo {
                 if pa.contains(center_x, y) {
-                    pb.set_char(center_x, y, '┆', d.color, Z_DATA);
+                    pb.set_char(center_x, y, '┆', border_fg, Z_DATA);
                 }
             }
 
@@ -533,10 +552,10 @@ impl Widget for &BoxPlot {
             let cap_right = center_x + box_width / 3;
             for x in cap_left..=cap_right {
                 if pa.contains(x, sy_whi) {
-                    pb.set_char(x, sy_whi, '─', d.color, Z_DATA);
+                    pb.set_char(x, sy_whi, '─', border_fg, Z_DATA);
                 }
                 if pa.contains(x, sy_wlo) {
-                    pb.set_char(x, sy_wlo, '─', d.color, Z_DATA);
+                    pb.set_char(x, sy_wlo, '─', border_fg, Z_DATA);
                 }
             }
 

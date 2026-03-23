@@ -80,6 +80,7 @@ fn main() -> color_eyre::Result<()> {
             .title("Notched")
             .y_axis(Axis::new().label("Value").grid(true))
             .notch(true)
+            .fill_boxes(false)
             .show_means(true);
         for g in make_groups() {
             p = p.box_data(g);
@@ -94,7 +95,8 @@ fn main() -> color_eyre::Result<()> {
             .y_axis(Axis::new().label("Value").grid(true))
             .bootstrap_ci(true)
             .bootstrap_n(1000)
-            .show_means(true);
+            .show_means(true)
+            .fill_boxes(true);
         for g in make_groups() {
             p = p.box_data(g);
         }

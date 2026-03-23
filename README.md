@@ -6,15 +6,107 @@
 [![docs.rs](https://docs.rs/ratatui-plt/badge.svg)](https://docs.rs/ratatui-plt)
 [![License: GPL-3.0](https://img.shields.io/badge/License-GPL--3.0-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)
 
+### Highlights
+
+- **58 plot widgets** — 2D, 3D, statistical, specialized, and layout
+- **55+ colormaps** — sequential, diverging, cyclic, qualitative, and custom
+- **7 axis scales** — linear, log, symlog, power, logit, asinh, function
+- **6 export formats** — text, ANSI, SVG, PNG, Sixel, Kitty
+- **72 runnable examples** — including 6 matplotlib showcase replicas
+
+> [!IMPORTANT]
+> **Status (0.0.2):** Early release. Most widgets work well, but the following have known rendering quality issues: **BandPlot** (fill gap artifacts), **BoxPlot / BoxenPlot** (outline alignment), **CandlestickPlot** (outline mismatches), **Contour3D** (surface artifacts), **VectorField 3D** (low contrast/density), **TernaryPlot** (staircase grid lines). Expect breaking API changes before 0.1.0.
+
+## Contents
+
+- [For Everyone](#for-everyone) — what it is, install, quick start
+- [For Users](#for-users) — widgets, colormaps, themes, examples
+- [For Developers](#for-developers) — architecture, traits, conventions, testing
+- [License](#license)
+
+> [!TIP]
+> **Users** — jump to [Widgets](#widgets) for the full widget catalog, or [Examples](#examples) to run a demo.
+> **Developers** — jump to [Architecture](#architecture) for the data-flow diagram and module layout.
+
 ---
+
+## For Everyone
 
 `ratatui-plt` is a comprehensive plotting library for terminal UIs built on [ratatui](https://ratatui.rs/). It provides 50+ plot widgets, colormaps, axis systems, and layout tools for scientific computing, simulation monitoring, and data exploration — all rendered in the terminal using Unicode characters for sub-cell resolution.
 
-> **Status (0.0.2):** Early release. Most widgets work well, but the following have known rendering quality issues: **BandPlot** (fill gap artifacts), **BoxPlot / BoxenPlot** (outline alignment), **CandlestickPlot** (outline mismatches), **Contour3D** (surface artifacts), **VectorField 3D** (low contrast/density), **TernaryPlot** (staircase grid lines). Expect breaking API changes before 0.1.0.
+### How it works
 
-## Features
+```
+                          ratatui-plt data flow
 
-### 2D Plots
+   Your Data          Data Containers        Widgets            Terminal
+  ──────────────     ──────────────────     ───────────       ───────────
+  Vec<(f64,f64)> ──> Series             ─┐
+  Vec<Vec<f64>>  ──> GridData            ├──> LinePlot    ─┐
+  OHLC tuples    ──> Series              │    Heatmap      ├──> ratatui
+  3D points      ──> Series3D            │    Surface3D    │    Frame
+  vectors        ──> VectorFieldData    ─┘    ...          │    ::render_widget()
+                                                           │
+                       Axis + Scale + Tickers              │
+                       Colormap + Normalize  ──────────────┘
+                       Theme
+```
+
+Each widget follows a **builder pattern** — configure data, axes, colors, and theme, then hand it to ratatui's rendering loop.
+
+### Install
+
+```toml
+[dependencies]
+ratatui-plt = "0.0.2"
+ratatui = "0.30"
+
+# Optional features:
+# ratatui-plt = { version = "0.0.2", features = ["statistics", "export"] }
+```
+
+### Quick start
+
+```rust
+use ratatui_plt::prelude::*;
+
+let series = Series::new("sin(x)")
+    .data((0..100).map(|i| {
+        let x = i as f64 * 0.1;
+        (x, x.sin())
+    }).collect())
+    .color(Color::Cyan);
+
+let plot = LinePlot::new()
+    .series(series)
+    .title("Sine Wave")
+    .x_axis(Axis::new().label("x").grid(true))
+    .y_axis(Axis::new().label("y"));
+
+// In your ratatui draw callback:
+frame.render_widget(&plot, area);
+```
+
+> [!NOTE]
+> **Minimum Supported Rust Version:** Rust edition 2024 (requires Rust 1.85+).
+
+---
+
+## For Users
+
+### Widgets
+
+**2D** — LinePlot, ScatterPlot, Heatmap, Histogram, BarChart, ContourPlot, and 20+ more
+**3D** — Surface3D, Wireframe3D, Scatter3D, Bar3D, Contour3D, Quiver3D (all with interactive camera via `Camera3DState`)
+**Statistical** — BoxPlot, ViolinPlot, Histogram, ECDF, ErrorBarPlot, JointPlot
+**Specialized** — RadialPlot, TernaryPlot, NetworkGraph, SankeyDiagram, SunburstChart, and more
+**Layout** — MultiPanel (GridSpec), FacetGrid, TwinAxes, InsetPlot
+**Interactive** — Crosshair, DataPicking, Brushing, InteractiveLegend, SpanSelector, LinkedView
+
+<details>
+<summary><strong>All 58 widgets</strong></summary>
+
+#### 2D Plots
 - **LinePlot** — multiple series, fill regions, step modes, dash patterns, markers
 - **ScatterPlot** — color-mapped point clouds, configurable markers, trendline overlays (linear/polynomial/LOWESS)
 - **Heatmap** — half-block rendering for 2x vertical resolution, colorbars
@@ -44,7 +136,7 @@
 - **GaugeChart** — semicircular gauge with needle indicator for KPI dashboards
 - **GanttChart** — horizontal bar segments for scheduling/timeline visualization
 
-### 3D Plots
+#### 3D Plots
 - **Surface3D** — colored surface with half-block shading and wireframe
 - **Wireframe3D** — depth-cued wireframe mesh with Braille lines
 - **Scatter3D** — 3D point cloud with axis lines
@@ -54,7 +146,7 @@
 
 All 3D widgets support interactive camera control via `Camera3DState` (arrow keys to rotate, +/- to zoom).
 
-### Specialized Plots
+#### Specialized Plots
 - **RadialPlot** — polar coordinates: line, scatter, bar, fill-between
 - **TernaryPlot** — ternary/triangle diagrams with percentage labels
 - **NetworkGraph** — force-directed or manual-layout graph visualization
@@ -65,20 +157,13 @@ All 3D widgets support interactive camera control via `Camera3DState` (arrow key
 - **DendrogramPlot** — hierarchical clustering trees
 - **StreamPlot** — vector field streamlines via Runge-Kutta integration
 
-### Layout
+#### Layout
 - **MultiPanel** — GridSpec-like subplot grid with `width_ratios` / `height_ratios`, mosaic syntax, shared axes
 - **FacetGrid** — seaborn-style automatic small multiples from grouped data
 - **TwinAxes** — dual y-axis overlay with independent scales
 - **InsetPlot** — zoomed inset panels with highlighted source regions
 
-### Axis System
-- **Scales**: Linear, Log, SymLog, Power, Logit, Asinh, Function (custom)
-- **Aspect Ratio**: `Auto`, `Equal`, `Fixed(ratio)` with terminal cell geometry compensation
-- **Tick Locators**: `MaxNLocator`, `LogLocator`, `MultipleLocator`, `FixedLocator`, `CategoricalLocator`, `AutoMinorLocator`, `NullLocator`
-- **Tick Formatters**: `ScalarFormatter`, `LogFormatter`, `SiFormatter`, `PercentFormatter`, `FuncFormatter`, `CategoricalFormatter`, `NullFormatter`
-- **Overlap detection**: x-axis labels are automatically skipped when they would collide
-
-### Interactivity
+#### Interactivity
 - **Crosshair** — cursor overlay with coordinate readout
 - **Data Picking** — nearest-point detection for hover tooltips
 - **Brushing** — rectangular selection with `SharedBrush` for linked plots
@@ -87,13 +172,20 @@ All 3D widgets support interactive camera control via `Camera3DState` (arrow key
 - **RectangleSelector** — 2D rectangular selection overlay
 - **LinkedView** — synchronized pan/zoom bounds across multiple panels with `SharedView`
 
-### Rendering
-- **Braille sub-pixel lines** — 2x4 dots per cell for smooth curves and diagonals
-- **Half-block characters** — `▀`/`▄` for 2x vertical resolution in heatmaps and surfaces
-- **Unicode box-drawing** — clean axis borders and chart outlines
-- **Depth sorting** — painter's algorithm for correct 3D occlusion
+</details>
 
 ### Colormaps
+
+55+ built-in colormaps across 8 families, plus custom `ListedColormap` and `LinearSegmentedColormap`:
+
+- **Sequential**: Viridis, Plasma, Inferno, Magma, Cividis
+- **Diverging**: Coolwarm, RdBu, Seismic, RdYlBu, ...
+- **Qualitative**: Paired, Set1, Tab20, ...
+- Colorbar widget with extend modes for out-of-range values
+
+<details>
+<summary><strong>All colormap families</strong></summary>
+
 - **Sequential**: Viridis, Plasma, Inferno, Magma, Cividis
 - **Diverging**: Coolwarm, RdBu, Seismic, RdYlBu, RdYlGn, BrBG, PiYG, PRGn, PuOr, RdGy, Spectral
 - **Cyclic**: Hsv, Twilight
@@ -102,32 +194,56 @@ All 3D widgets support interactive camera control via `Camera3DState` (arrow key
 - **Qualitative**: Paired, Set1, Set2, Set3, Accent, Dark2, Pastel1, Pastel2, Tab20, Tab20b, Tab20c
 - **Miscellaneous**: Grayscale, Jet, Turbo, Hot
 - **Custom**: `ListedColormap` and `LinearSegmentedColormap` from user-defined color stops
-- Colorbar widget with extend modes for out-of-range values
 
-### Normalization
-- `LinearNorm`, `LogNorm`, `SymLogNorm`, `PowerNorm`, `BoundaryNorm`, `TwoSlopeNorm`, `CenteredNorm`, `AsinhNorm`, `FuncNorm`
-- Trait-based: implement `Normalize` for custom mappings
+</details>
+
+### Axis System
+
+- **Scales**: Linear, Log, SymLog, Power, Logit, Asinh, Function (custom)
+- **Aspect Ratio**: `Auto`, `Equal`, `Fixed(ratio)` with terminal cell geometry compensation
+- **Tick Locators**: `MaxNLocator`, `LogLocator`, `MultipleLocator`, `FixedLocator`, `CategoricalLocator`, `AutoMinorLocator`, `NullLocator`
+- **Tick Formatters**: `ScalarFormatter`, `LogFormatter`, `SiFormatter`, `PercentFormatter`, `FuncFormatter`, `CategoricalFormatter`, `NullFormatter`
+- **Overlap detection**: x-axis labels are automatically skipped when they would collide
+
+### Rendering
+
+- **Braille sub-pixel lines** — 2x4 dots per cell for smooth curves and diagonals
+- **Half-block characters** — `▀`/`▄` for 2x vertical resolution in heatmaps and surfaces
+- **Unicode box-drawing** — clean axis borders and chart outlines
+- **Depth sorting** — painter's algorithm for correct 3D occlusion
 
 ### Themes
+
 - 5 presets: `dark`, `light`, `minimal`, `publication`, `solarized`
 - Global default via `Theme::set_default()` with RAII guard via `Theme::activate()`
 - TOML file loading (with `toml-themes` feature)
 - All interactive examples accept a theme CLI argument
 
+<details>
+<summary><strong>9 normalization modes</strong></summary>
+
+- `LinearNorm`, `LogNorm`, `SymLogNorm`, `PowerNorm`, `BoundaryNorm`, `TwoSlopeNorm`, `CenteredNorm`, `AsinhNorm`, `FuncNorm`
+- Trait-based: implement `Normalize` for custom mappings
+
+</details>
+
+### MathText
+
+- Greek letters: `\alpha` -> a, `\beta` -> b, `\Sigma` -> S
+- Superscripts: `x^2` -> x2, `10^{-3}` -> 10-3
+- Subscripts: `x_0` -> x0
+- Scientific notation formatting
+
 ### Annotations & Legend
+
 - `Annotation` with optional arrow styles (`Arrow`, `Simple`)
 - `Legend` with configurable position and multi-column layout
 - `InteractiveLegend` with toggle visibility
 - Reference lines and spans (`axhline`, `axvline`, `axhspan`, `axvspan`)
 - Spines control (show/hide individual axis borders)
 
-### MathText
-- Greek letters: `\alpha` -> a, `\beta` -> b, `\Sigma` -> S
-- Superscripts: `x^2` -> x2, `10^{-3}` -> 10-3
-- Subscripts: `x_0` -> x0
-- Scientific notation formatting
-
 ### Export
+
 - **Text** — plain Unicode (no color)
 - **ANSI** — 24-bit true color terminal escape sequences
 - **SVG** — monospace font rendering with cell-based layout
@@ -135,6 +251,7 @@ All 3D widgets support interactive camera control via `Camera3DState` (arrow key
 - **Sixel** — inline terminal graphics for Sixel-compatible terminals (requires `sixel` feature)
 - **Kitty** — inline terminal graphics for Kitty-compatible terminals (requires `kitty` feature)
 
+> [!NOTE]
 > **Terminal compatibility for image export:**
 >
 > | Protocol | Supported terminals |
@@ -145,7 +262,7 @@ All 3D widgets support interactive camera control via `Camera3DState` (arrow key
 >
 > GNOME Terminal, Alacritty, and most VTE-based terminals do **not** support Sixel or Kitty graphics. PNG export works everywhere (saves to file). Text/ANSI/SVG export requires no feature flags and works in any terminal.
 
-## Optional Features
+### Optional Features
 
 | Feature | Dependencies | Description |
 |---------|-------------|-------------|
@@ -160,38 +277,7 @@ All 3D widgets support interactive camera control via `Camera3DState` (arrow key
 | `fft` | `rustfft` | Power spectral density and spectrogram plots |
 | `triangulation` | `delaunator` | Delaunay triangulation for unstructured data |
 
-## Quick Start
-
-```toml
-[dependencies]
-ratatui-plt = "0.0.2"
-ratatui = "0.30"
-
-# Optional features:
-# ratatui-plt = { version = "0.0.2", features = ["statistics", "export"] }
-```
-
-```rust
-use ratatui_plt::prelude::*;
-
-let series = Series::new("sin(x)")
-    .data((0..100).map(|i| {
-        let x = i as f64 * 0.1;
-        (x, x.sin())
-    }).collect())
-    .color(Color::Cyan);
-
-let plot = LinePlot::new()
-    .series(series)
-    .title("Sine Wave")
-    .x_axis(Axis::new().label("x").grid(true))
-    .y_axis(Axis::new().label("y"));
-
-// In your ratatui draw callback:
-frame.render_widget(&plot, area);
-```
-
-## Examples
+### Examples
 
 70+ examples are included. Run any interactive example with:
 ```bash
@@ -215,7 +301,7 @@ Run all examples in sequence:
 ./run_examples.sh dark   # dark theme
 ```
 
-### Showcase Examples (matplotlib reference replicas)
+#### Showcase Examples (matplotlib reference replicas)
 
 Six showcase examples replicate matplotlib's reference plot gallery using `MultiPanel` grids:
 
@@ -228,7 +314,8 @@ Six showcase examples replicate matplotlib's reference plot gallery using `Multi
 | `showcase_tri` | TriPlot, TriContour (unfilled + filled), TriColor |
 | `showcase_3d` | Surface3D, Wireframe3D, Scatter3D, Bar3D, Quiver3D |
 
-### All Examples
+<details>
+<summary><strong>All 72 examples</strong></summary>
 
 | Example | Description |
 |---------|-------------|
@@ -297,7 +384,9 @@ Six showcase examples replicate matplotlib's reference plot gallery using `Multi
 | `sixel_export` | Inline Sixel image output (requires `sixel`) |
 | `toml_theme` | Load theme from TOML string (requires `toml-themes`) |
 
-## Convenience Macros
+</details>
+
+### Convenience Macros
 
 ```rust
 let s = series!("sin(x)", [(0.0, 0.0), (1.0, 0.84), (2.0, 0.91)]);
@@ -307,6 +396,60 @@ let panel = subplot!(2, 2, gap = 1);
 let cmap = colormap_custom!("div", 0.0 => Color::Blue, 0.5 => Color::White, 1.0 => Color::Red);
 ```
 
+---
+
+## For Developers
+
+### Architecture
+
+The crate follows a layered design:
+
+1. **Data containers** (`series.rs`) — `Series`, `Series3D`, `GridData`, `VectorFieldData`. All plot widgets consume these.
+2. **Configuration** (`axis.rs`, `norm.rs`, `colormap.rs`, `ticker.rs`, `theme.rs`) — scales, normalization, colormaps, tick generation, themes.
+3. **Widgets** (`widgets/`) — 58 plot widgets, each implementing ratatui's `Widget` or `StatefulWidget` trait via builder pattern.
+4. **Rendering helpers** (`drawing.rs`, `plot_buffer.rs`, `transform.rs`) — Braille/half-block drawing, Z-buffered rendering, 3D camera transforms.
+5. **Export** (`export.rs`) — text, ANSI, SVG, PNG, Sixel, Kitty output.
+
+### Key conventions
+
+- **Builder pattern everywhere** — all widgets: `LinePlot::new().series(s).title("Plot").x_axis(...)`
+- **Reference rendering** — widgets implement `Widget for &WidgetName` for zero-copy reuse
+- **3D uses StatefulWidget** — 3D widgets use `Camera3DState` for interactive camera control
+- **Half-block characters** — `Heatmap` uses `▀`/`▄` for 2x vertical resolution
+- **Prelude** — `use ratatui_plt::prelude::*` imports all commonly needed types
+- **Trait extensibility** — `Normalize`, `Colormap`, `TickLocator`, `TickFormatter` are all public traits users can implement
+
+### Builder API
+
+```rust
+// All widgets follow the same builder pattern:
+let plot = LinePlot::new()
+    .series(series)
+    .title("My Plot")
+    .x_axis(Axis::new().label("x").scale(Scale::Log).grid(true))
+    .y_axis(Axis::new().label("y"))
+    .theme(Theme::publication());
+
+// 3D widgets use StatefulWidget:
+let mut camera = Camera3DState::default();
+frame.render_stateful_widget(&surface, area, &mut camera);
+```
+
+### Testing
+
+Integration tests in `tests/integration.rs`. Tests cover data types, normalization, ticks, colormaps, mathtext, 3D transforms, and widget rendering.
+
+```bash
+cargo test                           # Run all tests
+cargo clippy                         # Lint
+cargo doc --open                     # Build and view docs
+```
+
+> [!TIP]
+> See the [API documentation on docs.rs](https://docs.rs/ratatui-plt) for full type-level documentation.
+
+---
+
 ## License
 
-GPL-3.0
+This project is licensed under the [GNU General Public License v3.0](https://www.gnu.org/licenses/gpl-3.0.en.html). See [LICENSE](LICENSE) for details.
