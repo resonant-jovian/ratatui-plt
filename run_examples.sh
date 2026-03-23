@@ -6,14 +6,16 @@ if [ -n "$1" ]; then
     theme="$1"
 else
     echo "Available themes:"
+    echo "  [0] auto (detect light/dark terminal)"
     echo "  [1] dark"
     echo "  [2] light"
     echo "  [3] minimal"
     echo "  [4] publication"
     echo "  [5] solarized"
-    printf "Select theme [4]: "
+    printf "Select theme [0]: "
     read -r choice
-    case "${choice:-4}" in
+    case "${choice:-0}" in
+        0|auto)        theme="" ;;
         1|dark)        theme="dark" ;;
         2|light)       theme="light" ;;
         3|minimal)     theme="minimal" ;;
@@ -23,8 +25,18 @@ else
     esac
 fi
 
-echo "Using theme: $theme"
+if [ -z "$theme" ]; then
+    echo "Using theme: auto (detecting terminal)"
+else
+    echo "Using theme: $theme"
+fi
 echo ""
+
+# Build theme argument (empty for auto-detect)
+theme_arg=()
+if [ -n "$theme" ]; then
+    theme_arg=("--" "$theme")
+fi
 
 # Prompt to continue or quit between examples
 wait_for_input() {
@@ -104,17 +116,17 @@ for ex in \
     wireframe3d
 do
     echo "=== $ex ==="
-    cargo run --release --example "$ex" -- "$theme"
+    cargo run --release --example "$ex" "${theme_arg[@]}"
     wait_for_input
 done
 
 # Feature-gated examples
 echo "=== statistics (--features statistics) ==="
-cargo run --release --features statistics --example statistics -- "$theme"
+cargo run --release --features statistics --example statistics "${theme_arg[@]}"
 wait_for_input
 
 echo "=== trendline (--features statistics) ==="
-cargo run --release --features statistics --example trendline -- "$theme"
+cargo run --release --features statistics --example trendline "${theme_arg[@]}"
 wait_for_input
 
 echo "=== kitty_export (--features kitty) ==="
@@ -130,11 +142,11 @@ cargo run --release --features toml-themes --example toml_theme
 wait_for_input
 
 echo "=== showcase_unicode (--features unicode-extended) ==="
-cargo run --release --features unicode-extended --example showcase_unicode -- "$theme"
+cargo run --release --features unicode-extended --example showcase_unicode "${theme_arg[@]}"
 wait_for_input
 
 echo "=== showcase_features (--features statistics) ==="
-cargo run --release --features statistics --example showcase_features -- "$theme"
+cargo run --release --features statistics --example showcase_features "${theme_arg[@]}"
 
 echo ""
 echo "All examples complete."

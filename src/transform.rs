@@ -200,8 +200,12 @@ pub fn apply_aspect_ratio(
         AspectRatio::Equal => {
             compute_aspect_area(1.0, data_x_range, data_y_range, area_width, area_height)
         }
-        AspectRatio::Fixed(ratio) => {
-            compute_aspect_area(*ratio, data_x_range, data_y_range, area_width, area_height)
+        // Frame-shape variants: constrain the drawing area to the requested
+        // visual ratio, ignoring data ranges.
+        other => {
+            let rect = ratatui::layout::Rect::new(0, 0, area_width, area_height);
+            let result = aspect_area(rect, other.clone());
+            (result.x, result.y, result.width, result.height)
         }
     }
 }
@@ -263,20 +267,76 @@ pub fn depth_sort(depths: &[f64]) -> Vec<usize> {
     indices
 }
 
-/// Compute a centered, visually square `Rect` within the given area.
+/// Compute a centered `Rect` with the requested visual aspect ratio.
 ///
-/// Terminal cells are approximately twice as tall as they are wide, so a visual
-/// square needs `width = 2 * height` in character cells. This function computes
-/// the largest such rectangle that fits within `area` and centers it.
-pub fn square_area(area: ratatui::layout::Rect) -> ratatui::layout::Rect {
-    let max_h = area.height;
-    let max_w = area.width;
-    let (w, h) = if max_w <= max_h * 2 {
-        (max_w, max_w / 2)
-    } else {
-        (max_h * 2, max_h)
+/// Terminal cells are approximately twice as tall as they are wide, so this
+/// function compensates for cell geometry when computing the result. The
+/// largest rectangle matching the requested ratio that fits within `area` is
+/// returned, centered in the remaining space.
+///
+/// # Examples
+///
+/// ```rust
+/// use ratatui::layout::Rect;
+/// use ratatui_plt::prelude::*;
+///
+/// let area = Rect::new(0, 0, 80, 24);
+///
+/// // Named presets
+/// let sq = aspect_area(area, AspectRatio::Square);
+/// let wide = aspect_area(area, AspectRatio::Wide);
+///
+/// // Tuple shorthand
+/// let custom = aspect_area(area, (2, 3));
+/// ```
+pub fn aspect_area(
+    area: ratatui::layout::Rect,
+    aspect: impl Into<AspectRatio>,
+) -> ratatui::layout::Rect {
+    let aspect = aspect.into();
+
+    // Resolve to a floating-point width:height ratio.
+    let ratio: f64 = match aspect {
+        AspectRatio::Auto => return area,
+        AspectRatio::Equal | AspectRatio::Square => 1.0,
+        AspectRatio::Wide => 2.0,
+        AspectRatio::UltraWide => 3.0,
+        AspectRatio::Tall => 0.5,
+        AspectRatio::Golden => 1.618_033_988_749_895,
+        AspectRatio::Widescreen => 16.0 / 9.0,
+        AspectRatio::Cinema => 21.0 / 9.0,
+        AspectRatio::Ratio(w, h) => {
+            if h == 0 || w == 0 {
+                return area;
+            }
+            w as f64 / h as f64
+        }
     };
-    let x = area.x + (max_w.saturating_sub(w)) / 2;
-    let y = area.y + (max_h.saturating_sub(h)) / 2;
+
+    let max_w = area.width as f64;
+    let max_h = area.height as f64;
+    let cell_aspect = terminal_cell_aspect();
+
+    // Convert desired visual ratio to character-cell ratio.
+    // A visual ratio of 1:1 needs width = height / cell_aspect in cells.
+    let cell_ratio = ratio / cell_aspect;
+
+    let (w, h) = if max_w <= max_h * cell_ratio {
+        // Width-constrained: use full width, compute height.
+        (max_w, max_w / cell_ratio)
+    } else {
+        // Height-constrained: use full height, compute width.
+        (max_h * cell_ratio, max_h)
+    };
+
+    let w = (w.round() as u16).min(area.width);
+    let h = (h.round() as u16).min(area.height);
+    let x = area.x + (area.width.saturating_sub(w)) / 2;
+    let y = area.y + (area.height.saturating_sub(h)) / 2;
     ratatui::layout::Rect::new(x, y, w, h)
+}
+
+/// Convenience alias for [`aspect_area`] with [`AspectRatio::Square`].
+pub fn square_area(area: ratatui::layout::Rect) -> ratatui::layout::Rect {
+    aspect_area(area, AspectRatio::Square)
 }

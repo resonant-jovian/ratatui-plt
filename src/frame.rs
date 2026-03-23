@@ -329,6 +329,7 @@ pub struct PlotFrame<'a> {
     x_axis: &'a Axis,
     y_axis: &'a Axis,
     aspect_ratio: AspectRatio,
+    border_style: BorderStyle,
     spines: Spines,
     theme: &'a Theme,
     colorbar_width: u16,
@@ -344,6 +345,7 @@ impl<'a> PlotFrame<'a> {
             x_axis,
             y_axis,
             aspect_ratio: AspectRatio::Auto,
+            border_style: BorderStyle::default(),
             spines: Spines::default(),
             theme,
             colorbar_width: 0,
@@ -361,6 +363,12 @@ impl<'a> PlotFrame<'a> {
     /// Set the aspect ratio.
     pub fn aspect_ratio(mut self, ar: AspectRatio) -> Self {
         self.aspect_ratio = ar;
+        self
+    }
+
+    /// Set the border style (Single, Rounded, Double, None).
+    pub fn border_style(mut self, bs: BorderStyle) -> Self {
+        self.border_style = bs;
         self
     }
 
@@ -447,12 +455,15 @@ impl<'a> PlotFrame<'a> {
             }
         }
 
-        // Draw spines (axis borders)
+        // Draw spines (axis borders) using the configured border style
+        let h_char = self.border_style.horizontal();
+        let v_char = self.border_style.vertical();
+
         if self.spines.bottom {
             for x in px..px + aw {
                 if x < area.x + area.width {
                     buf[(x, py + ah)]
-                        .set_char('─')
+                        .set_char(h_char)
                         .set_fg(self.theme.axis_color);
                 }
             }
@@ -460,7 +471,7 @@ impl<'a> PlotFrame<'a> {
         if self.spines.left && px > area.x {
             for y in py..py + ah {
                 buf[(px.saturating_sub(1), y)]
-                    .set_char('│')
+                    .set_char(v_char)
                     .set_fg(self.theme.axis_color);
             }
         }
@@ -469,7 +480,7 @@ impl<'a> PlotFrame<'a> {
                 if x < area.x + area.width {
                     let ty = py.saturating_sub(1);
                     if ty >= area.y {
-                        buf[(x, ty)].set_char('─').set_fg(self.theme.axis_color);
+                        buf[(x, ty)].set_char(h_char).set_fg(self.theme.axis_color);
                     }
                 }
             }
@@ -478,7 +489,7 @@ impl<'a> PlotFrame<'a> {
             let rx = px + aw;
             if rx < area.x + area.width {
                 for y in py..py + ah {
-                    buf[(rx, y)].set_char('│').set_fg(self.theme.axis_color);
+                    buf[(rx, y)].set_char(v_char).set_fg(self.theme.axis_color);
                 }
             }
         }

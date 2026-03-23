@@ -135,8 +135,35 @@ pub enum Bounds {
 
 /// Aspect ratio control for plots.
 ///
-/// Terminal cells are typically ~2:1 (height:width in pixels), so `Equal`
-/// automatically compensates to produce visually square data units.
+/// Controls both the visual frame shape (via [`aspect_area`]) and data scaling
+/// (via per-widget `.aspect_ratio()` builders). Terminal cells are typically
+/// ~2:1 (height:width in pixels), and all variants compensate automatically.
+///
+/// # Named presets
+///
+/// | Variant       | Visual ratio (w:h) |
+/// |---------------|-------------------|
+/// | `Square`      | 1:1               |
+/// | `Wide`        | 2:1               |
+/// | `UltraWide`   | 3:1               |
+/// | `Tall`        | 1:2               |
+/// | `Golden`      | ~1.618:1          |
+/// | `Widescreen`  | 16:9              |
+/// | `Cinema`      | 21:9              |
+///
+/// # Custom ratios
+///
+/// ```rust
+/// use ratatui_plt::prelude::*;
+///
+/// // Using the Ratio variant directly
+/// let ar = AspectRatio::Ratio(2, 3);
+///
+/// // Using tuple conversion
+/// let ar: AspectRatio = (2, 3).into();
+/// ```
+///
+/// [`aspect_area`]: crate::transform::aspect_area
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[derive(Clone, Debug, Default)]
 pub enum AspectRatio {
@@ -146,8 +173,28 @@ pub enum AspectRatio {
     /// Equal scaling: one data unit in x equals one data unit in y visually.
     /// Compensates for terminal cell aspect ratio (~2:1).
     Equal,
-    /// Fixed ratio: x_scale / y_scale.
-    Fixed(f64),
+    /// Visually square frame (1:1).
+    Square,
+    /// Wide frame (2:1).
+    Wide,
+    /// Ultra-wide frame (3:1).
+    UltraWide,
+    /// Tall frame (1:2).
+    Tall,
+    /// Golden ratio frame (~1.618:1).
+    Golden,
+    /// Widescreen frame (16:9).
+    Widescreen,
+    /// Cinema frame (21:9).
+    Cinema,
+    /// Custom aspect ratio (width : height).
+    Ratio(u16, u16),
+}
+
+impl From<(u16, u16)> for AspectRatio {
+    fn from((w, h): (u16, u16)) -> Self {
+        AspectRatio::Ratio(w, h)
+    }
 }
 
 /// Default terminal cell aspect ratio (width / height in pixels).

@@ -158,7 +158,7 @@ fn main() -> color_eyre::Result<()> {
 
     loop {
         terminal.draw(|frame| {
-            let area = frame.area();
+            let area = square_area(frame.area());
 
             // Title row (1 line)
             let outer = Layout::default()

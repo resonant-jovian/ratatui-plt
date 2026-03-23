@@ -55,9 +55,9 @@ impl Theme {
         Self {
             background: Color::Reset,
             foreground: Color::White,
-            grid_color: Color::Rgb(60, 60, 60),
-            minor_grid_color: Color::Rgb(40, 40, 40),
-            axis_color: Color::Gray,
+            grid_color: Color::Rgb(100, 100, 100),
+            minor_grid_color: Color::Rgb(70, 70, 70),
+            axis_color: Color::Rgb(180, 180, 180),
             color_cycle: ColorCycle::default(),
             grid_visible: true,
             grid_pattern: DashPattern::Dotted,
@@ -70,9 +70,9 @@ impl Theme {
         Self {
             background: Color::Reset,
             foreground: Color::Black,
-            grid_color: Color::Rgb(160, 160, 160),
-            minor_grid_color: Color::Rgb(200, 200, 200),
-            axis_color: Color::Rgb(80, 80, 80),
+            grid_color: Color::Rgb(130, 130, 130),
+            minor_grid_color: Color::Rgb(170, 170, 170),
+            axis_color: Color::Rgb(60, 60, 60),
             color_cycle: ColorCycle::default(),
             grid_visible: true,
             grid_pattern: DashPattern::Dotted,
@@ -137,6 +137,51 @@ impl Theme {
             grid_pattern: DashPattern::Dotted,
             bold_title: true,
         }
+    }
+
+    /// Auto-detect whether the terminal has a light or dark background and
+    /// return the appropriate theme.
+    ///
+    /// Detection checks (in order):
+    /// 1. `COLORFGBG` env var (xterm, rxvt, and others)
+    /// 2. `GTK_THEME` env var (`:dark` suffix → dark)
+    /// 3. GNOME/freedesktop color-scheme via `gsettings` (Linux desktops)
+    ///
+    /// Falls back to [`Theme::dark()`] if detection fails.
+    pub fn auto() -> Self {
+        // 1. COLORFGBG — format "fg;bg", bg > 8 means light background.
+        if let Ok(val) = std::env::var("COLORFGBG") {
+            if let Some(bg) = val.rsplit(';').next().and_then(|s| s.parse::<u8>().ok()) {
+                return if bg > 8 { Self::light() } else { Self::dark() };
+            }
+        }
+
+        // 2. GTK_THEME — e.g. "Adwaita:dark" or "Yaru-dark".
+        if let Ok(gtk) = std::env::var("GTK_THEME") {
+            let lower = gtk.to_lowercase();
+            if lower.contains("dark") {
+                return Self::dark();
+            }
+            if !lower.is_empty() {
+                return Self::light();
+            }
+        }
+
+        // 3. GNOME / freedesktop color-scheme preference.
+        if let Ok(output) = std::process::Command::new("gsettings")
+            .args(["get", "org.gnome.desktop.interface", "color-scheme"])
+            .output()
+        {
+            let stdout = String::from_utf8_lossy(&output.stdout);
+            if stdout.contains("prefer-dark") {
+                return Self::dark();
+            }
+            if stdout.contains("default") || stdout.contains("prefer-light") {
+                return Self::light();
+            }
+        }
+
+        Self::dark()
     }
 
     /// Set the global default theme.

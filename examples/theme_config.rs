@@ -76,7 +76,7 @@ fn main() -> color_eyre::Result<()> {
 
     loop {
         terminal.draw(|frame| {
-            let area = frame.area();
+            let area = square_area(frame.area());
 
             // Header + 2 rows of plots
             let outer = Layout::default()

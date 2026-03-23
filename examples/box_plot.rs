@@ -34,7 +34,8 @@ fn parse_theme() -> Theme {
         Some("minimal") => Theme::minimal(),
         Some("publication") => Theme::publication(),
         Some("solarized") => Theme::solarized(),
-        Some("dark") | None => Theme::dark(),
+        Some("dark") => Theme::dark(),
+        None => Theme::auto(),
         Some(other) => {
             eprintln!(
                 "Unknown theme '{other}'. Available: dark, light, minimal, publication, solarized"
@@ -102,7 +103,7 @@ fn main() -> color_eyre::Result<()> {
 
     loop {
         terminal.draw(|frame| {
-            let area = frame.area();
+            let area = square_area(frame.area());
             let cols = Layout::default()
                 .direction(Direction::Horizontal)
                 .constraints([

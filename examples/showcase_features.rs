@@ -154,7 +154,7 @@ fn main() -> color_eyre::Result<()> {
 
     loop {
         terminal.draw(|frame| {
-            frame.render_widget(&panel, frame.area());
+            frame.render_widget(&panel, square_area(frame.area()));
         })?;
 
         if let Event::Key(key) = event::read()?

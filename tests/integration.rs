@@ -1974,7 +1974,7 @@ fn test_violin_plot_split_mode_renders() {
 #[test]
 fn test_minor_grid_color_theme() {
     let theme = Theme::dark();
-    assert!(matches!(theme.minor_grid_color, Color::Rgb(40, 40, 40)));
+    assert!(matches!(theme.minor_grid_color, Color::Rgb(70, 70, 70)));
 }
 
 #[test]

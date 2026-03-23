@@ -108,7 +108,7 @@ pub use crate::ticker::{
     LogFormatter, LogLocator, MaxNLocator, MultipleLocator, NullFormatter, NullLocator,
     PercentFormatter, ScalarFormatter, SiFormatter, TickFormatter, TickLocator,
 };
-pub use crate::transform::{Camera3D, Camera3DState, square_area};
+pub use crate::transform::{Camera3D, Camera3DState, aspect_area, square_area};
 
 // 2D Plot Widgets
 pub use crate::widgets::band::{Band, BandPlot};
