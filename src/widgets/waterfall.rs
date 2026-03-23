@@ -25,6 +25,7 @@ use ratatui::widgets::Widget;
 use crate::annotation::Annotation;
 use crate::axis::Axis;
 use crate::frame::{DataBounds, PlotFrame, ReferenceLine};
+use crate::plot_buffer::{PlotBuffer, Z_CHROME, Z_DATA};
 use crate::spines::Spines;
 use crate::theme::Theme;
 use crate::ticker::NullLocator;
@@ -236,14 +237,16 @@ impl Widget for &WaterfallChart {
         // Use NullLocator for x-axis (category labels drawn manually)
         let x_axis = Axis::new().locator(NullLocator);
 
+        let mut pb = PlotBuffer::new(area);
+
         let frame = PlotFrame::new(&x_axis, &self.y_axis, &self.theme)
             .title(self.title.as_deref())
             .spines(self.spines.clone())
             .reference_lines(&self.reference_lines);
 
-        let Some(pa) = frame.render(
+        let Some(pa) = frame.render_to_pb(
+            &mut pb,
             area,
-            buf,
             DataBounds {
                 x_lo,
                 x_hi,
@@ -275,7 +278,6 @@ impl Widget for &WaterfallChart {
             let bar_x = group_x + bar_gap;
             let bar_w = group_width.saturating_sub(bar_gap * 2).max(1);
 
-            // Map data y to screen y
             let screen_top = data_to_screen(
                 bar_top,
                 y_lo,
@@ -293,7 +295,6 @@ impl Widget for &WaterfallChart {
             )
             .round() as u16;
 
-            // Choose color
             let color = if entry.is_total {
                 self.total_color
             } else if entry.value >= 0.0 {
@@ -308,7 +309,7 @@ impl Widget for &WaterfallChart {
             for x in bar_x..bar_x + bar_w {
                 for y in draw_top..=draw_bottom {
                     if pa.contains(x, y) {
-                        buf[(x, y)].set_char('\u{2588}').set_fg(color);
+                        pb.set_cell(x, y, ' ', color, color, Z_DATA);
                     }
                 }
             }
@@ -332,9 +333,7 @@ impl Widget for &WaterfallChart {
                 if conn_screen_y >= pa.y && conn_screen_y < pa.y + pa.height {
                     for x in conn_x_start..conn_x_end {
                         if pa.contains(x, conn_screen_y) {
-                            buf[(x, conn_screen_y)]
-                                .set_char('\u{2500}')
-                                .set_fg(self.theme.axis_color);
+                            pb.set_char(x, conn_screen_y, '\u{2500}', self.theme.axis_color, Z_DATA);
                         }
                     }
                 }
@@ -349,15 +348,16 @@ impl Widget for &WaterfallChart {
                 for (j, ch) in label.chars().enumerate() {
                     let lx = label_start + j as u16;
                     if lx >= area.x && lx < area.x + area.width {
-                        buf[(lx, label_y)]
-                            .set_char(ch)
-                            .set_fg(self.theme.axis_color);
+                        pb.set_char(lx, label_y, ch, self.theme.axis_color, Z_CHROME);
                     }
                 }
             }
         }
 
         // Draw annotations
-        PlotFrame::draw_annotations(&pa, &self.annotations, buf);
+        PlotFrame::draw_annotations_pb(&pa, &self.annotations, &mut pb);
+
+        // Composite
+        pb.composite(buf);
     }
 }

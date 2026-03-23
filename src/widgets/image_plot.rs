@@ -6,7 +6,7 @@
 
 use ratatui::buffer::Buffer;
 use ratatui::layout::Rect;
-use ratatui::style::{Color, Style};
+use ratatui::style::Color;
 use ratatui::widgets::Widget;
 
 use crate::annotation::Annotation;
@@ -14,6 +14,7 @@ use crate::axis::{AspectRatio, Axis, Bounds};
 use crate::colormap::{Colorbar, Colormap, Viridis};
 use crate::frame::{DataBounds, PlotFrame, ReferenceLine};
 use crate::norm::{LinearNorm, Normalize};
+use crate::plot_buffer::{PlotBuffer, Z_DATA};
 use crate::spines::Spines;
 use crate::theme::Theme;
 
@@ -356,6 +357,8 @@ impl Widget for &ImagePlot {
             0
         };
 
+        let mut pb = PlotBuffer::new(area);
+
         // Create and render the plot frame (title, axes, grid, ticks, labels, spines, ref lines)
         let frame = PlotFrame::new(&self.x_axis, &self.y_axis, &self.theme)
             .title(self.title.as_deref())
@@ -365,9 +368,9 @@ impl Widget for &ImagePlot {
             .y_label_width(7)
             .reference_lines(&self.reference_lines);
 
-        let Some(pa) = frame.render(
+        let Some(pa) = frame.render_to_pb(
+            &mut pb,
             area,
-            buf,
             DataBounds {
                 x_lo,
                 x_hi,
@@ -412,16 +415,16 @@ impl Widget for &ImagePlot {
                 );
 
                 // Use ▀ (upper half block): fg = top color, bg = bottom color
-                buf[(screen_x, screen_y)]
-                    .set_char('\u{2580}')
-                    .set_style(Style::default().fg(top_color).bg(bot_color));
+                pb.set_cell(screen_x, screen_y, '\u{2580}', top_color, bot_color, Z_DATA);
             }
         }
 
         // Draw annotations
-        PlotFrame::draw_annotations(&pa, &self.annotations, buf);
+        PlotFrame::draw_annotations_pb(&pa, &self.annotations, &mut pb);
 
-        // Draw colorbar (only for scalar data)
+        pb.composite(buf);
+
+        // Draw colorbar (only for scalar data, after composite)
         if self.show_colorbar && is_scalar {
             let (vmin, vmax) = scalar_value_bounds(&self.data);
             let cb = Colorbar::new(self.colormap.as_ref(), vmin, vmax)

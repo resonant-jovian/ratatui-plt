@@ -108,6 +108,9 @@ pub use crate::ticker::{
     LogFormatter, LogLocator, MaxNLocator, MultipleLocator, NullFormatter, NullLocator,
     PercentFormatter, ScalarFormatter, SiFormatter, TickFormatter, TickLocator,
 };
+pub use crate::plot_buffer::{
+    PlotBuffer, Z_ANNOTATION, Z_BACKGROUND, Z_CHROME, Z_DATA, Z_FILL, Z_GRID, Z_MARKER,
+};
 pub use crate::transform::{Camera3D, Camera3DState, aspect_area, square_area};
 
 // 2D Plot Widgets

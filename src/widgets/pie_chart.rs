@@ -23,6 +23,7 @@ use ratatui::layout::Rect;
 use ratatui::style::Color;
 use ratatui::widgets::Widget;
 
+use crate::plot_buffer::{PlotBuffer, Z_CHROME, Z_DATA};
 use crate::theme::Theme;
 
 /// A single slice of the pie chart.
@@ -154,6 +155,8 @@ impl Widget for &PieChart {
             return;
         }
 
+        let mut pb = PlotBuffer::new(area);
+
         // Reserve space for title
         let title_height: u16 = if self.title.is_some() { 1 } else { 0 };
         let py = area.y + title_height;
@@ -173,7 +176,7 @@ impl Widget for &PieChart {
             for (i, ch) in title.chars().enumerate() {
                 let x = start + i as u16;
                 if x < area.x + area.width {
-                    buf[(x, area.y)].set_char(ch).set_fg(self.theme.foreground);
+                    pb.set_char(x, area.y, ch, self.theme.foreground, Z_CHROME);
                 }
             }
         }
@@ -247,8 +250,7 @@ impl Widget for &PieChart {
                     }
 
                     if ea >= a_start && ea < a_end {
-                        // Use half-block characters for better vertical resolution
-                        buf[(screen_x, screen_y)].set_char('█').set_fg(slice.color);
+                        pb.set_cell(screen_x, screen_y, '█', slice.color, slice.color, Z_DATA);
                         break;
                     }
                 }
@@ -266,7 +268,7 @@ impl Widget for &PieChart {
                 let xi = sx.round() as u16;
                 let yi = sy.round() as u16;
                 if xi >= area.x && xi < area.x + area.width && yi >= py && yi < py + ph {
-                    buf[(xi, yi)].set_char('▪').set_fg(Color::DarkGray);
+                    pb.set_char(xi, yi, '▪', Color::DarkGray, Z_CHROME);
                 }
             }
         }
@@ -295,7 +297,7 @@ impl Widget for &PieChart {
                         (true, false) => '◞',  // lower-right quadrant
                         (false, false) => '◟', // lower-left quadrant
                     };
-                    buf[(xi, yi)].set_char(arc_ch).set_fg(Color::DarkGray);
+                    pb.set_char(xi, yi, arc_ch, Color::DarkGray, Z_CHROME);
                 }
             }
         }
@@ -340,11 +342,13 @@ impl Widget for &PieChart {
                     for (j, ch) in text.chars().enumerate() {
                         let x = xi + j as i32;
                         if x >= area.x as i32 && x < (area.x + area.width) as i32 {
-                            buf[(x as u16, yi)].set_char(ch).set_fg(slice.color);
+                            pb.set_char(x as u16, yi, ch, slice.color, Z_CHROME);
                         }
                     }
                 }
             }
         }
+
+        pb.composite(buf);
     }
 }

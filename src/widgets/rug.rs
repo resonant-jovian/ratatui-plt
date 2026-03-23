@@ -20,6 +20,7 @@ use ratatui::widgets::Widget;
 use crate::annotation::Annotation;
 use crate::axis::Axis;
 use crate::frame::{DataBounds, PlotFrame, ReferenceLine};
+use crate::plot_buffer::{PlotBuffer, Z_DATA};
 use crate::spines::Spines;
 use crate::theme::Theme;
 
@@ -214,22 +215,22 @@ impl Widget for &RugPlot {
             (xl, xh, yl, yh)
         };
 
+        let mut pb = PlotBuffer::new(area);
+
         // Create and render the plot frame
         let frame = PlotFrame::new(&self.x_axis, &self.y_axis, &self.theme)
             .title(self.title.as_deref())
             .spines(self.spines.clone())
             .reference_lines(&self.reference_lines);
 
-        let Some(pa) = frame.render(
-            area,
-            buf,
-            DataBounds {
-                x_lo,
-                x_hi,
-                y_lo,
-                y_hi,
-            },
-        ) else {
+        let bounds = DataBounds {
+            x_lo,
+            x_hi,
+            y_lo,
+            y_hi,
+        };
+
+        let Some(pa) = frame.render_to_pb(&mut pb, area, bounds) else {
             return;
         };
 
@@ -248,7 +249,7 @@ impl Widget for &RugPlot {
                         for dy in 0..tick_height {
                             let y = (pa.y + pa.height).saturating_sub(1 + dy);
                             if pa.contains(sx, y) {
-                                buf[(sx, y)].set_char('│').set_fg(ds.color);
+                                pb.set_char(sx, y, '│', ds.color, Z_DATA);
                             }
                         }
                     }
@@ -257,7 +258,7 @@ impl Widget for &RugPlot {
                         for dy in 0..tick_height {
                             let y = pa.y + dy;
                             if pa.contains(sx, y) {
-                                buf[(sx, y)].set_char('│').set_fg(ds.color);
+                                pb.set_char(sx, y, '│', ds.color, Z_DATA);
                             }
                         }
                     }
@@ -266,7 +267,7 @@ impl Widget for &RugPlot {
                         for dx in 0..tick_height {
                             let x = pa.x + dx;
                             if pa.contains(x, sy) {
-                                buf[(x, sy)].set_char('─').set_fg(ds.color);
+                                pb.set_char(x, sy, '─', ds.color, Z_DATA);
                             }
                         }
                     }
@@ -275,7 +276,7 @@ impl Widget for &RugPlot {
                         for dx in 0..tick_height {
                             let x = (pa.x + pa.width).saturating_sub(1 + dx);
                             if pa.contains(x, sy) {
-                                buf[(x, sy)].set_char('─').set_fg(ds.color);
+                                pb.set_char(x, sy, '─', ds.color, Z_DATA);
                             }
                         }
                     }
@@ -284,6 +285,9 @@ impl Widget for &RugPlot {
         }
 
         // Draw annotations
-        PlotFrame::draw_annotations(&pa, &self.annotations, buf);
+        PlotFrame::draw_annotations_pb(&pa, &self.annotations, &mut pb);
+
+        // Composite to buffer
+        pb.composite(buf);
     }
 }

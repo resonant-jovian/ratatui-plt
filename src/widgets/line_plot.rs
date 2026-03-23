@@ -24,6 +24,7 @@ use crate::axis::{AspectRatio, Axis};
 use crate::frame::{DataBounds, PlotArea, PlotFrame, ReferenceLine};
 use crate::legend::{Legend, LegendPosition};
 use crate::linked_view::SharedView;
+use crate::plot_buffer::{PlotBuffer, Z_DATA, Z_FILL, Z_MARKER};
 use crate::series::{Series, is_valid_point};
 use crate::spines::Spines;
 use crate::style::DashPattern;
@@ -198,6 +199,8 @@ impl Widget for &LinePlot {
             }
         }
 
+        let mut pb = PlotBuffer::new(area);
+
         // Create and render the plot frame (title, axes, grid, ticks, labels, spines, ref lines)
         let frame = PlotFrame::new(&self.x_axis, &self.y_axis, &self.theme)
             .title(self.title.as_deref())
@@ -205,16 +208,14 @@ impl Widget for &LinePlot {
             .spines(self.spines.clone())
             .reference_lines(&self.reference_lines);
 
-        let Some(pa) = frame.render(
-            area,
-            buf,
-            DataBounds {
-                x_lo,
-                x_hi,
-                y_lo,
-                y_hi,
-            },
-        ) else {
+        let bounds = DataBounds {
+            x_lo,
+            x_hi,
+            y_lo,
+            y_hi,
+        };
+
+        let Some(pa) = frame.render_to_pb(&mut pb, area, bounds) else {
             return;
         };
 
@@ -239,10 +240,7 @@ impl Widget for &LinePlot {
                     if xi >= pa.x && xi < pa.x + pa.width {
                         for y in y_top..=y_bot {
                             if pa.contains(xi, y) {
-                                buf[(xi, y)]
-                                    .set_char('░')
-                                    .set_fg(s.color)
-                                    .set_bg(s.color);
+                                pb.set_bg(xi, y, s.color, Z_FILL);
                             }
                         }
                     }
@@ -271,15 +269,15 @@ impl Widget for &LinePlot {
 
                     for ey in y_top..=y_bot {
                         if pa.contains(xi, ey) {
-                            buf[(xi, ey)].set_char('│').set_fg(s.color);
+                            pb.set_char(xi, ey, '│', s.color, Z_DATA);
                         }
                     }
                     // Caps
                     if pa.contains(xi, y_top) {
-                        buf[(xi, y_top)].set_char('┬').set_fg(s.color);
+                        pb.set_char(xi, y_top, '┬', s.color, Z_DATA);
                     }
                     if pa.contains(xi, y_bot) {
-                        buf[(xi, y_bot)].set_char('┴').set_fg(s.color);
+                        pb.set_char(xi, y_bot, '┴', s.color, Z_DATA);
                     }
                 }
             }
@@ -296,7 +294,7 @@ impl Widget for &LinePlot {
                     let yi = sy.round() as u16;
                     if pa.contains(xi, yi) {
                         let ch = s.marker.map_or('●', |m| m.char());
-                        buf[(xi, yi)].set_char(ch).set_fg(s.color);
+                        pb.set_char(xi, yi, ch, s.color, Z_MARKER);
                     }
                 }
                 continue;
@@ -319,8 +317,8 @@ impl Widget for &LinePlot {
                         let sy0 = pa.screen_y(y0);
                         let sx1 = pa.screen_x(x1);
                         let sy1 = pa.screen_y(y1);
-                        draw_line(
-                            buf,
+                        draw_line_pb(
+                            &mut pb,
                             &LineSegment {
                                 x0: sx0,
                                 y0: sy0,
@@ -339,8 +337,8 @@ impl Widget for &LinePlot {
                         let sx1 = pa.screen_x(x1);
                         let sy1 = pa.screen_y(y1);
                         // Horizontal segment at y0
-                        draw_line(
-                            buf,
+                        draw_line_pb(
+                            &mut pb,
                             &LineSegment {
                                 x0: sx0,
                                 y0: sy0,
@@ -352,8 +350,8 @@ impl Widget for &LinePlot {
                             &clip,
                         );
                         // Vertical segment at x1
-                        draw_line(
-                            buf,
+                        draw_line_pb(
+                            &mut pb,
                             &LineSegment {
                                 x0: sx1,
                                 y0: sy0,
@@ -372,8 +370,8 @@ impl Widget for &LinePlot {
                         let sx1 = pa.screen_x(x1);
                         let sy1 = pa.screen_y(y1);
                         // Vertical segment at x0
-                        draw_line(
-                            buf,
+                        draw_line_pb(
+                            &mut pb,
                             &LineSegment {
                                 x0: sx0,
                                 y0: sy0,
@@ -385,8 +383,8 @@ impl Widget for &LinePlot {
                             &clip,
                         );
                         // Horizontal segment at y1
-                        draw_line(
-                            buf,
+                        draw_line_pb(
+                            &mut pb,
                             &LineSegment {
                                 x0: sx0,
                                 y0: sy1,
@@ -407,8 +405,8 @@ impl Widget for &LinePlot {
                         let sx1 = pa.screen_x(x1);
                         let sy1 = pa.screen_y(y1);
                         // Horizontal at y0 from x0 to mid
-                        draw_line(
-                            buf,
+                        draw_line_pb(
+                            &mut pb,
                             &LineSegment {
                                 x0: sx0,
                                 y0: sy0,
@@ -420,8 +418,8 @@ impl Widget for &LinePlot {
                             &clip,
                         );
                         // Vertical at mid from y0 to y1
-                        draw_line(
-                            buf,
+                        draw_line_pb(
+                            &mut pb,
                             &LineSegment {
                                 x0: smx,
                                 y0: sy0,
@@ -433,8 +431,8 @@ impl Widget for &LinePlot {
                             &clip,
                         );
                         // Horizontal at y1 from mid to x1
-                        draw_line(
-                            buf,
+                        draw_line_pb(
+                            &mut pb,
                             &LineSegment {
                                 x0: smx,
                                 y0: sy1,
@@ -460,16 +458,19 @@ impl Widget for &LinePlot {
                     let xi = sx.round() as u16;
                     let yi = sy.round() as u16;
                     if pa.contains(xi, yi) {
-                        buf[(xi, yi)].set_char(marker.char()).set_fg(s.color);
+                        pb.set_char(xi, yi, marker.char(), s.color, Z_MARKER);
                     }
                 }
             }
         }
 
         // Draw annotations
-        PlotFrame::draw_annotations(&pa, &self.annotations, buf);
+        PlotFrame::draw_annotations_pb(&pa, &self.annotations, &mut pb);
 
-        // Draw legend
+        // Composite to buffer before legend
+        pb.composite(buf);
+
+        // Draw legend (directly to buf, after composite)
         if self.show_legend && !self.series.is_empty() {
             let legend = Legend::from_series(&self.series)
                 .position(self.legend_position.clone())
@@ -540,35 +541,6 @@ const BRAILLE_BITS: [[u8; 4]; 2] = [
     [0x01, 0x02, 0x04, 0x40], // column 0: rows 0-3
     [0x08, 0x10, 0x20, 0x80], // column 1: rows 0-3
 ];
-const BRAILLE_BASE: u32 = 0x2800;
-
-/// OR a braille dot into the buffer cell, preserving existing dots and background color.
-fn write_braille(buf: &mut Buffer, x: u16, y: u16, bits: u8, color: Color) {
-    let (existing_bits, existing_bg) = {
-        let cell = &buf[(x, y)];
-        let ch = cell.symbol().chars().next().unwrap_or(' ');
-        let bg = cell.bg;
-        let code = ch as u32;
-        if code == 0x2580 || code == 0x2584 {
-            return;
-        }
-        let bits = if (BRAILLE_BASE..=0x28FF).contains(&code) {
-            (code - BRAILLE_BASE) as u8
-        } else {
-            0
-        };
-        (bits, bg)
-    };
-    let combined = existing_bits | bits;
-    if let Some(ch) = char::from_u32(BRAILLE_BASE + combined as u32) {
-        let fg = if crate::drawing::colors_match(color, existing_bg) {
-            crate::drawing::contrasting_color(color)
-        } else {
-            color
-        };
-        buf[(x, y)].set_char(ch).set_fg(fg).set_bg(existing_bg);
-    }
-}
 
 /// Screen-space line segment endpoints.
 struct LineSegment {
@@ -578,9 +550,10 @@ struct LineSegment {
     y1: f64,
 }
 
-/// Draw a line between two screen points using Bresenham's at braille sub-pixel resolution (2x4 per cell).
-fn draw_line(
-    buf: &mut Buffer,
+/// Draw a line between two screen points using Bresenham's at braille sub-pixel resolution,
+/// writing into a [`PlotBuffer`] at Z_DATA.
+fn draw_line_pb(
+    pb: &mut PlotBuffer,
     seg: &LineSegment,
     color: Color,
     pattern: &DashPattern,
@@ -646,7 +619,7 @@ fn draw_line(
                 let dot_col = (ix0 % 2) as usize;
                 let dot_row = (iy0 % 4) as usize;
                 let bit = BRAILLE_BITS[dot_col][dot_row];
-                write_braille(buf, cell_x, cell_y, bit, color);
+                pb.set_braille(cell_x, cell_y, bit, color, Z_DATA);
             }
         }
 

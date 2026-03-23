@@ -8,6 +8,7 @@ use ratatui::buffer::Buffer;
 use ratatui::style::Color;
 
 use crate::frame::PlotArea;
+use crate::plot_buffer::PlotBuffer;
 
 /// Braille sub-pixel bit layout for each column/row within a cell.
 /// Braille characters (U+2800..=U+28FF) encode 8 dots in a 2x4 grid.
@@ -184,6 +185,71 @@ pub fn draw_braille_line(
                 let dot_row = (iy0 % 4) as usize;
                 let bit = BRAILLE_BITS[dot_col][dot_row];
                 write_braille(buf, cell_x, cell_y, bit, color);
+            }
+        }
+
+        if ix0 == ix1 && iy0 == iy1 {
+            break;
+        }
+        let e2 = 2 * err;
+        if e2 >= dy {
+            err += dy;
+            ix0 += sx;
+        }
+        if e2 <= dx {
+            err += dx;
+            iy0 += sy;
+        }
+    }
+}
+
+/// OR a braille dot into the [`PlotBuffer`] at the given cell, using `Z_DATA` priority.
+///
+/// This is the `PlotBuffer` counterpart of [`write_braille`].
+pub fn write_braille_pb(pb: &mut PlotBuffer, x: u16, y: u16, bits: u8, color: Color) {
+    pb.set_braille(x, y, bits, color, crate::plot_buffer::Z_DATA);
+}
+
+/// Draw a line between two screen-space points using Bresenham's algorithm
+/// at Braille sub-pixel resolution (2x4 per cell), writing into a [`PlotBuffer`].
+///
+/// This is the `PlotBuffer` counterpart of [`draw_braille_line`].
+/// Coordinates are in terminal cell space (floating point). The line is clipped
+/// to the given plot area bounds.
+pub fn draw_braille_line_pb(
+    pb: &mut PlotBuffer,
+    x0: f64,
+    y0: f64,
+    x1: f64,
+    y1: f64,
+    color: Color,
+    pa: &PlotArea,
+) {
+    // Scale to braille sub-pixel coordinates (2x horizontal, 4x vertical)
+    let mut ix0 = (x0 * 2.0).round() as i32;
+    let mut iy0 = (y0 * 4.0).round() as i32;
+    let ix1 = (x1 * 2.0).round() as i32;
+    let iy1 = (y1 * 4.0).round() as i32;
+
+    let dx = (ix1 - ix0).abs();
+    let dy = -(iy1 - iy0).abs();
+    let sx = if ix0 < ix1 { 1 } else { -1 };
+    let sy = if iy0 < iy1 { 1 } else { -1 };
+    let mut err = dx + dy;
+
+    loop {
+        if ix0 >= 0 && iy0 >= 0 {
+            let cell_x = (ix0 / 2) as u16;
+            let cell_y = (iy0 / 4) as u16;
+            if cell_x >= pa.x
+                && cell_x < pa.x + pa.width
+                && cell_y >= pa.y
+                && cell_y < pa.y + pa.height
+            {
+                let dot_col = (ix0 % 2) as usize;
+                let dot_row = (iy0 % 4) as usize;
+                let bit = BRAILLE_BITS[dot_col][dot_row];
+                write_braille_pb(pb, cell_x, cell_y, bit, color);
             }
         }
 

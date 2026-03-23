@@ -24,6 +24,7 @@ use ratatui::layout::Rect;
 use ratatui::style::Color;
 use ratatui::widgets::Widget;
 
+use crate::plot_buffer::{PlotBuffer, Z_CHROME, Z_DATA};
 use crate::theme::Theme;
 
 /// A node in the Sankey diagram.
@@ -227,13 +228,15 @@ impl Widget for &SankeyDiagram {
             return;
         }
 
+        let mut pb = PlotBuffer::new(area);
+
         // Draw title
         if let Some(ref title) = self.title {
             let start = area.x + (area.width.saturating_sub(title.len() as u16)) / 2;
             for (i, ch) in title.chars().enumerate() {
                 let x = start + i as u16;
                 if x < area.x + area.width {
-                    buf[(x, area.y)].set_char(ch).set_fg(self.theme.foreground);
+                    pb.set_char(x, area.y, ch, self.theme.foreground, Z_CHROME);
                 }
             }
         }
@@ -374,38 +377,28 @@ impl Widget for &SankeyDiagram {
                             continue;
                         }
                         if y == y_first && y == y_last {
-                            // Band fits within a single cell: use half-block for sub-cell edge
                             let top_half = top - y as f64;
                             if top_half > 0.5 {
-                                // Band starts in lower half: use ▄ in foreground color
-                                buf[(x, y)].set_char('▄').set_fg(flow_color);
+                                pb.set_char(x, y, '▄', flow_color, Z_DATA);
                             } else {
-                                // Band starts in upper half: use ▀ in foreground color
-                                buf[(x, y)].set_char('▀').set_fg(flow_color);
+                                pb.set_char(x, y, '▀', flow_color, Z_DATA);
                             }
                         } else if y == y_first {
-                            // Top edge cell: use half-block for sub-pixel top edge
-                            let top_frac = top - y as f64; // 0.0 = top of cell, 1.0 = bottom
+                            let top_frac = top - y as f64;
                             if top_frac > 0.5 {
-                                // Band starts in lower half: use ▄ with fg = flow color
-                                buf[(x, y)].set_char('▄').set_fg(flow_color);
+                                pb.set_char(x, y, '▄', flow_color, Z_DATA);
                             } else {
-                                // Band starts in upper half: fill the whole cell
-                                buf[(x, y)].set_char('█').set_fg(flow_color);
+                                pb.set_cell(x, y, '█', flow_color, flow_color, Z_DATA);
                             }
                         } else if y == y_last {
-                            // Bottom edge cell: use half-block for sub-pixel bottom edge
-                            let bot_frac = bot - y as f64; // how far into this cell the band extends
+                            let bot_frac = bot - y as f64;
                             if bot_frac < 0.5 {
-                                // Band ends in upper half: use ▀ with fg = flow color
-                                buf[(x, y)].set_char('▀').set_fg(flow_color);
+                                pb.set_char(x, y, '▀', flow_color, Z_DATA);
                             } else {
-                                // Band extends past midpoint: fill the whole cell
-                                buf[(x, y)].set_char('█').set_fg(flow_color);
+                                pb.set_cell(x, y, '█', flow_color, flow_color, Z_DATA);
                             }
                         } else {
-                            // Interior cell: fully filled
-                            buf[(x, y)].set_char('█').set_fg(flow_color);
+                            pb.set_cell(x, y, '█', flow_color, flow_color, Z_DATA);
                         }
                     }
                 }
@@ -425,7 +418,7 @@ impl Widget for &SankeyDiagram {
                     let x = nx + dx;
                     let y = ny + dy;
                     if x < area.x + area.width && y >= py && y < py + ph {
-                        buf[(x, y)].set_char('█').set_fg(node.color);
+                        pb.set_cell(x, y, '█', node.color, node.color, Z_DATA);
                     }
                 }
             }
@@ -448,10 +441,12 @@ impl Widget for &SankeyDiagram {
                 for (j, ch) in label.chars().enumerate() {
                     let x = label_x + j as u16;
                     if x < area.x + area.width {
-                        buf[(x, label_y)].set_char(ch).set_fg(self.theme.foreground);
+                        pb.set_char(x, label_y, ch, self.theme.foreground, Z_CHROME);
                     }
                 }
             }
         }
+
+        pb.composite(buf);
     }
 }

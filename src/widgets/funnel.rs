@@ -23,6 +23,7 @@ use ratatui::style::Color;
 use ratatui::widgets::Widget;
 
 use crate::color_cycle::ColorCycle;
+use crate::plot_buffer::{PlotBuffer, Z_CHROME, Z_DATA};
 use crate::theme::Theme;
 
 /// A single entry in a funnel chart.
@@ -129,13 +130,15 @@ impl Widget for &FunnelChart {
         // Reserve space for title
         let title_height: u16 = if self.title.is_some() { 1 } else { 0 };
 
+        let mut pb = PlotBuffer::new(area);
+
         // Draw title
         if let Some(ref title) = self.title {
             let start = area.x + (area.width.saturating_sub(title.len() as u16)) / 2;
             for (i, ch) in title.chars().enumerate() {
                 let x = start + i as u16;
                 if x < area.x + area.width {
-                    buf[(x, area.y)].set_char(ch).set_fg(self.theme.foreground);
+                    pb.set_char(x, area.y, ch, self.theme.foreground, Z_CHROME);
                 }
             }
         }
@@ -218,7 +221,7 @@ impl Widget for &FunnelChart {
             for y in bar_y_start..bar_y_end {
                 for x in bar_x..bar_x + bar_width {
                     if x < area.x + area.width && y < area.y + area.height {
-                        buf[(x, y)].set_char('\u{2588}').set_fg(color);
+                        pb.set_cell(x, y, '\u{2588}', color, color, Z_DATA);
                     }
                 }
             }
@@ -230,9 +233,7 @@ impl Widget for &FunnelChart {
                 for (j, ch) in entry.label.chars().enumerate() {
                     let lx = label_x + j as u16;
                     if lx < bar_area_x {
-                        buf[(lx, label_y)]
-                            .set_char(ch)
-                            .set_fg(self.theme.foreground);
+                        pb.set_char(lx, label_y, ch, self.theme.foreground, Z_CHROME);
                     }
                 }
             }
@@ -274,10 +275,12 @@ impl Widget for &FunnelChart {
                         } else {
                             self.theme.foreground
                         };
-                        buf[(lx, bar_center_y)].set_char(ch).set_fg(fg);
+                        pb.set_char(lx, bar_center_y, ch, fg, Z_CHROME);
                     }
                 }
             }
         }
+
+        pb.composite(buf);
     }
 }

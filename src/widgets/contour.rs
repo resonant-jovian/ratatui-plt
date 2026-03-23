@@ -8,9 +8,10 @@ use ratatui::widgets::Widget;
 use crate::annotation::Annotation;
 use crate::axis::{AspectRatio, Axis};
 use crate::colormap::{Colormap, Viridis};
-use crate::drawing::draw_braille_line;
+use crate::drawing::draw_braille_line_pb;
 use crate::frame::{DataBounds, PlotFrame, ReferenceLine};
 use crate::norm::{LinearNorm, Normalize};
+use crate::plot_buffer::{PlotBuffer, Z_ANNOTATION, Z_DATA};
 use crate::series::GridData;
 use crate::spines::Spines;
 use crate::theme::Theme;
@@ -171,6 +172,8 @@ impl Widget for &ContourPlot {
         let y_lo = self.data.y[0];
         let y_hi = self.data.y[nrows - 1];
 
+        let mut pb = PlotBuffer::new(area);
+
         // Create and render the plot frame (title, axes, grid, ticks, labels, spines, ref lines)
         let frame = PlotFrame::new(&self.x_axis, &self.y_axis, &self.theme)
             .title(self.title.as_deref())
@@ -178,9 +181,9 @@ impl Widget for &ContourPlot {
             .spines(self.spines.clone())
             .reference_lines(&self.reference_lines);
 
-        let Some(pa) = frame.render(
+        let Some(pa) = frame.render_to_pb(
+            &mut pb,
             area,
-            buf,
             DataBounds {
                 x_lo,
                 x_hi,
@@ -232,7 +235,7 @@ impl Widget for &ContourPlot {
                     let sx = pa.x + cx;
                     let sy = pa.y + cy;
                     if pa.in_area(sx, sy) {
-                        buf[(sx, sy)].set_char('▀').set_fg(top).set_bg(bot);
+                        pb.set_cell(sx, sy, '▀', top, bot, Z_DATA);
                     }
                 }
             }
@@ -327,7 +330,7 @@ impl Widget for &ContourPlot {
                             let sx1 = pa.screen_x(dx1);
                             let sy1 = pa.screen_y(dy1);
 
-                            draw_braille_line(buf, sx0, sy0, sx1, sy1, color, &pa);
+                            draw_braille_line_pb(&mut pb, sx0, sy0, sx1, sy1, color, &pa);
                         }
                     }
                 }
@@ -346,7 +349,7 @@ impl Widget for &ContourPlot {
                             for (j, ch) in label.chars().enumerate() {
                                 let cx = sx + j as u16;
                                 if pa.contains(cx, sy) {
-                                    buf[(cx, sy)].set_char(ch).set_fg(color);
+                                    pb.set_char(cx, sy, ch, color, Z_ANNOTATION);
                                 }
                             }
                         }
@@ -356,6 +359,8 @@ impl Widget for &ContourPlot {
         }
 
         // Draw annotations
-        PlotFrame::draw_annotations(&pa, &self.annotations, buf);
+        PlotFrame::draw_annotations_pb(&pa, &self.annotations, &mut pb);
+
+        pb.composite(buf);
     }
 }

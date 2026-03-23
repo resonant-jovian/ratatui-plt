@@ -25,6 +25,7 @@ use ratatui::layout::Rect;
 use ratatui::style::Color;
 use ratatui::widgets::Widget;
 
+use crate::plot_buffer::{PlotBuffer, Z_CHROME, Z_DATA};
 use crate::theme::Theme;
 
 /// A sector (colored segment) of the gauge arc.
@@ -155,13 +156,15 @@ impl Widget for &GaugeChart {
         // Reserve space for value label below arc
         let label_height: u16 = 1;
 
+        let mut pb = PlotBuffer::new(area);
+
         // Draw title
         if let Some(ref title) = self.title {
             let start = area.x + (area.width.saturating_sub(title.len() as u16)) / 2;
             for (i, ch) in title.chars().enumerate() {
                 let x = start + i as u16;
                 if x < area.x + area.width {
-                    buf[(x, area.y)].set_char(ch).set_fg(self.theme.foreground);
+                    pb.set_char(x, area.y, ch, self.theme.foreground, Z_CHROME);
                 }
             }
         }
@@ -226,9 +229,7 @@ impl Widget for &GaugeChart {
 
                 let color = self.color_for_value(val);
 
-                buf[(screen_x, screen_y)]
-                    .set_char('\u{2588}')
-                    .set_fg(color);
+                pb.set_cell(screen_x, screen_y, '\u{2588}', color, color, Z_DATA);
             }
         }
 
@@ -255,9 +256,7 @@ impl Widget for &GaugeChart {
                     && yi >= draw_y
                     && yi < draw_y + draw_h
                 {
-                    buf[(xi, yi)]
-                        .set_char('\u{2588}')
-                        .set_fg(self.theme.foreground);
+                    pb.set_cell(xi, yi, '\u{2588}', self.theme.foreground, self.theme.foreground, Z_CHROME);
                 }
             }
 
@@ -269,9 +268,7 @@ impl Widget for &GaugeChart {
                 && hub_y >= area.y
                 && hub_y < area.y + area.height
             {
-                buf[(hub_x, hub_y)]
-                    .set_char('\u{25CF}')
-                    .set_fg(self.theme.foreground);
+                pb.set_char(hub_x, hub_y, '\u{25CF}', self.theme.foreground, Z_CHROME);
             }
         }
 
@@ -292,11 +289,11 @@ impl Widget for &GaugeChart {
             for (i, ch) in text.chars().enumerate() {
                 let x = start + i as u16;
                 if x < area.x + area.width {
-                    buf[(x, label_y)]
-                        .set_char(ch)
-                        .set_fg(self.theme.foreground);
+                    pb.set_char(x, label_y, ch, self.theme.foreground, Z_CHROME);
                 }
             }
         }
+
+        pb.composite(buf);
     }
 }

@@ -2,12 +2,13 @@
 
 use ratatui::buffer::Buffer;
 use ratatui::layout::Rect;
-use ratatui::style::{Color, Style};
+use ratatui::style::Color;
 use ratatui::widgets::Widget;
 
 use crate::annotation::Annotation;
 use crate::axis::Axis;
 use crate::frame::{DataBounds, PlotFrame, ReferenceLine};
+use crate::plot_buffer::{PlotBuffer, Z_CHROME, Z_DATA, Z_MARKER};
 use crate::spines::Spines;
 use crate::theme::Theme;
 use crate::ticker::NullLocator;
@@ -311,15 +312,17 @@ impl Widget for &ViolinPlot {
         let x_lo = 0.0;
         let x_hi = n_slots as f64;
 
+        let mut pb = PlotBuffer::new(area);
+
         // Create and render the plot frame
         let frame = PlotFrame::new(&x_axis, &self.y_axis, &self.theme)
             .title(self.title.as_deref())
             .spines(self.spines.clone())
             .reference_lines(&self.reference_lines);
 
-        let Some(pa) = frame.render(
+        let Some(pa) = frame.render_to_pb(
+            &mut pb,
             area,
-            buf,
             DataBounds {
                 x_lo,
                 x_hi,
@@ -419,7 +422,6 @@ impl Widget for &ViolinPlot {
                             }
                         }
                         ViolinSide::Left => {
-                            // Draw only to the left of center (and center itself for dx=0)
                             if center_x >= dx + pa.x {
                                 vec![center_x - dx]
                             } else {
@@ -427,7 +429,6 @@ impl Widget for &ViolinPlot {
                             }
                         }
                         ViolinSide::Right => {
-                            // Draw only to the right of center (and center itself for dx=0)
                             if center_x + dx < pa.x + pa.width {
                                 vec![center_x + dx]
                             } else {
@@ -438,9 +439,7 @@ impl Widget for &ViolinPlot {
 
                     for &sx in &positions {
                         if pa.contains(sx, screen_y) {
-                            buf[(sx, screen_y)]
-                                .set_char(ch)
-                                .set_style(Style::default().fg(d.color));
+                            pb.set_char(sx, screen_y, ch, d.color, Z_DATA);
                         }
                     }
                 }
@@ -474,7 +473,7 @@ impl Widget for &ViolinPlot {
                                 for dx in 0..=box_half {
                                     let positions = inner_positions(center_x, dx, side, &pa);
                                     for sx in positions {
-                                        buf[(sx, y)].set_char('│').set_fg(self.theme.foreground);
+                                        pb.set_char(sx, y, '│', self.theme.foreground, Z_MARKER);
                                     }
                                 }
                             }
@@ -484,9 +483,7 @@ impl Widget for &ViolinPlot {
                             for dx in 0..=box_half {
                                 let positions = inner_positions(center_x, dx, side, &pa);
                                 for sx in positions {
-                                    buf[(sx, sy_median)]
-                                        .set_char('━')
-                                        .set_fg(self.theme.foreground);
+                                    pb.set_char(sx, sy_median, '━', self.theme.foreground, Z_MARKER);
                                 }
                             }
                         }
@@ -500,14 +497,13 @@ impl Widget for &ViolinPlot {
                                     let positions = inner_positions(center_x, dx, side, &pa);
                                     for sx in positions {
                                         let ch = if sy == sy_median { '━' } else { '─' };
-                                        buf[(sx, sy)].set_char(ch).set_fg(self.theme.foreground);
+                                        pb.set_char(sx, sy, ch, self.theme.foreground, Z_MARKER);
                                     }
                                 }
                             }
                         }
                     }
                     ViolinInner::Point => {
-                        // Show individual data points as dots at the center column
                         for &v in &sorted {
                             let sy = data_to_screen(
                                 v,
@@ -518,14 +514,11 @@ impl Widget for &ViolinPlot {
                             )
                             .round() as u16;
                             if pa.contains(center_x, sy) {
-                                buf[(center_x, sy)]
-                                    .set_char('•')
-                                    .set_fg(self.theme.foreground);
+                                pb.set_char(center_x, sy, '•', self.theme.foreground, Z_MARKER);
                             }
                         }
                     }
                     ViolinInner::Stick => {
-                        // Show thin vertical sticks for each data value
                         for &v in &sorted {
                             let sy = data_to_screen(
                                 v,
@@ -536,9 +529,7 @@ impl Widget for &ViolinPlot {
                             )
                             .round() as u16;
                             if pa.contains(center_x, sy) {
-                                buf[(center_x, sy)]
-                                    .set_char('│')
-                                    .set_fg(self.theme.foreground);
+                                pb.set_char(center_x, sy, '│', self.theme.foreground, Z_MARKER);
                             }
                         }
                     }
@@ -553,16 +544,17 @@ impl Widget for &ViolinPlot {
                 for (j, ch) in label.chars().enumerate() {
                     let lx = label_start + j as u16;
                     if lx >= area.x && lx < area.x + area.width {
-                        buf[(lx, label_y)]
-                            .set_char(ch)
-                            .set_fg(self.theme.axis_color);
+                        pb.set_char(lx, label_y, ch, self.theme.axis_color, Z_CHROME);
                     }
                 }
             }
         }
 
         // Draw annotations
-        PlotFrame::draw_annotations(&pa, &self.annotations, buf);
+        PlotFrame::draw_annotations_pb(&pa, &self.annotations, &mut pb);
+
+        // Composite
+        pb.composite(buf);
     }
 }
 

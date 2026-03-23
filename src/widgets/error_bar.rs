@@ -9,6 +9,7 @@ use crate::annotation::Annotation;
 use crate::axis::Axis;
 use crate::frame::{DataBounds, PlotFrame, ReferenceLine};
 use crate::legend::{Legend, LegendEntry, LegendPosition};
+use crate::plot_buffer::{PlotBuffer, Z_DATA, Z_MARKER};
 use crate::spines::Spines;
 use crate::theme::Theme;
 
@@ -196,22 +197,22 @@ impl Widget for &ErrorBarPlot {
         let (x_lo, x_hi) = self.x_axis.resolve_bounds(x_min, x_max);
         let (y_lo, y_hi) = self.y_axis.resolve_bounds(y_min, y_max);
 
+        let mut pb = PlotBuffer::new(area);
+
         // Create and render the plot frame (title, axes, grid, ticks, labels, spines, ref lines)
         let frame = PlotFrame::new(&self.x_axis, &self.y_axis, &self.theme)
             .title(self.title.as_deref())
             .spines(self.spines.clone())
             .reference_lines(&self.reference_lines);
 
-        let Some(pa) = frame.render(
-            area,
-            buf,
-            DataBounds {
-                x_lo,
-                x_hi,
-                y_lo,
-                y_hi,
-            },
-        ) else {
+        let bounds = DataBounds {
+            x_lo,
+            x_hi,
+            y_lo,
+            y_hi,
+        };
+
+        let Some(pa) = frame.render_to_pb(&mut pb, area, bounds) else {
             return;
         };
 
@@ -237,14 +238,14 @@ impl Widget for &ErrorBarPlot {
                 if xi >= pa.x && xi < pa.x + pa.width {
                     for ey in y_top..=y_bot {
                         if ey >= pa.y && ey < pa.y + pa.height {
-                            buf[(xi, ey)].set_char('│').set_fg(self.color);
+                            pb.set_char(xi, ey, '│', self.color, Z_DATA);
                         }
                     }
                     if y_top >= pa.y && y_top < pa.y + pa.height {
-                        buf[(xi, y_top)].set_char('┬').set_fg(self.color);
+                        pb.set_char(xi, y_top, '┬', self.color, Z_DATA);
                     }
                     if y_bot >= pa.y && y_bot < pa.y + pa.height {
-                        buf[(xi, y_bot)].set_char('┴').set_fg(self.color);
+                        pb.set_char(xi, y_bot, '┴', self.color, Z_DATA);
                     }
                 }
             }
@@ -264,28 +265,31 @@ impl Widget for &ErrorBarPlot {
                 if yi >= pa.y && yi < pa.y + pa.height {
                     for ex in x_left..=x_right {
                         if ex >= pa.x && ex < pa.x + pa.width {
-                            buf[(ex, yi)].set_char('─').set_fg(self.color);
+                            pb.set_char(ex, yi, '─', self.color, Z_DATA);
                         }
                     }
                     if x_left >= pa.x && x_left < pa.x + pa.width {
-                        buf[(x_left, yi)].set_char('├').set_fg(self.color);
+                        pb.set_char(x_left, yi, '├', self.color, Z_DATA);
                     }
                     if x_right >= pa.x && x_right < pa.x + pa.width {
-                        buf[(x_right, yi)].set_char('┤').set_fg(self.color);
+                        pb.set_char(x_right, yi, '┤', self.color, Z_DATA);
                     }
                 }
             }
 
             // Draw center point
             if pa.contains(xi, yi) {
-                buf[(xi, yi)].set_char('●').set_fg(self.color);
+                pb.set_char(xi, yi, '●', self.color, Z_MARKER);
             }
         }
 
         // Draw annotations
-        PlotFrame::draw_annotations(&pa, &self.annotations, buf);
+        PlotFrame::draw_annotations_pb(&pa, &self.annotations, &mut pb);
 
-        // Draw legend
+        // Composite to buffer before legend
+        pb.composite(buf);
+
+        // Draw legend (directly to buf, after composite)
         if self.show_legend
             && let Some(ref name) = self.name
         {

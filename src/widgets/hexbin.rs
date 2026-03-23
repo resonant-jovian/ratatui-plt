@@ -4,7 +4,6 @@ use std::collections::HashMap;
 
 use ratatui::buffer::Buffer;
 use ratatui::layout::Rect;
-use ratatui::style::Style;
 use ratatui::widgets::Widget;
 
 use crate::annotation::Annotation;
@@ -12,6 +11,7 @@ use crate::axis::Axis;
 use crate::colormap::{Colormap, Viridis};
 use crate::frame::{DataBounds, PlotFrame, ReferenceLine};
 use crate::norm::{LinearNorm, Normalize};
+use crate::plot_buffer::{PlotBuffer, Z_DATA};
 use crate::spines::Spines;
 use crate::theme::Theme;
 
@@ -44,6 +44,7 @@ pub struct HexbinPlot {
     data: Vec<(f64, f64)>,
     weights: Option<Vec<f64>>,
     gridsize: usize,
+    edge_width: f64,
     aggregation: HexAggregation,
     colormap: Box<dyn Colormap>,
     title: Option<String>,
@@ -61,6 +62,7 @@ impl HexbinPlot {
             data,
             weights: None,
             gridsize: 15,
+            edge_width: 0.0,
             aggregation: HexAggregation::Count,
             colormap: Box::new(Viridis),
             title: None,
@@ -75,6 +77,15 @@ impl HexbinPlot {
 
     pub fn gridsize(mut self, n: usize) -> Self {
         self.gridsize = n.max(3);
+        self
+    }
+
+    /// Set the edge width for hex boundary visibility.
+    ///
+    /// `0.0` = no edges (default), `0.5` = maximum edges.
+    /// Values are clamped to `[0.0, 0.5]`.
+    pub fn edge_width(mut self, w: f64) -> Self {
+        self.edge_width = w.clamp(0.0, 0.5);
         self
     }
 
@@ -157,6 +168,28 @@ fn pixel_to_hex(dx: f64, dy: f64, s: f64) -> (i32, i32) {
     axial_round(q_frac, r_frac)
 }
 
+/// Like `pixel_to_hex`, but also returns edge proximity (0.0 = center, 0.5 = boundary).
+fn pixel_to_hex_with_edge(dx: f64, dy: f64, s: f64) -> ((i32, i32), f64) {
+    let sqrt3 = 3.0_f64.sqrt();
+    let q_frac = (sqrt3 / 3.0 * dx - 1.0 / 3.0 * dy) / s;
+    let r_frac = (2.0 / 3.0 * dy) / s;
+    let s_frac = -q_frac - r_frac;
+    let (rq, rr, rs) = (q_frac.round(), r_frac.round(), s_frac.round());
+    let (dq, dr, ds) = (
+        (rq - q_frac).abs(),
+        (rr - r_frac).abs(),
+        (rs - s_frac).abs(),
+    );
+    let key = if dq > dr && dq > ds {
+        ((-rr - rs) as i32, rr as i32)
+    } else if dr > ds {
+        (rq as i32, (-rq - rs) as i32)
+    } else {
+        (rq as i32, rr as i32)
+    };
+    (key, dq.max(dr).max(ds))
+}
+
 impl Widget for &HexbinPlot {
     fn render(self, area: Rect, buf: &mut Buffer) {
         if area.width < 4 || area.height < 4 || self.data.is_empty() {
@@ -180,15 +213,17 @@ impl Widget for &HexbinPlot {
         let (x_lo, x_hi) = self.x_axis.resolve_bounds(x_min, x_max);
         let (y_lo, y_hi) = self.y_axis.resolve_bounds(y_min, y_max);
 
+        let mut pb = PlotBuffer::new(area);
+
         // Create and render the plot frame (title, axes, grid, ticks, labels, spines, ref lines)
         let frame = PlotFrame::new(&self.x_axis, &self.y_axis, &self.theme)
             .title(self.title.as_deref())
             .spines(self.spines.clone())
             .reference_lines(&self.reference_lines);
 
-        let Some(pa) = frame.render(
+        let Some(pa) = frame.render_to_pb(
+            &mut pb,
             area,
-            buf,
             DataBounds {
                 x_lo,
                 x_hi,
@@ -238,6 +273,9 @@ impl Widget for &HexbinPlot {
 
         // Half-block rasterization
         let effective_height = ph as usize * 2;
+        let edge_threshold = 0.5 - self.edge_width;
+        let bg_color = self.theme.background;
+        let has_edges = self.edge_width > 0.0;
 
         for cy in 0..ph {
             for cx in 0..pw {
@@ -252,24 +290,46 @@ impl Widget for &HexbinPlot {
                 // Top half-pixel
                 let top_frac_y = (cy as usize * 2) as f64 / effective_height as f64;
                 let top_data_y = y_hi - top_frac_y * (y_hi - y_lo);
-                let top_key = pixel_to_hex(data_x - x_lo, top_data_y - y_lo, s);
-                let top_val = values.get(&top_key).copied().unwrap_or(0.0);
-                let top_color = self.colormap.color_at(norm.normalize(top_val));
+                let top_color = if has_edges {
+                    let (key, edge) =
+                        pixel_to_hex_with_edge(data_x - x_lo, top_data_y - y_lo, s);
+                    if edge > edge_threshold {
+                        bg_color
+                    } else {
+                        let val = values.get(&key).copied().unwrap_or(0.0);
+                        self.colormap.color_at(norm.normalize(val))
+                    }
+                } else {
+                    let key = pixel_to_hex(data_x - x_lo, top_data_y - y_lo, s);
+                    let val = values.get(&key).copied().unwrap_or(0.0);
+                    self.colormap.color_at(norm.normalize(val))
+                };
 
                 // Bottom half-pixel
                 let bot_frac_y = (cy as usize * 2 + 1) as f64 / effective_height as f64;
                 let bot_data_y = y_hi - bot_frac_y * (y_hi - y_lo);
-                let bot_key = pixel_to_hex(data_x - x_lo, bot_data_y - y_lo, s);
-                let bot_val = values.get(&bot_key).copied().unwrap_or(0.0);
-                let bot_color = self.colormap.color_at(norm.normalize(bot_val));
+                let bot_color = if has_edges {
+                    let (key, edge) =
+                        pixel_to_hex_with_edge(data_x - x_lo, bot_data_y - y_lo, s);
+                    if edge > edge_threshold {
+                        bg_color
+                    } else {
+                        let val = values.get(&key).copied().unwrap_or(0.0);
+                        self.colormap.color_at(norm.normalize(val))
+                    }
+                } else {
+                    let key = pixel_to_hex(data_x - x_lo, bot_data_y - y_lo, s);
+                    let val = values.get(&key).copied().unwrap_or(0.0);
+                    self.colormap.color_at(norm.normalize(val))
+                };
 
-                buf[(screen_x, screen_y)]
-                    .set_char('▀')
-                    .set_style(Style::default().fg(top_color).bg(bot_color));
+                pb.set_cell(screen_x, screen_y, '▀', top_color, bot_color, Z_DATA);
             }
         }
 
         // Draw annotations
-        PlotFrame::draw_annotations(&pa, &self.annotations, buf);
+        PlotFrame::draw_annotations_pb(&pa, &self.annotations, &mut pb);
+
+        pb.composite(buf);
     }
 }

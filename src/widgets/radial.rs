@@ -4,7 +4,8 @@ use ratatui::buffer::Buffer;
 use ratatui::layout::Rect;
 use ratatui::widgets::Widget;
 
-use crate::drawing::{BRAILLE_BITS, write_braille};
+use crate::drawing::BRAILLE_BITS;
+use crate::plot_buffer::{PlotBuffer, Z_CHROME, Z_DATA, Z_FILL, Z_GRID, Z_MARKER};
 use crate::series::Series;
 use crate::theme::Theme;
 
@@ -152,12 +153,14 @@ impl Widget for &RadialPlot {
         let ph = area.height.saturating_sub(title_height);
         let pw = area.width;
 
+        let mut pb = PlotBuffer::new(area);
+
         if let Some(ref title) = self.title {
             let start = area.x + (area.width.saturating_sub(title.len() as u16)) / 2;
             for (i, ch) in title.chars().enumerate() {
                 let x = start + i as u16;
                 if x < area.x + area.width {
-                    buf[(x, area.y)].set_char(ch).set_fg(self.theme.foreground);
+                    pb.set_char(x, area.y, ch, self.theme.foreground, Z_CHROME);
                 }
             }
         }
@@ -210,13 +213,14 @@ impl Widget for &RadialPlot {
                 let sy0 = cy as f64 + ry * theta0.sin();
                 let sx1 = cx as f64 + rx * theta1.cos();
                 let sy1 = cy as f64 + ry * theta1.sin();
-                draw_braille_line_clipped(
-                    buf,
+                draw_braille_line_clipped_pb(
+                    &mut pb,
                     sx0,
                     sy0,
                     sx1,
                     sy1,
                     self.theme.grid_color,
+                    Z_GRID,
                     &ClipRect {
                         x: area.x,
                         y: py,
@@ -234,7 +238,7 @@ impl Widget for &RadialPlot {
                 for (j, ch) in label.chars().enumerate() {
                     let x = lx + j as u16 + 1;
                     if x < area.x + area.width {
-                        buf[(x, ly)].set_char(ch).set_fg(self.theme.axis_color);
+                        pb.set_char(x, ly, ch, self.theme.axis_color, Z_CHROME);
                     }
                 }
             }
@@ -245,13 +249,14 @@ impl Widget for &RadialPlot {
             let theta = 2.0 * std::f64::consts::PI * spoke as f64 / self.n_spokes as f64;
             let dx = r_screen_x * theta.cos();
             let dy = r_screen_y * theta.sin();
-            draw_braille_line_clipped(
-                buf,
+            draw_braille_line_clipped_pb(
+                &mut pb,
                 cx as f64,
                 cy as f64,
                 cx as f64 + dx,
                 cy as f64 + dy,
                 self.theme.grid_color,
+                Z_GRID,
                 &ClipRect {
                     x: area.x,
                     y: py,
@@ -271,9 +276,7 @@ impl Widget for &RadialPlot {
                 && ly < py + ph
             {
                 for (j, ch) in label.chars().enumerate() {
-                    buf[(lx + j as u16, ly)]
-                        .set_char(ch)
-                        .set_fg(self.theme.foreground);
+                    pb.set_char(lx + j as u16, ly, ch, self.theme.foreground, Z_CHROME);
                 }
             }
         }
@@ -294,7 +297,7 @@ impl Widget for &RadialPlot {
                         // Only markers, no lines
                         if sx >= area.x && sx < area.x + area.width && sy >= py && sy < py + ph {
                             let ch = s.marker.map_or('●', |m| m.char());
-                            buf[(sx, sy)].set_char(ch).set_fg(s.color);
+                            pb.set_char(sx, sy, ch, s.color, Z_MARKER);
                         }
                     }
                     PolarPlotType::Bar => {
@@ -307,7 +310,7 @@ impl Widget for &RadialPlot {
                             let by = (cy as f64 + frac * r_screen_y * t.sin()).round() as u16;
                             if bx >= area.x && bx < area.x + area.width && by >= py && by < py + ph
                             {
-                                buf[(bx, by)].set_char('█').set_fg(s.color);
+                                pb.set_cell(bx, by, '█', s.color, s.color, Z_DATA);
                             }
                         }
                         // Fill gap to previous bar by sweeping the arc at each radius level
@@ -333,7 +336,7 @@ impl Widget for &RadialPlot {
                                         && by >= py
                                         && by < py + ph
                                     {
-                                        buf[(bx, by)].set_char('█').set_fg(s.color);
+                                        pb.set_cell(bx, by, '█', s.color, s.color, Z_DATA);
                                     }
                                 }
                             }
@@ -350,10 +353,7 @@ impl Widget for &RadialPlot {
                             let by = (cy as f64 + frac * r_screen_y * t.sin()).round() as u16;
                             if bx >= area.x && bx < area.x + area.width && by >= py && by < py + ph
                             {
-                                buf[(bx, by)]
-                                    .set_char('░')
-                                    .set_fg(s.color)
-                                    .set_bg(s.color);
+                                pb.set_bg(bx, by, s.color, Z_FILL);
                             }
                         }
                     }
@@ -361,19 +361,20 @@ impl Widget for &RadialPlot {
                         // Marker at data point
                         if sx >= area.x && sx < area.x + area.width && sy >= py && sy < py + ph {
                             let ch = s.marker.map_or('●', |m| m.char());
-                            buf[(sx, sy)].set_char(ch).set_fg(s.color);
+                            pb.set_char(sx, sy, ch, s.color, Z_MARKER);
                         }
                         // Connect to previous point using Braille sub-pixel rendering
                         if let Some((px, py_prev)) = prev
                             && (sx != px || sy != py_prev)
                         {
-                            draw_braille_line_clipped(
-                                buf,
+                            draw_braille_line_clipped_pb(
+                                &mut pb,
                                 px as f64,
                                 py_prev as f64,
                                 sx as f64,
                                 sy as f64,
                                 s.color,
+                                Z_DATA,
                                 &ClipRect {
                                     x: area.x,
                                     y: py,
@@ -387,6 +388,8 @@ impl Widget for &RadialPlot {
                 prev = Some((sx, sy));
             }
         }
+
+        pb.composite(buf);
     }
 }
 
@@ -398,17 +401,19 @@ struct ClipRect {
     h: u16,
 }
 
-/// Draw a Braille sub-pixel line clipped to a rectangular region.
+/// Draw a Braille sub-pixel line clipped to a rectangular region, writing into a [`PlotBuffer`].
 ///
 /// Coordinates are in terminal cell space (floating point). The line is
 /// rendered at 2x4 sub-pixel resolution using Unicode Braille characters.
-fn draw_braille_line_clipped(
-    buf: &mut Buffer,
+#[allow(clippy::too_many_arguments)]
+fn draw_braille_line_clipped_pb(
+    pb: &mut PlotBuffer,
     x0: f64,
     y0: f64,
     x1: f64,
     y1: f64,
     color: ratatui::style::Color,
+    z: u8,
     clip: &ClipRect,
 ) {
     let mut ix0 = (x0 * 2.0).round() as i32;
@@ -434,7 +439,7 @@ fn draw_braille_line_clipped(
                 let dot_col = (ix0 % 2) as usize;
                 let dot_row = (iy0 % 4) as usize;
                 let bit = BRAILLE_BITS[dot_col][dot_row];
-                write_braille(buf, cell_x, cell_y, bit, color);
+                pb.set_braille(cell_x, cell_y, bit, color, z);
             }
         }
 

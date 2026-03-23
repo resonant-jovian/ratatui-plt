@@ -12,6 +12,7 @@ use ratatui::widgets::Widget;
 use crate::annotation::Annotation;
 use crate::axis::Axis;
 use crate::frame::{DataBounds, PlotFrame, ReferenceLine};
+use crate::plot_buffer::{PlotBuffer, Z_CHROME, Z_DATA, Z_FILL};
 use crate::spines::Spines;
 use crate::theme::Theme;
 use crate::ticker::NullLocator;
@@ -196,9 +197,11 @@ fn letter_value_levels(k: usize) -> Vec<(f64, f64)> {
 }
 
 /// Shading characters for successive box levels (innermost to outermost).
+#[allow(dead_code)]
 const LEVEL_CHARS: [char; 4] = ['█', '▓', '▒', '░'];
 
 /// Get the fill character for a given level index.
+#[allow(dead_code)]
 fn level_char(level: usize) -> char {
     LEVEL_CHARS[level.min(LEVEL_CHARS.len() - 1)]
 }
@@ -344,15 +347,17 @@ impl Widget for &BoxenPlot {
         let x_lo = 0.0;
         let x_hi = n as f64;
 
+        let mut pb = PlotBuffer::new(area);
+
         // Create and render the plot frame
         let frame = PlotFrame::new(&x_axis, &self.y_axis, &self.theme)
             .title(self.title.as_deref())
             .spines(self.spines.clone())
             .reference_lines(&self.reference_lines);
 
-        let Some(pa) = frame.render(
+        let Some(pa) = frame.render_to_pb(
+            &mut pb,
             area,
-            buf,
             DataBounds {
                 x_lo,
                 x_hi,
@@ -364,7 +369,6 @@ impl Widget for &BoxenPlot {
         };
 
         let col_width = pa.width / n.max(1) as u16;
-        // Maximum box width (widest level)
         let max_box_width = col_width.saturating_sub(2).max(3);
 
         for (i, group) in self.groups.iter().enumerate() {
@@ -375,15 +379,12 @@ impl Widget for &BoxenPlot {
 
             let center_x = pa.x + (i as u16 * pa.width / n as u16) + pa.width / n as u16 / 2;
 
-            // Determine k_depth
             let k = self.k_depth.unwrap_or_else(|| auto_k_depth(sorted.len()));
             let levels = letter_value_levels(k);
 
-            // Compute median
             let median = percentile(&sorted, 50.0);
 
-            // Draw levels from outermost (widest quantile range, narrowest box)
-            // to innermost (IQR, widest box) so inner boxes paint over outer.
+            // Draw levels from outermost to innermost
             for (level_idx, &(lower_pct, upper_pct)) in levels.iter().enumerate().rev() {
                 let lower_val = percentile(&sorted, lower_pct);
                 let upper_val = percentile(&sorted, upper_pct);
@@ -391,8 +392,6 @@ impl Widget for &BoxenPlot {
                 let sy_lower = pa.screen_y(lower_val).round() as u16;
                 let sy_upper = pa.screen_y(upper_val).round() as u16;
 
-                // Box width: level 0 (fourths) is widest, each subsequent level narrower.
-                // Width decreases proportionally: level 0 = max, level k-1 = ~30% of max.
                 let width_fraction = if k > 1 {
                     1.0 - 0.7 * (level_idx as f64 / (k as f64 - 1.0).max(1.0))
                 } else {
@@ -402,27 +401,19 @@ impl Widget for &BoxenPlot {
                 let box_left = center_x.saturating_sub(box_width / 2);
                 let box_right = box_left + box_width;
 
-                let fill_ch = level_char(level_idx);
-
-                // The top of the box is sy_upper (smaller y = higher on screen)
-                // The bottom is sy_lower (larger y = lower on screen)
                 let top = sy_upper.min(sy_lower);
                 let bottom = sy_upper.max(sy_lower);
 
-                // Compute depth-based color for fill: deeper levels use more saturated/darker colors
                 let fill_color = depth_gradient_color(group.color, level_idx, k);
 
-                // Fill the box
+                // Fill the box using background color
                 for y in top..=bottom {
                     for x in box_left..box_right {
                         if pa.contains(x, y) {
-                            buf[(x, y)].set_char(fill_ch).set_fg(fill_color);
+                            pb.set_bg(x, y, fill_color, Z_FILL);
                         }
                     }
                 }
-
-                // No outlines — the filled rectangles with depth gradient
-                // provide enough visual distinction between levels.
             }
 
             // Draw median line on top
@@ -431,7 +422,7 @@ impl Widget for &BoxenPlot {
             let median_right = median_left + max_box_width;
             for x in median_left..median_right {
                 if pa.contains(x, sy_median) {
-                    buf[(x, sy_median)].set_char('━').set_fg(group.color);
+                    pb.set_char(x, sy_median, '━', group.color, Z_DATA);
                 }
             }
 
@@ -443,15 +434,16 @@ impl Widget for &BoxenPlot {
                 for (j, ch) in label.chars().enumerate() {
                     let lx = label_start + j as u16;
                     if lx >= area.x && lx < area.x + area.width {
-                        buf[(lx, label_y)]
-                            .set_char(ch)
-                            .set_fg(self.theme.axis_color);
+                        pb.set_char(lx, label_y, ch, self.theme.axis_color, Z_CHROME);
                     }
                 }
             }
         }
 
         // Draw annotations
-        PlotFrame::draw_annotations(&pa, &self.annotations, buf);
+        PlotFrame::draw_annotations_pb(&pa, &self.annotations, &mut pb);
+
+        // Composite
+        pb.composite(buf);
     }
 }

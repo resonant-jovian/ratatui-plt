@@ -29,6 +29,7 @@ use crate::annotation::Annotation;
 use crate::axis::Axis;
 use crate::frame::{DataBounds, PlotFrame, ReferenceLine};
 use crate::legend::{Legend, LegendPosition};
+use crate::plot_buffer::{PlotBuffer, Z_MARKER};
 use crate::series::Series;
 use crate::spines::Spines;
 use crate::style::MarkerShape;
@@ -241,14 +242,16 @@ impl Widget for &JointPlot {
         let (y_lo, y_hi) = self.y_axis.resolve_bounds(y_min, y_max);
 
         // Render central scatter plot with PlotFrame
+        let mut pb = PlotBuffer::new(central_area);
+
         let frame = PlotFrame::new(&self.x_axis, &self.y_axis, &self.theme)
             .title(self.title.as_deref())
             .spines(self.spines.clone())
             .reference_lines(&self.reference_lines);
 
-        let Some(pa) = frame.render(
+        let Some(pa) = frame.render_to_pb(
+            &mut pb,
             central_area,
-            buf,
             DataBounds {
                 x_lo,
                 x_hi,
@@ -271,15 +274,17 @@ impl Widget for &JointPlot {
                 let xi = sx.round() as u16;
                 let yi = sy.round() as u16;
                 if pa.contains(xi, yi) {
-                    buf[(xi, yi)].set_char(marker.char()).set_fg(s.color);
+                    pb.set_char(xi, yi, marker.char(), s.color, Z_MARKER);
                 }
             }
         }
 
         // Draw annotations
-        PlotFrame::draw_annotations(&pa, &self.annotations, buf);
+        PlotFrame::draw_annotations_pb(&pa, &self.annotations, &mut pb);
 
-        // Draw legend
+        pb.composite(buf);
+
+        // Draw legend (after composite)
         if self.show_legend && !self.series.is_empty() {
             let legend = Legend::from_series(&self.series)
                 .position(self.legend_position.clone())

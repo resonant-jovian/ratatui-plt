@@ -27,6 +27,7 @@ use ratatui::widgets::Widget;
 use crate::annotation::Annotation;
 use crate::axis::Axis;
 use crate::frame::{DataBounds, PlotFrame, ReferenceLine};
+use crate::plot_buffer::{PlotBuffer, Z_DATA, Z_FILL};
 use crate::spines::Spines;
 use crate::theme::Theme;
 
@@ -186,15 +187,17 @@ impl Widget for &CandlestickChart {
         let (x_lo, x_hi) = self.x_axis.resolve_bounds(data_x_min, data_x_max);
         let (y_lo, y_hi) = self.y_axis.resolve_bounds(data_y_min, data_y_max);
 
+        let mut pb = PlotBuffer::new(area);
+
         // Create and render the plot frame
         let frame = PlotFrame::new(&self.x_axis, &self.y_axis, &self.theme)
             .title(self.title.as_deref())
             .spines(self.spines.clone())
             .reference_lines(&self.reference_lines);
 
-        let Some(pa) = frame.render(
+        let Some(pa) = frame.render_to_pb(
+            &mut pb,
             area,
-            buf,
             DataBounds {
                 x_lo,
                 x_hi,
@@ -237,18 +240,17 @@ impl Widget for &CandlestickChart {
             let sy_open = pa.screen_y(candle.open).round() as u16;
             let sy_close = pa.screen_y(candle.close).round() as u16;
             let body_top = sy_open.min(sy_close);
-            // Ensure body is at least 1 row tall so tiny candles are visible
             let body_bot = sy_open.max(sy_close).max(body_top);
 
             // Body extends 1 column on each side of center (3 cols wide)
             let body_left = if sx > pa.x { sx - 1 } else { sx };
             let body_right = if sx + 1 < pa.x + pa.width { sx + 1 } else { sx };
 
-            // 1. Clear the full candle area to remove grid dots
+            // 1. Clear the full candle area with a reset background
             for y in wick_top..=wick_bot {
                 for x in body_left..=body_right {
                     if pa.contains(x, y) {
-                        buf[(x, y)].set_char(' ');
+                        pb.set_bg(x, y, Color::Reset, Z_FILL);
                     }
                 }
             }
@@ -257,44 +259,41 @@ impl Widget for &CandlestickChart {
             for y in body_top..=body_bot {
                 for x in body_left..=body_right {
                     if pa.contains(x, y) {
-                        buf[(x, y)].set_char('█').set_fg(color);
+                        pb.set_char(x, y, '█', color, Z_DATA);
                     }
                 }
             }
 
             // 3. Draw wicks on center column (AFTER body)
-            // Upper wick: from wick_top to body_top-1
             if wick_top < body_top {
-                // T-cap at top of upper wick: ┬
                 if pa.contains(sx, wick_top) {
-                    buf[(sx, wick_top)].set_char('┬').set_fg(color);
+                    pb.set_char(sx, wick_top, '┬', color, Z_DATA);
                 }
-                // Wick stem
                 for y in (wick_top + 1)..body_top {
                     if pa.contains(sx, y) {
-                        buf[(sx, y)].set_char('│').set_fg(color);
+                        pb.set_char(sx, y, '│', color, Z_DATA);
                     }
                 }
             }
-            // Lower wick: from body_bot+1 to wick_bot
             if wick_bot > body_bot {
-                // Wick stem
                 if wick_bot > body_bot + 1 {
                     for y in (body_bot + 1)..wick_bot {
                         if pa.contains(sx, y) {
-                            buf[(sx, y)].set_char('│').set_fg(color);
+                            pb.set_char(sx, y, '│', color, Z_DATA);
                         }
                     }
                 }
-                // Inverted T-cap at bottom of lower wick: ┴
                 if pa.contains(sx, wick_bot) {
-                    buf[(sx, wick_bot)].set_char('┴').set_fg(color);
+                    pb.set_char(sx, wick_bot, '┴', color, Z_DATA);
                 }
             }
         }
 
         // Draw annotations
-        PlotFrame::draw_annotations(&pa, &self.annotations, buf);
+        PlotFrame::draw_annotations_pb(&pa, &self.annotations, &mut pb);
+
+        // Composite
+        pb.composite(buf);
     }
 }
 

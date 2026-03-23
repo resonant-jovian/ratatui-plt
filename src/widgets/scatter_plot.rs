@@ -10,11 +10,12 @@ use crate::annotation::Annotation;
 use crate::axis::{AspectRatio, Axis};
 use crate::colormap::{Colormap, Viridis};
 #[cfg(feature = "statistics")]
-use crate::drawing::draw_braille_line;
+use crate::drawing::draw_braille_line_pb;
 use crate::frame::{DataBounds, PlotFrame, ReferenceLine};
 use crate::legend::{Legend, LegendPosition};
 use crate::linked_view::SharedView;
 use crate::norm::{LinearNorm, Normalize};
+use crate::plot_buffer::{PlotBuffer, Z_MARKER};
 use crate::series::Series;
 use crate::spines::Spines;
 use crate::style::MarkerShape;
@@ -260,6 +261,8 @@ impl Widget for &ScatterPlot {
             }
         }
 
+        let mut pb = PlotBuffer::new(area);
+
         // Create and render the plot frame (title, axes, grid, ticks, labels, spines, ref lines)
         let frame = PlotFrame::new(&self.x_axis, &self.y_axis, &self.theme)
             .title(self.title.as_deref())
@@ -267,16 +270,14 @@ impl Widget for &ScatterPlot {
             .spines(self.spines.clone())
             .reference_lines(&self.reference_lines);
 
-        let Some(pa) = frame.render(
-            area,
-            buf,
-            DataBounds {
-                x_lo,
-                x_hi,
-                y_lo,
-                y_hi,
-            },
-        ) else {
+        let bounds = DataBounds {
+            x_lo,
+            x_hi,
+            y_lo,
+            y_hi,
+        };
+
+        let Some(pa) = frame.render_to_pb(&mut pb, area, bounds) else {
             return;
         };
 
@@ -305,7 +306,7 @@ impl Widget for &ScatterPlot {
                     } else {
                         s.color
                     };
-                    buf[(xi, yi)].set_char(marker.char()).set_fg(color);
+                    pb.set_char(xi, yi, marker.char(), color, Z_MARKER);
                 }
                 global_point_idx += 1;
             }
@@ -367,15 +368,18 @@ impl Widget for &ScatterPlot {
                     let sy0 = pa.screen_y(ys[i]);
                     let sx1 = pa.screen_x(eval_xs[i + 1]);
                     let sy1 = pa.screen_y(ys[i + 1]);
-                    draw_braille_line(buf, sx0, sy0, sx1, sy1, trend_color, &pa);
+                    draw_braille_line_pb(&mut pb, sx0, sy0, sx1, sy1, trend_color, &pa);
                 }
             }
         }
 
         // Draw annotations
-        PlotFrame::draw_annotations(&pa, &self.annotations, buf);
+        PlotFrame::draw_annotations_pb(&pa, &self.annotations, &mut pb);
 
-        // Draw legend
+        // Composite to buffer before legend
+        pb.composite(buf);
+
+        // Draw legend (directly to buf, after composite)
         if self.show_legend && !self.series.is_empty() && self.color_values.is_none() {
             let legend = Legend::from_series(&self.series)
                 .position(self.legend_position.clone())

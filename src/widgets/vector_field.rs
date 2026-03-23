@@ -10,6 +10,7 @@ use crate::axis::{AspectRatio, Axis};
 use crate::colormap::{Colormap, Viridis};
 use crate::frame::{DataBounds, PlotFrame, ReferenceLine};
 use crate::norm::{LinearNorm, Normalize};
+use crate::plot_buffer::{PlotBuffer, Z_DATA};
 use crate::series::VectorFieldData;
 use crate::spines::Spines;
 use crate::theme::Theme;
@@ -242,6 +243,8 @@ impl Widget for &VectorField {
         let (x_lo, x_hi) = self.x_axis.resolve_bounds(x_min, x_max);
         let (y_lo, y_hi) = self.y_axis.resolve_bounds(y_min, y_max);
 
+        let mut pb = PlotBuffer::new(area);
+
         // Create and render the plot frame (title, axes, grid, ticks, labels, spines, ref lines)
         let frame = PlotFrame::new(&self.x_axis, &self.y_axis, &self.theme)
             .title(self.title.as_deref())
@@ -249,9 +252,9 @@ impl Widget for &VectorField {
             .spines(self.spines.clone())
             .reference_lines(&self.reference_lines);
 
-        let Some(pa) = frame.render(
+        let Some(pa) = frame.render_to_pb(
+            &mut pb,
             area,
-            buf,
             DataBounds {
                 x_lo,
                 x_hi,
@@ -280,11 +283,13 @@ impl Widget for &VectorField {
                 };
 
                 let ch = arrow_char(dx, -dy, &self.arrow_char_set); // Negate dy because screen y is inverted
-                buf[(xi, yi)].set_char(ch).set_fg(color);
+                pb.set_char(xi, yi, ch, color, Z_DATA);
             }
         }
 
         // Draw annotations
-        PlotFrame::draw_annotations(&pa, &self.annotations, buf);
+        PlotFrame::draw_annotations_pb(&pa, &self.annotations, &mut pb);
+
+        pb.composite(buf);
     }
 }

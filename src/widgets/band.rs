@@ -29,6 +29,7 @@ use crate::annotation::Annotation;
 use crate::axis::Axis;
 use crate::frame::{DataBounds, PlotFrame, ReferenceLine};
 use crate::legend::{Legend, LegendEntry, LegendPosition};
+use crate::plot_buffer::{PlotBuffer, Z_DATA};
 use crate::spines::Spines;
 use crate::theme::Theme;
 
@@ -199,15 +200,17 @@ impl Widget for &BandPlot {
         let (x_lo, x_hi) = self.x_axis.resolve_bounds(data_x_min, data_x_max);
         let (y_lo, y_hi) = self.y_axis.resolve_bounds(data_y_min, data_y_max);
 
+        let mut pb = PlotBuffer::new(area);
+
         // Create and render the plot frame
         let frame = PlotFrame::new(&self.x_axis, &self.y_axis, &self.theme)
             .title(self.title.as_deref())
             .spines(self.spines.clone())
             .reference_lines(&self.reference_lines);
 
-        let Some(pa) = frame.render(
+        let Some(pa) = frame.render_to_pb(
+            &mut pb,
             area,
-            buf,
             DataBounds {
                 x_lo,
                 x_hi,
@@ -245,39 +248,20 @@ impl Widget for &BandPlot {
 
                         for y in y_top..=y_bot {
                             if pa.contains(screen_x, y) {
-                                buf[(screen_x, y)]
-                                    .set_char(band.alpha_char)
-                                    .set_fg(band.color)
-                                    .set_bg(band.color);
+                                pb.set_cell(screen_x, y, ' ', band.color, band.color, Z_DATA);
                             }
                         }
                     }
                 }
             }
 
-            // Draw boundary lines (upper and lower edges)
-            for i in 0..n.saturating_sub(1) {
-                let x0 = band.x[i];
-                let x1 = band.x[i + 1];
-
-                // Upper boundary
-                let yu0 = band.y_upper[i];
-                let yu1 = band.y_upper[i + 1];
-                if x0.is_finite() && x1.is_finite() && yu0.is_finite() && yu1.is_finite() {
-                    draw_boundary_line(buf, &pa, x0, yu0, x1, yu1, band.color);
-                }
-
-                // Lower boundary
-                let yl0 = band.y_lower[i];
-                let yl1 = band.y_lower[i + 1];
-                if x0.is_finite() && x1.is_finite() && yl0.is_finite() && yl1.is_finite() {
-                    draw_boundary_line(buf, &pa, x0, yl0, x1, yl1, band.color);
-                }
-            }
         }
 
         // Draw annotations
-        PlotFrame::draw_annotations(&pa, &self.annotations, buf);
+        PlotFrame::draw_annotations_pb(&pa, &self.annotations, &mut pb);
+
+        // Composite before legend
+        pb.composite(buf);
 
         // Draw legend
         if self.show_legend && !self.bands.is_empty() {
@@ -366,19 +350,3 @@ fn interpolate_at(xs: &[f64], ys: &[f64], x: f64) -> Option<f64> {
     Some(y0 + t * (y1 - y0))
 }
 
-/// Draw a boundary line segment between two data points using Braille sub-pixel rendering.
-fn draw_boundary_line(
-    buf: &mut Buffer,
-    pa: &crate::frame::PlotArea,
-    x0: f64,
-    y0: f64,
-    x1: f64,
-    y1: f64,
-    color: Color,
-) {
-    let sx0 = pa.screen_x(x0);
-    let sy0 = pa.screen_y(y0);
-    let sx1 = pa.screen_x(x1);
-    let sy1 = pa.screen_y(y1);
-    crate::drawing::draw_braille_line(buf, sx0, sy0, sx1, sy1, color, pa);
-}

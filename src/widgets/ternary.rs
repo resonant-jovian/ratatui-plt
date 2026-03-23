@@ -26,6 +26,7 @@ use ratatui::layout::Rect;
 use ratatui::style::Color;
 use ratatui::widgets::Widget;
 
+use crate::plot_buffer::{PlotBuffer, Z_CHROME, Z_GRID, Z_MARKER};
 use crate::style::MarkerShape;
 use crate::theme::Theme;
 
@@ -196,13 +197,15 @@ impl Widget for &TernaryPlot {
             return;
         }
 
+        let mut pb = PlotBuffer::new(area);
+
         // Draw title
         if let Some(ref title) = self.title {
             let start = area.x + (area.width.saturating_sub(title.len() as u16)) / 2;
             for (i, ch) in title.chars().enumerate() {
                 let x = start + i as u16;
                 if x < area.x + area.width {
-                    buf[(x, area.y)].set_char(ch).set_fg(self.theme.foreground);
+                    pb.set_char(x, area.y, ch, self.theme.foreground, Z_CHROME);
                 }
             }
         }
@@ -243,31 +246,34 @@ impl Widget for &TernaryPlot {
         let clip = TernaryClip { area, py, ph };
 
         // Draw triangle edges using Bresenham-style line drawing
-        draw_screen_line(
-            buf,
+        draw_screen_line_pb(
+            &mut pb,
             sx_bl,
             sy_bl,
             sx_br,
             sy_br,
             self.theme.axis_color,
+            Z_CHROME,
             &clip,
         );
-        draw_screen_line(
-            buf,
+        draw_screen_line_pb(
+            &mut pb,
             sx_br,
             sy_br,
             sx_top,
             sy_top,
             self.theme.axis_color,
+            Z_CHROME,
             &clip,
         );
-        draw_screen_line(
-            buf,
+        draw_screen_line_pb(
+            &mut pb,
             sx_top,
             sy_top,
             sx_bl,
             sy_bl,
             self.theme.axis_color,
+            Z_CHROME,
             &clip,
         );
 
@@ -282,21 +288,21 @@ impl Widget for &TernaryPlot {
                 let (x1, y1) = ternary_to_cartesian(0.0, 1.0 - frac, frac);
                 let (sx0, sy0) = to_screen(x0, y0);
                 let (sx1, sy1) = to_screen(x1, y1);
-                draw_screen_line(buf, sx0, sy0, sx1, sy1, self.theme.grid_color, &clip);
+                draw_screen_line_pb(&mut pb, sx0, sy0, sx1, sy1, self.theme.grid_color, Z_GRID, &clip);
 
                 // Lines parallel to left edge (constant b)
                 let (x0, y0) = ternary_to_cartesian(1.0 - frac, frac, 0.0);
                 let (x1, y1) = ternary_to_cartesian(0.0, frac, 1.0 - frac);
                 let (sx0, sy0) = to_screen(x0, y0);
                 let (sx1, sy1) = to_screen(x1, y1);
-                draw_screen_line(buf, sx0, sy0, sx1, sy1, self.theme.grid_color, &clip);
+                draw_screen_line_pb(&mut pb, sx0, sy0, sx1, sy1, self.theme.grid_color, Z_GRID, &clip);
 
                 // Lines parallel to right edge (constant a)
                 let (x0, y0) = ternary_to_cartesian(frac, 1.0 - frac, 0.0);
                 let (x1, y1) = ternary_to_cartesian(frac, 0.0, 1.0 - frac);
                 let (sx0, sy0) = to_screen(x0, y0);
                 let (sx1, sy1) = to_screen(x1, y1);
-                draw_screen_line(buf, sx0, sy0, sx1, sy1, self.theme.grid_color, &clip);
+                draw_screen_line_pb(&mut pb, sx0, sy0, sx1, sy1, self.theme.grid_color, Z_GRID, &clip);
             }
         }
 
@@ -319,7 +325,7 @@ impl Widget for &TernaryPlot {
                     for (j, ch) in label.chars().enumerate() {
                         let x = lx + j as u16;
                         if x >= area.x && x < area.x + area.width {
-                            buf[(x, ly)].set_char(ch).set_fg(self.theme.grid_color);
+                            pb.set_char(x, ly, ch, self.theme.grid_color, Z_CHROME);
                         }
                     }
                 }
@@ -362,9 +368,7 @@ impl Widget for &TernaryPlot {
                 let xi = sx.round() as u16;
                 let yi = sy.round() as u16;
                 if xi >= area.x && xi < area.x + area.width && yi >= py && yi < py + ph {
-                    buf[(xi, yi)]
-                        .set_char(dataset.marker.char())
-                        .set_fg(dataset.color);
+                    pb.set_char(xi, yi, dataset.marker.char(), dataset.color, Z_MARKER);
                 }
             }
         }
@@ -381,7 +385,7 @@ impl Widget for &TernaryPlot {
                 for (j, ch) in label.chars().enumerate() {
                     let x = lx + j as u16;
                     if x < area.x + area.width {
-                        buf[(x, ly)].set_char(ch).set_fg(self.theme.foreground);
+                        pb.set_char(x, ly, ch, self.theme.foreground, Z_CHROME);
                     }
                 }
             }
@@ -398,7 +402,7 @@ impl Widget for &TernaryPlot {
                 for (j, ch) in label.chars().enumerate() {
                     let x = lx + j as u16;
                     if x < area.x + area.width {
-                        buf[(x, ly)].set_char(ch).set_fg(self.theme.foreground);
+                        pb.set_char(x, ly, ch, self.theme.foreground, Z_CHROME);
                     }
                 }
             }
@@ -415,11 +419,13 @@ impl Widget for &TernaryPlot {
                 for (j, ch) in label.chars().enumerate() {
                     let x = lx + j as u16;
                     if x < area.x + area.width {
-                        buf[(x, ly)].set_char(ch).set_fg(self.theme.foreground);
+                        pb.set_char(x, ly, ch, self.theme.foreground, Z_CHROME);
                     }
                 }
             }
         }
+
+        pb.composite(buf);
     }
 }
 
@@ -430,14 +436,16 @@ struct TernaryClip {
     ph: u16,
 }
 
-/// Draw a line between two screen coordinates using character-level Bresenham.
-fn draw_screen_line(
-    buf: &mut Buffer,
+/// Draw a line between two screen coordinates using character-level Bresenham, writing into a [`PlotBuffer`].
+#[allow(clippy::too_many_arguments)]
+fn draw_screen_line_pb(
+    pb: &mut PlotBuffer,
     x0: f64,
     y0: f64,
     x1: f64,
     y1: f64,
     color: Color,
+    z: u8,
     clip: &TernaryClip,
 ) {
     let mut ix = x0.round() as i32;
@@ -467,7 +475,7 @@ fn draw_screen_line(
             } else {
                 '╱'
             };
-            buf[(ix as u16, iy as u16)].set_char(ch).set_fg(color);
+            pb.set_char(ix as u16, iy as u16, ch, color, z);
         }
 
         if ix == ix1 && iy == iy1 {

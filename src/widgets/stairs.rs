@@ -23,9 +23,10 @@ use ratatui::widgets::Widget;
 
 use crate::annotation::Annotation;
 use crate::axis::Axis;
-use crate::drawing::draw_braille_line;
+use crate::drawing::draw_braille_line_pb;
 use crate::frame::{DataBounds, PlotFrame, ReferenceLine};
 use crate::legend::{Legend, LegendEntry, LegendPosition};
+use crate::plot_buffer::{PlotBuffer, Z_FILL};
 use crate::spines::Spines;
 use crate::theme::Theme;
 
@@ -233,22 +234,22 @@ impl Widget for &StairsPlot {
         let (x_lo, x_hi) = self.x_axis.resolve_bounds(x_min, x_max);
         let (y_lo, y_hi) = self.y_axis.resolve_bounds(y_min, y_max);
 
+        let mut pb = PlotBuffer::new(area);
+
         // Create and render the plot frame
         let frame = PlotFrame::new(&self.x_axis, &self.y_axis, &self.theme)
             .title(self.title.as_deref())
             .spines(self.spines.clone())
             .reference_lines(&self.reference_lines);
 
-        let Some(pa) = frame.render(
-            area,
-            buf,
-            DataBounds {
-                x_lo,
-                x_hi,
-                y_lo,
-                y_hi,
-            },
-        ) else {
+        let bounds = DataBounds {
+            x_lo,
+            x_hi,
+            y_lo,
+            y_hi,
+        };
+
+        let Some(pa) = frame.render_to_pb(&mut pb, area, bounds) else {
             return;
         };
 
@@ -276,37 +277,39 @@ impl Widget for &StairsPlot {
                     for x in x_start..x_end {
                         for y in y_top..=y_bot {
                             if pa.contains(x, y) {
-                                buf[(x, y)]
-                                    .set_char('░')
-                                    .set_fg(ds.color)
-                                    .set_bg(ds.color);
+                                pb.set_bg(x, y, ds.color, Z_FILL);
                             }
                         }
                     }
                 }
             }
 
-            // Draw the step outline
-            for i in 0..n {
-                let sx_left = pa.screen_x(ds.edges[i]);
-                let sx_right = pa.screen_x(ds.edges[i + 1]);
-                let sy = pa.screen_y(ds.values[i]);
+            // Draw the step outline (only when no fill is active)
+            if self.baseline.is_none() {
+                for i in 0..n {
+                    let sx_left = pa.screen_x(ds.edges[i]);
+                    let sx_right = pa.screen_x(ds.edges[i + 1]);
+                    let sy = pa.screen_y(ds.values[i]);
 
-                // Horizontal segment at current value
-                draw_braille_line(buf, sx_left, sy, sx_right, sy, ds.color, &pa);
+                    // Horizontal segment at current value
+                    draw_braille_line_pb(&mut pb, sx_left, sy, sx_right, sy, ds.color, &pa);
 
-                // Vertical segment at the right edge connecting to next value
-                if i + 1 < n {
-                    let sy_next = pa.screen_y(ds.values[i + 1]);
-                    draw_braille_line(buf, sx_right, sy, sx_right, sy_next, ds.color, &pa);
+                    // Vertical segment at the right edge connecting to next value
+                    if i + 1 < n {
+                        let sy_next = pa.screen_y(ds.values[i + 1]);
+                        draw_braille_line_pb(&mut pb, sx_right, sy, sx_right, sy_next, ds.color, &pa);
+                    }
                 }
             }
         }
 
         // Draw annotations
-        PlotFrame::draw_annotations(&pa, &self.annotations, buf);
+        PlotFrame::draw_annotations_pb(&pa, &self.annotations, &mut pb);
 
-        // Draw legend
+        // Composite to buffer before legend
+        pb.composite(buf);
+
+        // Draw legend (directly to buf, after composite)
         if self.show_legend && !self.datasets.is_empty() {
             let entries: Vec<LegendEntry> = self
                 .datasets

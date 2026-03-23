@@ -193,18 +193,6 @@ impl Widget for &TwinAxes {
         // Draw grid
         let x_grid = self.x_axis.grid || self.theme.grid_visible;
         let y_grid = self.primary_y_axis.grid || self.theme.grid_visible;
-        if x_grid {
-            let gx_ticks = self.x_axis.tick_positions(x_lo, x_hi);
-            for &tv in &gx_ticks {
-                let sx = data_to_screen(tv, x_lo, x_hi, px as f64, (px + pw - 1) as f64);
-                let xi = sx.round() as u16;
-                if xi >= px && xi < px + pw {
-                    for y in py..py + ph {
-                        buf[(xi, y)].set_char('·').set_fg(self.theme.grid_color);
-                    }
-                }
-            }
-        }
         if y_grid {
             let gy_ticks = self.primary_y_axis.tick_positions(py_lo, py_hi);
             for &tv in &gy_ticks {
@@ -212,7 +200,20 @@ impl Widget for &TwinAxes {
                 let yi = sy.round() as u16;
                 if yi >= py && yi < py + ph {
                     for x in px..px + pw {
-                        buf[(x, yi)].set_char('·').set_fg(self.theme.grid_color);
+                        buf[(x, yi)].set_char('─').set_fg(self.theme.grid_color);
+                    }
+                }
+            }
+        }
+        if x_grid {
+            let gx_ticks = self.x_axis.tick_positions(x_lo, x_hi);
+            for &tv in &gx_ticks {
+                let sx = data_to_screen(tv, x_lo, x_hi, px as f64, (px + pw - 1) as f64);
+                let xi = sx.round() as u16;
+                if xi >= px && xi < px + pw {
+                    for y in py..py + ph {
+                        let ch = if buf[(xi, y)].symbol() == "─" { '┼' } else { '│' };
+                        buf[(xi, y)].set_char(ch).set_fg(self.theme.grid_color);
                     }
                 }
             }

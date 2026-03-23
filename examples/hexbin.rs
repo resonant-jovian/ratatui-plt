@@ -33,7 +33,7 @@ fn main() -> color_eyre::Result<()> {
     enable_raw_mode()?;
     let mut terminal = Terminal::new(CrosstermBackend::new(io::stdout()))?;
 
-    // Generate 10000 points from 3 Gaussian clusters using Box-Muller transform
+    // Generate 100000 points from 3 Gaussian clusters using Box-Muller transform
     let mut rng = rand::rng();
     let mut data = Vec::with_capacity(100000);
 
@@ -54,7 +54,8 @@ fn main() -> color_eyre::Result<()> {
     }
 
     let plot = HexbinPlot::new(data)
-        .gridsize(80)
+        .gridsize(20)
+        .edge_width(0.12)
         .colormap(Plasma)
         .title("Gaussian Cluster Hexbin Density (q to quit)")
         .x_axis(Axis::new().label("x"))

@@ -4,7 +4,6 @@
 
 use ratatui::buffer::Buffer;
 use ratatui::layout::Rect;
-use ratatui::style::Style;
 use ratatui::widgets::Widget;
 
 use crate::annotation::Annotation;
@@ -12,6 +11,7 @@ use crate::axis::Axis;
 use crate::colormap::{Colorbar, Colormap, Viridis};
 use crate::frame::{DataBounds, PlotFrame, ReferenceLine};
 use crate::norm::{LinearNorm, Normalize};
+use crate::plot_buffer::{PlotBuffer, Z_DATA};
 use crate::spines::Spines;
 use crate::theme::Theme;
 
@@ -211,6 +211,8 @@ impl Widget for &Hist2D {
 
         let colorbar_width: u16 = if self.show_colorbar { 10 } else { 0 };
 
+        let mut pb = PlotBuffer::new(area);
+
         // Create and render the plot frame (title, axes, grid, ticks, labels, spines, ref lines)
         let frame = PlotFrame::new(&self.x_axis, &self.y_axis, &self.theme)
             .title(self.title.as_deref())
@@ -219,9 +221,9 @@ impl Widget for &Hist2D {
             .y_label_width(7)
             .reference_lines(&self.reference_lines);
 
-        let Some(pa) = frame.render(
+        let Some(pa) = frame.render_to_pb(
+            &mut pb,
             area,
-            buf,
             DataBounds {
                 x_lo: x_min,
                 x_hi: x_max,
@@ -263,16 +265,16 @@ impl Widget for &Hist2D {
                 let bot_t = norm.normalize(bot_val);
                 let bot_color = self.colormap.color_at(bot_t);
 
-                buf[(screen_x, screen_y)]
-                    .set_char('▀')
-                    .set_style(Style::default().fg(top_color).bg(bot_color));
+                pb.set_cell(screen_x, screen_y, '▀', top_color, bot_color, Z_DATA);
             }
         }
 
         // Draw annotations
-        PlotFrame::draw_annotations(&pa, &self.annotations, buf);
+        PlotFrame::draw_annotations_pb(&pa, &self.annotations, &mut pb);
 
-        // Colorbar
+        pb.composite(buf);
+
+        // Colorbar (after composite, as it manages its own rendering)
         if self.show_colorbar {
             let cb = Colorbar::new(self.colormap.as_ref(), 0.0, vmax);
             let cb_area = Rect::new(

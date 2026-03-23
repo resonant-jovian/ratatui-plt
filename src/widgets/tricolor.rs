@@ -13,6 +13,7 @@ use crate::axis::Axis;
 use crate::colormap::{Colormap, Viridis};
 use crate::frame::{DataBounds, PlotArea, PlotFrame, ReferenceLine};
 use crate::norm::{LinearNorm, Normalize};
+use crate::plot_buffer::{PlotBuffer, Z_DATA};
 use crate::spines::Spines;
 use crate::theme::Theme;
 use crate::triangulation::Triangulation;
@@ -157,14 +158,16 @@ impl Widget for &TriColor {
         let (x_lo, x_hi) = self.x_axis.resolve_bounds(x_min, x_max);
         let (y_lo, y_hi) = self.y_axis.resolve_bounds(y_min, y_max);
 
+        let mut pb = PlotBuffer::new(area);
+
         let frame = PlotFrame::new(&self.x_axis, &self.y_axis, &self.theme)
             .title(self.title.as_deref())
             .spines(self.spines.clone())
             .reference_lines(&self.reference_lines);
 
-        let Some(pa) = frame.render(
+        let Some(pa) = frame.render_to_pb(
+            &mut pb,
             area,
-            buf,
             DataBounds {
                 x_lo,
                 x_hi,
@@ -193,14 +196,16 @@ impl Widget for &TriColor {
             let scx = pa.screen_x(cx);
             let scy = pa.screen_y(cy);
 
-            scanline_fill_triangle(buf, [(sax, say), (sbx, sby), (scx, scy)], color, &pa);
+            scanline_fill_triangle(&mut pb, [(sax, say), (sbx, sby), (scx, scy)], color, &pa);
         }
+
+        pb.composite(buf);
     }
 }
 
 /// Fill a triangle using scanline algorithm.
 fn scanline_fill_triangle(
-    buf: &mut Buffer,
+    pb: &mut PlotBuffer,
     vertices: [(f64, f64); 3],
     color: Color,
     pa: &PlotArea,
@@ -221,7 +226,7 @@ fn scanline_fill_triangle(
         let sy = iy_min as u16;
         for sx in min_x..=max_x {
             if pa.contains(sx, sy) {
-                buf[(sx, sy)].set_char('\u{2588}').set_fg(color);
+                pb.set_cell(sx, sy, '\u{2588}', color, color, Z_DATA);
             }
         }
         return;
@@ -260,7 +265,7 @@ fn scanline_fill_triangle(
             let sy = iy as u16;
             for sx in left..=right {
                 if pa.contains(sx, sy) {
-                    buf[(sx, sy)].set_char('\u{2588}').set_fg(color);
+                    pb.set_cell(sx, sy, '\u{2588}', color, color, Z_DATA);
                 }
             }
         }

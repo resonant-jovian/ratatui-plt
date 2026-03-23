@@ -27,8 +27,10 @@ use ratatui::widgets::Widget;
 use crate::annotation::Annotation;
 use crate::axis::Axis;
 use crate::colormap::{Colormap, Viridis};
+use crate::drawing::BRAILLE_BITS;
 use crate::frame::{DataBounds, PlotFrame, ReferenceLine};
 use crate::norm::{LinearNorm, Normalize};
+use crate::plot_buffer::{PlotBuffer, Z_DATA, Z_MARKER};
 use crate::series::VectorFieldData;
 use crate::spines::Spines;
 use crate::theme::Theme;
@@ -229,47 +231,19 @@ fn trace_streamline(
     points
 }
 
-struct ClipRect {
-    x_min: u16,
-    y_min: u16,
-    x_max: u16,
-    y_max: u16,
-}
-
-const BRAILLE_BITS: [[u8; 4]; 2] = [[0x01, 0x02, 0x04, 0x40], [0x08, 0x10, 0x20, 0x80]];
-const BRAILLE_BASE: u32 = 0x2800;
-
-fn write_braille(buf: &mut Buffer, x: u16, y: u16, bits: u8, color: Color) {
-    let (existing_bits, existing_bg) = {
-        let cell = &buf[(x, y)];
-        let ch = cell.symbol().chars().next().unwrap_or(' ');
-        let bg = cell.bg;
-        let code = ch as u32;
-        if code == 0x2580 || code == 0x2584 {
-            return;
-        }
-        let bits = if (BRAILLE_BASE..=0x28FF).contains(&code) {
-            (code - BRAILLE_BASE) as u8
-        } else {
-            0
-        };
-        (bits, bg)
-    };
-    let combined = existing_bits | bits;
-    if let Some(ch) = char::from_u32(BRAILLE_BASE + combined as u32) {
-        let fg = if crate::drawing::colors_match(color, existing_bg) { crate::drawing::contrasting_color(color) } else { color };
-        buf[(x, y)].set_char(ch).set_fg(fg).set_bg(existing_bg);
-    }
-}
-
-fn draw_braille_line(
-    buf: &mut Buffer,
+/// Draw a braille line into a PlotBuffer, clipped to the plot area.
+#[allow(clippy::too_many_arguments)]
+fn draw_braille_line_stream(
+    pb: &mut PlotBuffer,
     x0: f64,
     y0: f64,
     x1: f64,
     y1: f64,
     color: Color,
-    clip: &ClipRect,
+    pa_x: u16,
+    pa_y: u16,
+    pa_w: u16,
+    pa_h: u16,
 ) {
     let mut ix0 = (x0 * 2.0).round() as i32;
     let mut iy0 = (y0 * 4.0).round() as i32;
@@ -286,15 +260,15 @@ fn draw_braille_line(
         if ix0 >= 0 && iy0 >= 0 {
             let cell_x = (ix0 / 2) as u16;
             let cell_y = (iy0 / 4) as u16;
-            if cell_x >= clip.x_min
-                && cell_x < clip.x_max
-                && cell_y >= clip.y_min
-                && cell_y < clip.y_max
+            if cell_x >= pa_x
+                && cell_x < pa_x + pa_w
+                && cell_y >= pa_y
+                && cell_y < pa_y + pa_h
             {
                 let dot_col = (ix0 % 2) as usize;
                 let dot_row = (iy0 % 4) as usize;
                 let bit = BRAILLE_BITS[dot_col][dot_row];
-                write_braille(buf, cell_x, cell_y, bit, color);
+                pb.set_braille(cell_x, cell_y, bit, color, Z_DATA);
             }
         }
 
@@ -358,15 +332,17 @@ impl Widget for &StreamPlot {
         let max_mag = self.field.max_magnitude();
         let norm = LinearNorm::new(0.0, if max_mag == 0.0 { 1.0 } else { max_mag });
 
+        let mut pb = PlotBuffer::new(area);
+
         // Create and render the plot frame (title, axes, grid, ticks, labels, spines, ref lines)
         let frame = PlotFrame::new(&self.x_axis, &self.y_axis, &self.theme)
             .title(self.title.as_deref())
             .spines(self.spines.clone())
             .reference_lines(&self.reference_lines);
 
-        let Some(pa) = frame.render(
+        let Some(pa) = frame.render_to_pb(
+            &mut pb,
             area,
-            buf,
             DataBounds {
                 x_lo,
                 x_hi,
@@ -426,12 +402,6 @@ impl Widget for &StreamPlot {
                 }
 
                 // Render the streamline using braille sub-pixel lines
-                let clip = ClipRect {
-                    x_min: px,
-                    y_min: py,
-                    x_max: px + pw,
-                    y_max: py + ph,
-                };
                 let mut prev_screen: Option<(f64, f64)> = None;
                 for (idx, &(ptx, pty)) in points.iter().enumerate() {
                     let scr_x = pa.screen_x(ptx);
@@ -456,14 +426,14 @@ impl Widget for &StreamPlot {
 
                     // Draw braille line from previous point
                     if let Some((prev_x, prev_y)) = prev_screen {
-                        draw_braille_line(buf, prev_x, prev_y, scr_x, scr_y, color, &clip);
+                        draw_braille_line_stream(&mut pb, prev_x, prev_y, scr_x, scr_y, color, px, py, pw, ph);
                     }
 
                     // Arrow head at intervals (cell resolution, drawn on top)
                     if idx % arrow_interval == arrow_interval / 2 && idx > 0 {
                         let (fdx, fdy) = interpolate_field(&self.field, ptx, pty);
                         let ch = arrow_char(fdx, -fdy);
-                        buf[(xi, yi)].set_char(ch).set_fg(color);
+                        pb.set_char(xi, yi, ch, color, Z_MARKER);
                     }
 
                     prev_screen = Some((scr_x, scr_y));
@@ -472,6 +442,9 @@ impl Widget for &StreamPlot {
         }
 
         // Draw annotations
-        PlotFrame::draw_annotations(&pa, &self.annotations, buf);
+        PlotFrame::draw_annotations_pb(&pa, &self.annotations, &mut pb);
+
+        // Composite
+        pb.composite(buf);
     }
 }

@@ -55,12 +55,12 @@ impl Theme {
         Self {
             background: Color::Reset,
             foreground: Color::White,
-            grid_color: Color::Rgb(100, 100, 100),
-            minor_grid_color: Color::Rgb(70, 70, 70),
+            grid_color: Color::Rgb(75, 75, 75),
+            minor_grid_color: Color::Rgb(50, 50, 50),
             axis_color: Color::Rgb(180, 180, 180),
             color_cycle: ColorCycle::default(),
             grid_visible: true,
-            grid_pattern: DashPattern::Dotted,
+            grid_pattern: DashPattern::Solid,
             bold_title: true,
         }
     }
@@ -70,12 +70,12 @@ impl Theme {
         Self {
             background: Color::Reset,
             foreground: Color::Black,
-            grid_color: Color::Rgb(130, 130, 130),
-            minor_grid_color: Color::Rgb(170, 170, 170),
+            grid_color: Color::Rgb(180, 180, 180),
+            minor_grid_color: Color::Rgb(205, 205, 205),
             axis_color: Color::Rgb(60, 60, 60),
             color_cycle: ColorCycle::default(),
             grid_visible: true,
-            grid_pattern: DashPattern::Dotted,
+            grid_pattern: DashPattern::Solid,
             bold_title: true,
         }
     }
@@ -90,7 +90,7 @@ impl Theme {
             axis_color: Color::Rgb(120, 120, 120),
             color_cycle: ColorCycle::default(),
             grid_visible: false,
-            grid_pattern: DashPattern::Dotted,
+            grid_pattern: DashPattern::Solid,
             bold_title: false,
         }
     }
@@ -110,7 +110,7 @@ impl Theme {
                 Color::Rgb(100, 100, 100),
             ]),
             grid_visible: true,
-            grid_pattern: DashPattern::Dotted,
+            grid_pattern: DashPattern::Solid,
             bold_title: true,
         }
     }
@@ -134,7 +134,7 @@ impl Theme {
                 Color::Rgb(220, 50, 47),   // red
             ]),
             grid_visible: true,
-            grid_pattern: DashPattern::Dotted,
+            grid_pattern: DashPattern::Solid,
             bold_title: true,
         }
     }
@@ -150,10 +150,10 @@ impl Theme {
     /// Falls back to [`Theme::dark()`] if detection fails.
     pub fn auto() -> Self {
         // 1. COLORFGBG — format "fg;bg", bg > 8 means light background.
-        if let Ok(val) = std::env::var("COLORFGBG") {
-            if let Some(bg) = val.rsplit(';').next().and_then(|s| s.parse::<u8>().ok()) {
-                return if bg > 8 { Self::light() } else { Self::dark() };
-            }
+        if let Ok(val) = std::env::var("COLORFGBG")
+            && let Some(bg) = val.rsplit(';').next().and_then(|s| s.parse::<u8>().ok())
+        {
+            return if bg > 8 { Self::light() } else { Self::dark() };
         }
 
         // 2. GTK_THEME — e.g. "Adwaita:dark" or "Yaru-dark".

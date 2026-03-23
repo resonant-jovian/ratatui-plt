@@ -8,6 +8,7 @@ use ratatui::widgets::Widget;
 use crate::annotation::Annotation;
 use crate::axis::Axis;
 use crate::frame::{DataBounds, PlotFrame, ReferenceLine};
+use crate::plot_buffer::{PlotBuffer, Z_CHROME, Z_DATA, Z_FILL, Z_MARKER};
 use crate::spines::Spines;
 use crate::theme::Theme;
 use crate::ticker::NullLocator;
@@ -315,15 +316,17 @@ impl Widget for &BoxPlot {
         let x_lo = 0.0;
         let x_hi = n as f64;
 
+        let mut pb = PlotBuffer::new(area);
+
         // Create and render the plot frame
         let frame = PlotFrame::new(&x_axis, &self.y_axis, &self.theme)
             .title(self.title.as_deref())
             .spines(self.spines.clone())
             .reference_lines(&self.reference_lines);
 
-        let Some(pa) = frame.render(
+        let Some(pa) = frame.render_to_pb(
+            &mut pb,
             area,
-            buf,
             DataBounds {
                 x_lo,
                 x_hi,
@@ -403,7 +406,6 @@ impl Widget for &BoxPlot {
                         pa.y as f64,
                     )
                     .round() as u16;
-                    // Notch narrows the box by ~25% at the median
                     let notch_inset = (box_width / 4).max(1);
                     let n_left = box_left + notch_inset;
                     let n_right = box_right.saturating_sub(notch_inset);
@@ -412,11 +414,11 @@ impl Widget for &BoxPlot {
                     (sy_median, sy_median, box_left, box_right)
                 };
 
-            // Clear box interior (remove grid dots so boxes look clean)
+            // Clear box interior with fill background
             for y in sy_q3..=sy_q1 {
                 for x in box_left..box_right {
                     if pa.contains(x, y) {
-                        buf[(x, y)].set_char(' ');
+                        pb.set_bg(x, y, Color::Reset, Z_FILL);
                     }
                 }
             }
@@ -424,93 +426,83 @@ impl Widget for &BoxPlot {
             // Draw box (Q1 to Q3), with notch if enabled
             // Top edge (Q3) with corners
             if pa.contains(box_left, sy_q3) {
-                buf[(box_left, sy_q3)].set_char('┌').set_fg(d.color);
+                pb.set_char(box_left, sy_q3, '┌', d.color, Z_DATA);
             }
             for x in (box_left + 1)..box_right.saturating_sub(1) {
                 if pa.contains(x, sy_q3) {
-                    buf[(x, sy_q3)].set_char('─').set_fg(d.color);
+                    pb.set_char(x, sy_q3, '─', d.color, Z_DATA);
                 }
             }
             if box_right > box_left + 1 && pa.contains(box_right - 1, sy_q3) {
-                buf[(box_right - 1, sy_q3)].set_char('┐').set_fg(d.color);
+                pb.set_char(box_right - 1, sy_q3, '┐', d.color, Z_DATA);
             }
             // Bottom edge (Q1) with corners
             if pa.contains(box_left, sy_q1) {
-                buf[(box_left, sy_q1)].set_char('└').set_fg(d.color);
+                pb.set_char(box_left, sy_q1, '└', d.color, Z_DATA);
             }
             for x in (box_left + 1)..box_right.saturating_sub(1) {
                 if pa.contains(x, sy_q1) {
-                    buf[(x, sy_q1)].set_char('─').set_fg(d.color);
+                    pb.set_char(x, sy_q1, '─', d.color, Z_DATA);
                 }
             }
             if box_right > box_left + 1 && pa.contains(box_right - 1, sy_q1) {
-                buf[(box_right - 1, sy_q1)].set_char('┘').set_fg(d.color);
+                pb.set_char(box_right - 1, sy_q1, '┘', d.color, Z_DATA);
             }
 
             if self.notch || self.bootstrap_ci {
-                // Box sides with notch: narrower in the notch region.
-                // The right side column is box_right - 1 (matching corners)
-                // and notch_right - 1 in the notch region.
                 for y in (sy_q3 + 1)..sy_q1 {
                     let (left_x, right_x) = if y >= notch_hi_y && y <= notch_lo_y {
-                        // Inside the notch region: use narrower sides
                         (notch_left, notch_right.saturating_sub(1))
                     } else {
                         (box_left, box_right.saturating_sub(1))
                     };
                     if pa.contains(left_x, y) {
-                        buf[(left_x, y)].set_char('│').set_fg(d.color);
+                        pb.set_char(left_x, y, '│', d.color, Z_DATA);
                     }
                     if pa.contains(right_x, y) {
-                        buf[(right_x, y)].set_char('│').set_fg(d.color);
+                        pb.set_char(right_x, y, '│', d.color, Z_DATA);
                     }
                 }
-                // Draw notch transition lines connecting the wider box edges
-                // to the narrower notch edges.
-                // Upper notch edge: horizontal from box_left to notch_left
-                // and from notch_right-1 to box_right-1
                 if notch_hi_y > sy_q3 {
                     for x in box_left..=notch_left {
                         if pa.contains(x, notch_hi_y) {
-                            buf[(x, notch_hi_y)].set_char('─').set_fg(d.color);
+                            pb.set_char(x, notch_hi_y, '─', d.color, Z_DATA);
                         }
                     }
                     if notch_right > 0 {
                         for x in (notch_right - 1)..box_right {
                             if pa.contains(x, notch_hi_y) {
-                                buf[(x, notch_hi_y)].set_char('─').set_fg(d.color);
+                                pb.set_char(x, notch_hi_y, '─', d.color, Z_DATA);
                             }
                         }
                     }
                 }
-                // Lower notch edge
                 if notch_lo_y < sy_q1 {
                     for x in box_left..=notch_left {
                         if pa.contains(x, notch_lo_y) {
-                            buf[(x, notch_lo_y)].set_char('─').set_fg(d.color);
+                            pb.set_char(x, notch_lo_y, '─', d.color, Z_DATA);
                         }
                     }
                     if notch_right > 0 {
                         for x in (notch_right - 1)..box_right {
                             if pa.contains(x, notch_lo_y) {
-                                buf[(x, notch_lo_y)].set_char('─').set_fg(d.color);
+                                pb.set_char(x, notch_lo_y, '─', d.color, Z_DATA);
                             }
                         }
                     }
                 }
             } else {
-                // Standard box sides (no notch) — skip corner rows
                 for y in (sy_q3 + 1)..sy_q1 {
                     if pa.contains(box_left, y) {
-                        buf[(box_left, y)].set_char('│').set_fg(d.color);
+                        pb.set_char(box_left, y, '│', d.color, Z_DATA);
                     }
                     if box_right > 0 && pa.contains(box_right - 1, y) {
-                        buf[(box_right - 1, y)].set_char('│').set_fg(d.color);
+                        pb.set_char(box_right - 1, y, '│', d.color, Z_DATA);
                     }
                 }
             }
 
-            // Median line — draw within the box boundaries (inclusive on both ends)
+            // Median line
             let use_notch = self.notch || self.bootstrap_ci;
             let median_left = if use_notch { notch_left } else { box_left };
             let median_right = if use_notch {
@@ -520,19 +512,19 @@ impl Widget for &BoxPlot {
             };
             for x in median_left..=median_right {
                 if pa.contains(x, sy_median) {
-                    buf[(x, sy_median)].set_char('━').set_fg(d.color);
+                    pb.set_char(x, sy_median, '━', d.color, Z_DATA);
                 }
             }
 
             // Whiskers
             for y in sy_whi..sy_q3 {
                 if pa.contains(center_x, y) {
-                    buf[(center_x, y)].set_char('│').set_fg(d.color);
+                    pb.set_char(center_x, y, '│', d.color, Z_DATA);
                 }
             }
             for y in (sy_q1 + 1)..=sy_wlo {
                 if pa.contains(center_x, y) {
-                    buf[(center_x, y)].set_char('│').set_fg(d.color);
+                    pb.set_char(center_x, y, '│', d.color, Z_DATA);
                 }
             }
 
@@ -541,10 +533,10 @@ impl Widget for &BoxPlot {
             let cap_right = center_x + box_width / 4;
             for x in cap_left..=cap_right {
                 if pa.contains(x, sy_whi) {
-                    buf[(x, sy_whi)].set_char('─').set_fg(d.color);
+                    pb.set_char(x, sy_whi, '─', d.color, Z_DATA);
                 }
                 if pa.contains(x, sy_wlo) {
-                    buf[(x, sy_wlo)].set_char('─').set_fg(d.color);
+                    pb.set_char(x, sy_wlo, '─', d.color, Z_DATA);
                 }
             }
 
@@ -555,7 +547,7 @@ impl Widget for &BoxPlot {
                         data_to_screen(v, y_lo, y_hi, (pa.y + pa.height - 1) as f64, pa.y as f64)
                             .round() as u16;
                     if pa.contains(center_x, sy) {
-                        buf[(center_x, sy)].set_char('○').set_fg(d.color);
+                        pb.set_char(center_x, sy, '○', d.color, Z_MARKER);
                     }
                 }
             }
@@ -572,7 +564,7 @@ impl Widget for &BoxPlot {
                 )
                 .round() as u16;
                 if pa.contains(center_x, sy_mean) {
-                    buf[(center_x, sy_mean)].set_char('◇').set_fg(d.color);
+                    pb.set_char(center_x, sy_mean, '◇', d.color, Z_MARKER);
                 }
             }
 
@@ -584,15 +576,16 @@ impl Widget for &BoxPlot {
                 for (j, ch) in label.chars().enumerate() {
                     let lx = label_start + j as u16;
                     if lx >= area.x && lx < area.x + area.width {
-                        buf[(lx, label_y)]
-                            .set_char(ch)
-                            .set_fg(self.theme.axis_color);
+                        pb.set_char(lx, label_y, ch, self.theme.axis_color, Z_CHROME);
                     }
                 }
             }
         }
 
         // Draw annotations
-        PlotFrame::draw_annotations(&pa, &self.annotations, buf);
+        PlotFrame::draw_annotations_pb(&pa, &self.annotations, &mut pb);
+
+        // Composite
+        pb.composite(buf);
     }
 }

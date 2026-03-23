@@ -55,6 +55,7 @@ pub mod macros;
 pub mod mathtext;
 pub mod norm;
 pub mod picking;
+pub mod plot_buffer;
 pub mod prelude;
 pub mod series;
 pub mod spines;

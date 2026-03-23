@@ -11,6 +11,7 @@ use ratatui::style::Color;
 
 use crate::annotation::Annotation;
 use crate::axis::{AspectRatio, Axis};
+use crate::plot_buffer::{PlotBuffer, Z_ANNOTATION, Z_CHROME, Z_FILL, Z_GRID};
 use crate::spines::Spines;
 use crate::theme::Theme;
 use crate::transform::{apply_aspect_ratio, data_to_screen};
@@ -494,22 +495,11 @@ impl<'a> PlotFrame<'a> {
             }
         }
 
-        // Draw major grid lines
+        // Draw major grid lines using thin box-drawing characters.
+        // Horizontal lines use '─', vertical use '│', intersections use '┼'.
         let x_grid = self.x_axis.grid || self.theme.grid_visible;
         let y_grid = self.y_axis.grid || self.theme.grid_visible;
 
-        if x_grid {
-            let x_ticks = self.x_axis.tick_positions(x_lo, x_hi);
-            for &tv in &x_ticks {
-                let sx = data_to_screen(tv, x_lo, x_hi, px as f64, (px + aw - 1) as f64);
-                let xi = sx.round() as u16;
-                if xi >= px && xi < px + aw {
-                    for y in py..py + ah {
-                        buf[(xi, y)].set_char('·').set_fg(self.theme.grid_color);
-                    }
-                }
-            }
-        }
         if y_grid {
             let y_ticks = self.y_axis.tick_positions(y_lo, y_hi);
             for &tv in &y_ticks {
@@ -517,27 +507,26 @@ impl<'a> PlotFrame<'a> {
                 let yi = sy.round() as u16;
                 if yi >= py && yi < py + ah {
                     for x in px..px + aw {
-                        buf[(x, yi)].set_char('·').set_fg(self.theme.grid_color);
+                        buf[(x, yi)].set_char('─').set_fg(self.theme.grid_color);
+                    }
+                }
+            }
+        }
+        if x_grid {
+            let x_ticks = self.x_axis.tick_positions(x_lo, x_hi);
+            for &tv in &x_ticks {
+                let sx = data_to_screen(tv, x_lo, x_hi, px as f64, (px + aw - 1) as f64);
+                let xi = sx.round() as u16;
+                if xi >= px && xi < px + aw {
+                    for y in py..py + ah {
+                        let ch = if buf[(xi, y)].symbol() == "─" { '┼' } else { '│' };
+                        buf[(xi, y)].set_char(ch).set_fg(self.theme.grid_color);
                     }
                 }
             }
         }
 
-        // Draw minor grid lines
-        if self.x_axis.minor_grid {
-            let minor = self.x_axis.minor_tick_positions(x_lo, x_hi);
-            for &tv in &minor {
-                let sx = data_to_screen(tv, x_lo, x_hi, px as f64, (px + aw - 1) as f64);
-                let xi = sx.round() as u16;
-                if xi >= px && xi < px + aw {
-                    for y in py..py + ah {
-                        buf[(xi, y)]
-                            .set_char('⋅')
-                            .set_fg(self.theme.minor_grid_color);
-                    }
-                }
-            }
-        }
+        // Draw minor grid lines using light dashed box-drawing characters.
         if self.y_axis.minor_grid {
             let minor = self.y_axis.minor_tick_positions(y_lo, y_hi);
             for &tv in &minor {
@@ -546,7 +535,21 @@ impl<'a> PlotFrame<'a> {
                 if yi >= py && yi < py + ah {
                     for x in px..px + aw {
                         buf[(x, yi)]
-                            .set_char('⋅')
+                            .set_char('┄')
+                            .set_fg(self.theme.minor_grid_color);
+                    }
+                }
+            }
+        }
+        if self.x_axis.minor_grid {
+            let minor = self.x_axis.minor_tick_positions(x_lo, x_hi);
+            for &tv in &minor {
+                let sx = data_to_screen(tv, x_lo, x_hi, px as f64, (px + aw - 1) as f64);
+                let xi = sx.round() as u16;
+                if xi >= px && xi < px + aw {
+                    for y in py..py + ah {
+                        buf[(xi, y)]
+                            .set_char('┆')
                             .set_fg(self.theme.minor_grid_color);
                     }
                 }
@@ -768,6 +771,395 @@ impl<'a> PlotFrame<'a> {
                                 .set_char('░')
                                 .set_fg(*color)
                                 .set_bg(*color);
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    /// Render all plot chrome into a [`PlotBuffer`] and return the inner drawing area.
+    ///
+    /// This is the Z-buffered counterpart of [`PlotFrame::render`]. Every visual
+    /// element is written with an explicit Z-level so that compositing produces
+    /// correct layering (fills behind grids behind data, etc.).
+    ///
+    /// `bounds` contains the already-resolved data bounds (after axis bounds
+    /// resolution). Returns `None` if the area is too small.
+    pub fn render_to_pb(
+        &self,
+        pb: &mut PlotBuffer,
+        area: Rect,
+        bounds: DataBounds,
+    ) -> Option<PlotArea> {
+        let DataBounds {
+            x_lo,
+            x_hi,
+            y_lo,
+            y_hi,
+        } = bounds;
+        if area.width < 4 || area.height < 4 {
+            return None;
+        }
+
+        // Compute margins
+        let title_height: u16 = if self.title.is_some() { 1 } else { 0 };
+        let x_label_height: u16 = if self.x_axis.label.is_some() { 1 } else { 0 };
+        let tick_height: u16 = 1;
+
+        let plot_x = area.x + self.y_label_width;
+        let plot_y = area.y + title_height;
+        let plot_width = area
+            .width
+            .saturating_sub(self.y_label_width + self.colorbar_width + 1);
+        let plot_height = area
+            .height
+            .saturating_sub(title_height + tick_height + x_label_height);
+
+        if plot_width < 2 || plot_height < 2 {
+            return None;
+        }
+
+        // Apply aspect ratio
+        let (ax_off, ay_off, aw, ah) = apply_aspect_ratio(
+            &self.aspect_ratio,
+            (x_hi - x_lo).abs(),
+            (y_hi - y_lo).abs(),
+            plot_width,
+            plot_height,
+        );
+        let px = plot_x + ax_off;
+        let py = plot_y + ay_off;
+
+        if aw < 2 || ah < 2 {
+            return None;
+        }
+
+        // Draw title
+        if let Some(title) = self.title {
+            let start = area.x + (area.width.saturating_sub(title.len() as u16)) / 2;
+            for (i, ch) in title.chars().enumerate() {
+                let x = start + i as u16;
+                if x < area.x + area.width {
+                    pb.set_char(x, area.y, ch, self.theme.foreground, Z_CHROME);
+                }
+            }
+        }
+
+        // Draw spines (axis borders) using the configured border style
+        let h_char = self.border_style.horizontal();
+        let v_char = self.border_style.vertical();
+
+        if self.spines.bottom {
+            for x in px..px + aw {
+                if x < area.x + area.width {
+                    pb.set_char(x, py + ah, h_char, self.theme.axis_color, Z_CHROME);
+                }
+            }
+        }
+        if self.spines.left && px > area.x {
+            for y in py..py + ah {
+                pb.set_char(
+                    px.saturating_sub(1),
+                    y,
+                    v_char,
+                    self.theme.axis_color,
+                    Z_CHROME,
+                );
+            }
+        }
+        if self.spines.top && py > 0 {
+            for x in px..px + aw {
+                if x < area.x + area.width {
+                    let ty = py.saturating_sub(1);
+                    if ty >= area.y {
+                        pb.set_char(x, ty, h_char, self.theme.axis_color, Z_CHROME);
+                    }
+                }
+            }
+        }
+        if self.spines.right {
+            let rx = px + aw;
+            if rx < area.x + area.width {
+                for y in py..py + ah {
+                    pb.set_char(rx, y, v_char, self.theme.axis_color, Z_CHROME);
+                }
+            }
+        }
+
+        // Draw major grid lines
+        let x_grid = self.x_axis.grid || self.theme.grid_visible;
+        let y_grid = self.y_axis.grid || self.theme.grid_visible;
+
+        // Track horizontal grid row positions for intersection detection
+        let mut h_grid_rows: Vec<u16> = Vec::new();
+
+        if y_grid {
+            let y_ticks = self.y_axis.tick_positions(y_lo, y_hi);
+            for &tv in &y_ticks {
+                let sy = data_to_screen(tv, y_lo, y_hi, (py + ah - 1) as f64, py as f64);
+                let yi = sy.round() as u16;
+                if yi >= py && yi < py + ah {
+                    h_grid_rows.push(yi);
+                    for x in px..px + aw {
+                        pb.set_char(x, yi, '─', self.theme.grid_color, Z_GRID);
+                    }
+                }
+            }
+        }
+        if x_grid {
+            let x_ticks = self.x_axis.tick_positions(x_lo, x_hi);
+            for &tv in &x_ticks {
+                let sx = data_to_screen(tv, x_lo, x_hi, px as f64, (px + aw - 1) as f64);
+                let xi = sx.round() as u16;
+                if xi >= px && xi < px + aw {
+                    for y in py..py + ah {
+                        let ch = if h_grid_rows.contains(&y) { '┼' } else { '│' };
+                        pb.set_char(xi, y, ch, self.theme.grid_color, Z_GRID);
+                    }
+                }
+            }
+        }
+
+        // Draw minor grid lines
+        if self.y_axis.minor_grid {
+            let minor = self.y_axis.minor_tick_positions(y_lo, y_hi);
+            for &tv in &minor {
+                let sy = data_to_screen(tv, y_lo, y_hi, (py + ah - 1) as f64, py as f64);
+                let yi = sy.round() as u16;
+                if yi >= py && yi < py + ah {
+                    for x in px..px + aw {
+                        pb.set_char(x, yi, '┄', self.theme.minor_grid_color, Z_GRID);
+                    }
+                }
+            }
+        }
+        if self.x_axis.minor_grid {
+            let minor = self.x_axis.minor_tick_positions(x_lo, x_hi);
+            for &tv in &minor {
+                let sx = data_to_screen(tv, x_lo, x_hi, px as f64, (px + aw - 1) as f64);
+                let xi = sx.round() as u16;
+                if xi >= px && xi < px + aw {
+                    for y in py..py + ah {
+                        pb.set_char(xi, y, '┆', self.theme.minor_grid_color, Z_GRID);
+                    }
+                }
+            }
+        }
+
+        // Draw reference lines and spans
+        self.draw_reference_lines_pb(
+            pb,
+            &PlotArea {
+                x: px,
+                y: py,
+                width: aw,
+                height: ah,
+                x_lo,
+                x_hi,
+                y_lo,
+                y_hi,
+                area,
+            },
+        );
+
+        // Draw x tick labels with overlap detection
+        let x_ticks = self.x_axis.tick_positions(x_lo, x_hi);
+        let mut last_label_end: u16 = 0;
+        for &tv in &x_ticks {
+            let sx = data_to_screen(tv, x_lo, x_hi, px as f64, (px + aw - 1) as f64);
+            let label = self.x_axis.format_tick(tv);
+            let xi = sx.round() as u16;
+            let label_len = label.len() as u16;
+            let label_start = xi.saturating_sub(label_len / 2);
+            let label_end = label_start + label_len;
+
+            // Skip this label if it would overlap with the previous one
+            if label_start < last_label_end + 1 && last_label_end > 0 {
+                continue;
+            }
+
+            let y = py + ah;
+            if y < area.y + area.height {
+                for (j, ch) in label.chars().enumerate() {
+                    let lx = label_start + j as u16;
+                    if lx >= area.x && lx < area.x + area.width {
+                        pb.set_char(lx, y, ch, self.theme.axis_color, Z_CHROME);
+                    }
+                }
+                last_label_end = label_end;
+            }
+        }
+
+        // Draw y tick labels
+        let y_ticks = self.y_axis.tick_positions(y_lo, y_hi);
+        for &tv in &y_ticks {
+            let sy = data_to_screen(tv, y_lo, y_hi, (py + ah - 1) as f64, py as f64);
+            let label = self.y_axis.format_tick(tv);
+            let yi = sy.round() as u16;
+            if yi >= py && yi < py + ah {
+                let label_start = px.saturating_sub(label.len() as u16 + 1);
+                for (j, ch) in label.chars().enumerate() {
+                    let lx = label_start + j as u16;
+                    if lx >= area.x && lx < px {
+                        pb.set_char(lx, yi, ch, self.theme.axis_color, Z_CHROME);
+                    }
+                }
+            }
+        }
+
+        // Draw axis labels
+        if let Some(ref label) = self.x_axis.label {
+            let y = area.y + area.height - 1;
+            let start = px + (aw.saturating_sub(label.len() as u16)) / 2;
+            for (i, ch) in label.chars().enumerate() {
+                let x = start + i as u16;
+                if x < area.x + area.width && y < area.y + area.height {
+                    pb.set_char(x, y, ch, self.theme.foreground, Z_CHROME);
+                }
+            }
+        }
+        if let Some(ref label) = self.y_axis.label {
+            // Render y-axis label vertically centered along the left edge.
+            let label_len = label.chars().count() as u16;
+            let label_x = area.x;
+            let center_y = py + ah / 2;
+            let label_start_y = center_y.saturating_sub(label_len / 2);
+            for (i, ch) in label.chars().enumerate() {
+                let y = label_start_y + i as u16;
+                if label_x < area.x + area.width && y >= area.y && y < area.y + area.height {
+                    pb.set_char(label_x, y, ch, self.theme.foreground, Z_CHROME);
+                }
+            }
+        }
+
+        Some(PlotArea {
+            x: px,
+            y: py,
+            width: aw,
+            height: ah,
+            x_lo,
+            x_hi,
+            y_lo,
+            y_hi,
+            area,
+        })
+    }
+
+    /// Draw annotations into a [`PlotBuffer`] at [`Z_ANNOTATION`].
+    ///
+    /// This is the Z-buffered counterpart of [`PlotFrame::draw_annotations`].
+    pub fn draw_annotations_pb(pa: &PlotArea, annotations: &[Annotation], pb: &mut PlotBuffer) {
+        for ann in annotations {
+            let sx = pa.screen_x(ann.text_x);
+            let sy = pa.screen_y(ann.text_y);
+            let xi = sx.round() as u16;
+            let yi = sy.round() as u16;
+            if yi >= pa.y && yi < pa.y + pa.height {
+                for (j, ch) in ann.text.chars().enumerate() {
+                    let x = xi + j as u16;
+                    if x >= pa.x && x < pa.x + pa.width {
+                        pb.set_char(x, yi, ch, ann.color, Z_ANNOTATION);
+                    }
+                }
+            }
+            // Draw arrow if target is specified
+            if let Some((tx, ty)) = ann.target {
+                let target_sx = pa.screen_x(tx).round() as u16;
+                let target_sy = pa.screen_y(ty).round() as u16;
+                if pa.contains(target_sx, target_sy) {
+                    let dx = target_sx as f64 - xi as f64;
+                    let dy = target_sy as f64 - yi as f64;
+                    let arrow_ch = ann.arrow_char(dx, dy);
+                    if arrow_ch != ' ' {
+                        pb.set_char(target_sx, target_sy, arrow_ch, ann.color, Z_ANNOTATION);
+                    }
+                }
+            }
+        }
+    }
+
+    /// Draw reference lines and spans into a [`PlotBuffer`].
+    ///
+    /// Reference lines use [`Z_GRID`], reference spans/fills use [`Z_FILL`].
+    fn draw_reference_lines_pb(&self, pb: &mut PlotBuffer, pa: &PlotArea) {
+        let (px, py, aw, ah) = (pa.x, pa.y, pa.width, pa.height);
+        let (x_lo, x_hi, y_lo, y_hi) = (pa.x_lo, pa.x_hi, pa.y_lo, pa.y_hi);
+        for refline in self.reference_lines {
+            match refline {
+                ReferenceLine::Horizontal { y, color, dash } => {
+                    let sy = data_to_screen(*y, y_lo, y_hi, (py + ah - 1) as f64, py as f64);
+                    let yi = sy.round() as u16;
+                    if yi >= py && yi < py + ah {
+                        for x in px..px + aw {
+                            let draw = match dash {
+                                RefLineDash::Solid => true,
+                                RefLineDash::Dashed => ((x - px) / 3).is_multiple_of(2),
+                                RefLineDash::Dotted => (x - px).is_multiple_of(2),
+                            };
+                            if draw {
+                                pb.set_char(x, yi, '─', *color, Z_GRID);
+                            }
+                        }
+                    }
+                }
+                ReferenceLine::Vertical { x, color, dash } => {
+                    let sx = data_to_screen(*x, x_lo, x_hi, px as f64, (px + aw - 1) as f64);
+                    let xi = sx.round() as u16;
+                    if xi >= px && xi < px + aw {
+                        for y in py..py + ah {
+                            let draw = match dash {
+                                RefLineDash::Solid => true,
+                                RefLineDash::Dashed => ((y - py) / 2).is_multiple_of(2),
+                                RefLineDash::Dotted => (y - py).is_multiple_of(2),
+                            };
+                            if draw {
+                                pb.set_char(xi, y, '│', *color, Z_GRID);
+                            }
+                        }
+                    }
+                }
+                ReferenceLine::HorizontalSpan { y1, y2, color } => {
+                    let sy1 = data_to_screen(*y1, y_lo, y_hi, (py + ah - 1) as f64, py as f64)
+                        .round() as u16;
+                    let sy2 = data_to_screen(*y2, y_lo, y_hi, (py + ah - 1) as f64, py as f64)
+                        .round() as u16;
+                    let top = sy1.min(sy2).max(py);
+                    let bot = sy1.max(sy2).min(py + ah);
+                    for y in top..bot {
+                        for x in px..px + aw {
+                            pb.set_bg(x, y, *color, Z_FILL);
+                        }
+                    }
+                }
+                ReferenceLine::VerticalSpan {
+                    x1,
+                    x2,
+                    color,
+                    y_lo: span_y_lo,
+                    y_hi: span_y_hi,
+                } => {
+                    let sx1 = data_to_screen(*x1, x_lo, x_hi, px as f64, (px + aw - 1) as f64)
+                        .round() as u16;
+                    let sx2 = data_to_screen(*x2, x_lo, x_hi, px as f64, (px + aw - 1) as f64)
+                        .round() as u16;
+                    let left = sx1.min(sx2).max(px);
+                    let right = sx1.max(sx2).min(px + aw);
+                    // Determine vertical extent: use bounded Y range if provided
+                    let (y_top, y_bottom) = if let (Some(yl), Some(yh)) = (span_y_lo, span_y_hi) {
+                        let sy_lo =
+                            data_to_screen(*yl, y_lo, y_hi, (py + ah - 1) as f64, py as f64)
+                                .round() as u16;
+                        let sy_hi =
+                            data_to_screen(*yh, y_lo, y_hi, (py + ah - 1) as f64, py as f64)
+                                .round() as u16;
+                        (sy_hi.min(sy_lo).max(py), sy_hi.max(sy_lo).min(py + ah))
+                    } else {
+                        (py, py + ah)
+                    };
+                    for x in left..right {
+                        for y in y_top..y_bottom {
+                            pb.set_bg(x, y, *color, Z_FILL);
                         }
                     }
                 }

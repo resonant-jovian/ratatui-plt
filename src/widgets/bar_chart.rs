@@ -9,6 +9,7 @@ use crate::annotation::Annotation;
 use crate::axis::Axis;
 use crate::frame::{DataBounds, PlotFrame, ReferenceLine};
 use crate::legend::{Legend, LegendEntry, LegendPosition};
+use crate::plot_buffer::{PlotBuffer, Z_CHROME, Z_DATA};
 use crate::spines::Spines;
 use crate::theme::Theme;
 use crate::ticker::NullLocator;
@@ -217,15 +218,17 @@ impl Widget for &BarChart {
         let x_lo = 0.0;
         let x_hi = n_cats as f64;
 
-        // Create and render the plot frame (title, axes, grid, ticks, labels, spines, ref lines)
+        let mut pb = PlotBuffer::new(area);
+
+        // Create and render the plot frame
         let frame = PlotFrame::new(&x_axis, &y_axis, &self.theme)
             .title(self.title.as_deref())
             .spines(self.spines.clone())
             .reference_lines(&self.reference_lines);
 
-        let Some(pa) = frame.render(
+        let Some(pa) = frame.render_to_pb(
+            &mut pb,
             area,
-            buf,
             DataBounds {
                 x_lo,
                 x_hi,
@@ -261,7 +264,7 @@ impl Widget for &BarChart {
                         for x in bar_x..bar_x + bar_width.max(1) {
                             for y in bar_top..pa.y + pa.height {
                                 if pa.contains(x, y) {
-                                    buf[(x, y)].set_char('█').set_fg(ds.color);
+                                    pb.set_cell(x, y, ' ', ds.color, ds.color, Z_DATA);
                                 }
                             }
                         }
@@ -294,7 +297,7 @@ impl Widget for &BarChart {
                         for x in bar_x..bar_x + bar_width {
                             for y in y_top..y_bot {
                                 if pa.contains(x, y) {
-                                    buf[(x, y)].set_char('█').set_fg(ds.color);
+                                    pb.set_cell(x, y, ' ', ds.color, ds.color, Z_DATA);
                                 }
                             }
                         }
@@ -313,16 +316,17 @@ impl Widget for &BarChart {
                 for (j, ch) in cat.chars().enumerate() {
                     let lx = label_start + j as u16;
                     if lx >= area.x && lx < area.x + area.width {
-                        buf[(lx, label_y)]
-                            .set_char(ch)
-                            .set_fg(self.theme.axis_color);
+                        pb.set_char(lx, label_y, ch, self.theme.axis_color, Z_CHROME);
                     }
                 }
             }
         }
 
         // Draw annotations
-        PlotFrame::draw_annotations(&pa, &self.annotations, buf);
+        PlotFrame::draw_annotations_pb(&pa, &self.annotations, &mut pb);
+
+        // Composite before legend
+        pb.composite(buf);
 
         // Draw legend
         if self.show_legend && !self.datasets.is_empty() {

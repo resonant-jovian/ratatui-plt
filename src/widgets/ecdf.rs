@@ -19,9 +19,10 @@ use ratatui::widgets::Widget;
 
 use crate::annotation::Annotation;
 use crate::axis::Axis;
-use crate::drawing::draw_braille_line;
+use crate::drawing::draw_braille_line_pb;
 use crate::frame::{DataBounds, PlotFrame, ReferenceLine};
 use crate::legend::{Legend, LegendEntry, LegendPosition};
+use crate::plot_buffer::PlotBuffer;
 use crate::spines::Spines;
 use crate::theme::Theme;
 
@@ -234,22 +235,22 @@ impl Widget for &EcdfPlot {
         let (x_lo, x_hi) = self.x_axis.resolve_bounds(x_min, x_max);
         let (y_lo, y_hi) = self.y_axis.resolve_bounds(data_y_min, data_y_max);
 
+        let mut pb = PlotBuffer::new(area);
+
         // Create and render the plot frame
         let frame = PlotFrame::new(&self.x_axis, &self.y_axis, &self.theme)
             .title(self.title.as_deref())
             .spines(self.spines.clone())
             .reference_lines(&self.reference_lines);
 
-        let Some(pa) = frame.render(
-            area,
-            buf,
-            DataBounds {
-                x_lo,
-                x_hi,
-                y_lo,
-                y_hi,
-            },
-        ) else {
+        let bounds = DataBounds {
+            x_lo,
+            x_hi,
+            y_lo,
+            y_hi,
+        };
+
+        let Some(pa) = frame.render_to_pb(&mut pb, area, bounds) else {
             return;
         };
 
@@ -272,10 +273,10 @@ impl Widget for &EcdfPlot {
                 let sy1 = pa.screen_y(y1);
 
                 // Horizontal segment at y0 from x0 to x1
-                draw_braille_line(buf, sx0, sy0, sx1, sy0, ds.color, &pa);
+                draw_braille_line_pb(&mut pb, sx0, sy0, sx1, sy0, ds.color, &pa);
 
                 // Vertical segment at x1 from y0 to y1
-                draw_braille_line(buf, sx1, sy0, sx1, sy1, ds.color, &pa);
+                draw_braille_line_pb(&mut pb, sx1, sy0, sx1, sy1, ds.color, &pa);
             }
 
             // Extend the last step to the right edge of the plot
@@ -284,14 +285,17 @@ impl Widget for &EcdfPlot {
                 let sx_end = pa.screen_x(x_hi);
                 let sy = pa.screen_y(last_y);
 
-                draw_braille_line(buf, sx_last, sy, sx_end, sy, ds.color, &pa);
+                draw_braille_line_pb(&mut pb, sx_last, sy, sx_end, sy, ds.color, &pa);
             }
         }
 
         // Draw annotations
-        PlotFrame::draw_annotations(&pa, &self.annotations, buf);
+        PlotFrame::draw_annotations_pb(&pa, &self.annotations, &mut pb);
 
-        // Draw legend
+        // Composite to buffer before legend
+        pb.composite(buf);
+
+        // Draw legend (directly to buf, after composite)
         if self.show_legend && !self.datasets.is_empty() {
             let entries: Vec<LegendEntry> = self
                 .datasets

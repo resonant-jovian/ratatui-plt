@@ -23,6 +23,7 @@ use ratatui::style::Color;
 use ratatui::widgets::Widget;
 
 use crate::color_cycle::ColorCycle;
+use crate::plot_buffer::{PlotBuffer, Z_CHROME, Z_DATA};
 use crate::theme::Theme;
 
 /// A node in the sunburst hierarchy.
@@ -213,13 +214,15 @@ impl Widget for &Sunburst {
             return;
         }
 
+        let mut pb = PlotBuffer::new(area);
+
         // Draw title
         if let Some(ref title) = self.title {
             let start = area.x + (area.width.saturating_sub(title.len() as u16)) / 2;
             for (i, ch) in title.chars().enumerate() {
                 let x = start + i as u16;
                 if x < area.x + area.width {
-                    buf[(x, area.y)].set_char(ch).set_fg(self.theme.foreground);
+                    pb.set_char(x, area.y, ch, self.theme.foreground, Z_CHROME);
                 }
             }
         }
@@ -292,7 +295,7 @@ impl Widget for &Sunburst {
                 // Find matching segment
                 for seg in &segments {
                     if seg.level == level && angle >= seg.angle_start && angle < seg.angle_end {
-                        buf[(screen_x, screen_y)].set_char('█').set_fg(seg.color);
+                        pb.set_cell(screen_x, screen_y, '█', seg.color, seg.color, Z_DATA);
                         break;
                     }
                 }
@@ -310,7 +313,7 @@ impl Widget for &Sunburst {
                 let x = lx.round() as u16 + j as u16;
                 let y = ly.round() as u16;
                 if x >= area.x && x < area.x + area.width && y >= py && y < py + ph {
-                    buf[(x, y)].set_char(ch).set_fg(self.theme.foreground);
+                    pb.set_char(x, y, ch, self.theme.foreground, Z_CHROME);
                 }
             }
         }
@@ -337,11 +340,13 @@ impl Widget for &Sunburst {
                     for (j, ch) in seg.label.chars().enumerate() {
                         let x = (label_start_x + j as f64).round() as u16;
                         if x >= area.x && x < area.x + area.width {
-                            buf[(x, label_y)].set_char(ch).set_fg(self.theme.foreground);
+                            pb.set_char(x, label_y, ch, self.theme.foreground, Z_CHROME);
                         }
                     }
                 }
             }
         }
+
+        pb.composite(buf);
     }
 }

@@ -25,6 +25,7 @@ use crate::annotation::Annotation;
 use crate::axis::Axis;
 use crate::color_cycle::ColorCycle;
 use crate::frame::{DataBounds, PlotFrame, ReferenceLine};
+use crate::plot_buffer::{PlotBuffer, Z_CHROME, Z_DATA};
 use crate::spines::Spines;
 use crate::theme::Theme;
 use crate::ticker::NullLocator;
@@ -207,14 +208,16 @@ impl Widget for &GanttChart {
             self.x_axis.clone()
         };
 
+        let mut pb = PlotBuffer::new(area);
+
         let frame = PlotFrame::new(&x_axis, &y_axis, &self.theme)
             .title(self.title.as_deref())
             .spines(self.spines.clone())
             .reference_lines(&self.reference_lines);
 
-        let Some(pa) = frame.render(
+        let Some(pa) = frame.render_to_pb(
+            &mut pb,
             area,
-            buf,
             DataBounds {
                 x_lo,
                 x_hi,
@@ -233,11 +236,8 @@ impl Widget for &GanttChart {
                 let _ = cycle.next_color();
             }
 
-            // Task row center in data coords: task 0 at y=0, task 1 at y=1, etc.
-            // But y-axis is inverted on screen: top of screen = high y
-            // We want task 0 at the top, so map task i to y = (n_tasks - 1 - i)
             let task_y = (n_tasks - 1 - i) as f64;
-            let bar_half_height = 0.35; // fraction of row height
+            let bar_half_height = 0.35;
 
             let screen_y_top = data_to_screen(
                 task_y + bar_half_height,
@@ -283,7 +283,7 @@ impl Widget for &GanttChart {
                 for x in x_start..=x_end {
                     for y in y_top..=y_bot {
                         if pa.contains(x, y) {
-                            buf[(x, y)].set_char('\u{2588}').set_fg(color);
+                            pb.set_cell(x, y, ' ', color, color, Z_DATA);
                         }
                     }
                 }
@@ -299,15 +299,16 @@ impl Widget for &GanttChart {
                 for (j, ch) in label.chars().enumerate() {
                     let lx = label_start + j as u16;
                     if lx >= area.x && lx < label_end {
-                        buf[(lx, label_y)]
-                            .set_char(ch)
-                            .set_fg(self.theme.axis_color);
+                        pb.set_char(lx, label_y, ch, self.theme.axis_color, Z_CHROME);
                     }
                 }
             }
         }
 
         // Draw annotations
-        PlotFrame::draw_annotations(&pa, &self.annotations, buf);
+        PlotFrame::draw_annotations_pb(&pa, &self.annotations, &mut pb);
+
+        // Composite
+        pb.composite(buf);
     }
 }
