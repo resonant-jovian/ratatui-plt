@@ -207,8 +207,13 @@ std::thread_local! {
 
 /// Get the terminal cell aspect ratio (width / height).
 ///
-/// Returns the value set by [`set_cell_aspect`], or auto-detected from the
-/// `RATATUI_PLT_CELL_ASPECT` environment variable, or the default (0.5).
+/// On the first call the value is resolved once and cached for the thread.
+/// Resolution order:
+/// 1. Value set by [`set_cell_aspect`]
+/// 2. `RATATUI_PLT_CELL_ASPECT` environment variable
+/// 3. Auto-detected from the terminal via `crossterm::terminal::window_size()`
+///    (requires the `crossterm` feature, enabled by default)
+/// 4. Fallback constant (0.45)
 pub fn terminal_cell_aspect() -> f64 {
     CELL_ASPECT.with(|c| {
         let v = c.get();
@@ -220,10 +225,34 @@ pub fn terminal_cell_aspect() -> f64 {
             .ok()
             .and_then(|s| s.parse::<f64>().ok())
             .filter(|&v| v > 0.0 && v < 2.0)
+            // Try auto-detection from the terminal
+            .or_else(detect_cell_aspect)
             .unwrap_or(DEFAULT_CELL_ASPECT);
         c.set(detected);
         detected
     })
+}
+
+/// Try to auto-detect the terminal cell aspect ratio using the terminal's
+/// reported pixel dimensions. Returns `None` if detection is unavailable
+/// or the terminal doesn't report pixel sizes.
+#[cfg(feature = "crossterm")]
+fn detect_cell_aspect() -> Option<f64> {
+    let size = crossterm::terminal::window_size().ok()?;
+    if size.width > 0 && size.height > 0 && size.columns > 0 && size.rows > 0 {
+        let cell_w = size.width as f64 / size.columns as f64;
+        let cell_h = size.height as f64 / size.rows as f64;
+        let ratio = cell_w / cell_h;
+        if ratio > 0.0 && ratio < 2.0 {
+            return Some(ratio);
+        }
+    }
+    None
+}
+
+#[cfg(not(feature = "crossterm"))]
+fn detect_cell_aspect() -> Option<f64> {
+    None
 }
 
 /// Set the terminal cell aspect ratio (width / height).

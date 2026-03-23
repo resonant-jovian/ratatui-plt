@@ -35,15 +35,6 @@ fn main() -> color_eyre::Result<()> {
     color_eyre::install()?;
     Theme::set_default(parse_theme());
 
-    // Auto-detect terminal cell aspect ratio for accurate visual scaling.
-    if let Ok(size) = crossterm::terminal::window_size() {
-        if size.width > 0 && size.height > 0 && size.columns > 0 && size.rows > 0 {
-            let cell_w = size.width as f64 / size.columns as f64;
-            let cell_h = size.height as f64 / size.rows as f64;
-            set_cell_aspect(cell_w / cell_h);
-        }
-    }
-
     io::stdout().execute(EnterAlternateScreen)?;
     enable_raw_mode()?;
     let mut terminal = Terminal::new(CrosstermBackend::new(io::stdout()))?;

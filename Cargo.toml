@@ -10,7 +10,7 @@ keywords = ["ratatui", "tui", "plotting", "scientific", "visualization"]
 categories = ["command-line-interface", "visualization", "science"]
 
 [features]
-default = []
+default = ["crossterm"]
 async = ["dep:tokio"]
 chrono = ["dep:chrono"]
 serde = ["dep:serde"]
@@ -27,6 +27,7 @@ unicode-extended = []
 ratatui = "0.30"
 palette = "0.7"
 ordered-float = "5"
+crossterm = { version = "0.29", optional = true }
 
 [dependencies.tokio]
 version = "1"
