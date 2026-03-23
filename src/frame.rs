@@ -437,25 +437,27 @@ impl<'a> PlotFrame<'a> {
             return None;
         }
 
-        // Snap Auto bounds to tick positions first (data-range snapping only).
+        // Snap Auto bounds to tick positions with one extra step of margin.
+        // Snapping ensures each tick interval maps to the same number of pixels.
+        // The extra step on each side provides visual breathing room around data.
         {
-            let x_ticks_snap = self.x_axis.tick_positions(x_lo, x_hi);
-            let x_is_linear = matches!(self.x_axis.scale, crate::axis::Scale::Linear);
+            let x_ticks = self.x_axis.tick_positions(x_lo, x_hi);
             if matches!(self.x_axis.bounds, crate::axis::Bounds::Auto)
-                && x_is_linear
-                && x_ticks_snap.len() >= 2
+                && matches!(self.x_axis.scale, crate::axis::Scale::Linear)
+                && x_ticks.len() >= 2
             {
-                x_lo = x_ticks_snap[0];
-                x_hi = x_ticks_snap[x_ticks_snap.len() - 1];
+                let step = x_ticks[1] - x_ticks[0];
+                x_lo = x_ticks[0] - step;
+                x_hi = x_ticks[x_ticks.len() - 1] + step;
             }
-            let y_ticks_snap = self.y_axis.tick_positions(y_lo, y_hi);
-            let y_is_linear = matches!(self.y_axis.scale, crate::axis::Scale::Linear);
+            let y_ticks = self.y_axis.tick_positions(y_lo, y_hi);
             if matches!(self.y_axis.bounds, crate::axis::Bounds::Auto)
-                && y_is_linear
-                && y_ticks_snap.len() >= 2
+                && matches!(self.y_axis.scale, crate::axis::Scale::Linear)
+                && y_ticks.len() >= 2
             {
-                y_lo = y_ticks_snap[0];
-                y_hi = y_ticks_snap[y_ticks_snap.len() - 1];
+                let step = y_ticks[1] - y_ticks[0];
+                y_lo = y_ticks[0] - step;
+                y_hi = y_ticks[y_ticks.len() - 1] + step;
             }
         }
 
@@ -1087,23 +1089,25 @@ impl<'a> PlotFrame<'a> {
             return None;
         }
 
-        // Snap Auto bounds to tick positions (data-range snapping only).
+        // Snap Auto bounds to tick positions with margin (see primary render).
         {
-            let x_ticks_snap = self.x_axis.tick_positions(x_lo, x_hi);
+            let x_ticks = self.x_axis.tick_positions(x_lo, x_hi);
             if matches!(self.x_axis.bounds, crate::axis::Bounds::Auto)
                 && matches!(self.x_axis.scale, crate::axis::Scale::Linear)
-                && x_ticks_snap.len() >= 2
+                && x_ticks.len() >= 2
             {
-                x_lo = x_ticks_snap[0];
-                x_hi = x_ticks_snap[x_ticks_snap.len() - 1];
+                let step = x_ticks[1] - x_ticks[0];
+                x_lo = x_ticks[0] - step;
+                x_hi = x_ticks[x_ticks.len() - 1] + step;
             }
-            let y_ticks_snap = self.y_axis.tick_positions(y_lo, y_hi);
+            let y_ticks = self.y_axis.tick_positions(y_lo, y_hi);
             if matches!(self.y_axis.bounds, crate::axis::Bounds::Auto)
                 && matches!(self.y_axis.scale, crate::axis::Scale::Linear)
-                && y_ticks_snap.len() >= 2
+                && y_ticks.len() >= 2
             {
-                y_lo = y_ticks_snap[0];
-                y_hi = y_ticks_snap[y_ticks_snap.len() - 1];
+                let step = y_ticks[1] - y_ticks[0];
+                y_lo = y_ticks[0] - step;
+                y_hi = y_ticks[y_ticks.len() - 1] + step;
             }
         }
 
