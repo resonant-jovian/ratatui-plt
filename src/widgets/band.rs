@@ -29,7 +29,7 @@ use crate::annotation::Annotation;
 use crate::axis::Axis;
 use crate::frame::{DataBounds, PlotFrame, ReferenceLine};
 use crate::legend::{Legend, LegendEntry, LegendPosition};
-use crate::plot_buffer::{PlotBuffer, Z_DATA};
+use crate::plot_buffer::{PlotBuffer, Z_DATA, Z_FILL};
 use crate::spines::Spines;
 use crate::theme::Theme;
 
@@ -229,26 +229,74 @@ impl Widget for &BandPlot {
             // Instead of filling only at data point x-coordinates, iterate over every
             // screen column and interpolate the bounds for gap-free rendering.
             if n >= 2 {
+                // Half-block fill for 2x vertical resolution.
+                // Edge cells use set_char ONLY (not set_cell) so the bg from
+                // underlying bands is preserved — overlapping bands composite
+                // correctly without overwriting each other's colors.
+                let mut prev_zero_y_draw: Option<f64> = None;
                 for col_offset in 0..pa.width {
                     let screen_x = pa.x + col_offset;
-                    // Map screen column to data x coordinate
                     let data_x = pa.x_lo
                         + (col_offset as f64 / (pa.width - 1).max(1) as f64) * (pa.x_hi - pa.x_lo);
 
-                    // Find the data segment containing this x and interpolate
                     let yl_interp = interpolate_at(&band.x[..n], &band.y_lower[..n], data_x);
                     let yu_interp = interpolate_at(&band.x[..n], &band.y_upper[..n], data_x);
 
                     if let (Some(yl), Some(yu)) = (yl_interp, yu_interp) {
-                        let sy_lower = pa.screen_y(yl).round() as u16;
-                        let sy_upper = pa.screen_y(yu).round() as u16;
+                        let sy_top_f = pa.screen_y(yu.max(yl));
+                        let sy_bot_f = pa.screen_y(yu.min(yl));
 
-                        let y_top = sy_upper.min(sy_lower);
-                        let y_bot = sy_upper.max(sy_lower);
+                        // Half-pixel resolution: each cell has top (even) and bottom (odd)
+                        let hp_top = (sy_top_f * 2.0).round() as i32;
+                        let hp_bot = (sy_bot_f * 2.0).round() as i32;
+                        if hp_top >= hp_bot {
+                            // Zero-width band: draw as a braille line segment
+                            // connecting this column to the next for a smooth curve.
+                            if let Some(prev_y) = prev_zero_y_draw {
+                                crate::drawing::draw_braille_line_pb(
+                                    &mut pb,
+                                    (screen_x - 1) as f64,
+                                    prev_y,
+                                    screen_x as f64,
+                                    sy_top_f,
+                                    band.color,
+                                    &pa,
+                                );
+                            }
+                            prev_zero_y_draw = Some(sy_top_f);
+                            continue;
+                        }
 
-                        for y in y_top..=y_bot {
-                            if pa.contains(screen_x, y) {
-                                pb.set_cell(screen_x, y, ' ', band.color, band.color, Z_DATA);
+                        let cell_top = (hp_top.max(0) / 2) as u16;
+                        let cell_bot = ((hp_bot - 1).max(0) / 2) as u16;
+
+                        for cell_y in cell_top..=cell_bot {
+                            if !pa.contains(screen_x, cell_y) {
+                                continue;
+                            }
+                            let hp_cell_top = cell_y as i32 * 2;
+                            let hp_cell_bot = hp_cell_top + 1;
+
+                            let top_in = hp_top <= hp_cell_top && hp_bot > hp_cell_top;
+                            let bot_in = hp_top <= hp_cell_bot && hp_bot > hp_cell_bot;
+
+                            match (top_in, bot_in) {
+                                (true, true) => {
+                                    // Both halves: fully opaque
+                                    pb.set_cell(screen_x, cell_y, ' ', band.color, band.color, Z_DATA);
+                                }
+                                (true, false) => {
+                                    // Top half only: '▀' fg=band_color, bg inherited
+                                    pb.set_char(screen_x, cell_y, '▀', band.color, Z_DATA);
+                                    // Also set bg so outermost edges have a color
+                                    pb.set_bg(screen_x, cell_y, band.color, Z_FILL);
+                                }
+                                (false, true) => {
+                                    // Bottom half only: '▄' fg=band_color, bg inherited
+                                    pb.set_char(screen_x, cell_y, '▄', band.color, Z_DATA);
+                                    pb.set_bg(screen_x, cell_y, band.color, Z_FILL);
+                                }
+                                (false, false) => {}
                             }
                         }
                     }
@@ -263,6 +311,9 @@ impl Widget for &BandPlot {
         // Composite before legend
         pb.composite(buf);
 
+        // Draw End-positioned labels directly to buf (after composite to avoid PB clipping)
+        frame.draw_end_labels(buf, area, &pa);
+
         // Draw legend
         if self.show_legend && !self.bands.is_empty() {
             let entries: Vec<LegendEntry> = self
@@ -271,7 +322,7 @@ impl Widget for &BandPlot {
                 .map(|b| LegendEntry {
                     name: b.name.clone(),
                     color: b.color,
-                    marker: Some(b.alpha_char),
+                    marker: Some('█'),
                 })
                 .collect();
             let legend = Legend::new(entries)

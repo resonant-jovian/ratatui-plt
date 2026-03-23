@@ -414,7 +414,16 @@ impl<'a> PlotFrame<'a> {
 
         // Compute margins
         let title_height: u16 = if self.title.is_some() { 1 } else { 0 };
-        let x_label_height: u16 = if self.x_axis.label.is_some() { 1 } else { 0 };
+        let x_label_height: u16 = if self.x_axis.label.is_some() {
+            match self.x_axis.label_position {
+                crate::axis::LabelPosition::End => 1, // 1 row for bottom border of box
+                crate::axis::LabelPosition::Center => {
+                    if self.x_axis.label_boxed { 3 } else { 1 }
+                }
+            }
+        } else {
+            0
+        };
         let tick_height: u16 = 1;
 
         let plot_x = area.x + self.y_label_width;
@@ -618,30 +627,8 @@ impl<'a> PlotFrame<'a> {
         }
 
         // Draw axis labels
-        if let Some(ref label) = self.x_axis.label {
-            let y = area.y + area.height - 1;
-            let start = px + (aw.saturating_sub(label.len() as u16)) / 2;
-            for (i, ch) in label.chars().enumerate() {
-                let x = start + i as u16;
-                if x < area.x + area.width && y < area.y + area.height {
-                    buf[(x, y)].set_char(ch).set_fg(self.theme.foreground);
-                }
-            }
-        }
-        if let Some(ref label) = self.y_axis.label {
-            // Render y-axis label vertically centered along the left edge.
-            // Each character is stacked vertically for a rotated-text effect.
-            let label_len = label.chars().count() as u16;
-            let label_x = area.x;
-            let center_y = py + ah / 2;
-            let label_start_y = center_y.saturating_sub(label_len / 2);
-            for (i, ch) in label.chars().enumerate() {
-                let y = label_start_y + i as u16;
-                if label_x < area.x + area.width && y >= area.y && y < area.y + area.height {
-                    buf[(label_x, y)].set_char(ch).set_fg(self.theme.foreground);
-                }
-            }
-        }
+        self.draw_x_label(buf, area, px, py, aw, ah);
+        self.draw_y_label(buf, area, py, ah);
 
         Some(PlotArea {
             x: px,
@@ -654,6 +641,216 @@ impl<'a> PlotFrame<'a> {
             y_hi,
             area,
         })
+    }
+
+    /// Draw the x-axis label, optionally in a box.
+    fn draw_x_label(&self, buf: &mut Buffer, area: Rect, px: u16, py: u16, aw: u16, ah: u16) {
+        let Some(ref label) = self.x_axis.label else {
+            return;
+        };
+        let fg = self.theme.foreground;
+        let bc = self.theme.axis_color;
+        let label_len = label.chars().count() as u16;
+
+        match self.x_axis.label_position {
+            crate::axis::LabelPosition::Center => {
+                let y = area.y + area.height - 1;
+                if self.x_axis.label_boxed {
+                    let box_w = label_len + 4;
+                    let box_x = px + (aw.saturating_sub(box_w)) / 2;
+                    Self::draw_boxed_label_h(buf, box_x, y, label, fg, bc, area);
+                } else {
+                    let start = px + (aw.saturating_sub(label_len)) / 2;
+                    for (i, ch) in label.chars().enumerate() {
+                        let x = start + i as u16;
+                        if x < area.x + area.width && y < area.y + area.height {
+                            buf[(x, y)].set_char(ch).set_fg(fg);
+                        }
+                    }
+                }
+            }
+            crate::axis::LabelPosition::End => {
+                // Place on the tick label row, right after the plot area
+                let y = py + ah; // same row as tick values
+                let box_x = (px + aw).saturating_sub(2); // slightly overlapping end
+                if self.x_axis.label_boxed {
+                    Self::draw_boxed_label_h(buf, box_x, y, label, fg, bc, area);
+                } else {
+                    for (i, ch) in label.chars().enumerate() {
+                        let x = box_x + i as u16;
+                        if x < area.x + area.width && y < area.y + area.height {
+                            buf[(x, y)].set_char(ch).set_fg(fg);
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    /// Draw the y-axis label, optionally in a box.
+    fn draw_y_label(&self, buf: &mut Buffer, area: Rect, py: u16, ah: u16) {
+        let Some(ref label) = self.y_axis.label else {
+            return;
+        };
+        let fg = self.theme.foreground;
+        let bc = self.theme.axis_color;
+        let label_len = label.chars().count() as u16;
+
+        match self.y_axis.label_position {
+            crate::axis::LabelPosition::End => {
+                // Horizontal text at the top of the y-axis, in a box
+                let y = py.max(area.y);
+                if self.y_axis.label_boxed {
+                    let box_x = area.x;
+                    Self::draw_boxed_label_h(buf, box_x, y, label, fg, bc, area);
+                } else {
+                    for (i, ch) in label.chars().enumerate() {
+                        let x = area.x + i as u16;
+                        if x < area.x + area.width && y < area.y + area.height {
+                            buf[(x, y)].set_char(ch).set_fg(fg);
+                        }
+                    }
+                }
+            }
+            crate::axis::LabelPosition::Center => {
+                // Bottom-to-top vertical stacking, centered along y-axis
+                let label_x = area.x;
+                let center_y = py + ah / 2;
+                let label_start_y = center_y.saturating_sub(label_len / 2);
+                if self.y_axis.label_boxed {
+                    // Box around vertical text: 3 chars wide, label_len+2 tall
+                    let box_top = label_start_y.saturating_sub(1);
+                    let box_bot = label_start_y + label_len;
+                    // Top border
+                    if box_top >= area.y && box_top < area.y + area.height {
+                        if label_x < area.x + area.width {
+                            buf[(label_x, box_top)].set_char('┌').set_fg(fg);
+                        }
+                        if label_x + 1 < area.x + area.width {
+                            buf[(label_x + 1, box_top)].set_char('─').set_fg(fg);
+                        }
+                        if label_x + 2 < area.x + area.width {
+                            buf[(label_x + 2, box_top)].set_char('┐').set_fg(fg);
+                        }
+                    }
+                    // Characters bottom-to-top
+                    for (i, ch) in label.chars().rev().enumerate() {
+                        let y = label_start_y + i as u16;
+                        if y >= area.y && y < area.y + area.height {
+                            if label_x < area.x + area.width {
+                                buf[(label_x, y)].set_char('│').set_fg(fg);
+                            }
+                            if label_x + 1 < area.x + area.width {
+                                buf[(label_x + 1, y)].set_char(ch).set_fg(fg);
+                            }
+                            if label_x + 2 < area.x + area.width {
+                                buf[(label_x + 2, y)].set_char('│').set_fg(fg);
+                            }
+                        }
+                    }
+                    // Bottom border
+                    if box_bot >= area.y && box_bot < area.y + area.height {
+                        if label_x < area.x + area.width {
+                            buf[(label_x, box_bot)].set_char('└').set_fg(fg);
+                        }
+                        if label_x + 1 < area.x + area.width {
+                            buf[(label_x + 1, box_bot)].set_char('─').set_fg(fg);
+                        }
+                        if label_x + 2 < area.x + area.width {
+                            buf[(label_x + 2, box_bot)].set_char('┘').set_fg(fg);
+                        }
+                    }
+                } else {
+                    // Bottom-to-top without box
+                    for (i, ch) in label.chars().rev().enumerate() {
+                        let y = label_start_y + i as u16;
+                        if label_x < area.x + area.width && y >= area.y && y < area.y + area.height
+                        {
+                            buf[(label_x, y)].set_char(ch).set_fg(fg);
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    /// Draw a horizontal label in a bordered box (legend-style, 3 rows tall).
+    ///
+    /// ```text
+    /// ┌──────────┐
+    /// │  label   │
+    /// └──────────┘
+    /// ```
+    fn draw_boxed_label_h(
+        buf: &mut Buffer,
+        x: u16,
+        y: u16,
+        label: &str,
+        fg: Color,
+        border_color: Color,
+        area: Rect,
+    ) {
+        let label_len = label.chars().count() as u16;
+        let box_w = label_len + 4; // 1 border + 1 pad + label + 1 pad + 1 border
+        let top_y = y.saturating_sub(1);
+        let bot_y = y + 1;
+        let max_x = area.x + area.width;
+        let max_y = area.y + area.height;
+
+        // Top border row: ┌──┐
+        if top_y >= area.y && top_y < max_y {
+            if x < max_x {
+                buf[(x, top_y)].set_char('┌').set_fg(border_color);
+            }
+            for i in 1..box_w.saturating_sub(1) {
+                if x + i < max_x {
+                    buf[(x + i, top_y)].set_char('─').set_fg(border_color);
+                }
+            }
+            if x + box_w - 1 < max_x {
+                buf[(x + box_w - 1, top_y)].set_char('┐').set_fg(border_color);
+            }
+        }
+
+        // Middle row: │ label │ (bold text)
+        if y >= area.y && y < max_y {
+            if x < max_x {
+                buf[(x, y)].set_char('│').set_fg(border_color);
+            }
+            if x + 1 < max_x {
+                buf[(x + 1, y)].set_char(' ').set_fg(fg);
+            }
+            for (i, ch) in label.chars().enumerate() {
+                let cx = x + 2 + i as u16;
+                if cx < max_x {
+                    buf[(cx, y)]
+                        .set_char(ch)
+                        .set_fg(fg)
+                        .set_style(ratatui::style::Style::default().add_modifier(ratatui::style::Modifier::BOLD));
+                }
+            }
+            if x + label_len + 2 < max_x {
+                buf[(x + label_len + 2, y)].set_char(' ').set_fg(fg);
+            }
+            if x + box_w - 1 < max_x {
+                buf[(x + box_w - 1, y)].set_char('│').set_fg(border_color);
+            }
+        }
+
+        // Bottom border row: └──┘
+        if bot_y >= area.y && bot_y < max_y {
+            if x < max_x {
+                buf[(x, bot_y)].set_char('└').set_fg(border_color);
+            }
+            for i in 1..box_w.saturating_sub(1) {
+                if x + i < max_x {
+                    buf[(x + i, bot_y)].set_char('─').set_fg(border_color);
+                }
+            }
+            if x + box_w - 1 < max_x {
+                buf[(x + box_w - 1, bot_y)].set_char('┘').set_fg(border_color);
+            }
+        }
     }
 
     /// Draw annotations within the plot area.
@@ -804,7 +1001,16 @@ impl<'a> PlotFrame<'a> {
 
         // Compute margins
         let title_height: u16 = if self.title.is_some() { 1 } else { 0 };
-        let x_label_height: u16 = if self.x_axis.label.is_some() { 1 } else { 0 };
+        let x_label_height: u16 = if self.x_axis.label.is_some() {
+            match self.x_axis.label_position {
+                crate::axis::LabelPosition::End => 1, // 1 row for bottom border of box
+                crate::axis::LabelPosition::Center => {
+                    if self.x_axis.label_boxed { 3 } else { 1 }
+                }
+            }
+        } else {
+            0
+        };
         let tick_height: u16 = 1;
 
         let plot_x = area.x + self.y_label_width;
@@ -1009,29 +1215,8 @@ impl<'a> PlotFrame<'a> {
         }
 
         // Draw axis labels
-        if let Some(ref label) = self.x_axis.label {
-            let y = area.y + area.height - 1;
-            let start = px + (aw.saturating_sub(label.len() as u16)) / 2;
-            for (i, ch) in label.chars().enumerate() {
-                let x = start + i as u16;
-                if x < area.x + area.width && y < area.y + area.height {
-                    pb.set_char(x, y, ch, self.theme.foreground, Z_CHROME);
-                }
-            }
-        }
-        if let Some(ref label) = self.y_axis.label {
-            // Render y-axis label vertically centered along the left edge.
-            let label_len = label.chars().count() as u16;
-            let label_x = area.x;
-            let center_y = py + ah / 2;
-            let label_start_y = center_y.saturating_sub(label_len / 2);
-            for (i, ch) in label.chars().enumerate() {
-                let y = label_start_y + i as u16;
-                if label_x < area.x + area.width && y >= area.y && y < area.y + area.height {
-                    pb.set_char(label_x, y, ch, self.theme.foreground, Z_CHROME);
-                }
-            }
-        }
+        self.draw_x_label_pb(pb, area, px, py, aw, ah);
+        self.draw_y_label_pb(pb, area, py, ah);
 
         Some(PlotArea {
             x: px,
@@ -1049,6 +1234,229 @@ impl<'a> PlotFrame<'a> {
     /// Draw annotations into a [`PlotBuffer`] at [`Z_ANNOTATION`].
     ///
     /// This is the Z-buffered counterpart of [`PlotFrame::draw_annotations`].
+    /// Draw the x-axis label to PlotBuffer.
+    fn draw_x_label_pb(&self, pb: &mut PlotBuffer, area: Rect, px: u16, _py: u16, aw: u16, _ah: u16) {
+        let Some(ref label) = self.x_axis.label else {
+            return;
+        };
+        let fg = self.theme.foreground;
+        let bc = self.theme.axis_color;
+        let label_len = label.chars().count() as u16;
+
+        match self.x_axis.label_position {
+            crate::axis::LabelPosition::Center => {
+                let y = area.y + area.height - 1;
+                if self.x_axis.label_boxed {
+                    let box_w = label_len + 4;
+                    let box_x = px + (aw.saturating_sub(box_w)) / 2;
+                    Self::draw_boxed_label_h_pb(pb, box_x, y, label, fg, bc, area);
+                } else {
+                    let start = px + (aw.saturating_sub(label_len)) / 2;
+                    for (i, ch) in label.chars().enumerate() {
+                        let x = start + i as u16;
+                        if x < area.x + area.width && y < area.y + area.height {
+                            pb.set_char(x, y, ch, fg, Z_CHROME);
+                        }
+                    }
+                }
+            }
+            crate::axis::LabelPosition::End => {
+                // End labels are rendered after composite via draw_end_labels()
+                // to avoid PlotBuffer bounds clipping.
+            }
+        }
+    }
+
+    /// Draw End-positioned axis labels directly to the buffer.
+    ///
+    /// Call this AFTER `pb.composite(buf)` so the labels aren't clipped by
+    /// the PlotBuffer area bounds.
+    pub fn draw_end_labels(&self, buf: &mut Buffer, _area: Rect, pa: &PlotArea) {
+        // Use the full buffer area for bounds (not the widget area) so labels
+        // can extend beyond the plot's square_area.
+        let buf_area = buf.area;
+        if let Some(ref label) = self.x_axis.label {
+            if matches!(self.x_axis.label_position, crate::axis::LabelPosition::End) {
+                let fg = self.theme.foreground;
+                let bc = self.theme.axis_color;
+                let y = pa.y + pa.height;
+                let box_x = (pa.x + pa.width).saturating_sub(2);
+                if self.x_axis.label_boxed {
+                    Self::draw_boxed_label_h(buf, box_x, y, label, fg, bc, buf_area);
+                } else {
+                    for (i, ch) in label.chars().enumerate() {
+                        let x = box_x + i as u16;
+                        if x < buf_area.x + buf_area.width && y < buf_area.y + buf_area.height {
+                            buf[(x, y)].set_char(ch).set_fg(fg);
+                        }
+                    }
+                }
+            }
+        }
+        // Y-axis End label (horizontal at top)
+        if let Some(ref label) = self.y_axis.label {
+            if matches!(self.y_axis.label_position, crate::axis::LabelPosition::End) {
+                let fg = self.theme.foreground;
+                let bc = self.theme.axis_color;
+                let y = pa.y.max(buf_area.y);
+                let box_x = buf_area.x;
+                if self.y_axis.label_boxed {
+                    Self::draw_boxed_label_h(buf, box_x, y, label, fg, bc, buf_area);
+                } else {
+                    for (i, ch) in label.chars().enumerate() {
+                        let x = box_x + i as u16;
+                        if x < buf_area.x + buf_area.width && y < buf_area.y + buf_area.height {
+                            buf[(x, y)].set_char(ch).set_fg(fg);
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    /// Draw the y-axis label to PlotBuffer.
+    fn draw_y_label_pb(&self, pb: &mut PlotBuffer, area: Rect, py: u16, ah: u16) {
+        let Some(ref label) = self.y_axis.label else {
+            return;
+        };
+        let fg = self.theme.foreground;
+        let bc = self.theme.axis_color;
+        let label_len = label.chars().count() as u16;
+
+        match self.y_axis.label_position {
+            crate::axis::LabelPosition::End => {
+                // End labels rendered after composite via draw_end_labels()
+                // for bold support and to avoid PB bounds clipping.
+            }
+            crate::axis::LabelPosition::Center => {
+                let label_x = area.x;
+                let center_y = py + ah / 2;
+                let label_start_y = center_y.saturating_sub(label_len / 2);
+                if self.y_axis.label_boxed {
+                    let box_top = label_start_y.saturating_sub(1);
+                    let box_bot = label_start_y + label_len;
+                    if box_top >= area.y && box_top < area.y + area.height {
+                        if label_x < area.x + area.width {
+                            pb.set_char(label_x, box_top, '┌', bc, Z_CHROME);
+                        }
+                        if label_x + 1 < area.x + area.width {
+                            pb.set_char(label_x + 1, box_top, '─', bc, Z_CHROME);
+                        }
+                        if label_x + 2 < area.x + area.width {
+                            pb.set_char(label_x + 2, box_top, '┐', bc, Z_CHROME);
+                        }
+                    }
+                    for (i, ch) in label.chars().rev().enumerate() {
+                        let y = label_start_y + i as u16;
+                        if y >= area.y && y < area.y + area.height {
+                            if label_x < area.x + area.width {
+                                pb.set_char(label_x, y, '│', bc, Z_CHROME);
+                            }
+                            if label_x + 1 < area.x + area.width {
+                                pb.set_char(label_x + 1, y, ch, fg, Z_CHROME);
+                            }
+                            if label_x + 2 < area.x + area.width {
+                                pb.set_char(label_x + 2, y, '│', bc, Z_CHROME);
+                            }
+                        }
+                    }
+                    if box_bot >= area.y && box_bot < area.y + area.height {
+                        if label_x < area.x + area.width {
+                            pb.set_char(label_x, box_bot, '└', fg, Z_CHROME);
+                        }
+                        if label_x + 1 < area.x + area.width {
+                            pb.set_char(label_x + 1, box_bot, '─', fg, Z_CHROME);
+                        }
+                        if label_x + 2 < area.x + area.width {
+                            pb.set_char(label_x + 2, box_bot, '┘', fg, Z_CHROME);
+                        }
+                    }
+                } else {
+                    for (i, ch) in label.chars().rev().enumerate() {
+                        let y = label_start_y + i as u16;
+                        if label_x < area.x + area.width && y >= area.y && y < area.y + area.height
+                        {
+                            pb.set_char(label_x, y, ch, fg, Z_CHROME);
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    /// Draw a horizontal boxed label to PlotBuffer (legend-style, 3 rows).
+    /// Uses set_cell with Color::Reset bg to make the box opaque (clears grid lines behind it).
+    fn draw_boxed_label_h_pb(
+        pb: &mut PlotBuffer,
+        x: u16,
+        y: u16,
+        label: &str,
+        fg: Color,
+        border_color: Color,
+        area: Rect,
+    ) {
+        let label_len = label.chars().count() as u16;
+        let box_w = label_len + 4;
+        let top_y = y.saturating_sub(1);
+        let bot_y = y + 1;
+        let max_x = area.x + area.width;
+        let max_y = area.y + area.height;
+        let bg = Color::Reset;
+
+        // Top border
+        if top_y >= area.y && top_y < max_y {
+            if x < max_x {
+                pb.set_cell(x, top_y, '┌', border_color, bg, Z_CHROME);
+            }
+            for i in 1..box_w.saturating_sub(1) {
+                if x + i < max_x {
+                    pb.set_cell(x + i, top_y, '─', border_color, bg, Z_CHROME);
+                }
+            }
+            if x + box_w - 1 < max_x {
+                pb.set_cell(x + box_w - 1, top_y, '┐', border_color, bg, Z_CHROME);
+            }
+        }
+
+        // Middle row: │ label │
+        if y >= area.y && y < max_y {
+            if x < max_x {
+                pb.set_cell(x, y, '│', border_color, bg, Z_CHROME);
+            }
+            // Space padding
+            if x + 1 < max_x {
+                pb.set_cell(x + 1, y, ' ', fg, bg, Z_CHROME);
+            }
+            for (i, ch) in label.chars().enumerate() {
+                let cx = x + 2 + i as u16;
+                if cx < max_x {
+                    pb.set_cell(cx, y, ch, fg, bg, Z_CHROME);
+                }
+            }
+            if x + label_len + 2 < max_x {
+                pb.set_cell(x + label_len + 2, y, ' ', fg, bg, Z_CHROME);
+            }
+            if x + box_w - 1 < max_x {
+                pb.set_cell(x + box_w - 1, y, '│', border_color, bg, Z_CHROME);
+            }
+        }
+
+        // Bottom border
+        if bot_y >= area.y && bot_y < max_y {
+            if x < max_x {
+                pb.set_cell(x, bot_y, '└', border_color, bg, Z_CHROME);
+            }
+            for i in 1..box_w.saturating_sub(1) {
+                if x + i < max_x {
+                    pb.set_cell(x + i, bot_y, '─', border_color, bg, Z_CHROME);
+                }
+            }
+            if x + box_w - 1 < max_x {
+                pb.set_cell(x + box_w - 1, bot_y, '┘', border_color, bg, Z_CHROME);
+            }
+        }
+    }
+
     pub fn draw_annotations_pb(pa: &PlotArea, annotations: &[Annotation], pb: &mut PlotBuffer) {
         for ann in annotations {
             let sx = pa.screen_x(ann.text_x);

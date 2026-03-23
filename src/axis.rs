@@ -279,6 +279,19 @@ pub enum LabelRotation {
     Vertical,
 }
 
+/// Position of the axis label.
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub enum LabelPosition {
+    /// Centered along the axis (default for x-axis).
+    /// For y-axis, renders bottom-to-top vertical text.
+    #[default]
+    Center,
+    /// At the end of the axis: right for x-axis, top for y-axis.
+    /// Text is always horizontal.
+    End,
+}
+
 /// Axis configuration.
 ///
 /// # Example
@@ -322,6 +335,10 @@ pub struct Axis {
     pub tick_padding: u16,
     /// Rotation for tick labels.
     pub label_rotation: LabelRotation,
+    /// Position of the axis label (Center or End).
+    pub label_position: LabelPosition,
+    /// Whether to draw a box around the axis label.
+    pub label_boxed: bool,
 }
 
 /// Configuration for major/minor grid lines.
@@ -364,6 +381,8 @@ impl Default for Axis {
             tick_size: 1,
             tick_padding: 1,
             label_rotation: LabelRotation::default(),
+            label_position: LabelPosition::default(),
+            label_boxed: true,
         }
     }
 }
@@ -455,6 +474,18 @@ impl Axis {
     /// Set the padding between tick marks and labels.
     pub fn tick_padding(mut self, padding: u16) -> Self {
         self.tick_padding = padding;
+        self
+    }
+
+    /// Set the position of the axis label (Center or End).
+    pub fn label_position(mut self, pos: LabelPosition) -> Self {
+        self.label_position = pos;
+        self
+    }
+
+    /// Set whether the axis label is drawn in a bordered box.
+    pub fn label_boxed(mut self, boxed: bool) -> Self {
+        self.label_boxed = boxed;
         self
     }
 
