@@ -403,10 +403,10 @@ impl<'a> PlotFrame<'a> {
     /// (after axis bounds resolution). Returns `None` if the area is too small.
     pub fn render(&self, area: Rect, buf: &mut Buffer, bounds: DataBounds) -> Option<PlotArea> {
         let DataBounds {
-            x_lo,
-            x_hi,
-            y_lo,
-            y_hi,
+            mut x_lo,
+            mut x_hi,
+            mut y_lo,
+            mut y_hi,
         } = bounds;
         if area.width < 4 || area.height < 4 {
             return None;
@@ -440,18 +440,53 @@ impl<'a> PlotFrame<'a> {
         }
 
         // Apply aspect ratio
-        let (ax_off, ay_off, aw, ah) = apply_aspect_ratio(
+        let (ax_off, ay_off, mut aw, mut ah) = apply_aspect_ratio(
             &self.aspect_ratio,
             (x_hi - x_lo).abs(),
             (y_hi - y_lo).abs(),
             plot_width,
             plot_height,
         );
-        let px = plot_x + ax_off;
-        let py = plot_y + ay_off;
+        let mut px = plot_x + ax_off;
+        let mut py = plot_y + ay_off;
 
         if aw < 2 || ah < 2 {
             return None;
+        }
+
+        // Snap Auto bounds to tick positions and align pixel grid for uniform cells.
+        {
+            let x_ticks_snap = self.x_axis.tick_positions(x_lo, x_hi);
+            if matches!(self.x_axis.bounds, crate::axis::Bounds::Auto)
+                && matches!(self.x_axis.scale, crate::axis::Scale::Linear)
+                && x_ticks_snap.len() >= 2
+            {
+                x_lo = x_ticks_snap[0];
+                x_hi = x_ticks_snap[x_ticks_snap.len() - 1];
+                // Align pixel width to be divisible by number of intervals
+                let n_intervals = (x_ticks_snap.len() - 1) as u16;
+                if let Some(cell_w) = aw.checked_div(n_intervals) {
+                    let aligned_w = cell_w * n_intervals;
+                    let pad = aw - aligned_w;
+                    px += pad / 2;
+                    aw = aligned_w;
+                }
+            }
+            let y_ticks_snap = self.y_axis.tick_positions(y_lo, y_hi);
+            if matches!(self.y_axis.bounds, crate::axis::Bounds::Auto)
+                && matches!(self.y_axis.scale, crate::axis::Scale::Linear)
+                && y_ticks_snap.len() >= 2
+            {
+                y_lo = y_ticks_snap[0];
+                y_hi = y_ticks_snap[y_ticks_snap.len() - 1];
+                let n_intervals = (y_ticks_snap.len() - 1) as u16;
+                if let Some(cell_h) = ah.checked_div(n_intervals) {
+                    let aligned_h = cell_h * n_intervals;
+                    let pad = ah - aligned_h;
+                    py += pad / 2;
+                    ah = aligned_h;
+                }
+            }
         }
 
         // Draw title
@@ -990,10 +1025,10 @@ impl<'a> PlotFrame<'a> {
         bounds: DataBounds,
     ) -> Option<PlotArea> {
         let DataBounds {
-            x_lo,
-            x_hi,
-            y_lo,
-            y_hi,
+            mut x_lo,
+            mut x_hi,
+            mut y_lo,
+            mut y_hi,
         } = bounds;
         if area.width < 4 || area.height < 4 {
             return None;
@@ -1027,18 +1062,52 @@ impl<'a> PlotFrame<'a> {
         }
 
         // Apply aspect ratio
-        let (ax_off, ay_off, aw, ah) = apply_aspect_ratio(
+        let (ax_off, ay_off, mut aw, mut ah) = apply_aspect_ratio(
             &self.aspect_ratio,
             (x_hi - x_lo).abs(),
             (y_hi - y_lo).abs(),
             plot_width,
             plot_height,
         );
-        let px = plot_x + ax_off;
-        let py = plot_y + ay_off;
+        let mut px = plot_x + ax_off;
+        let mut py = plot_y + ay_off;
 
         if aw < 2 || ah < 2 {
             return None;
+        }
+
+        // Snap Auto bounds to tick positions and align pixel grid for uniform cells.
+        {
+            let x_ticks_snap = self.x_axis.tick_positions(x_lo, x_hi);
+            if matches!(self.x_axis.bounds, crate::axis::Bounds::Auto)
+                && matches!(self.x_axis.scale, crate::axis::Scale::Linear)
+                && x_ticks_snap.len() >= 2
+            {
+                x_lo = x_ticks_snap[0];
+                x_hi = x_ticks_snap[x_ticks_snap.len() - 1];
+                let n_intervals = (x_ticks_snap.len() - 1) as u16;
+                if let Some(cell_w) = aw.checked_div(n_intervals) {
+                    let aligned_w = cell_w * n_intervals;
+                    let pad = aw - aligned_w;
+                    px += pad / 2;
+                    aw = aligned_w;
+                }
+            }
+            let y_ticks_snap = self.y_axis.tick_positions(y_lo, y_hi);
+            if matches!(self.y_axis.bounds, crate::axis::Bounds::Auto)
+                && matches!(self.y_axis.scale, crate::axis::Scale::Linear)
+                && y_ticks_snap.len() >= 2
+            {
+                y_lo = y_ticks_snap[0];
+                y_hi = y_ticks_snap[y_ticks_snap.len() - 1];
+                let n_intervals = (y_ticks_snap.len() - 1) as u16;
+                if let Some(cell_h) = ah.checked_div(n_intervals) {
+                    let aligned_h = cell_h * n_intervals;
+                    let pad = ah - aligned_h;
+                    py += pad / 2;
+                    ah = aligned_h;
+                }
+            }
         }
 
         // Draw title
@@ -1275,27 +1344,28 @@ impl<'a> PlotFrame<'a> {
         // Use the full buffer area for bounds (not the widget area) so labels
         // can extend beyond the plot's square_area.
         let buf_area = buf.area;
-        if let Some(ref label) = self.x_axis.label {
-            if matches!(self.x_axis.label_position, crate::axis::LabelPosition::End) {
-                let fg = self.theme.foreground;
-                let bc = self.theme.axis_color;
-                let y = pa.y + pa.height;
-                let box_x = (pa.x + pa.width).saturating_sub(2);
-                if self.x_axis.label_boxed {
-                    Self::draw_boxed_label_h(buf, box_x, y, label, fg, bc, buf_area);
-                } else {
-                    for (i, ch) in label.chars().enumerate() {
-                        let x = box_x + i as u16;
-                        if x < buf_area.x + buf_area.width && y < buf_area.y + buf_area.height {
-                            buf[(x, y)].set_char(ch).set_fg(fg);
-                        }
+        if let Some(ref label) = self.x_axis.label
+            && matches!(self.x_axis.label_position, crate::axis::LabelPosition::End)
+        {
+            let fg = self.theme.foreground;
+            let bc = self.theme.axis_color;
+            let y = pa.y + pa.height;
+            let box_x = (pa.x + pa.width).saturating_sub(2);
+            if self.x_axis.label_boxed {
+                Self::draw_boxed_label_h(buf, box_x, y, label, fg, bc, buf_area);
+            } else {
+                for (i, ch) in label.chars().enumerate() {
+                    let x = box_x + i as u16;
+                    if x < buf_area.x + buf_area.width && y < buf_area.y + buf_area.height {
+                        buf[(x, y)].set_char(ch).set_fg(fg);
                     }
                 }
             }
         }
         // Y-axis End label (horizontal at top)
-        if let Some(ref label) = self.y_axis.label {
-            if matches!(self.y_axis.label_position, crate::axis::LabelPosition::End) {
+        if let Some(ref label) = self.y_axis.label
+            && matches!(self.y_axis.label_position, crate::axis::LabelPosition::End)
+        {
                 let fg = self.theme.foreground;
                 let bc = self.theme.axis_color;
                 let y = pa.y.max(buf_area.y);
@@ -1310,7 +1380,6 @@ impl<'a> PlotFrame<'a> {
                         }
                     }
                 }
-            }
         }
     }
 
