@@ -208,6 +208,14 @@ impl Widget for &CandlestickChart {
             return;
         };
 
+        // Compute dynamic candle body width with gap between candles
+        let n_candles = self.candles.len().max(1) as u16;
+        let slot_width = pa.width / n_candles.max(1);
+        // Body takes ~60% of slot, rest is gap. Force odd for centered wick.
+        let body_w = (slot_width * 3 / 5).max(1);
+        let body_width = if body_w.is_multiple_of(2) { body_w + 1 } else { body_w };
+        let half_body = body_width / 2;
+
         // Draw each candle
         for candle in &self.candles {
             if !candle.x.is_finite()
@@ -242,9 +250,9 @@ impl Widget for &CandlestickChart {
             let body_top = sy_open.min(sy_close);
             let body_bot = sy_open.max(sy_close).max(body_top);
 
-            // Body extends 1 column on each side of center (3 cols wide)
-            let body_left = if sx > pa.x { sx - 1 } else { sx };
-            let body_right = if sx + 1 < pa.x + pa.width { sx + 1 } else { sx };
+            // Body width is dynamic based on number of candles
+            let body_left = sx.saturating_sub(half_body).max(pa.x);
+            let body_right = (sx + half_body).min(pa.x + pa.width - 1);
 
             // 1. Clear the full candle area with a reset background
             for y in wick_top..=wick_bot {
