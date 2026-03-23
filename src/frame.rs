@@ -1362,14 +1362,15 @@ impl<'a> PlotFrame<'a> {
                 }
             }
         }
-        // Y-axis End label (horizontal at top)
+        // Y-axis End label (horizontal at top of this widget's area)
         if let Some(ref label) = self.y_axis.label
             && matches!(self.y_axis.label_position, crate::axis::LabelPosition::End)
         {
                 let fg = self.theme.foreground;
                 let bc = self.theme.axis_color;
-                let y = pa.y.max(buf_area.y);
-                let box_x = buf_area.x;
+                // Position above the plot area, within the widget's area
+                let y = pa.y.saturating_sub(2).max(pa.area.y);
+                let box_x = pa.area.x;
                 if self.y_axis.label_boxed {
                     Self::draw_boxed_label_h(buf, box_x, y, label, fg, bc, buf_area);
                 } else {
