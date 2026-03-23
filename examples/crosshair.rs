@@ -95,13 +95,22 @@ fn main() -> color_eyre::Result<()> {
         .data(points)
         .marker(MarkerShape::FilledCircle);
 
-    let x_axis = Axis::new().label("RA offset (kpc)").grid(true);
-    let y_axis = Axis::new().label("Dec offset (kpc)").grid(true);
+    let x_axis = Axis::new()
+        .label("RA offset (kpc)")
+        .grid(true)
+        .bounds(Bounds::Manual(-4.0, 14.0))
+        .locator(MultipleLocator::new(1.0));
+    let y_axis = Axis::new()
+        .label("Dec offset (kpc)")
+        .grid(true)
+        .bounds(Bounds::Manual(-4.0, 14.0))
+        .locator(MultipleLocator::new(1.0))
+        .label_position(LabelPosition::End);
 
     // Crosshair position in data coordinates, start at galactic center
     let mut cursor_x = 5.0_f64;
     let mut cursor_y = 5.0_f64;
-    let step = 0.2;
+    let step = 0.5;
 
     loop {
         terminal.draw(|frame| {
@@ -153,6 +162,9 @@ fn main() -> color_eyre::Result<()> {
                     .show_labels(true)
                     .format(|x, y| format!("({:.1}, {:.1})", x, y));
                 crosshair.render_on(&pa, buf);
+
+                // Draw axis labels after all rendering
+                pf.draw_end_labels(buf, area, &pa);
             }
         })?;
 

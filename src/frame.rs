@@ -453,33 +453,47 @@ impl<'a> PlotFrame<'a> {
         }
 
         // Snap Auto bounds to tick positions and align pixel grid for uniform cells.
+        // data_to_screen maps to [px, px + aw - 1], so the effective screen range
+        // is (aw - 1). We align (aw - 1) to be divisible by n_intervals so that
+        // each tick interval maps to an exact integer number of pixels.
         {
             let x_ticks_snap = self.x_axis.tick_positions(x_lo, x_hi);
+            let x_is_linear = matches!(self.x_axis.scale, crate::axis::Scale::Linear);
             if matches!(self.x_axis.bounds, crate::axis::Bounds::Auto)
-                && matches!(self.x_axis.scale, crate::axis::Scale::Linear)
+                && x_is_linear
                 && x_ticks_snap.len() >= 2
             {
                 x_lo = x_ticks_snap[0];
                 x_hi = x_ticks_snap[x_ticks_snap.len() - 1];
-                // Align pixel width to be divisible by number of intervals
+            }
+            if x_is_linear && x_ticks_snap.len() >= 2 {
                 let n_intervals = (x_ticks_snap.len() - 1) as u16;
-                if let Some(cell_w) = aw.checked_div(n_intervals) {
-                    let aligned_w = cell_w * n_intervals;
+                let screen_range = aw - 1;
+                if let Some(cell_w) = screen_range.checked_div(n_intervals)
+                    && cell_w > 0
+                {
+                    let aligned_w = cell_w * n_intervals + 1;
                     let pad = aw - aligned_w;
                     px += pad / 2;
                     aw = aligned_w;
                 }
             }
             let y_ticks_snap = self.y_axis.tick_positions(y_lo, y_hi);
+            let y_is_linear = matches!(self.y_axis.scale, crate::axis::Scale::Linear);
             if matches!(self.y_axis.bounds, crate::axis::Bounds::Auto)
-                && matches!(self.y_axis.scale, crate::axis::Scale::Linear)
+                && y_is_linear
                 && y_ticks_snap.len() >= 2
             {
                 y_lo = y_ticks_snap[0];
                 y_hi = y_ticks_snap[y_ticks_snap.len() - 1];
+            }
+            if y_is_linear && y_ticks_snap.len() >= 2 {
                 let n_intervals = (y_ticks_snap.len() - 1) as u16;
-                if let Some(cell_h) = ah.checked_div(n_intervals) {
-                    let aligned_h = cell_h * n_intervals;
+                let screen_range = ah - 1;
+                if let Some(cell_h) = screen_range.checked_div(n_intervals)
+                    && cell_h > 0
+                {
+                    let aligned_h = cell_h * n_intervals + 1;
                     let pad = ah - aligned_h;
                     py += pad / 2;
                     ah = aligned_h;
@@ -659,9 +673,7 @@ impl<'a> PlotFrame<'a> {
             }
         }
 
-        // Draw axis labels
-        self.draw_x_label(buf, area, px, py, aw, ah);
-        self.draw_y_label(buf, area, py, ah);
+        // Axis labels are drawn by draw_end_labels() after rendering
 
         Some(PlotArea {
             x: px,
@@ -674,51 +686,6 @@ impl<'a> PlotFrame<'a> {
             y_hi,
             area,
         })
-    }
-
-    /// Draw the x-axis label, optionally in a box.
-    fn draw_x_label(&self, buf: &mut Buffer, area: Rect, px: u16, py: u16, aw: u16, ah: u16) {
-        let Some(ref label) = self.x_axis.label else {
-            return;
-        };
-        let fg = self.theme.foreground;
-        let bc = self.theme.axis_color;
-        let label_len = label.chars().count() as u16;
-
-        match self.x_axis.label_position {
-            crate::axis::LabelPosition::Center => {
-                // Just below the tick labels (py + ah = spine, +1 = tick row, +1 = label)
-                let y = py + ah + 2;
-                if self.x_axis.label_boxed {
-                    let box_w = label_len + 4;
-                    let box_x = px + (aw.saturating_sub(box_w)) / 2;
-                    Self::draw_boxed_label_h(buf, box_x, y, label, fg, bc, area);
-                } else {
-                    let start = px + (aw.saturating_sub(label_len)) / 2;
-                    for (i, ch) in label.chars().enumerate() {
-                        let x = start + i as u16;
-                        if x < area.x + area.width && y < area.y + area.height {
-                            buf[(x, y)].set_char(ch).set_fg(fg);
-                        }
-                    }
-                }
-            }
-            crate::axis::LabelPosition::End => {
-                // Place on the tick label row, right after the plot area
-                let y = py + ah; // same row as tick values
-                let box_x = (px + aw).saturating_sub(2); // slightly overlapping end
-                if self.x_axis.label_boxed {
-                    Self::draw_boxed_label_h(buf, box_x, y, label, fg, bc, area);
-                } else {
-                    for (i, ch) in label.chars().enumerate() {
-                        let x = box_x + i as u16;
-                        if x < area.x + area.width && y < area.y + area.height {
-                            buf[(x, y)].set_char(ch).set_fg(fg);
-                        }
-                    }
-                }
-            }
-        }
     }
 
     /// Draw the y-axis label, optionally in a box.
@@ -1075,32 +1042,45 @@ impl<'a> PlotFrame<'a> {
         }
 
         // Snap Auto bounds to tick positions and align pixel grid for uniform cells.
+        // See the primary render() method for detailed comments on the alignment math.
         {
             let x_ticks_snap = self.x_axis.tick_positions(x_lo, x_hi);
+            let x_is_linear = matches!(self.x_axis.scale, crate::axis::Scale::Linear);
             if matches!(self.x_axis.bounds, crate::axis::Bounds::Auto)
-                && matches!(self.x_axis.scale, crate::axis::Scale::Linear)
+                && x_is_linear
                 && x_ticks_snap.len() >= 2
             {
                 x_lo = x_ticks_snap[0];
                 x_hi = x_ticks_snap[x_ticks_snap.len() - 1];
+            }
+            if x_is_linear && x_ticks_snap.len() >= 2 {
                 let n_intervals = (x_ticks_snap.len() - 1) as u16;
-                if let Some(cell_w) = aw.checked_div(n_intervals) {
-                    let aligned_w = cell_w * n_intervals;
+                let screen_range = aw - 1;
+                if let Some(cell_w) = screen_range.checked_div(n_intervals)
+                    && cell_w > 0
+                {
+                    let aligned_w = cell_w * n_intervals + 1;
                     let pad = aw - aligned_w;
                     px += pad / 2;
                     aw = aligned_w;
                 }
             }
             let y_ticks_snap = self.y_axis.tick_positions(y_lo, y_hi);
+            let y_is_linear = matches!(self.y_axis.scale, crate::axis::Scale::Linear);
             if matches!(self.y_axis.bounds, crate::axis::Bounds::Auto)
-                && matches!(self.y_axis.scale, crate::axis::Scale::Linear)
+                && y_is_linear
                 && y_ticks_snap.len() >= 2
             {
                 y_lo = y_ticks_snap[0];
                 y_hi = y_ticks_snap[y_ticks_snap.len() - 1];
+            }
+            if y_is_linear && y_ticks_snap.len() >= 2 {
                 let n_intervals = (y_ticks_snap.len() - 1) as u16;
-                if let Some(cell_h) = ah.checked_div(n_intervals) {
-                    let aligned_h = cell_h * n_intervals;
+                let screen_range = ah - 1;
+                if let Some(cell_h) = screen_range.checked_div(n_intervals)
+                    && cell_h > 0
+                {
+                    let aligned_h = cell_h * n_intervals + 1;
                     let pad = ah - aligned_h;
                     py += pad / 2;
                     ah = aligned_h;
