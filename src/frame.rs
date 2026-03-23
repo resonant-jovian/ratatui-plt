@@ -769,7 +769,7 @@ impl<'a> PlotFrame<'a> {
                         }
                     }
                     // Characters bottom-to-top
-                    for (i, ch) in label.chars().rev().enumerate() {
+                    for (i, ch) in label.chars().enumerate() {
                         let y = label_start_y + i as u16;
                         if y >= area.y && y < area.y + area.height {
                             if label_x < area.x + area.width {
@@ -797,7 +797,7 @@ impl<'a> PlotFrame<'a> {
                     }
                 } else {
                     // Bottom-to-top without box
-                    for (i, ch) in label.chars().rev().enumerate() {
+                    for (i, ch) in label.chars().enumerate() {
                         let y = label_start_y + i as u16;
                         if label_x < area.x + area.width && y >= area.y && y < area.y + area.height
                         {
@@ -1415,7 +1415,7 @@ impl<'a> PlotFrame<'a> {
                             pb.set_char(label_x + 2, box_top, '┐', bc, Z_CHROME);
                         }
                     }
-                    for (i, ch) in label.chars().rev().enumerate() {
+                    for (i, ch) in label.chars().enumerate() {
                         let y = label_start_y + i as u16;
                         if y >= area.y && y < area.y + area.height {
                             if label_x < area.x + area.width {
@@ -1441,7 +1441,7 @@ impl<'a> PlotFrame<'a> {
                         }
                     }
                 } else {
-                    for (i, ch) in label.chars().rev().enumerate() {
+                    for (i, ch) in label.chars().enumerate() {
                         let y = label_start_y + i as u16;
                         if label_x < area.x + area.width && y >= area.y && y < area.y + area.height
                         {

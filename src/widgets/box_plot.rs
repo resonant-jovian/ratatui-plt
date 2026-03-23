@@ -337,7 +337,7 @@ impl Widget for &BoxPlot {
             return;
         };
 
-        let box_width = (pa.width / n as u16).saturating_sub(2).max(3);
+        let box_width = ((pa.width * 3) / (n as u16 * 4)).max(3);
 
         for (i, d) in self.data.iter().enumerate() {
             let center_x = pa.x + (i as u16 * pa.width / n as u16) + pa.width / n as u16 / 2;
@@ -414,11 +414,11 @@ impl Widget for &BoxPlot {
                     (sy_median, sy_median, box_left, box_right)
                 };
 
-            // Clear box interior with fill background
+            // Fill box interior with background color
             for y in sy_q3..=sy_q1 {
-                for x in box_left..box_right {
+                for x in (box_left + 1)..box_right.saturating_sub(1) {
                     if pa.contains(x, y) {
-                        pb.set_bg(x, y, Color::Reset, Z_FILL);
+                        pb.set_cell(x, y, ' ', d.color, d.color, Z_FILL);
                     }
                 }
             }
@@ -516,21 +516,21 @@ impl Widget for &BoxPlot {
                 }
             }
 
-            // Whiskers
+            // Whiskers (dashed style like matplotlib)
             for y in sy_whi..sy_q3 {
                 if pa.contains(center_x, y) {
-                    pb.set_char(center_x, y, '│', d.color, Z_DATA);
+                    pb.set_char(center_x, y, '┆', d.color, Z_DATA);
                 }
             }
             for y in (sy_q1 + 1)..=sy_wlo {
                 if pa.contains(center_x, y) {
-                    pb.set_char(center_x, y, '│', d.color, Z_DATA);
+                    pb.set_char(center_x, y, '┆', d.color, Z_DATA);
                 }
             }
 
-            // Whisker caps
-            let cap_left = center_x.saturating_sub(box_width / 4);
-            let cap_right = center_x + box_width / 4;
+            // Whisker caps (half box width for matplotlib-style T-caps)
+            let cap_left = center_x.saturating_sub(box_width / 3);
+            let cap_right = center_x + box_width / 3;
             for x in cap_left..=cap_right {
                 if pa.contains(x, sy_whi) {
                     pb.set_char(x, sy_whi, '─', d.color, Z_DATA);
