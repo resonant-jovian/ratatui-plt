@@ -165,7 +165,12 @@ fn main() -> color_eyre::Result<()> {
         .bins(30)
         .title("D: Histogram (eighth-block precision)")
         .x_axis(Axis::new().label("Value").grid(true))
-        .y_axis(Axis::new().label("Count").label_position(LabelPosition::End).grid(true))
+        .y_axis(
+            Axis::new()
+                .label("Count")
+                .label_position(LabelPosition::End)
+                .grid(true),
+        )
         .show_legend(false);
 
     // ---- Panel E: Enclosed Numbers — annotations with circled digits ----

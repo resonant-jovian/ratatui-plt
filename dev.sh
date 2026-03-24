@@ -247,8 +247,8 @@ cmd_examples() {
         local examples
         read -ra examples <<< "$(get_all_examples)"
         hdr "all examples (${#examples[@]})"
-        local pause="false"
-        ! $no_pause || pause="false"
+        local pause="true"
+        $no_pause && pause="false"
         run_example_list "$pause" "$profile" "${examples[@]}"
         return
     fi

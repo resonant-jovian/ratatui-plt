@@ -74,7 +74,12 @@ fn main() -> color_eyre::Result<()> {
         .box_data(box_group4)
         .show_means(true)
         .title("Box Plot")
-        .y_axis(Axis::new().label("Value").label_position(LabelPosition::End).grid(true));
+        .y_axis(
+            Axis::new()
+                .label("Value")
+                .label_position(LabelPosition::End)
+                .grid(true),
+        );
 
     // ---- Panel B: ViolinPlot (3 distributions) ----
     let mut seed_v = 777u64;
@@ -92,7 +97,12 @@ fn main() -> color_eyre::Result<()> {
         .dataset(violin_wide)
         .show_box(false)
         .title("Violin Plot")
-        .y_axis(Axis::new().label("Value").label_position(LabelPosition::End).grid(true));
+        .y_axis(
+            Axis::new()
+                .label("Value")
+                .label_position(LabelPosition::End)
+                .grid(true),
+        );
 
     // ---- Panel C: ErrorBarPlot ----
     let n_err = 10;
@@ -124,7 +134,12 @@ fn main() -> color_eyre::Result<()> {
         .dataset(ecdf_ds)
         .title("ECDF Plot")
         .x_axis(Axis::new().label("Value").grid(true))
-        .y_axis(Axis::new().label("F(x)").label_position(LabelPosition::End).grid(true))
+        .y_axis(
+            Axis::new()
+                .label("F(x)")
+                .label_position(LabelPosition::End)
+                .grid(true),
+        )
         .show_legend(true)
         .legend_position(LegendPosition::BottomRight);
 

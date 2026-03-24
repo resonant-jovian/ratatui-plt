@@ -131,7 +131,12 @@ fn main() -> color_eyre::Result<()> {
         .bins(20)
         .title("Histogram")
         .x_axis(Axis::new().label("Value").grid(true))
-        .y_axis(Axis::new().label("Count").label_position(LabelPosition::End).grid(true))
+        .y_axis(
+            Axis::new()
+                .label("Count")
+                .label_position(LabelPosition::End)
+                .grid(true),
+        )
         .show_legend(false);
 
     // ---- Panel E: PieChart ----
