@@ -266,21 +266,8 @@ impl Widget for &PieChart {
             }
         }
 
-        // Draw slice border outlines (use thin ring on the outer and inner edges)
-        // Draw radial borders between slices
-        for &(a_start, _a_end) in &angles {
-            let steps = (r_screen_x.max(r_screen_y) * 1.5) as usize;
-            for s in 0..=steps {
-                let frac = inner_ratio + (1.0 - inner_ratio) * s as f64 / steps as f64;
-                let sx = cx + frac * r_screen_x * a_start.cos();
-                let sy = cy + frac * r_screen_y * a_start.sin();
-                let xi = sx.round() as u16;
-                let yi = sy.round() as u16;
-                if xi >= area.x && xi < area.x + area.width && yi >= py && yi < py + ph {
-                    pb.set_char(xi, yi, self.theme.chars.marker.center_dot, self.theme.muted, Z_CHROME);
-                }
-            }
-        }
+        // Slice colors provide visual separation; radial borders are omitted
+        // to avoid dotted-line artifacts at slice boundaries.
 
         // When unicode-extended is enabled, draw arc quadrant characters along the
         // outer rim for smoother circular edges.

@@ -661,8 +661,8 @@ impl Histogram {
                         let bar_top_y = pa.screen_y(top);
                         let bar_bottom_y = pa.screen_y(bottom);
 
-                        let x_start = (bar_left + offset).floor() as u16;
-                        let x_end = (bar_right - offset).ceil() as u16;
+                        let x_start = (bar_left + offset).round() as u16;
+                        let x_end = (bar_right - offset).round() as u16;
                         let y_top = bar_top_y.floor() as u16;
                         let y_bot = bar_bottom_y.ceil() as u16;
 
@@ -764,11 +764,9 @@ impl Histogram {
             let bar_top = pa.screen_y(heights[i]);
             let bar_bottom = pa.screen_y(0.0);
 
-            // Use floor for left edge and ceil for right edge so that
-            // adjacent bins share the boundary pixel without gaps.
             let rect = BarRect {
-                x_start: x_start_f.floor() as u16,
-                x_end: x_end_f.ceil() as u16,
+                x_start: x_start_f.round() as u16,
+                x_end: x_end_f.round() as u16,
                 y_top: bar_top.floor() as u16,
                 y_bot: bar_bottom.round() as u16,
                 #[cfg(feature = "unicode-extended")]
