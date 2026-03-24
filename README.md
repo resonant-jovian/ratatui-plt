@@ -5,9 +5,10 @@
 [![Crates.io](https://img.shields.io/crates/v/ratatui-plt.svg)](https://crates.io/crates/ratatui-plt)
 [![docs.rs](https://docs.rs/ratatui-plt/badge.svg)](https://docs.rs/ratatui-plt)
 [![License: GPL-3.0](https://img.shields.io/badge/License-GPL--3.0-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)
+[![Support on thanks.dev](https://img.shields.io/badge/Support-thanks.dev-green)](https://thanks.dev/u/gh/resonant-jovian)
+
 [![Rust](https://github.com/resonant-jovian/ratatui-plt/actions/workflows/test.yml/badge.svg)](https://github.com/resonant-jovian/ratatui-plt/actions/workflows/test.yml)
 [![rust-clippy analyze](https://github.com/resonant-jovian/ratatui-plt/actions/workflows/clippy.yml/badge.svg)](https://github.com/resonant-jovian/ratatui-plt/actions/workflows/clippy.yml)
-[![Support on thanks.dev](https://img.shields.io/badge/Support-thanks.dev-green)](https://thanks.dev/u/gh/resonant-jovian)
 
 ### Highlights
 
