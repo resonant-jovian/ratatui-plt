@@ -185,19 +185,20 @@ impl Widget for &Legend {
             let r = rect;
             let bc = self.theme.axis_color;
             if r.width >= 2 && r.height >= 2 {
-                buf[(r.x, r.y)].set_char('┌').set_fg(bc);
-                buf[(r.x + r.width - 1, r.y)].set_char('┐').set_fg(bc);
-                buf[(r.x, r.y + r.height - 1)].set_char('└').set_fg(bc);
+                let border = &self.theme.chars.border;
+                buf[(r.x, r.y)].set_char(border.top_left).set_fg(bc);
+                buf[(r.x + r.width - 1, r.y)].set_char(border.top_right).set_fg(bc);
+                buf[(r.x, r.y + r.height - 1)].set_char(border.bottom_left).set_fg(bc);
                 buf[(r.x + r.width - 1, r.y + r.height - 1)]
-                    .set_char('┘')
+                    .set_char(border.bottom_right)
                     .set_fg(bc);
                 for x in r.x + 1..r.x + r.width - 1 {
-                    buf[(x, r.y)].set_char('─').set_fg(bc);
-                    buf[(x, r.y + r.height - 1)].set_char('─').set_fg(bc);
+                    buf[(x, r.y)].set_char(border.horizontal).set_fg(bc);
+                    buf[(x, r.y + r.height - 1)].set_char(border.horizontal).set_fg(bc);
                 }
                 for y in r.y + 1..r.y + r.height - 1 {
-                    buf[(r.x, y)].set_char('│').set_fg(bc);
-                    buf[(r.x + r.width - 1, y)].set_char('│').set_fg(bc);
+                    buf[(r.x, y)].set_char(border.vertical).set_fg(bc);
+                    buf[(r.x + r.width - 1, y)].set_char(border.vertical).set_fg(bc);
                 }
             }
         }
@@ -224,7 +225,7 @@ impl Widget for &Legend {
             }
 
             // Draw marker/color indicator
-            let marker_char = entry.marker.unwrap_or('━');
+            let marker_char = entry.marker.unwrap_or(self.theme.chars.marker.legend_line);
             if x_off < area.x + area.width {
                 buf[(x_off, y)].set_char(marker_char).set_fg(entry.color);
             }
@@ -389,19 +390,20 @@ impl Widget for &InteractiveLegend {
             let r = rect;
             let bc = self.theme.axis_color;
             if r.width >= 2 && r.height >= 2 {
-                buf[(r.x, r.y)].set_char('┌').set_fg(bc);
-                buf[(r.x + r.width - 1, r.y)].set_char('┐').set_fg(bc);
-                buf[(r.x, r.y + r.height - 1)].set_char('└').set_fg(bc);
+                let border = &self.theme.chars.border;
+                buf[(r.x, r.y)].set_char(border.top_left).set_fg(bc);
+                buf[(r.x + r.width - 1, r.y)].set_char(border.top_right).set_fg(bc);
+                buf[(r.x, r.y + r.height - 1)].set_char(border.bottom_left).set_fg(bc);
                 buf[(r.x + r.width - 1, r.y + r.height - 1)]
-                    .set_char('┘')
+                    .set_char(border.bottom_right)
                     .set_fg(bc);
                 for x in r.x + 1..r.x + r.width - 1 {
-                    buf[(x, r.y)].set_char('─').set_fg(bc);
-                    buf[(x, r.y + r.height - 1)].set_char('─').set_fg(bc);
+                    buf[(x, r.y)].set_char(border.horizontal).set_fg(bc);
+                    buf[(x, r.y + r.height - 1)].set_char(border.horizontal).set_fg(bc);
                 }
                 for y in r.y + 1..r.y + r.height - 1 {
-                    buf[(r.x, y)].set_char('│').set_fg(bc);
-                    buf[(r.x + r.width - 1, y)].set_char('│').set_fg(bc);
+                    buf[(r.x, y)].set_char(border.vertical).set_fg(bc);
+                    buf[(r.x + r.width - 1, y)].set_char(border.vertical).set_fg(bc);
                 }
             }
         }
@@ -432,14 +434,14 @@ impl Widget for &InteractiveLegend {
 
             // Draw marker/color indicator
             if visible {
-                let marker_char = entry.marker.unwrap_or('━');
+                let marker_char = entry.marker.unwrap_or(self.theme.chars.marker.legend_line);
                 if x_off < area.x + area.width {
                     buf[(x_off, y)].set_char(marker_char).set_fg(entry.color);
                 }
             } else {
                 // Hidden entry: draw strike-through marker
                 if x_off < area.x + area.width {
-                    buf[(x_off, y)].set_char('─').set_fg(Color::DarkGray);
+                    buf[(x_off, y)].set_char(self.theme.chars.border.horizontal).set_fg(self.theme.disabled_color);
                 }
             }
 
@@ -448,7 +450,7 @@ impl Widget for &InteractiveLegend {
             let name_color = if visible {
                 self.theme.foreground
             } else {
-                Color::DarkGray
+                self.theme.disabled_color
             };
             for (j, ch) in entry.name.chars().enumerate() {
                 let x = name_x + j as u16;

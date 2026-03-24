@@ -259,7 +259,7 @@ impl Widget for &PieChart {
 
                     if ea >= a_start && ea < a_end {
                         let sc = slice_colors[si];
-                        pb.set_cell(screen_x, screen_y, '█', sc, sc, Z_DATA);
+                        pb.set_cell(screen_x, screen_y, self.theme.chars.fill.solid, sc, sc, Z_DATA);
                         break;
                     }
                 }
@@ -277,7 +277,7 @@ impl Widget for &PieChart {
                 let xi = sx.round() as u16;
                 let yi = sy.round() as u16;
                 if xi >= area.x && xi < area.x + area.width && yi >= py && yi < py + ph {
-                    pb.set_char(xi, yi, '▪', self.theme.muted, Z_CHROME);
+                    pb.set_char(xi, yi, self.theme.chars.marker.center_dot, self.theme.muted, Z_CHROME);
                 }
             }
         }
@@ -301,10 +301,10 @@ impl Widget for &PieChart {
                     //   ◜ upper-left   ◝ upper-right
                     //   ◟ lower-left   ◞ lower-right
                     let arc_ch = match (theta.cos() >= 0.0, theta.sin() < 0.0) {
-                        (false, true) => '◜',  // upper-left quadrant
-                        (true, true) => '◝',   // upper-right quadrant
-                        (true, false) => '◞',  // lower-right quadrant
-                        (false, false) => '◟', // lower-left quadrant
+                        (false, true) => self.theme.chars.arc.top_left,  // upper-left quadrant
+                        (true, true) => self.theme.chars.arc.top_right,   // upper-right quadrant
+                        (true, false) => self.theme.chars.arc.bottom_right,  // lower-right quadrant
+                        (false, false) => self.theme.chars.arc.bottom_left, // lower-left quadrant
                     };
                     pb.set_char(xi, yi, arc_ch, self.theme.muted, Z_CHROME);
                 }

@@ -249,7 +249,7 @@ impl Widget for &StripPlot {
                     .round() as u16;
 
                 if pa.contains(sx, sy) {
-                    pb.set_char(sx, sy, '●', g.color, Z_MARKER);
+                    pb.set_char(sx, sy, self.theme.chars.marker.default_point, g.color, Z_MARKER);
                 }
             }
 

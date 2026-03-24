@@ -168,24 +168,27 @@ impl VectorField {
 }
 
 /// Choose an arrow character based on the direction angle and character set.
-fn arrow_char(dx: f64, dy: f64, char_set: &ArrowCharSet) -> char {
+fn arrow_char(dx: f64, dy: f64, char_set: &ArrowCharSet, theme: &Theme) -> char {
     if dx == 0.0 && dy == 0.0 {
         return '·';
     }
     let angle = dy.atan2(dx);
     let octant = ((angle + std::f64::consts::PI) / (std::f64::consts::PI / 4.0)).round() as i32 % 8;
     match char_set {
-        ArrowCharSet::Standard => match octant {
-            0 => '←',
-            1 => '↙',
-            2 => '↓',
-            3 => '↘',
-            4 => '→',
-            5 => '↗',
-            6 => '↑',
-            7 => '↖',
-            _ => '→',
-        },
+        ArrowCharSet::Standard => {
+            let a = &theme.chars.arrow;
+            match octant {
+                0 => a.left,
+                1 => a.sw,
+                2 => a.down,
+                3 => a.se,
+                4 => a.right,
+                5 => a.ne,
+                6 => a.up,
+                7 => a.nw,
+                _ => a.right,
+            }
+        }
         ArrowCharSet::Heavy => match octant {
             0 => '⬅',
             1 => '⬋',
@@ -282,7 +285,7 @@ impl Widget for &VectorField {
                     self.color.unwrap_or(self.theme.primary)
                 };
 
-                let ch = arrow_char(dx, -dy, &self.arrow_char_set); // Negate dy because screen y is inverted
+                let ch = arrow_char(dx, -dy, &self.arrow_char_set, &self.theme); // Negate dy because screen y is inverted
                 pb.set_char(xi, yi, ch, color, Z_DATA);
             }
         }

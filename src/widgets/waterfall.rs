@@ -337,7 +337,7 @@ impl Widget for &WaterfallChart {
                             pb.set_char(
                                 x,
                                 conn_screen_y,
-                                '\u{2500}',
+                                self.theme.chars.border.horizontal,
                                 self.theme.axis_color,
                                 Z_DATA,
                             );

@@ -164,7 +164,7 @@ fn main() -> color_eyre::Result<()> {
 
     let ci_band = Band::new("95% CI (mean)", band_x.clone(), band_lo, band_hi)
         .color(theme.primary)
-        .alpha_char('\u{2591}');
+        .alpha_char(theme.chars.fill.light);
 
     let band_plot = BandPlot::new()
         .band(ci_band)

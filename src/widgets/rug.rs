@@ -249,7 +249,7 @@ impl Widget for &RugPlot {
                         for dy in 0..tick_height {
                             let y = (pa.y + pa.height).saturating_sub(1 + dy);
                             if pa.contains(sx, y) {
-                                pb.set_char(sx, y, '│', ds.color, Z_DATA);
+                                pb.set_char(sx, y, self.theme.chars.border.vertical, ds.color, Z_DATA);
                             }
                         }
                     }
@@ -258,7 +258,7 @@ impl Widget for &RugPlot {
                         for dy in 0..tick_height {
                             let y = pa.y + dy;
                             if pa.contains(sx, y) {
-                                pb.set_char(sx, y, '│', ds.color, Z_DATA);
+                                pb.set_char(sx, y, self.theme.chars.border.vertical, ds.color, Z_DATA);
                             }
                         }
                     }
@@ -267,7 +267,7 @@ impl Widget for &RugPlot {
                         for dx in 0..tick_height {
                             let x = pa.x + dx;
                             if pa.contains(x, sy) {
-                                pb.set_char(x, sy, '─', ds.color, Z_DATA);
+                                pb.set_char(x, sy, self.theme.chars.border.horizontal, ds.color, Z_DATA);
                             }
                         }
                     }
@@ -276,7 +276,7 @@ impl Widget for &RugPlot {
                         for dx in 0..tick_height {
                             let x = (pa.x + pa.width).saturating_sub(1 + dx);
                             if pa.contains(x, sy) {
-                                pb.set_char(x, sy, '─', ds.color, Z_DATA);
+                                pb.set_char(x, sy, self.theme.chars.border.horizontal, ds.color, Z_DATA);
                             }
                         }
                     }

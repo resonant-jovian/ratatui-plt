@@ -381,26 +381,26 @@ impl Widget for &SankeyDiagram {
                         if y == y_first && y == y_last {
                             let top_half = top - y as f64;
                             if top_half > 0.5 {
-                                pb.set_char(x, y, '▄', flow_color, Z_DATA);
+                                pb.set_char(x, y, self.theme.chars.fill.half_lower, flow_color, Z_DATA);
                             } else {
-                                pb.set_char(x, y, '▀', flow_color, Z_DATA);
+                                pb.set_char(x, y, self.theme.chars.fill.half_upper, flow_color, Z_DATA);
                             }
                         } else if y == y_first {
                             let top_frac = top - y as f64;
                             if top_frac > 0.5 {
-                                pb.set_char(x, y, '▄', flow_color, Z_DATA);
+                                pb.set_char(x, y, self.theme.chars.fill.half_lower, flow_color, Z_DATA);
                             } else {
-                                pb.set_cell(x, y, '█', flow_color, flow_color, Z_DATA);
+                                pb.set_cell(x, y, self.theme.chars.fill.solid, flow_color, flow_color, Z_DATA);
                             }
                         } else if y == y_last {
                             let bot_frac = bot - y as f64;
                             if bot_frac < 0.5 {
-                                pb.set_char(x, y, '▀', flow_color, Z_DATA);
+                                pb.set_char(x, y, self.theme.chars.fill.half_upper, flow_color, Z_DATA);
                             } else {
-                                pb.set_cell(x, y, '█', flow_color, flow_color, Z_DATA);
+                                pb.set_cell(x, y, self.theme.chars.fill.solid, flow_color, flow_color, Z_DATA);
                             }
                         } else {
-                            pb.set_cell(x, y, '█', flow_color, flow_color, Z_DATA);
+                            pb.set_cell(x, y, self.theme.chars.fill.solid, flow_color, flow_color, Z_DATA);
                         }
                     }
                 }
@@ -421,7 +421,7 @@ impl Widget for &SankeyDiagram {
                     let x = nx + dx;
                     let y = ny + dy;
                     if x < area.x + area.width && y >= py && y < py + ph {
-                        pb.set_cell(x, y, '█', node_color, node_color, Z_DATA);
+                        pb.set_cell(x, y, self.theme.chars.fill.solid, node_color, node_color, Z_DATA);
                     }
                 }
             }

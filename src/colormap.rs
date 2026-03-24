@@ -1283,6 +1283,7 @@ impl Widget for &Colorbar<'_> {
         if area.width < 2 || area.height < 2 {
             return;
         }
+        let theme = crate::theme::Theme::get_default();
 
         let bar_width = self.width.min(area.width.saturating_sub(6));
         let label_x = area.x + bar_width + 1;
@@ -1298,7 +1299,7 @@ impl Widget for &Colorbar<'_> {
             let color = self.cmap.color_at(1.0);
             let mid = area.x + bar_width / 2;
             if mid < area.x + area.width {
-                buf[(mid, area.y)].set_char('▲').set_fg(color);
+                buf[(mid, area.y)].set_char(theme.chars.colorbar.extend_max).set_fg(color);
             }
         }
 
@@ -1310,7 +1311,7 @@ impl Widget for &Colorbar<'_> {
                 let x = area.x + col;
                 let y = grad_start + row;
                 if x < area.x + area.width && y < area.y + area.height {
-                    buf[(x, y)].set_char('█').set_fg(color);
+                    buf[(x, y)].set_char(theme.chars.fill.solid).set_fg(color);
                 }
             }
         }
@@ -1321,7 +1322,7 @@ impl Widget for &Colorbar<'_> {
             let mid = area.x + bar_width / 2;
             let y = grad_start + grad_height;
             if mid < area.x + area.width && y < area.y + area.height {
-                buf[(mid, y)].set_char('▼').set_fg(color);
+                buf[(mid, y)].set_char(theme.chars.colorbar.extend_min).set_fg(color);
             }
         }
 
@@ -1345,7 +1346,7 @@ impl Widget for &Colorbar<'_> {
                         if x < area.x + area.width {
                             buf[(x, y)]
                                 .set_char(ch)
-                                .set_style(Style::default().fg(self.label_color.unwrap_or(Color::White)));
+                                .set_style(Style::default().fg(self.label_color.unwrap_or(theme.foreground)));
                         }
                     }
                 }

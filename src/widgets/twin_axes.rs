@@ -166,18 +166,20 @@ impl Widget for &TwinAxes {
         let (py_lo, py_hi) = self.primary_y_axis.resolve_bounds(py_min, py_max);
         let (sy_lo, sy_hi) = self.secondary_y_axis.resolve_bounds(sy_min, sy_max);
 
+        let border = &self.theme.chars.border;
+
         // Draw axes
         for x in px..px + pw {
             if x < area.x + area.width {
                 buf[(x, py + ph)]
-                    .set_char('─')
+                    .set_char(border.horizontal)
                     .set_fg(self.theme.axis_color);
             }
         }
         // Left y-axis
         for y in py..py + ph {
             buf[(px.saturating_sub(1), y)]
-                .set_char('│')
+                .set_char(border.vertical)
                 .set_fg(self.theme.axis_color);
         }
         // Right y-axis
@@ -185,12 +187,13 @@ impl Widget for &TwinAxes {
         if right_x < area.x + area.width {
             for y in py..py + ph {
                 buf[(right_x, y)]
-                    .set_char('│')
+                    .set_char(border.vertical)
                     .set_fg(self.theme.axis_color);
             }
         }
 
         // Draw grid
+        let grid = &self.theme.chars.grid;
         let x_grid = self.x_axis.grid || self.theme.grid_visible;
         let y_grid = self.primary_y_axis.grid || self.theme.grid_visible;
         if y_grid {
@@ -200,11 +203,12 @@ impl Widget for &TwinAxes {
                 let yi = sy.round() as u16;
                 if yi >= py && yi < py + ph {
                     for x in px..px + pw {
-                        buf[(x, yi)].set_char('─').set_fg(self.theme.grid_color);
+                        buf[(x, yi)].set_char(border.horizontal).set_fg(self.theme.grid_color);
                     }
                 }
             }
         }
+        let h_str: String = border.horizontal.to_string();
         if x_grid {
             let gx_ticks = self.x_axis.tick_positions(x_lo, x_hi);
             for &tv in &gx_ticks {
@@ -212,10 +216,10 @@ impl Widget for &TwinAxes {
                 let xi = sx.round() as u16;
                 if xi >= px && xi < px + pw {
                     for y in py..py + ph {
-                        let ch = if buf[(xi, y)].symbol() == "─" {
-                            '┼'
+                        let ch = if buf[(xi, y)].symbol() == h_str {
+                            grid.intersection
                         } else {
-                            '│'
+                            border.vertical
                         };
                         buf[(xi, y)].set_char(ch).set_fg(self.theme.grid_color);
                     }

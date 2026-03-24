@@ -205,7 +205,7 @@ impl Widget for &Spectrogram {
                 };
 
                 buf[(screen_x, screen_y)]
-                    .set_char('\u{2580}')
+                    .set_char(self.theme.chars.fill.half_upper)
                     .set_style(Style::default().fg(top_color).bg(bot_color));
             }
         }

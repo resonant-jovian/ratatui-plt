@@ -35,18 +35,21 @@ use crate::theme::Theme;
 pub struct RectangleSelector {
     brush: SharedBrush,
     color: Color,
-    fill_char: char,
+    fill_char: Option<char>,
     border: bool,
+    theme: Theme,
 }
 
 impl RectangleSelector {
     /// Create a new rectangle selector with the given shared brush state.
     pub fn new(brush: SharedBrush) -> Self {
+        let theme = Theme::get_default();
         Self {
             brush,
-            color: Theme::get_default().accent,
-            fill_char: '░',
+            color: theme.accent,
+            fill_char: None,
             border: true,
+            theme,
         }
     }
 
@@ -58,7 +61,7 @@ impl RectangleSelector {
 
     /// Set the fill character.
     pub fn fill_char(mut self, ch: char) -> Self {
-        self.fill_char = ch;
+        self.fill_char = Some(ch);
         self
     }
 
@@ -95,10 +98,13 @@ impl RectangleSelector {
             return;
         }
 
+        let fill_char = self.fill_char.unwrap_or(self.theme.chars.fill.light);
+        let border = &self.theme.chars.border;
+
         // Fill the rectangle interior
         for y in y_start..y_end {
             for x in x_start..x_end {
-                buf[(x, y)].set_char(self.fill_char).set_fg(self.color);
+                buf[(x, y)].set_char(fill_char).set_fg(self.color);
             }
         }
 
@@ -112,29 +118,29 @@ impl RectangleSelector {
             // Top and bottom edges
             for x in left + 1..right {
                 if x < pa.x + pa.width {
-                    buf[(x, top)].set_char('─').set_fg(self.color);
-                    buf[(x, bottom)].set_char('─').set_fg(self.color);
+                    buf[(x, top)].set_char(border.horizontal).set_fg(self.color);
+                    buf[(x, bottom)].set_char(border.horizontal).set_fg(self.color);
                 }
             }
 
             // Left and right edges
             for y in top + 1..bottom {
                 if y < pa.y + pa.height {
-                    buf[(left, y)].set_char('│').set_fg(self.color);
-                    buf[(right, y)].set_char('│').set_fg(self.color);
+                    buf[(left, y)].set_char(border.vertical).set_fg(self.color);
+                    buf[(right, y)].set_char(border.vertical).set_fg(self.color);
                 }
             }
 
             // Corners
-            buf[(left, top)].set_char('┌').set_fg(self.color);
+            buf[(left, top)].set_char(border.top_left).set_fg(self.color);
             if right < pa.x + pa.width {
-                buf[(right, top)].set_char('┐').set_fg(self.color);
+                buf[(right, top)].set_char(border.top_right).set_fg(self.color);
             }
             if bottom < pa.y + pa.height {
-                buf[(left, bottom)].set_char('└').set_fg(self.color);
+                buf[(left, bottom)].set_char(border.bottom_left).set_fg(self.color);
             }
             if right < pa.x + pa.width && bottom < pa.y + pa.height {
-                buf[(right, bottom)].set_char('┘').set_fg(self.color);
+                buf[(right, bottom)].set_char(border.bottom_right).set_fg(self.color);
             }
         }
     }

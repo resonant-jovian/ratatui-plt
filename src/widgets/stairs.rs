@@ -337,7 +337,7 @@ impl Widget for &StairsPlot {
                 .map(|ds| LegendEntry {
                     name: ds.name.clone(),
                     color: ds.color,
-                    marker: Some('━'),
+                    marker: Some(self.theme.chars.marker.legend_line),
                 })
                 .collect();
             let legend = Legend::new(entries)

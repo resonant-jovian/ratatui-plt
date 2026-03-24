@@ -159,53 +159,53 @@ pub enum BorderStyle {
 
 impl BorderStyle {
     /// Top-left corner character.
-    pub fn top_left(&self) -> char {
+    pub fn top_left(&self, border: &crate::chars::BorderChars) -> char {
         match self {
-            Self::Single => '┌',
+            Self::Single => border.top_left,
             Self::Rounded => '╭',
             Self::Double => '╔',
             Self::None => ' ',
         }
     }
     /// Top-right corner character.
-    pub fn top_right(&self) -> char {
+    pub fn top_right(&self, border: &crate::chars::BorderChars) -> char {
         match self {
-            Self::Single => '┐',
+            Self::Single => border.top_right,
             Self::Rounded => '╮',
             Self::Double => '╗',
             Self::None => ' ',
         }
     }
     /// Bottom-left corner character.
-    pub fn bottom_left(&self) -> char {
+    pub fn bottom_left(&self, border: &crate::chars::BorderChars) -> char {
         match self {
-            Self::Single => '└',
+            Self::Single => border.bottom_left,
             Self::Rounded => '╰',
             Self::Double => '╚',
             Self::None => ' ',
         }
     }
     /// Bottom-right corner character.
-    pub fn bottom_right(&self) -> char {
+    pub fn bottom_right(&self, border: &crate::chars::BorderChars) -> char {
         match self {
-            Self::Single => '┘',
+            Self::Single => border.bottom_right,
             Self::Rounded => '╯',
             Self::Double => '╝',
             Self::None => ' ',
         }
     }
     /// Horizontal line character.
-    pub fn horizontal(&self) -> char {
+    pub fn horizontal(&self, border: &crate::chars::BorderChars) -> char {
         match self {
-            Self::Single | Self::Rounded => '─',
+            Self::Single | Self::Rounded => border.horizontal,
             Self::Double => '═',
             Self::None => ' ',
         }
     }
     /// Vertical line character.
-    pub fn vertical(&self) -> char {
+    pub fn vertical(&self, border: &crate::chars::BorderChars) -> char {
         match self {
-            Self::Single | Self::Rounded => '│',
+            Self::Single | Self::Rounded => border.vertical,
             Self::Double => '║',
             Self::None => ' ',
         }
@@ -604,8 +604,8 @@ impl<'a> PlotFrame<'a> {
         }
 
         // Draw spines (axis borders) using the configured border style
-        let h_char = self.border_style.horizontal();
-        let v_char = self.border_style.vertical();
+        let h_char = self.border_style.horizontal(&self.theme.chars.border);
+        let v_char = self.border_style.vertical(&self.theme.chars.border);
 
         if self.spines.bottom {
             for x in px..px + aw {
@@ -800,7 +800,7 @@ impl<'a> PlotFrame<'a> {
                 let y = py.max(area.y);
                 if self.y_axis.label_boxed {
                     let box_x = area.x;
-                    Self::draw_boxed_label_h(buf, box_x, y, label, fg, bc, area, self.theme);
+                    Self::draw_boxed_label_h(buf, box_x, y, label, fg, bc, area, &self.theme.chars.border);
                 } else {
                     for (i, ch) in label.chars().enumerate() {
                         let x = area.x + i as u16;
@@ -883,6 +883,7 @@ impl<'a> PlotFrame<'a> {
     /// │  label   │
     /// └──────────┘
     /// ```
+    #[expect(clippy::too_many_arguments)]
     fn draw_boxed_label_h(
         buf: &mut Buffer,
         x: u16,
@@ -891,9 +892,8 @@ impl<'a> PlotFrame<'a> {
         fg: Color,
         border_color: Color,
         area: Rect,
-        theme: &Theme,
+        bch: &crate::chars::BorderChars,
     ) {
-        let bch = &theme.chars.border;
         let label_len = label.chars().count() as u16;
         let box_w = label_len + 4; // 1 border + 1 pad + label + 1 pad + 1 border
         let top_y = y.saturating_sub(1);
@@ -983,11 +983,12 @@ impl<'a> PlotFrame<'a> {
                 if pa.contains(target_sx, target_sy) {
                     let dx = target_sx as f64 - xi as f64;
                     let dy = target_sy as f64 - yi as f64;
-                    let arrow_ch = ann.arrow_char(dx, dy);
+                    let theme = Theme::get_default();
+                    let arrow_ch = ann.arrow_char(dx, dy, &theme.chars.arrow, theme.chars.border.horizontal);
                     if arrow_ch != ' ' {
                         buf[(target_sx, target_sy)]
                             .set_char(arrow_ch)
-                            .set_fg(ann.color.unwrap_or(Theme::get_default().annotation_color));
+                            .set_fg(ann.color.unwrap_or(theme.annotation_color));
                     }
                 }
             }
@@ -1255,8 +1256,8 @@ impl<'a> PlotFrame<'a> {
         }
 
         // Draw spines (axis borders) using the configured border style
-        let h_char = self.border_style.horizontal();
-        let v_char = self.border_style.vertical();
+        let h_char = self.border_style.horizontal(&self.theme.chars.border);
+        let v_char = self.border_style.vertical(&self.theme.chars.border);
 
         if self.spines.bottom {
             for x in px..px + aw {
@@ -1310,7 +1311,7 @@ impl<'a> PlotFrame<'a> {
                 if yi >= py && yi < py + ah {
                     h_grid_rows.push(yi);
                     for x in px..px + aw {
-                        pb.set_char(x, yi, '─', self.theme.grid_color, Z_GRID);
+                        pb.set_char(x, yi, self.theme.chars.grid.major_h, self.theme.grid_color, Z_GRID);
                     }
                 }
             }
@@ -1323,9 +1324,9 @@ impl<'a> PlotFrame<'a> {
                 if xi >= px && xi < px + aw {
                     for y in py..py + ah {
                         let ch = if h_grid_rows.contains(&y) {
-                            '┼'
+                            self.theme.chars.grid.intersection
                         } else {
-                            '│'
+                            self.theme.chars.grid.major_v
                         };
                         pb.set_char(xi, y, ch, self.theme.grid_color, Z_GRID);
                     }
@@ -1341,7 +1342,7 @@ impl<'a> PlotFrame<'a> {
                 let yi = sy.round() as u16;
                 if yi >= py && yi < py + ah {
                     for x in px..px + aw {
-                        pb.set_char(x, yi, '┄', self.theme.minor_grid_color, Z_GRID);
+                        pb.set_char(x, yi, self.theme.chars.grid.minor_h, self.theme.minor_grid_color, Z_GRID);
                     }
                 }
             }
@@ -1353,7 +1354,7 @@ impl<'a> PlotFrame<'a> {
                 let xi = sx.round() as u16;
                 if xi >= px && xi < px + aw {
                     for y in py..py + ah {
-                        pb.set_char(xi, y, '┆', self.theme.minor_grid_color, Z_GRID);
+                        pb.set_char(xi, y, self.theme.chars.grid.minor_v, self.theme.minor_grid_color, Z_GRID);
                     }
                 }
             }
@@ -1471,7 +1472,7 @@ impl<'a> PlotFrame<'a> {
                     let y = pa.y + pa.height;
                     let box_x = (pa.x + pa.width).saturating_sub(2);
                     if self.x_axis.label_boxed {
-                        Self::draw_boxed_label_h(buf, box_x, y, label, fg, bc, buf_area, self.theme);
+                        Self::draw_boxed_label_h(buf, box_x, y, label, fg, bc, buf_area, &self.theme.chars.border);
                     } else {
                         for (i, ch) in label.chars().enumerate() {
                             let x = box_x + i as u16;
@@ -1486,7 +1487,7 @@ impl<'a> PlotFrame<'a> {
                     if self.x_axis.label_boxed {
                         let box_w = label_len + 4;
                         let box_x = pa.x + (pa.width.saturating_sub(box_w)) / 2;
-                        Self::draw_boxed_label_h(buf, box_x, y, label, fg, bc, buf_area, self.theme);
+                        Self::draw_boxed_label_h(buf, box_x, y, label, fg, bc, buf_area, &self.theme.chars.border);
                     } else {
                         let start = pa.x + (pa.width.saturating_sub(label_len)) / 2;
                         for (i, ch) in label.chars().enumerate() {
@@ -1508,7 +1509,7 @@ impl<'a> PlotFrame<'a> {
                     let y = pa.y.saturating_sub(2).max(pa.area.y);
                     let box_x = pa.area.x;
                     if self.y_axis.label_boxed {
-                        Self::draw_boxed_label_h(buf, box_x, y, label, fg, bc, buf_area, self.theme);
+                        Self::draw_boxed_label_h(buf, box_x, y, label, fg, bc, buf_area, &self.theme.chars.border);
                     } else {
                         for (i, ch) in label.chars().enumerate() {
                             let x = box_x + i as u16;
@@ -1559,7 +1560,8 @@ impl<'a> PlotFrame<'a> {
                 if pa.contains(target_sx, target_sy) {
                     let dx = target_sx as f64 - xi as f64;
                     let dy = target_sy as f64 - yi as f64;
-                    let arrow_ch = ann.arrow_char(dx, dy);
+                    let theme = Theme::get_default();
+                    let arrow_ch = ann.arrow_char(dx, dy, &theme.chars.arrow, theme.chars.border.horizontal);
                     if arrow_ch != ' ' {
                         pb.set_char(target_sx, target_sy, arrow_ch, color, Z_ANNOTATION);
                     }
@@ -1587,7 +1589,7 @@ impl<'a> PlotFrame<'a> {
                                 RefLineDash::Dotted => (x - px).is_multiple_of(2),
                             };
                             if draw {
-                                pb.set_char(x, yi, '─', *color, Z_GRID);
+                                pb.set_char(x, yi, self.theme.chars.grid.major_h, *color, Z_GRID);
                             }
                         }
                     }
@@ -1603,7 +1605,7 @@ impl<'a> PlotFrame<'a> {
                                 RefLineDash::Dotted => (y - py).is_multiple_of(2),
                             };
                             if draw {
-                                pb.set_char(xi, y, '│', *color, Z_GRID);
+                                pb.set_char(xi, y, self.theme.chars.grid.major_v, *color, Z_GRID);
                             }
                         }
                     }

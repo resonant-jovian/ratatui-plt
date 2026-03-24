@@ -267,7 +267,7 @@ impl Quiver3D {
             if xi >= px && xi < px + pw && yi >= py && yi < py + ph {
                 let screen_dx = scx1 - scx0;
                 let screen_dy = scy1 - scy0;
-                let ch = arrow_head_char(screen_dx, screen_dy);
+                let ch = arrow_head_char(screen_dx, screen_dy, &self.theme.chars.arrow);
                 buf[(xi, yi)].set_char(ch).set_fg(arrow.color);
             }
         }
@@ -275,22 +275,22 @@ impl Quiver3D {
 }
 
 /// Choose an arrowhead character based on screen-space direction.
-fn arrow_head_char(dx: f64, dy: f64) -> char {
+fn arrow_head_char(dx: f64, dy: f64, arrows: &crate::chars::ArrowChars) -> char {
     if dx.abs() < 0.001 && dy.abs() < 0.001 {
         return '·';
     }
     let angle = dy.atan2(dx);
     let octant = ((angle + std::f64::consts::PI) / (std::f64::consts::PI / 4.0)).round() as i32 % 8;
     match octant {
-        0 => '←',
-        1 => '↙',
-        2 => '↓',
-        3 => '↘',
-        4 => '→',
-        5 => '↗',
-        6 => '↑',
-        7 => '↖',
-        _ => '→',
+        0 => arrows.left,
+        1 => arrows.sw,
+        2 => arrows.down,
+        3 => arrows.se,
+        4 => arrows.right,
+        5 => arrows.ne,
+        6 => arrows.up,
+        7 => arrows.nw,
+        _ => arrows.right,
     }
 }
 

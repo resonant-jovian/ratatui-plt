@@ -46,8 +46,8 @@ pub struct Band {
     pub y_upper: Vec<f64>,
     /// Band color (None = use theme primary).
     pub color: Option<Color>,
-    /// Fill character: '░' (light), '▒' (medium), '▓' (dense).
-    pub alpha_char: char,
+    /// Fill character (`None` = use theme light fill).
+    pub alpha_char: Option<char>,
 }
 
 impl Band {
@@ -59,7 +59,7 @@ impl Band {
             y_lower,
             y_upper,
             color: None,
-            alpha_char: '\u{2591}', // ░
+            alpha_char: None,
         }
     }
 
@@ -70,10 +70,8 @@ impl Band {
     }
 
     /// Set the fill character for the band interior.
-    ///
-    /// Common choices: '\u{2591}' (░ light), '\u{2592}' (▒ medium), '\u{2593}' (▓ dense).
     pub fn alpha_char(mut self, ch: char) -> Self {
-        self.alpha_char = ch;
+        self.alpha_char = Some(ch);
         self
     }
 }

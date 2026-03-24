@@ -399,9 +399,9 @@ impl Widget for &ViolinPlot {
                     let bot_filled = dx <= bot_width && bot_width > 0;
 
                     let ch = match (top_filled, bot_filled) {
-                        (true, true) => '█',
-                        (true, false) => '▀',
-                        (false, true) => '▄',
+                        (true, true) => self.theme.chars.fill.solid,
+                        (true, false) => self.theme.chars.fill.half_upper,
+                        (false, true) => self.theme.chars.fill.half_lower,
                         (false, false) => continue,
                     };
 
@@ -473,7 +473,7 @@ impl Widget for &ViolinPlot {
                                 for dx in 0..=box_half {
                                     let positions = inner_positions(center_x, dx, side, &pa);
                                     for sx in positions {
-                                        pb.set_char(sx, y, '│', self.theme.foreground, Z_MARKER);
+                                        pb.set_char(sx, y, self.theme.chars.border.vertical, self.theme.foreground, Z_MARKER);
                                     }
                                 }
                             }
@@ -486,7 +486,7 @@ impl Widget for &ViolinPlot {
                                     pb.set_char(
                                         sx,
                                         sy_median,
-                                        '━',
+                                        self.theme.chars.dash.bold_h,
                                         self.theme.foreground,
                                         Z_MARKER,
                                     );
@@ -502,7 +502,7 @@ impl Widget for &ViolinPlot {
                                 for dx in 0..=half {
                                     let positions = inner_positions(center_x, dx, side, &pa);
                                     for sx in positions {
-                                        let ch = if sy == sy_median { '━' } else { '─' };
+                                        let ch = if sy == sy_median { self.theme.chars.dash.bold_h } else { self.theme.chars.border.horizontal };
                                         pb.set_char(sx, sy, ch, self.theme.foreground, Z_MARKER);
                                     }
                                 }
@@ -520,7 +520,7 @@ impl Widget for &ViolinPlot {
                             )
                             .round() as u16;
                             if pa.contains(center_x, sy) {
-                                pb.set_char(center_x, sy, '•', self.theme.foreground, Z_MARKER);
+                                pb.set_char(center_x, sy, self.theme.chars.marker.small_point, self.theme.foreground, Z_MARKER);
                             }
                         }
                     }
@@ -535,7 +535,7 @@ impl Widget for &ViolinPlot {
                             )
                             .round() as u16;
                             if pa.contains(center_x, sy) {
-                                pb.set_char(center_x, sy, '│', self.theme.foreground, Z_MARKER);
+                                pb.set_char(center_x, sy, self.theme.chars.border.vertical, self.theme.foreground, Z_MARKER);
                             }
                         }
                     }

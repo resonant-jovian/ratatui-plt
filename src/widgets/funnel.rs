@@ -216,7 +216,7 @@ impl Widget for &FunnelChart {
             for y in bar_y_start..bar_y_end {
                 for x in bar_x..bar_x + bar_width {
                     if x < area.x + area.width && y < area.y + area.height {
-                        pb.set_cell(x, y, '\u{2588}', color, color, Z_DATA);
+                        pb.set_cell(x, y, self.theme.chars.fill.solid, color, color, Z_DATA);
                     }
                 }
             }

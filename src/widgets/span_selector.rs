@@ -65,17 +65,20 @@ pub struct SpanSelector {
     state: SharedSpanState,
     direction: SpanDirection,
     color: Color,
-    fill_char: char,
+    fill_char: Option<char>,
+    theme: Theme,
 }
 
 impl SpanSelector {
     /// Create a new span selector with the given shared state.
     pub fn new(state: SharedSpanState) -> Self {
+        let theme = Theme::get_default();
         Self {
             state,
             direction: SpanDirection::default(),
-            color: Theme::get_default().accent,
-            fill_char: '░',
+            color: theme.accent,
+            fill_char: None,
+            theme,
         }
     }
 
@@ -93,7 +96,7 @@ impl SpanSelector {
 
     /// Set the fill character.
     pub fn fill_char(mut self, ch: char) -> Self {
-        self.fill_char = ch;
+        self.fill_char = Some(ch);
         self
     }
 
@@ -115,6 +118,8 @@ impl SpanSelector {
             (end, start)
         };
 
+        let fill_char = self.fill_char.unwrap_or(self.theme.chars.fill.light);
+
         match self.direction {
             SpanDirection::Horizontal => {
                 let sx_lo = pa.screen_x(lo).round() as u16;
@@ -126,7 +131,7 @@ impl SpanSelector {
 
                 for y in pa.y..pa.y + pa.height {
                     for x in x_start..x_end {
-                        buf[(x, y)].set_char(self.fill_char).set_fg(self.color);
+                        buf[(x, y)].set_char(fill_char).set_fg(self.color);
                     }
                 }
             }
@@ -140,7 +145,7 @@ impl SpanSelector {
 
                 for y in y_start..y_end {
                     for x in pa.x..pa.x + pa.width {
-                        buf[(x, y)].set_char(self.fill_char).set_fg(self.color);
+                        buf[(x, y)].set_char(fill_char).set_fg(self.color);
                     }
                 }
             }

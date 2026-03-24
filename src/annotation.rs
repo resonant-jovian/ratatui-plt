@@ -5,6 +5,8 @@
 
 use ratatui::style::Color;
 
+use crate::chars::ArrowChars;
+
 /// Convert a number (1-20) to its enclosed circled variant.
 /// Returns the original number as a string if out of range.
 pub fn enclosed_number(n: usize) -> String {
@@ -106,21 +108,24 @@ impl Annotation {
     }
 
     /// Get the arrow character for drawing from source to target.
-    pub fn arrow_char(&self, dx: f64, dy: f64) -> char {
+    ///
+    /// Uses the provided [`ArrowChars`] and the theme's horizontal border
+    /// character for the `Simple` style.
+    pub fn arrow_char(&self, dx: f64, dy: f64, arrows: &ArrowChars, horizontal: char) -> char {
         match &self.arrow_style {
             ArrowStyle::None => ' ',
-            ArrowStyle::Simple => '─',
+            ArrowStyle::Simple => horizontal,
             ArrowStyle::Arrow => {
                 if dx.abs() > dy.abs() * 2.0 {
-                    if dx > 0.0 { '→' } else { '←' }
+                    if dx > 0.0 { arrows.right } else { arrows.left }
                 } else if dy.abs() > dx.abs() * 2.0 {
-                    if dy > 0.0 { '↓' } else { '↑' }
+                    if dy > 0.0 { arrows.down } else { arrows.up }
                 } else if dx > 0.0 {
-                    if dy > 0.0 { '↘' } else { '↗' }
+                    if dy > 0.0 { arrows.se } else { arrows.ne }
                 } else if dy > 0.0 {
-                    '↙'
+                    arrows.sw
                 } else {
-                    '↖'
+                    arrows.nw
                 }
             }
         }

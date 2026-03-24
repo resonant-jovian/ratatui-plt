@@ -285,22 +285,22 @@ fn draw_braille_line_stream(
 }
 
 /// Choose an arrow character for the direction.
-fn arrow_char(dx: f64, dy: f64) -> char {
+fn arrow_char(dx: f64, dy: f64, arrows: &crate::chars::ArrowChars) -> char {
     if dx.abs() < 1e-10 && dy.abs() < 1e-10 {
         return '·';
     }
     let angle = dy.atan2(dx);
     let octant = ((angle + std::f64::consts::PI) / (std::f64::consts::PI / 4.0)).round() as i32 % 8;
     match octant {
-        0 => '←',
-        1 => '↙',
-        2 => '↓',
-        3 => '↘',
-        4 => '→',
-        5 => '↗',
-        6 => '↑',
-        7 => '↖',
-        _ => '→',
+        0 => arrows.left,
+        1 => arrows.sw,
+        2 => arrows.down,
+        3 => arrows.se,
+        4 => arrows.right,
+        5 => arrows.ne,
+        6 => arrows.up,
+        7 => arrows.nw,
+        _ => arrows.right,
     }
 }
 
@@ -431,7 +431,7 @@ impl Widget for &StreamPlot {
                     // Arrow head at intervals (cell resolution, drawn on top)
                     if idx % arrow_interval == arrow_interval / 2 && idx > 0 {
                         let (fdx, fdy) = interpolate_field(&self.field, ptx, pty);
-                        let ch = arrow_char(fdx, -fdy);
+                        let ch = arrow_char(fdx, -fdy, &self.theme.chars.arrow);
                         pb.set_char(xi, yi, ch, color, Z_MARKER);
                     }
 

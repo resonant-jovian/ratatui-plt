@@ -490,7 +490,7 @@ impl Widget for &BoxPlot {
             // Median line — thin horizontal, full box width
             for x in box_left..box_right {
                 if pa.contains(x, sy_median) {
-                    pb.set_char(x, sy_median, '─', border_fg, Z_DATA);
+                    pb.set_char(x, sy_median, self.theme.chars.border.horizontal, border_fg, Z_DATA);
                 }
             }
 
@@ -511,10 +511,10 @@ impl Widget for &BoxPlot {
             let cap_right = center_x + box_width / 3;
             for x in cap_left..=cap_right {
                 if pa.contains(x, sy_whi) {
-                    pb.set_char(x, sy_whi, '─', border_fg, Z_DATA);
+                    pb.set_char(x, sy_whi, self.theme.chars.border.horizontal, border_fg, Z_DATA);
                 }
                 if pa.contains(x, sy_wlo) {
-                    pb.set_char(x, sy_wlo, '─', border_fg, Z_DATA);
+                    pb.set_char(x, sy_wlo, self.theme.chars.border.horizontal, border_fg, Z_DATA);
                 }
             }
 
@@ -530,7 +530,7 @@ impl Widget for &BoxPlot {
                         } else {
                             self.theme.foreground
                         };
-                        pb.set_char(center_x, sy, '●', marker_fg, Z_MARKER);
+                        pb.set_char(center_x, sy, self.theme.chars.marker.default_point, marker_fg, Z_MARKER);
                     }
                 }
             }
@@ -552,7 +552,7 @@ impl Widget for &BoxPlot {
                     } else {
                         self.theme.foreground
                     };
-                    pb.set_char(center_x, sy_mean, '●', marker_fg, Z_MARKER);
+                    pb.set_char(center_x, sy_mean, self.theme.chars.marker.default_point, marker_fg, Z_MARKER);
                 }
             }
 

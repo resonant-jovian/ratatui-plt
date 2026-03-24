@@ -325,7 +325,7 @@ impl Surface3D {
                         let upper_color = shade_surface_color(color, 1.0 - upper_frac * 0.2);
                         let lower_color = shade_surface_color(color, 1.0 - lower_frac * 0.2);
                         buf[(ux, uy_upper)]
-                            .set_char('\u{2580}') // ▀
+                            .set_char(self.theme.chars.fill.half_upper)
                             .set_style(Style::default().fg(upper_color).bg(lower_color));
                     } else if upper_in {
                         // Only upper row inside: use ▀ with fg=color, bg unchanged
@@ -336,7 +336,7 @@ impl Surface3D {
                         };
                         let upper_color = shade_surface_color(color, 1.0 - upper_frac * 0.2);
                         buf[(ux, uy_upper)]
-                            .set_char('\u{2580}') // ▀
+                            .set_char(self.theme.chars.fill.half_upper)
                             .set_style(Style::default().fg(upper_color));
                     } else if lower_in {
                         // Only lower row inside: use ▄ with fg=color
@@ -347,7 +347,7 @@ impl Surface3D {
                         };
                         let lower_color = shade_surface_color(color, 1.0 - lower_frac * 0.2);
                         buf[(ux, uy_upper)]
-                            .set_char('\u{2584}') // ▄
+                            .set_char(self.theme.chars.fill.half_lower)
                             .set_style(Style::default().fg(lower_color));
                     }
                 }

@@ -3615,13 +3615,15 @@ fn test_marker_shapes_dingbats() {
 
 #[test]
 fn test_border_style_chars() {
+    use ratatui_plt::chars::BorderChars;
     use ratatui_plt::frame::BorderStyle;
+    let border = BorderChars::default();
     let s = BorderStyle::Single;
-    assert_eq!(s.top_left(), '┌');
+    assert_eq!(s.top_left(&border), '┌');
     let r = BorderStyle::Rounded;
-    assert_eq!(r.top_left(), '╭');
+    assert_eq!(r.top_left(&border), '╭');
     let d = BorderStyle::Double;
-    assert_eq!(d.top_left(), '╔');
+    assert_eq!(d.top_left(&border), '╔');
 }
 
 #[test]

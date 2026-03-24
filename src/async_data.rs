@@ -8,6 +8,7 @@ use tokio::sync::watch;
 
 use crate::series::{GridData, Series};
 use crate::style::LineStyle;
+use crate::theme::Theme;
 
 /// An async-capable data series backed by a tokio watch channel.
 ///
@@ -62,7 +63,7 @@ pub fn async_series(name: &str) -> (AsyncSeriesSender, AsyncSeries) {
     };
     let receiver = AsyncSeries {
         name: name.to_string(),
-        color: Color::White,
+        color: Theme::get_default().primary,
         line_style: LineStyle::default(),
         rx,
     };

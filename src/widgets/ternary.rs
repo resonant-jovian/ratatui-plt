@@ -49,7 +49,7 @@ impl TernaryData {
         Self {
             label: label.into(),
             points: Vec::new(),
-            color: Color::White,
+            color: Theme::get_default().primary,
             marker: MarkerShape::FilledCircle,
         }
     }
@@ -255,6 +255,7 @@ impl Widget for &TernaryPlot {
             self.theme.axis_color,
             Z_CHROME,
             &clip,
+            &self.theme.chars.border,
         );
         draw_screen_line_pb(
             &mut pb,
@@ -265,6 +266,7 @@ impl Widget for &TernaryPlot {
             self.theme.axis_color,
             Z_CHROME,
             &clip,
+            &self.theme.chars.border,
         );
         draw_screen_line_pb(
             &mut pb,
@@ -275,6 +277,7 @@ impl Widget for &TernaryPlot {
             self.theme.axis_color,
             Z_CHROME,
             &clip,
+            &self.theme.chars.border,
         );
 
         // Draw grid lines
@@ -297,6 +300,7 @@ impl Widget for &TernaryPlot {
                     self.theme.grid_color,
                     Z_GRID,
                     &clip,
+                    &self.theme.chars.border,
                 );
 
                 // Lines parallel to left edge (constant b)
@@ -313,6 +317,7 @@ impl Widget for &TernaryPlot {
                     self.theme.grid_color,
                     Z_GRID,
                     &clip,
+                    &self.theme.chars.border,
                 );
 
                 // Lines parallel to right edge (constant a)
@@ -329,6 +334,7 @@ impl Widget for &TernaryPlot {
                     self.theme.grid_color,
                     Z_GRID,
                     &clip,
+                    &self.theme.chars.border,
                 );
             }
         }
@@ -474,6 +480,7 @@ fn draw_screen_line_pb(
     color: Color,
     z: u8,
     clip: &TernaryClip,
+    border: &crate::chars::BorderChars,
 ) {
     let mut ix = x0.round() as i32;
     let mut iy = y0.round() as i32;
@@ -494,9 +501,9 @@ fn draw_screen_line_pb(
         {
             // Choose line character based on direction
             let ch = if dx > dy.abs() * 2 {
-                '─'
+                border.horizontal
             } else if dy.abs() > dx * 2 {
-                '│'
+                border.vertical
             } else if (ix1 > ix) == (iy1 > iy) {
                 '╲'
             } else {

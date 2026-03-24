@@ -292,7 +292,7 @@ impl EventPlot {
                 // Draw the horizontal baseline for this group
                 for x in pa.x..pa.x + pa.width {
                     if x < area.x + area.width {
-                        pb.set_char(x, lane_y, '─', self.theme.grid_color, Z_GRID);
+                        pb.set_char(x, lane_y, self.theme.chars.border.horizontal, self.theme.grid_color, Z_GRID);
                     }
                 }
             }
@@ -311,7 +311,7 @@ impl EventPlot {
                 let y_bot = (lane_y + tick_half).min(pa.y + pa.height - 1);
                 for ty in y_top..=y_bot {
                     if ty >= pa.y && ty < pa.y + pa.height && xi < area.x + area.width {
-                        pb.set_char(xi, ty, '│', group_color, Z_DATA);
+                        pb.set_char(xi, ty, self.theme.chars.border.vertical, group_color, Z_DATA);
                     }
                 }
             }
@@ -400,7 +400,7 @@ impl EventPlot {
             // Draw the vertical baseline for this group
             if lane_x >= pa.x && lane_x < pa.x + pa.width {
                 for y in pa.y..pa.y + pa.height {
-                    pb.set_char(lane_x, y, '│', self.theme.grid_color, Z_GRID);
+                    pb.set_char(lane_x, y, self.theme.chars.grid.major_v, self.theme.grid_color, Z_GRID);
                 }
             }
 
@@ -419,7 +419,7 @@ impl EventPlot {
                 let x_right = (lane_x + tick_half).min(pa.x + pa.width - 1);
                 for tx in x_left..=x_right {
                     if tx >= pa.x && tx < pa.x + pa.width && yi < area.y + area.height {
-                        pb.set_char(tx, yi, '─', group_color, Z_DATA);
+                        pb.set_char(tx, yi, self.theme.chars.border.horizontal, group_color, Z_DATA);
                     }
                 }
             }

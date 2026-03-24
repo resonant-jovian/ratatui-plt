@@ -16,7 +16,7 @@
 //! ```
 
 /// All character constants used for rendering, configurable via [`Theme`](crate::theme::Theme).
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Default)]
 pub struct CharSet {
     /// Half-block and fill characters for area rendering.
     pub fill: FillChars,
@@ -40,22 +40,6 @@ pub struct CharSet {
     pub depth: DepthChars,
 }
 
-impl Default for CharSet {
-    fn default() -> Self {
-        Self {
-            fill: FillChars::default(),
-            border: BorderChars::default(),
-            grid: GridChars::default(),
-            tick: TickChars::default(),
-            arrow: ArrowChars::default(),
-            dash: DashChars::default(),
-            arc: ArcChars::default(),
-            colorbar: ColorbarChars::default(),
-            marker: MarkerChars::default(),
-            depth: DepthChars::default(),
-        }
-    }
-}
 
 /// Half-block and fill characters for area rendering.
 #[derive(Clone, Debug)]

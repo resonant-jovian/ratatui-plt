@@ -204,7 +204,7 @@ impl Widget for &PsdPlot {
                     let xi = sx.round() as u16;
                     let yi = sy.round() as u16;
                     if pa.contains(xi, yi) {
-                        buf[(xi, yi)].set_char('\u{25cf}').set_fg(color);
+                        buf[(xi, yi)].set_char(self.theme.chars.marker.default_point).set_fg(color);
                     }
                 }
                 continue;

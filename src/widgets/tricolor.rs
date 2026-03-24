@@ -196,7 +196,7 @@ impl Widget for &TriColor {
             let scx = pa.screen_x(cx);
             let scy = pa.screen_y(cy);
 
-            scanline_fill_triangle(&mut pb, [(sax, say), (sbx, sby), (scx, scy)], color, &pa);
+            scanline_fill_triangle(&mut pb, [(sax, say), (sbx, sby), (scx, scy)], color, &pa, self.theme.chars.fill.solid);
         }
 
         pb.composite(buf);
@@ -211,6 +211,7 @@ fn scanline_fill_triangle(
     vertices: [(f64, f64); 3],
     color: Color,
     pa: &PlotArea,
+    fill_char: char,
 ) {
     let [(x0, y0), (x1, y1), (x2, y2)] = vertices;
     // Sort vertices by y coordinate (top to bottom on screen)
@@ -228,7 +229,7 @@ fn scanline_fill_triangle(
         let sy = iy_min as u16;
         for sx in min_x..=max_x {
             if pa.contains(sx, sy) {
-                pb.set_cell(sx, sy, '\u{2588}', color, color, Z_DATA);
+                pb.set_cell(sx, sy, fill_char, color, color, Z_DATA);
             }
         }
         return;
@@ -267,7 +268,7 @@ fn scanline_fill_triangle(
             let sy = iy as u16;
             for sx in left..=right {
                 if pa.contains(sx, sy) {
-                    pb.set_cell(sx, sy, '\u{2588}', color, color, Z_DATA);
+                    pb.set_cell(sx, sy, fill_char, color, color, Z_DATA);
                 }
             }
         }

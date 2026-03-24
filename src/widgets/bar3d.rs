@@ -226,7 +226,7 @@ impl Bar3D {
                 ],
                 depth: top_depth,
                 color: top_color,
-                char_fill: '█',
+                char_fill: self.theme.chars.depth.front,
             });
 
             // Front face: corners 0, 1, 5, 4
@@ -241,7 +241,7 @@ impl Bar3D {
                 ],
                 depth: front_depth,
                 color: front_color,
-                char_fill: '▓',
+                char_fill: self.theme.chars.depth.side_near,
             });
 
             // Right side face: corners 1, 2, 6, 5
@@ -256,7 +256,7 @@ impl Bar3D {
                 ],
                 depth: right_depth,
                 color: side_color,
-                char_fill: '▒',
+                char_fill: self.theme.chars.depth.side_far,
             });
 
             // Back face: corners 2, 3, 7, 6
@@ -271,7 +271,7 @@ impl Bar3D {
                 ],
                 depth: back_depth,
                 color: front_color,
-                char_fill: '▓',
+                char_fill: self.theme.chars.depth.top_near,
             });
 
             // Left side face: corners 3, 0, 4, 7
@@ -286,7 +286,7 @@ impl Bar3D {
                 ],
                 depth: left_depth,
                 color: side_color,
-                char_fill: '▒',
+                char_fill: self.theme.chars.depth.top_far,
             });
         }
 

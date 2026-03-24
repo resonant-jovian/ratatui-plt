@@ -98,12 +98,12 @@ fn main() -> color_eyre::Result<()> {
         .band(
             Band::new("95% CI", band_x.clone(), band_lower_95, band_upper_95)
                 .color(theme.color_cycle.at(0))
-                .alpha_char('\u{2591}'),
+                .alpha_char(theme.chars.fill.light),
         )
         .band(
             Band::new("50% CI", band_x, band_lower_50, band_upper_50)
                 .color(theme.color_cycle.at(1))
-                .alpha_char('\u{2592}'),
+                .alpha_char(theme.chars.fill.medium),
         )
         .title("Prediction Interval")
         .x_axis(Axis::new().label("x").grid(true))

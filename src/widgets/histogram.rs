@@ -502,8 +502,9 @@ impl Histogram {
         let y_lo = 0.0;
         let y_hi = if y_max == 0.0 { 1.0 } else { y_max * 1.1 };
 
-        // Create and render the plot frame
-        let frame = PlotFrame::new(&self.x_axis, &self.y_axis, &self.theme)
+        // Force y-axis to start at 0 — histogram counts are never negative
+        let y_axis_fixed = self.y_axis.clone().bounds(crate::axis::Bounds::Manual(y_lo, y_hi));
+        let frame = PlotFrame::new(&self.x_axis, &y_axis_fixed, &self.theme)
             .title(self.title.as_deref())
             .spines(self.spines.clone())
             .reference_lines(&self.reference_lines);
@@ -597,7 +598,9 @@ impl Histogram {
         let y_lo = 0.0;
         let y_hi = if y_max == 0.0 { 1.0 } else { y_max * 1.1 };
 
-        let frame = PlotFrame::new(&self.x_axis, &self.y_axis, &self.theme)
+        // Force y-axis to start at 0 — histogram counts are never negative
+        let y_axis_fixed = self.y_axis.clone().bounds(crate::axis::Bounds::Manual(y_lo, y_hi));
+        let frame = PlotFrame::new(&self.x_axis, &y_axis_fixed, &self.theme)
             .title(self.title.as_deref())
             .spines(self.spines.clone())
             .reference_lines(&self.reference_lines);
@@ -639,8 +642,14 @@ impl Histogram {
 
                 for (ds_i, ds) in self.datasets.iter().enumerate() {
                     let heights = &all_heights[ds_i];
+                    // Use incrementing Z so later datasets don't overwrite
+                    // earlier ones at shared boundary cells.
+                    let z_level = Z_FILL + ds_i as u8;
                     for i in 0..n {
                         let h = heights.get(i).copied().unwrap_or(0.0);
+                        if h == 0.0 {
+                            continue;
+                        }
                         let bottom = bottoms[i];
                         let top = bottom + h;
 
@@ -655,21 +664,16 @@ impl Histogram {
                         let x_start = (bar_left + offset).floor() as u16;
                         let x_end = (bar_right - offset).ceil() as u16;
                         let y_top = bar_top_y.floor() as u16;
-                        let y_bot = bar_bottom_y.round() as u16;
+                        let y_bot = bar_bottom_y.ceil() as u16;
 
-                        self.draw_bar_region(
-                            &pa,
-                            &BarRect {
-                                x_start,
-                                x_end,
-                                y_top,
-                                y_bot,
-                                #[cfg(feature = "unicode-extended")]
-                                top_frac: bar_top_y.fract(),
-                            },
-                            ds.color,
-                            pb,
-                        );
+                        // Draw stacked bar region directly with per-dataset Z
+                        for x in x_start..x_end {
+                            for y in y_top..y_bot {
+                                if pa.contains(x, y) {
+                                    pb.set_bg(x, y, ds.color, z_level);
+                                }
+                            }
+                        }
                         bottoms[i] = top;
                     }
                 }

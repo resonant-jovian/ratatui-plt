@@ -73,7 +73,7 @@ impl ParallelRecord {
     pub fn new(values: Vec<f64>) -> Self {
         Self {
             values,
-            color: Color::White,
+            color: Theme::get_default().primary,
             name: None,
         }
     }
@@ -260,7 +260,7 @@ impl Widget for &ParallelCoords {
             };
             for y in plot_top..=plot_bottom {
                 if ax_x >= area.x && ax_x < area.x + area.width {
-                    pb.set_char(ax_x, y, '\u{2502}', axis_color, Z_CHROME); // │
+                    pb.set_char(ax_x, y, self.theme.chars.border.vertical, axis_color, Z_CHROME);
                 }
             }
 
@@ -357,7 +357,7 @@ impl Widget for &ParallelCoords {
                     && *ax_x >= area.x
                     && *ax_x < area.x + area.width
                 {
-                    pb.set_char(*ax_x, sy, '\u{25CF}', rec.color, Z_MARKER); // ●
+                    pb.set_char(*ax_x, sy, self.theme.chars.marker.default_point, rec.color, Z_MARKER);
                 }
             }
         }
@@ -396,7 +396,7 @@ impl Widget for &ParallelCoords {
                     .map(|r| LegendEntry {
                         name: r.name.clone().unwrap_or_default(),
                         color: r.color,
-                        marker: Some('\u{2501}'), // ━
+                        marker: Some(self.theme.chars.dash.bold_h),
                     })
                     .collect();
                 let legend = Legend::new(entries)

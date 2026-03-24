@@ -272,6 +272,8 @@ impl Widget for &Dendrogram {
             return;
         };
 
+        let border = &self.theme.chars.border;
+
         // Draw U-shaped connectors for each link
         for (i, link) in self.links.iter().enumerate() {
             let left_pos = if link.left < positions.len() {
@@ -306,6 +308,7 @@ impl Widget for &Dendrogram {
                         left_height,
                         merge_height,
                         color,
+                        border,
                     );
                     draw_vertical_segment_pb(
                         &mut pb,
@@ -314,6 +317,7 @@ impl Widget for &Dendrogram {
                         right_height,
                         merge_height,
                         color,
+                        border,
                     );
                     draw_horizontal_segment_pb(
                         &mut pb,
@@ -322,6 +326,7 @@ impl Widget for &Dendrogram {
                         right_pos,
                         merge_height,
                         color,
+                        border,
                     );
                 }
                 DendroOrientation::Top => {
@@ -333,6 +338,7 @@ impl Widget for &Dendrogram {
                         flip_h(left_height),
                         flip_h(merge_height),
                         color,
+                        border,
                     );
                     draw_vertical_segment_pb(
                         &mut pb,
@@ -341,6 +347,7 @@ impl Widget for &Dendrogram {
                         flip_h(right_height),
                         flip_h(merge_height),
                         color,
+                        border,
                     );
                     draw_horizontal_segment_pb(
                         &mut pb,
@@ -349,6 +356,7 @@ impl Widget for &Dendrogram {
                         right_pos,
                         flip_h(merge_height),
                         color,
+                        border,
                     );
                 }
                 DendroOrientation::Left => {
@@ -359,6 +367,7 @@ impl Widget for &Dendrogram {
                         left_height,
                         merge_height,
                         color,
+                        border,
                     );
                     draw_horizontal_segment_h_pb(
                         &mut pb,
@@ -367,6 +376,7 @@ impl Widget for &Dendrogram {
                         right_height,
                         merge_height,
                         color,
+                        border,
                     );
                     draw_vertical_segment_h_pb(
                         &mut pb,
@@ -375,6 +385,7 @@ impl Widget for &Dendrogram {
                         right_pos,
                         merge_height,
                         color,
+                        border,
                     );
                 }
                 DendroOrientation::Right => {
@@ -386,6 +397,7 @@ impl Widget for &Dendrogram {
                         flip_h(left_height),
                         flip_h(merge_height),
                         color,
+                        border,
                     );
                     draw_horizontal_segment_h_pb(
                         &mut pb,
@@ -394,6 +406,7 @@ impl Widget for &Dendrogram {
                         flip_h(right_height),
                         flip_h(merge_height),
                         color,
+                        border,
                     );
                     draw_vertical_segment_h_pb(
                         &mut pb,
@@ -402,6 +415,7 @@ impl Widget for &Dendrogram {
                         right_pos,
                         flip_h(merge_height),
                         color,
+                        border,
                     );
                 }
             }
@@ -447,6 +461,7 @@ impl Widget for &Dendrogram {
     }
 }
 
+use crate::chars::BorderChars;
 use crate::frame::PlotArea;
 
 /// Draw a vertical line segment (for Bottom/Top orientation) into a PlotBuffer.
@@ -457,6 +472,7 @@ fn draw_vertical_segment_pb(
     h0: f64,
     h1: f64,
     color: Color,
+    border: &BorderChars,
 ) {
     let sx = pa.screen_x(cat).round() as u16;
     let sy0 = pa.screen_y(h0).round() as i32;
@@ -467,7 +483,7 @@ fn draw_vertical_segment_pb(
         for sy in top..=bot {
             let y = sy as u16;
             if y >= pa.y && y < pa.y + pa.height {
-                pb.set_char(sx, y, '│', color, Z_DATA);
+                pb.set_char(sx, y, border.vertical, color, Z_DATA);
             }
         }
     }
@@ -481,6 +497,7 @@ fn draw_horizontal_segment_pb(
     cat1: f64,
     h: f64,
     color: Color,
+    border: &BorderChars,
 ) {
     let sy = pa.screen_y(h).round() as u16;
     let sx0 = pa.screen_x(cat0).round() as i32;
@@ -491,17 +508,17 @@ fn draw_horizontal_segment_pb(
         for sx in left..=right {
             let x = sx as u16;
             if x >= pa.x && x < pa.x + pa.width {
-                pb.set_char(x, sy, '─', color, Z_DATA);
+                pb.set_char(x, sy, border.horizontal, color, Z_DATA);
             }
         }
         // Draw corner connectors
         let lx = left as u16;
         let rx = right as u16;
         if lx >= pa.x && lx < pa.x + pa.width {
-            pb.set_char(lx, sy, '┌', color, Z_DATA);
+            pb.set_char(lx, sy, border.top_left, color, Z_DATA);
         }
         if rx >= pa.x && rx < pa.x + pa.width {
-            pb.set_char(rx, sy, '┐', color, Z_DATA);
+            pb.set_char(rx, sy, border.top_right, color, Z_DATA);
         }
     }
 }
@@ -514,6 +531,7 @@ fn draw_horizontal_segment_h_pb(
     h0: f64,
     h1: f64,
     color: Color,
+    border: &BorderChars,
 ) {
     let sy = pa.screen_y(cat).round() as u16;
     let sx0 = pa.screen_x(h0).round() as i32;
@@ -524,7 +542,7 @@ fn draw_horizontal_segment_h_pb(
         for sx in left..=right {
             let x = sx as u16;
             if x >= pa.x && x < pa.x + pa.width {
-                pb.set_char(x, sy, '─', color, Z_DATA);
+                pb.set_char(x, sy, border.horizontal, color, Z_DATA);
             }
         }
     }
@@ -538,6 +556,7 @@ fn draw_vertical_segment_h_pb(
     cat1: f64,
     h: f64,
     color: Color,
+    border: &BorderChars,
 ) {
     let sx = pa.screen_x(h).round() as u16;
     let sy0 = pa.screen_y(cat0).round() as i32;
@@ -548,17 +567,17 @@ fn draw_vertical_segment_h_pb(
         for sy in top..=bot {
             let y = sy as u16;
             if y >= pa.y && y < pa.y + pa.height {
-                pb.set_char(sx, y, '│', color, Z_DATA);
+                pb.set_char(sx, y, border.vertical, color, Z_DATA);
             }
         }
         // Draw corner connectors
         let ty = top as u16;
         let by = bot as u16;
         if ty >= pa.y && ty < pa.y + pa.height {
-            pb.set_char(sx, ty, '┌', color, Z_DATA);
+            pb.set_char(sx, ty, border.top_left, color, Z_DATA);
         }
         if by >= pa.y && by < pa.y + pa.height {
-            pb.set_char(sx, by, '└', color, Z_DATA);
+            pb.set_char(sx, by, border.bottom_left, color, Z_DATA);
         }
     }
 }

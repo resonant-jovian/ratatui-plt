@@ -338,7 +338,7 @@ impl Widget for &BarChart {
                 .map(|ds| LegendEntry {
                     name: ds.name.clone(),
                     color: ds.color,
-                    marker: Some('█'),
+                    marker: Some(self.theme.chars.fill.solid),
                 })
                 .collect();
             let legend = Legend::new(entries)

@@ -86,15 +86,15 @@ fn main() -> color_eyre::Result<()> {
 
     let band_2sig = Band::new("\u{00b1}2\u{03c3} (95%)", x.clone(), y_2sig_lo, y_2sig_hi)
         .color(theme.secondary)
-        .alpha_char('\u{2591}'); // light shade
+        .alpha_char(theme.chars.fill.light);
 
     let band_1sig = Band::new("\u{00b1}1\u{03c3} (68%)", x.clone(), y_1sig_lo, y_1sig_hi)
         .color(theme.primary)
-        .alpha_char('\u{2592}'); // medium shade
+        .alpha_char(theme.chars.fill.medium);
 
     let center_line = Band::new("Prediction", x.clone(), y_line_lo, y_line_hi)
         .color(theme.foreground)
-        .alpha_char('\u{2501}'); // heavy horizontal
+        .alpha_char(theme.chars.dash.bold_h);
 
     let plot = BandPlot::new()
         .band(band_2sig)

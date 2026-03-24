@@ -18,8 +18,11 @@ use crate::spines::Spines;
 use crate::theme::Theme;
 use crate::transform::data_to_screen;
 
-/// Fill density characters from lightest to heaviest.
-const FILL_CHARS: &[char] = &['░', '▒', '▓', '█'];
+/// Fill density characters from lightest to heaviest, pulled from theme.
+fn fill_chars(theme: &Theme) -> [char; 4] {
+    let f = &theme.chars.fill;
+    [f.light, f.medium, f.dense, f.solid]
+}
 
 /// A stacked area chart widget.
 ///
@@ -277,7 +280,8 @@ impl Widget for &StackedArea {
                 .enumerate()
                 .map(|(i, s)| {
                     let color = s.color.unwrap_or(self.theme.color_cycle.at(i));
-                    let fill_ch = FILL_CHARS[i % FILL_CHARS.len()];
+                    let fc = fill_chars(&self.theme);
+                    let fill_ch = fc[i % fc.len()];
                     LegendEntry {
                         name: s.name.clone(),
                         color,
