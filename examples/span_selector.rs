@@ -95,10 +95,14 @@ fn main() -> color_eyre::Result<()> {
                     let sy1 = pa.screen_y(y1).round() as u16;
                     // Simple point-based rendering
                     if pa.contains(sx0, sy0) {
-                        buf[(sx0, sy0)].set_char('·').set_fg(s.color.unwrap_or(theme.foreground));
+                        buf[(sx0, sy0)]
+                            .set_char('·')
+                            .set_fg(s.color.unwrap_or(theme.foreground));
                     }
                     if pa.contains(sx1, sy1) {
-                        buf[(sx1, sy1)].set_char('·').set_fg(s.color.unwrap_or(theme.foreground));
+                        buf[(sx1, sy1)]
+                            .set_char('·')
+                            .set_fg(s.color.unwrap_or(theme.foreground));
                     }
                 }
 

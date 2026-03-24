@@ -296,7 +296,13 @@ impl Widget for &CandlestickChart {
                     }
                 }
                 if pa.contains(sx, wick_bot) {
-                    pb.set_char(sx, wick_bot, self.theme.chars.tick.cap_bottom, color, Z_MARKER);
+                    pb.set_char(
+                        sx,
+                        wick_bot,
+                        self.theme.chars.tick.cap_bottom,
+                        color,
+                        Z_MARKER,
+                    );
                 }
             }
         }

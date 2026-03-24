@@ -425,7 +425,13 @@ impl Widget for &BoxenPlot {
             let median_right = median_left + max_box_width;
             for x in median_left..median_right {
                 if pa.contains(x, sy_median) {
-                    pb.set_char(x, sy_median, self.theme.chars.dash.bold_h, group.color, Z_DATA);
+                    pb.set_char(
+                        x,
+                        sy_median,
+                        self.theme.chars.dash.bold_h,
+                        group.color,
+                        Z_DATA,
+                    );
                 }
             }
 

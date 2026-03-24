@@ -473,7 +473,13 @@ impl Widget for &ViolinPlot {
                                 for dx in 0..=box_half {
                                     let positions = inner_positions(center_x, dx, side, &pa);
                                     for sx in positions {
-                                        pb.set_char(sx, y, self.theme.chars.border.vertical, self.theme.foreground, Z_MARKER);
+                                        pb.set_char(
+                                            sx,
+                                            y,
+                                            self.theme.chars.border.vertical,
+                                            self.theme.foreground,
+                                            Z_MARKER,
+                                        );
                                     }
                                 }
                             }
@@ -502,7 +508,11 @@ impl Widget for &ViolinPlot {
                                 for dx in 0..=half {
                                     let positions = inner_positions(center_x, dx, side, &pa);
                                     for sx in positions {
-                                        let ch = if sy == sy_median { self.theme.chars.dash.bold_h } else { self.theme.chars.border.horizontal };
+                                        let ch = if sy == sy_median {
+                                            self.theme.chars.dash.bold_h
+                                        } else {
+                                            self.theme.chars.border.horizontal
+                                        };
                                         pb.set_char(sx, sy, ch, self.theme.foreground, Z_MARKER);
                                     }
                                 }
@@ -520,7 +530,13 @@ impl Widget for &ViolinPlot {
                             )
                             .round() as u16;
                             if pa.contains(center_x, sy) {
-                                pb.set_char(center_x, sy, self.theme.chars.marker.small_point, self.theme.foreground, Z_MARKER);
+                                pb.set_char(
+                                    center_x,
+                                    sy,
+                                    self.theme.chars.marker.small_point,
+                                    self.theme.foreground,
+                                    Z_MARKER,
+                                );
                             }
                         }
                     }
@@ -535,7 +551,13 @@ impl Widget for &ViolinPlot {
                             )
                             .round() as u16;
                             if pa.contains(center_x, sy) {
-                                pb.set_char(center_x, sy, self.theme.chars.border.vertical, self.theme.foreground, Z_MARKER);
+                                pb.set_char(
+                                    center_x,
+                                    sy,
+                                    self.theme.chars.border.vertical,
+                                    self.theme.foreground,
+                                    Z_MARKER,
+                                );
                             }
                         }
                     }

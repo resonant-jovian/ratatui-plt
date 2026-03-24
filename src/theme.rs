@@ -44,7 +44,6 @@ pub struct Theme {
     pub bold_title: bool,
 
     // --- Named palette ---
-
     /// Primary data color (main series, single-dataset widgets).
     pub primary: Color,
     /// Secondary data color (second series, comparisons).
@@ -59,7 +58,6 @@ pub struct Theme {
     pub surface: Color,
 
     // --- Semantic colors ---
-
     /// Positive-value color (waterfall gains, upward trends).
     pub positive_color: Color,
     /// Negative-value color (waterfall losses, downward trends).
@@ -68,7 +66,6 @@ pub struct Theme {
     pub neutral_color: Color,
 
     // --- 3D axis colors ---
-
     /// X-axis color in 3D plots.
     pub x_axis_3d_color: Color,
     /// Y-axis color in 3D plots.
@@ -77,7 +74,6 @@ pub struct Theme {
     pub z_axis_3d_color: Color,
 
     // --- Chrome / decoration ---
-
     /// Color for disabled/hidden UI elements (e.g. hidden legend entries).
     pub disabled_color: Color,
     /// Color for bad/missing data cells (NaN in heatmaps).
@@ -246,18 +242,18 @@ impl Theme {
             grid_visible: true,
             grid_pattern: DashPattern::Solid,
             bold_title: true,
-            primary: Color::Rgb(38, 139, 210),   // blue
-            secondary: Color::Rgb(211, 54, 130),  // magenta
-            accent: Color::Rgb(42, 161, 152),     // cyan
-            highlight: Color::Rgb(181, 137, 0),    // yellow
-            muted: Color::Rgb(88, 110, 117),       // base01
-            surface: Color::Rgb(7, 54, 66),        // base02
-            positive_color: Color::Rgb(133, 153, 0),   // green
-            negative_color: Color::Rgb(220, 50, 47),    // red
-            neutral_color: Color::Rgb(38, 139, 210),    // blue
-            x_axis_3d_color: Color::Rgb(220, 50, 47),   // red
-            y_axis_3d_color: Color::Rgb(133, 153, 0),   // green
-            z_axis_3d_color: Color::Rgb(38, 139, 210),  // blue
+            primary: Color::Rgb(38, 139, 210),           // blue
+            secondary: Color::Rgb(211, 54, 130),         // magenta
+            accent: Color::Rgb(42, 161, 152),            // cyan
+            highlight: Color::Rgb(181, 137, 0),          // yellow
+            muted: Color::Rgb(88, 110, 117),             // base01
+            surface: Color::Rgb(7, 54, 66),              // base02
+            positive_color: Color::Rgb(133, 153, 0),     // green
+            negative_color: Color::Rgb(220, 50, 47),     // red
+            neutral_color: Color::Rgb(38, 139, 210),     // blue
+            x_axis_3d_color: Color::Rgb(220, 50, 47),    // red
+            y_axis_3d_color: Color::Rgb(133, 153, 0),    // green
+            z_axis_3d_color: Color::Rgb(38, 139, 210),   // blue
             disabled_color: Color::Rgb(88, 110, 117),    // base01
             bad_data_color: Color::Rgb(88, 110, 117),    // base01
             annotation_color: Color::Rgb(131, 148, 150), // base0
@@ -285,19 +281,19 @@ impl Theme {
             grid_visible: true,
             grid_pattern: DashPattern::Solid,
             bold_title: true,
-            primary: Color::Rgb(131, 165, 152),   // aqua
-            secondary: Color::Rgb(184, 187, 38),   // green
-            accent: Color::Rgb(131, 165, 152),      // aqua
-            highlight: Color::Rgb(250, 189, 47),    // yellow
-            muted: Color::Rgb(146, 131, 116),       // gray
-            surface: Color::Rgb(60, 56, 54),         // bg1
-            positive_color: Color::Rgb(152, 151, 26),  // ok green
-            negative_color: Color::Rgb(204, 36, 29),   // error red
-            neutral_color: Color::Rgb(69, 133, 136),    // teal
+            primary: Color::Rgb(131, 165, 152),       // aqua
+            secondary: Color::Rgb(184, 187, 38),      // green
+            accent: Color::Rgb(131, 165, 152),        // aqua
+            highlight: Color::Rgb(250, 189, 47),      // yellow
+            muted: Color::Rgb(146, 131, 116),         // gray
+            surface: Color::Rgb(60, 56, 54),          // bg1
+            positive_color: Color::Rgb(152, 151, 26), // ok green
+            negative_color: Color::Rgb(204, 36, 29),  // error red
+            neutral_color: Color::Rgb(69, 133, 136),  // teal
             x_axis_3d_color: Color::Rgb(204, 36, 29),
             y_axis_3d_color: Color::Rgb(152, 151, 26),
             z_axis_3d_color: Color::Rgb(69, 133, 136),
-            disabled_color: Color::Rgb(146, 131, 116),  // dim gray
+            disabled_color: Color::Rgb(146, 131, 116), // dim gray
             bad_data_color: Color::Rgb(80, 73, 69),
             annotation_color: Color::Rgb(215, 153, 33), // warn yellow
             chars: CharSet::default(),

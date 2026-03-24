@@ -260,7 +260,13 @@ impl Widget for &ParallelCoords {
             };
             for y in plot_top..=plot_bottom {
                 if ax_x >= area.x && ax_x < area.x + area.width {
-                    pb.set_char(ax_x, y, self.theme.chars.border.vertical, axis_color, Z_CHROME);
+                    pb.set_char(
+                        ax_x,
+                        y,
+                        self.theme.chars.border.vertical,
+                        axis_color,
+                        Z_CHROME,
+                    );
                 }
             }
 
@@ -357,7 +363,13 @@ impl Widget for &ParallelCoords {
                     && *ax_x >= area.x
                     && *ax_x < area.x + area.width
                 {
-                    pb.set_char(*ax_x, sy, self.theme.chars.marker.default_point, rec.color, Z_MARKER);
+                    pb.set_char(
+                        *ax_x,
+                        sy,
+                        self.theme.chars.marker.default_point,
+                        rec.color,
+                        Z_MARKER,
+                    );
                 }
             }
         }

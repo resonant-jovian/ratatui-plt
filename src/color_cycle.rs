@@ -87,4 +87,3 @@ impl ColorCycle {
         self.colors.is_empty()
     }
 }
-

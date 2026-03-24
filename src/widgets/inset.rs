@@ -111,18 +111,26 @@ impl InsetAxes {
             let r = rect;
             if r.width >= 2 && r.height >= 2 {
                 buf[(r.x, r.y)].set_char(border.top_left).set_fg(bc);
-                buf[(r.x + r.width - 1, r.y)].set_char(border.top_right).set_fg(bc);
-                buf[(r.x, r.y + r.height - 1)].set_char(border.bottom_left).set_fg(bc);
+                buf[(r.x + r.width - 1, r.y)]
+                    .set_char(border.top_right)
+                    .set_fg(bc);
+                buf[(r.x, r.y + r.height - 1)]
+                    .set_char(border.bottom_left)
+                    .set_fg(bc);
                 buf[(r.x + r.width - 1, r.y + r.height - 1)]
                     .set_char(border.bottom_right)
                     .set_fg(bc);
                 for x in r.x + 1..r.x + r.width - 1 {
                     buf[(x, r.y)].set_char(border.horizontal).set_fg(bc);
-                    buf[(x, r.y + r.height - 1)].set_char(border.horizontal).set_fg(bc);
+                    buf[(x, r.y + r.height - 1)]
+                        .set_char(border.horizontal)
+                        .set_fg(bc);
                 }
                 for y in r.y + 1..r.y + r.height - 1 {
                     buf[(r.x, y)].set_char(border.vertical).set_fg(bc);
-                    buf[(r.x + r.width - 1, y)].set_char(border.vertical).set_fg(bc);
+                    buf[(r.x + r.width - 1, y)]
+                        .set_char(border.vertical)
+                        .set_fg(bc);
                 }
 
                 // Render content inside the border

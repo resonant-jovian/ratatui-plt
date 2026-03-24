@@ -468,9 +468,7 @@ fn draw_axis_lines(
     let xxi = xx.round() as u16;
     let xyi = xy.round() as u16;
     if xxi >= px && xxi < px + pw && xyi >= py && xyi < py + ph {
-        buf[(xxi, xyi)]
-            .set_char('X')
-            .set_fg(theme.x_axis_3d_color);
+        buf[(xxi, xyi)].set_char('X').set_fg(theme.x_axis_3d_color);
     }
 
     // Y axis line and label
@@ -480,9 +478,7 @@ fn draw_axis_lines(
     let yxi = yx.round() as u16;
     let yyi = yy.round() as u16;
     if yxi >= px && yxi < px + pw && yyi >= py && yyi < py + ph {
-        buf[(yxi, yyi)]
-            .set_char('Y')
-            .set_fg(theme.y_axis_3d_color);
+        buf[(yxi, yyi)].set_char('Y').set_fg(theme.y_axis_3d_color);
     }
 
     // Z axis line and label
@@ -492,8 +488,6 @@ fn draw_axis_lines(
     let zxi = zx.round() as u16;
     let zyi = zy.round() as u16;
     if zxi >= px && zxi < px + pw && zyi >= py && zyi < py + ph {
-        buf[(zxi, zyi)]
-            .set_char('Z')
-            .set_fg(theme.z_axis_3d_color);
+        buf[(zxi, zyi)].set_char('Z').set_fg(theme.z_axis_3d_color);
     }
 }

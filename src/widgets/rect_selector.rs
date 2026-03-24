@@ -119,7 +119,9 @@ impl RectangleSelector {
             for x in left + 1..right {
                 if x < pa.x + pa.width {
                     buf[(x, top)].set_char(border.horizontal).set_fg(self.color);
-                    buf[(x, bottom)].set_char(border.horizontal).set_fg(self.color);
+                    buf[(x, bottom)]
+                        .set_char(border.horizontal)
+                        .set_fg(self.color);
                 }
             }
 
@@ -132,15 +134,23 @@ impl RectangleSelector {
             }
 
             // Corners
-            buf[(left, top)].set_char(border.top_left).set_fg(self.color);
+            buf[(left, top)]
+                .set_char(border.top_left)
+                .set_fg(self.color);
             if right < pa.x + pa.width {
-                buf[(right, top)].set_char(border.top_right).set_fg(self.color);
+                buf[(right, top)]
+                    .set_char(border.top_right)
+                    .set_fg(self.color);
             }
             if bottom < pa.y + pa.height {
-                buf[(left, bottom)].set_char(border.bottom_left).set_fg(self.color);
+                buf[(left, bottom)]
+                    .set_char(border.bottom_left)
+                    .set_fg(self.color);
             }
             if right < pa.x + pa.width && bottom < pa.y + pa.height {
-                buf[(right, bottom)].set_char(border.bottom_right).set_fg(self.color);
+                buf[(right, bottom)]
+                    .set_char(border.bottom_right)
+                    .set_fg(self.color);
             }
         }
     }

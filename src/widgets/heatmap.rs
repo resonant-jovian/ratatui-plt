@@ -266,7 +266,14 @@ impl Widget for &Heatmap {
                 };
 
                 // Use ▀ (upper half block): fg = top color, bg = bottom color
-                pb.set_cell(screen_x, screen_y, self.theme.chars.fill.half_upper, top_color, bot_color, Z_DATA);
+                pb.set_cell(
+                    screen_x,
+                    screen_y,
+                    self.theme.chars.fill.half_upper,
+                    top_color,
+                    bot_color,
+                    Z_DATA,
+                );
             }
         }
 

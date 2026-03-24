@@ -655,7 +655,9 @@ impl<'a> PlotFrame<'a> {
                 let yi = sy.round() as u16;
                 if yi >= py && yi < py + ah {
                     for x in px..px + aw {
-                        buf[(x, yi)].set_char(grid_chars.major_h).set_fg(self.theme.grid_color);
+                        buf[(x, yi)]
+                            .set_char(grid_chars.major_h)
+                            .set_fg(self.theme.grid_color);
                     }
                 }
             }
@@ -800,7 +802,16 @@ impl<'a> PlotFrame<'a> {
                 let y = py.max(area.y);
                 if self.y_axis.label_boxed {
                     let box_x = area.x;
-                    Self::draw_boxed_label_h(buf, box_x, y, label, fg, bc, area, &self.theme.chars.border);
+                    Self::draw_boxed_label_h(
+                        buf,
+                        box_x,
+                        y,
+                        label,
+                        fg,
+                        bc,
+                        area,
+                        &self.theme.chars.border,
+                    );
                 } else {
                     for (i, ch) in label.chars().enumerate() {
                         let x = area.x + i as u16;
@@ -826,10 +837,14 @@ impl<'a> PlotFrame<'a> {
                             buf[(label_x, box_top)].set_char(bch.top_left).set_fg(fg);
                         }
                         if label_x + 1 < area.x + area.width {
-                            buf[(label_x + 1, box_top)].set_char(bch.horizontal).set_fg(fg);
+                            buf[(label_x + 1, box_top)]
+                                .set_char(bch.horizontal)
+                                .set_fg(fg);
                         }
                         if label_x + 2 < area.x + area.width {
-                            buf[(label_x + 2, box_top)].set_char(bch.top_right).set_fg(fg);
+                            buf[(label_x + 2, box_top)]
+                                .set_char(bch.top_right)
+                                .set_fg(fg);
                         }
                     }
                     // Characters bottom-to-top
@@ -856,10 +871,14 @@ impl<'a> PlotFrame<'a> {
                             buf[(label_x, box_bot)].set_char(bch.bottom_left).set_fg(fg);
                         }
                         if label_x + 1 < area.x + area.width {
-                            buf[(label_x + 1, box_bot)].set_char(bch.horizontal).set_fg(fg);
+                            buf[(label_x + 1, box_bot)]
+                                .set_char(bch.horizontal)
+                                .set_fg(fg);
                         }
                         if label_x + 2 < area.x + area.width {
-                            buf[(label_x + 2, box_bot)].set_char(bch.bottom_right).set_fg(fg);
+                            buf[(label_x + 2, box_bot)]
+                                .set_char(bch.bottom_right)
+                                .set_fg(fg);
                         }
                     }
                 } else {
@@ -908,7 +927,9 @@ impl<'a> PlotFrame<'a> {
             }
             for i in 1..box_w.saturating_sub(1) {
                 if x + i < max_x {
-                    buf[(x + i, top_y)].set_char(bch.horizontal).set_fg(border_color);
+                    buf[(x + i, top_y)]
+                        .set_char(bch.horizontal)
+                        .set_fg(border_color);
                 }
             }
             if x + box_w - 1 < max_x {
@@ -939,18 +960,24 @@ impl<'a> PlotFrame<'a> {
                 buf[(x + label_len + 2, y)].set_char(' ').set_fg(fg);
             }
             if x + box_w - 1 < max_x {
-                buf[(x + box_w - 1, y)].set_char(bch.vertical).set_fg(border_color);
+                buf[(x + box_w - 1, y)]
+                    .set_char(bch.vertical)
+                    .set_fg(border_color);
             }
         }
 
         // Bottom border row: └──┘
         if bot_y >= area.y && bot_y < max_y {
             if x < max_x {
-                buf[(x, bot_y)].set_char(bch.bottom_left).set_fg(border_color);
+                buf[(x, bot_y)]
+                    .set_char(bch.bottom_left)
+                    .set_fg(border_color);
             }
             for i in 1..box_w.saturating_sub(1) {
                 if x + i < max_x {
-                    buf[(x + i, bot_y)].set_char(bch.horizontal).set_fg(border_color);
+                    buf[(x + i, bot_y)]
+                        .set_char(bch.horizontal)
+                        .set_fg(border_color);
                 }
             }
             if x + box_w - 1 < max_x {
@@ -972,7 +999,9 @@ impl<'a> PlotFrame<'a> {
                 for (j, ch) in ann.text.chars().enumerate() {
                     let x = xi + j as u16;
                     if x >= pa.x && x < pa.x + pa.width {
-                        buf[(x, yi)].set_char(ch).set_fg(ann.color.unwrap_or(Theme::get_default().annotation_color));
+                        buf[(x, yi)]
+                            .set_char(ch)
+                            .set_fg(ann.color.unwrap_or(Theme::get_default().annotation_color));
                     }
                 }
             }
@@ -984,7 +1013,8 @@ impl<'a> PlotFrame<'a> {
                     let dx = target_sx as f64 - xi as f64;
                     let dy = target_sy as f64 - yi as f64;
                     let theme = Theme::get_default();
-                    let arrow_ch = ann.arrow_char(dx, dy, &theme.chars.arrow, theme.chars.border.horizontal);
+                    let arrow_ch =
+                        ann.arrow_char(dx, dy, &theme.chars.arrow, theme.chars.border.horizontal);
                     if arrow_ch != ' ' {
                         buf[(target_sx, target_sy)]
                             .set_char(arrow_ch)
@@ -1043,7 +1073,10 @@ impl<'a> PlotFrame<'a> {
                     let bot = sy1.max(sy2).min(py + ah);
                     for y in top..bot {
                         for x in px..px + aw {
-                            buf[(x, y)].set_char(fill_light).set_fg(*color).set_bg(*color);
+                            buf[(x, y)]
+                                .set_char(fill_light)
+                                .set_fg(*color)
+                                .set_bg(*color);
                         }
                     }
                 }
@@ -1072,7 +1105,10 @@ impl<'a> PlotFrame<'a> {
                     };
                     for x in left..right {
                         for y in y_top..y_bottom {
-                            buf[(x, y)].set_char(fill_light).set_fg(*color).set_bg(*color);
+                            buf[(x, y)]
+                                .set_char(fill_light)
+                                .set_fg(*color)
+                                .set_bg(*color);
                         }
                     }
                 }
@@ -1311,7 +1347,13 @@ impl<'a> PlotFrame<'a> {
                 if yi >= py && yi < py + ah {
                     h_grid_rows.push(yi);
                     for x in px..px + aw {
-                        pb.set_char(x, yi, self.theme.chars.grid.major_h, self.theme.grid_color, Z_GRID);
+                        pb.set_char(
+                            x,
+                            yi,
+                            self.theme.chars.grid.major_h,
+                            self.theme.grid_color,
+                            Z_GRID,
+                        );
                     }
                 }
             }
@@ -1342,7 +1384,13 @@ impl<'a> PlotFrame<'a> {
                 let yi = sy.round() as u16;
                 if yi >= py && yi < py + ah {
                     for x in px..px + aw {
-                        pb.set_char(x, yi, self.theme.chars.grid.minor_h, self.theme.minor_grid_color, Z_GRID);
+                        pb.set_char(
+                            x,
+                            yi,
+                            self.theme.chars.grid.minor_h,
+                            self.theme.minor_grid_color,
+                            Z_GRID,
+                        );
                     }
                 }
             }
@@ -1354,7 +1402,13 @@ impl<'a> PlotFrame<'a> {
                 let xi = sx.round() as u16;
                 if xi >= px && xi < px + aw {
                     for y in py..py + ah {
-                        pb.set_char(xi, y, self.theme.chars.grid.minor_v, self.theme.minor_grid_color, Z_GRID);
+                        pb.set_char(
+                            xi,
+                            y,
+                            self.theme.chars.grid.minor_v,
+                            self.theme.minor_grid_color,
+                            Z_GRID,
+                        );
                     }
                 }
             }
@@ -1472,7 +1526,16 @@ impl<'a> PlotFrame<'a> {
                     let y = pa.y + pa.height;
                     let box_x = (pa.x + pa.width).saturating_sub(2);
                     if self.x_axis.label_boxed {
-                        Self::draw_boxed_label_h(buf, box_x, y, label, fg, bc, buf_area, &self.theme.chars.border);
+                        Self::draw_boxed_label_h(
+                            buf,
+                            box_x,
+                            y,
+                            label,
+                            fg,
+                            bc,
+                            buf_area,
+                            &self.theme.chars.border,
+                        );
                     } else {
                         for (i, ch) in label.chars().enumerate() {
                             let x = box_x + i as u16;
@@ -1487,7 +1550,16 @@ impl<'a> PlotFrame<'a> {
                     if self.x_axis.label_boxed {
                         let box_w = label_len + 4;
                         let box_x = pa.x + (pa.width.saturating_sub(box_w)) / 2;
-                        Self::draw_boxed_label_h(buf, box_x, y, label, fg, bc, buf_area, &self.theme.chars.border);
+                        Self::draw_boxed_label_h(
+                            buf,
+                            box_x,
+                            y,
+                            label,
+                            fg,
+                            bc,
+                            buf_area,
+                            &self.theme.chars.border,
+                        );
                     } else {
                         let start = pa.x + (pa.width.saturating_sub(label_len)) / 2;
                         for (i, ch) in label.chars().enumerate() {
@@ -1509,7 +1581,16 @@ impl<'a> PlotFrame<'a> {
                     let y = pa.y.saturating_sub(2).max(pa.area.y);
                     let box_x = pa.area.x;
                     if self.y_axis.label_boxed {
-                        Self::draw_boxed_label_h(buf, box_x, y, label, fg, bc, buf_area, &self.theme.chars.border);
+                        Self::draw_boxed_label_h(
+                            buf,
+                            box_x,
+                            y,
+                            label,
+                            fg,
+                            bc,
+                            buf_area,
+                            &self.theme.chars.border,
+                        );
                     } else {
                         for (i, ch) in label.chars().enumerate() {
                             let x = box_x + i as u16;
@@ -1561,7 +1642,8 @@ impl<'a> PlotFrame<'a> {
                     let dx = target_sx as f64 - xi as f64;
                     let dy = target_sy as f64 - yi as f64;
                     let theme = Theme::get_default();
-                    let arrow_ch = ann.arrow_char(dx, dy, &theme.chars.arrow, theme.chars.border.horizontal);
+                    let arrow_ch =
+                        ann.arrow_char(dx, dy, &theme.chars.arrow, theme.chars.border.horizontal);
                     if arrow_ch != ' ' {
                         pb.set_char(target_sx, target_sy, arrow_ch, color, Z_ANNOTATION);
                     }

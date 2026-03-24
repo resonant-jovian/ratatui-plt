@@ -250,9 +250,7 @@ impl Widget for &StackedArea {
                 )
                 .round() as u16;
 
-                let color = filtered[si]
-                    .color
-                    .unwrap_or(self.theme.color_cycle.at(si));
+                let color = filtered[si].color.unwrap_or(self.theme.color_cycle.at(si));
 
                 let y_top = sy_upper.max(pa.y);
                 let y_bot = sy_lower.min(pa.y + pa.height - 1);

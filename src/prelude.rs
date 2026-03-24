@@ -7,12 +7,12 @@
 pub use ratatui::style::Color;
 
 pub use crate::annotation::{Annotation, enclosed_number};
-pub use crate::chars::CharSet;
 pub use crate::axis::{
     AspectRatio, Axis, Bounds, GridConfig, LabelPosition, LabelRotation, Scale, TickDirection,
     set_cell_aspect, terminal_cell_aspect,
 };
 pub use crate::brushing::{BrushState, SharedBrush, shared_brush};
+pub use crate::chars::CharSet;
 pub use crate::collections::{LineCollection, PathCollection};
 pub use crate::color_cycle::ColorCycle;
 pub use crate::colormap::ColorbarExtend;
@@ -81,7 +81,8 @@ pub use crate::colormap::{
     YlOrBr,
     YlOrRd,
     // Registry
-    colormap_names, get_colormap,
+    colormap_names,
+    get_colormap,
 };
 pub use crate::config::{ConfigGuard, PlotConfig};
 #[cfg(feature = "export")]

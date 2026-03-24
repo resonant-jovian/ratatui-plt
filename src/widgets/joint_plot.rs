@@ -406,7 +406,9 @@ fn render_marginal_top(buf: &mut Buffer, area: Rect, cfg: &MarginalConfig<'_>) {
                 for dy in 0..bar_height {
                     let y = area.y + area.height - 1 - dy;
                     if xi >= area.x && xi < area.x + area.width && y >= area.y {
-                        buf[(xi, y)].set_char(cfg.chars.fill.solid).set_fg(cfg.color);
+                        buf[(xi, y)]
+                            .set_char(cfg.chars.fill.solid)
+                            .set_fg(cfg.color);
                     }
                 }
             }
@@ -434,7 +436,9 @@ fn render_marginal_top(buf: &mut Buffer, area: Rect, cfg: &MarginalConfig<'_>) {
                 for dy in 0..bar_height {
                     let y = area.y + area.height - 1 - dy;
                     if xi >= area.x && xi < area.x + area.width && y >= area.y {
-                        buf[(xi, y)].set_char(cfg.chars.fill.light).set_fg(cfg.color);
+                        buf[(xi, y)]
+                            .set_char(cfg.chars.fill.light)
+                            .set_fg(cfg.color);
                     }
                 }
             }
@@ -451,7 +455,9 @@ fn render_marginal_top(buf: &mut Buffer, area: Rect, cfg: &MarginalConfig<'_>) {
                 );
                 let xi = sx.round() as u16;
                 if xi >= area.x && xi < area.x + area.width && y >= area.y {
-                    buf[(xi, y)].set_char(cfg.chars.border.vertical).set_fg(cfg.color);
+                    buf[(xi, y)]
+                        .set_char(cfg.chars.border.vertical)
+                        .set_fg(cfg.color);
                 }
             }
         }
@@ -492,7 +498,9 @@ fn render_marginal_right(buf: &mut Buffer, area: Rect, cfg: &MarginalConfig<'_>)
                 for dx in 0..bar_width {
                     let x = area.x + dx;
                     if x < area.x + area.width && yi >= area.y && yi < area.y + area.height {
-                        buf[(x, yi)].set_char(cfg.chars.fill.solid).set_fg(cfg.color);
+                        buf[(x, yi)]
+                            .set_char(cfg.chars.fill.solid)
+                            .set_fg(cfg.color);
                     }
                 }
             }
@@ -520,7 +528,9 @@ fn render_marginal_right(buf: &mut Buffer, area: Rect, cfg: &MarginalConfig<'_>)
                 for dx in 0..bar_width {
                     let x = area.x + dx;
                     if x < area.x + area.width && yi >= area.y && yi < area.y + area.height {
-                        buf[(x, yi)].set_char(cfg.chars.fill.light).set_fg(cfg.color);
+                        buf[(x, yi)]
+                            .set_char(cfg.chars.fill.light)
+                            .set_fg(cfg.color);
                     }
                 }
             }
@@ -537,7 +547,9 @@ fn render_marginal_right(buf: &mut Buffer, area: Rect, cfg: &MarginalConfig<'_>)
                 );
                 let yi = sy.round() as u16;
                 if yi >= area.y && yi < area.y + area.height && x < area.x + area.width {
-                    buf[(x, yi)].set_char(cfg.chars.border.horizontal).set_fg(cfg.color);
+                    buf[(x, yi)]
+                        .set_char(cfg.chars.border.horizontal)
+                        .set_fg(cfg.color);
                 }
             }
         }

@@ -203,7 +203,9 @@ impl Widget for &TwinAxes {
                 let yi = sy.round() as u16;
                 if yi >= py && yi < py + ph {
                     for x in px..px + pw {
-                        buf[(x, yi)].set_char(border.horizontal).set_fg(self.theme.grid_color);
+                        buf[(x, yi)]
+                            .set_char(border.horizontal)
+                            .set_fg(self.theme.grid_color);
                     }
                 }
             }

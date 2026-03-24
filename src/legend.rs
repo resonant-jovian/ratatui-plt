@@ -187,18 +187,26 @@ impl Widget for &Legend {
             if r.width >= 2 && r.height >= 2 {
                 let border = &self.theme.chars.border;
                 buf[(r.x, r.y)].set_char(border.top_left).set_fg(bc);
-                buf[(r.x + r.width - 1, r.y)].set_char(border.top_right).set_fg(bc);
-                buf[(r.x, r.y + r.height - 1)].set_char(border.bottom_left).set_fg(bc);
+                buf[(r.x + r.width - 1, r.y)]
+                    .set_char(border.top_right)
+                    .set_fg(bc);
+                buf[(r.x, r.y + r.height - 1)]
+                    .set_char(border.bottom_left)
+                    .set_fg(bc);
                 buf[(r.x + r.width - 1, r.y + r.height - 1)]
                     .set_char(border.bottom_right)
                     .set_fg(bc);
                 for x in r.x + 1..r.x + r.width - 1 {
                     buf[(x, r.y)].set_char(border.horizontal).set_fg(bc);
-                    buf[(x, r.y + r.height - 1)].set_char(border.horizontal).set_fg(bc);
+                    buf[(x, r.y + r.height - 1)]
+                        .set_char(border.horizontal)
+                        .set_fg(bc);
                 }
                 for y in r.y + 1..r.y + r.height - 1 {
                     buf[(r.x, y)].set_char(border.vertical).set_fg(bc);
-                    buf[(r.x + r.width - 1, y)].set_char(border.vertical).set_fg(bc);
+                    buf[(r.x + r.width - 1, y)]
+                        .set_char(border.vertical)
+                        .set_fg(bc);
                 }
             }
         }
@@ -392,18 +400,26 @@ impl Widget for &InteractiveLegend {
             if r.width >= 2 && r.height >= 2 {
                 let border = &self.theme.chars.border;
                 buf[(r.x, r.y)].set_char(border.top_left).set_fg(bc);
-                buf[(r.x + r.width - 1, r.y)].set_char(border.top_right).set_fg(bc);
-                buf[(r.x, r.y + r.height - 1)].set_char(border.bottom_left).set_fg(bc);
+                buf[(r.x + r.width - 1, r.y)]
+                    .set_char(border.top_right)
+                    .set_fg(bc);
+                buf[(r.x, r.y + r.height - 1)]
+                    .set_char(border.bottom_left)
+                    .set_fg(bc);
                 buf[(r.x + r.width - 1, r.y + r.height - 1)]
                     .set_char(border.bottom_right)
                     .set_fg(bc);
                 for x in r.x + 1..r.x + r.width - 1 {
                     buf[(x, r.y)].set_char(border.horizontal).set_fg(bc);
-                    buf[(x, r.y + r.height - 1)].set_char(border.horizontal).set_fg(bc);
+                    buf[(x, r.y + r.height - 1)]
+                        .set_char(border.horizontal)
+                        .set_fg(bc);
                 }
                 for y in r.y + 1..r.y + r.height - 1 {
                     buf[(r.x, y)].set_char(border.vertical).set_fg(bc);
-                    buf[(r.x + r.width - 1, y)].set_char(border.vertical).set_fg(bc);
+                    buf[(r.x + r.width - 1, y)]
+                        .set_char(border.vertical)
+                        .set_fg(bc);
                 }
             }
         }
@@ -441,7 +457,9 @@ impl Widget for &InteractiveLegend {
             } else {
                 // Hidden entry: draw strike-through marker
                 if x_off < area.x + area.width {
-                    buf[(x_off, y)].set_char(self.theme.chars.border.horizontal).set_fg(self.theme.disabled_color);
+                    buf[(x_off, y)]
+                        .set_char(self.theme.chars.border.horizontal)
+                        .set_fg(self.theme.disabled_color);
                 }
             }
 

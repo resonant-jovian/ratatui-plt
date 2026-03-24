@@ -1175,12 +1175,61 @@ pub fn get_colormap(name: &str) -> Option<Box<dyn Colormap>> {
 /// All available named colormaps in the registry.
 pub fn colormap_names() -> &'static [&'static str] {
     &[
-        "viridis", "plasma", "inferno", "magma", "cividis", "hot", "spring", "summer", "autumn",
-        "winter", "blues", "greens", "reds", "oranges", "purples", "greys", "ylorbr", "ylorrd",
-        "orrd", "purd", "rdpu", "bupu", "gnbu", "pubu", "ylgnbu", "pubugn", "bugn", "ylgn",
-        "coolwarm", "rdbu", "seismic", "piyg", "prgn", "brbg", "puor", "rdgy", "rdylbu",
-        "rdylgn", "spectral", "twilight", "hsv", "jet", "turbo", "tab20", "tab20b", "tab20c",
-        "paired", "set1", "set2", "set3", "pastel1", "pastel2", "accent", "dark2", "cubehelix",
+        "viridis",
+        "plasma",
+        "inferno",
+        "magma",
+        "cividis",
+        "hot",
+        "spring",
+        "summer",
+        "autumn",
+        "winter",
+        "blues",
+        "greens",
+        "reds",
+        "oranges",
+        "purples",
+        "greys",
+        "ylorbr",
+        "ylorrd",
+        "orrd",
+        "purd",
+        "rdpu",
+        "bupu",
+        "gnbu",
+        "pubu",
+        "ylgnbu",
+        "pubugn",
+        "bugn",
+        "ylgn",
+        "coolwarm",
+        "rdbu",
+        "seismic",
+        "piyg",
+        "prgn",
+        "brbg",
+        "puor",
+        "rdgy",
+        "rdylbu",
+        "rdylgn",
+        "spectral",
+        "twilight",
+        "hsv",
+        "jet",
+        "turbo",
+        "tab20",
+        "tab20b",
+        "tab20c",
+        "paired",
+        "set1",
+        "set2",
+        "set3",
+        "pastel1",
+        "pastel2",
+        "accent",
+        "dark2",
+        "cubehelix",
     ]
 }
 
@@ -1299,7 +1348,9 @@ impl Widget for &Colorbar<'_> {
             let color = self.cmap.color_at(1.0);
             let mid = area.x + bar_width / 2;
             if mid < area.x + area.width {
-                buf[(mid, area.y)].set_char(theme.chars.colorbar.extend_max).set_fg(color);
+                buf[(mid, area.y)]
+                    .set_char(theme.chars.colorbar.extend_max)
+                    .set_fg(color);
             }
         }
 
@@ -1322,7 +1373,9 @@ impl Widget for &Colorbar<'_> {
             let mid = area.x + bar_width / 2;
             let y = grad_start + grad_height;
             if mid < area.x + area.width && y < area.y + area.height {
-                buf[(mid, y)].set_char(theme.chars.colorbar.extend_min).set_fg(color);
+                buf[(mid, y)]
+                    .set_char(theme.chars.colorbar.extend_min)
+                    .set_fg(color);
             }
         }
 
@@ -1344,9 +1397,9 @@ impl Widget for &Colorbar<'_> {
                     for (j, ch) in label.chars().enumerate() {
                         let x = label_x + j as u16;
                         if x < area.x + area.width {
-                            buf[(x, y)]
-                                .set_char(ch)
-                                .set_style(Style::default().fg(self.label_color.unwrap_or(theme.foreground)));
+                            buf[(x, y)].set_char(ch).set_style(
+                                Style::default().fg(self.label_color.unwrap_or(theme.foreground)),
+                            );
                         }
                     }
                 }

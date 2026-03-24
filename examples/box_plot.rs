@@ -60,7 +60,11 @@ fn main() -> color_eyre::Result<()> {
             BoxData::new("Ctrl", generate_data(42, 500, 5.0, 2.0), cycle.next_color()),
             BoxData::new("DrA", generate_data(123, 500, 7.5, 3.0), cycle.next_color()),
             BoxData::new("DrB", generate_data(999, 500, 6.0, 1.5), cycle.next_color()),
-            BoxData::new("DrC", generate_data(7777, 500, 8.0, 2.5), cycle.next_color()),
+            BoxData::new(
+                "DrC",
+                generate_data(7777, 500, 8.0, 2.5),
+                cycle.next_color(),
+            ),
         ]
     };
 

@@ -196,7 +196,13 @@ impl Widget for &TriColor {
             let scx = pa.screen_x(cx);
             let scy = pa.screen_y(cy);
 
-            scanline_fill_triangle(&mut pb, [(sax, say), (sbx, sby), (scx, scy)], color, &pa, self.theme.chars.fill.solid);
+            scanline_fill_triangle(
+                &mut pb,
+                [(sax, say), (sbx, sby), (scx, scy)],
+                color,
+                &pa,
+                self.theme.chars.fill.solid,
+            );
         }
 
         pb.composite(buf);

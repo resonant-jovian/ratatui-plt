@@ -87,11 +87,7 @@ fn main() -> color_eyre::Result<()> {
     let mut cycle = theme.color_cycle.clone();
     let plot = SwarmPlot::new()
         .group(SwarmGroup::new("Chrome", chrome, cycle.next_color()))
-        .group(SwarmGroup::new(
-            "Firefox",
-            firefox,
-            cycle.next_color(),
-        ))
+        .group(SwarmGroup::new("Firefox", firefox, cycle.next_color()))
         .group(SwarmGroup::new("Safari", safari, cycle.next_color()))
         .group(SwarmGroup::new("Edge", edge, cycle.next_color()))
         .title("Beeswarm: Response Times by Browser (q to quit)")

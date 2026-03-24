@@ -109,7 +109,9 @@ impl Crosshair {
 
         // Draw intersection marker
         if pa.contains(xi, yi) {
-            buf[(xi, yi)].set_char(theme.chars.marker.default_point).set_fg(self.color);
+            buf[(xi, yi)]
+                .set_char(theme.chars.marker.default_point)
+                .set_fg(self.color);
         }
 
         // Draw coordinate labels if enabled

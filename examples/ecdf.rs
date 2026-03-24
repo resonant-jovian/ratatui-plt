@@ -96,7 +96,8 @@ fn main() -> color_eyre::Result<()> {
     let mut cycle = theme.color_cycle.clone();
 
     let gaussian_ds = EcdfDataset::new("Gaussian (n=1000)", gaussian_data, cycle.next_color());
-    let exponential_ds = EcdfDataset::new("Exponential (n=1000)", exponential_data, cycle.next_color());
+    let exponential_ds =
+        EcdfDataset::new("Exponential (n=1000)", exponential_data, cycle.next_color());
     let uniform_ds = EcdfDataset::new("Uniform (n=1000)", uniform_data, cycle.next_color());
 
     let plot = EcdfPlot::new()

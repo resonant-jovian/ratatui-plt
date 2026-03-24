@@ -223,7 +223,8 @@ impl Widget for &LinePlot {
 
         // Resolve series colors: use explicitly set color, or auto-assign from theme color cycle
         let mut color_cycle = self.theme.color_cycle.clone();
-        let resolved_colors: Vec<Color> = self.series
+        let resolved_colors: Vec<Color> = self
+            .series
             .iter()
             .map(|s| {
                 if let Some(c) = s.color {
@@ -308,7 +309,9 @@ impl Widget for &LinePlot {
                     let xi = sx.round() as u16;
                     let yi = sy.round() as u16;
                     if pa.contains(xi, yi) {
-                        let ch = s.marker.map_or(self.theme.chars.marker.default_point, |m| m.char());
+                        let ch = s
+                            .marker
+                            .map_or(self.theme.chars.marker.default_point, |m| m.char());
                         pb.set_char(xi, yi, ch, color, Z_MARKER);
                     }
                 }

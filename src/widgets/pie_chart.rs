@@ -227,7 +227,9 @@ impl Widget for &PieChart {
                 }
 
                 // Find which slice this angle belongs to
-                for (si, (slice, &(a_start, a_end))) in self.slices.iter().zip(angles.iter()).enumerate() {
+                for (si, (slice, &(a_start, a_end))) in
+                    self.slices.iter().zip(angles.iter()).enumerate()
+                {
                     // Handle exploded slices by shifting the centre
                     let (ecx, ecy) = if slice.explode > 0.0 {
                         let mid_angle = (a_start + a_end) / 2.0;
@@ -259,7 +261,14 @@ impl Widget for &PieChart {
 
                     if ea >= a_start && ea < a_end {
                         let sc = slice_colors[si];
-                        pb.set_cell(screen_x, screen_y, self.theme.chars.fill.solid, sc, sc, Z_DATA);
+                        pb.set_cell(
+                            screen_x,
+                            screen_y,
+                            self.theme.chars.fill.solid,
+                            sc,
+                            sc,
+                            Z_DATA,
+                        );
                         break;
                     }
                 }
@@ -288,9 +297,9 @@ impl Widget for &PieChart {
                     //   ◜ upper-left   ◝ upper-right
                     //   ◟ lower-left   ◞ lower-right
                     let arc_ch = match (theta.cos() >= 0.0, theta.sin() < 0.0) {
-                        (false, true) => self.theme.chars.arc.top_left,  // upper-left quadrant
-                        (true, true) => self.theme.chars.arc.top_right,   // upper-right quadrant
-                        (true, false) => self.theme.chars.arc.bottom_right,  // lower-right quadrant
+                        (false, true) => self.theme.chars.arc.top_left, // upper-left quadrant
+                        (true, true) => self.theme.chars.arc.top_right, // upper-right quadrant
+                        (true, false) => self.theme.chars.arc.bottom_right, // lower-right quadrant
                         (false, false) => self.theme.chars.arc.bottom_left, // lower-left quadrant
                     };
                     pb.set_char(xi, yi, arc_ch, self.theme.muted, Z_CHROME);

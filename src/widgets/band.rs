@@ -289,13 +289,25 @@ impl Widget for &BandPlot {
                                 }
                                 (true, false) => {
                                     // Top half only: '▀' fg=band_color, bg inherited
-                                    pb.set_char(screen_x, cell_y, self.theme.chars.fill.half_upper, band_color, Z_DATA);
+                                    pb.set_char(
+                                        screen_x,
+                                        cell_y,
+                                        self.theme.chars.fill.half_upper,
+                                        band_color,
+                                        Z_DATA,
+                                    );
                                     // Also set bg so outermost edges have a color
                                     pb.set_bg(screen_x, cell_y, band_color, Z_FILL);
                                 }
                                 (false, true) => {
                                     // Bottom half only: '▄' fg=band_color, bg inherited
-                                    pb.set_char(screen_x, cell_y, self.theme.chars.fill.half_lower, band_color, Z_DATA);
+                                    pb.set_char(
+                                        screen_x,
+                                        cell_y,
+                                        self.theme.chars.fill.half_lower,
+                                        band_color,
+                                        Z_DATA,
+                                    );
                                     pb.set_bg(screen_x, cell_y, band_color, Z_FILL);
                                 }
                                 (false, false) => {}

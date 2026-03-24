@@ -297,7 +297,9 @@ impl Widget for &RadialPlot {
                     PolarPlotType::Scatter => {
                         // Only markers, no lines
                         if sx >= area.x && sx < area.x + area.width && sy >= py && sy < py + ph {
-                            let ch = s.marker.map_or(self.theme.chars.marker.default_point, |m| m.char());
+                            let ch = s
+                                .marker
+                                .map_or(self.theme.chars.marker.default_point, |m| m.char());
                             pb.set_char(sx, sy, ch, color, Z_MARKER);
                         }
                     }
@@ -311,7 +313,14 @@ impl Widget for &RadialPlot {
                             let by = (cy as f64 + frac * r_screen_y * t.sin()).round() as u16;
                             if bx >= area.x && bx < area.x + area.width && by >= py && by < py + ph
                             {
-                                pb.set_cell(bx, by, self.theme.chars.fill.solid, color, color, Z_DATA);
+                                pb.set_cell(
+                                    bx,
+                                    by,
+                                    self.theme.chars.fill.solid,
+                                    color,
+                                    color,
+                                    Z_DATA,
+                                );
                             }
                         }
                         // Fill gap to previous bar by sweeping the arc at each radius level
@@ -337,7 +346,14 @@ impl Widget for &RadialPlot {
                                         && by >= py
                                         && by < py + ph
                                     {
-                                        pb.set_cell(bx, by, self.theme.chars.fill.solid, color, color, Z_DATA);
+                                        pb.set_cell(
+                                            bx,
+                                            by,
+                                            self.theme.chars.fill.solid,
+                                            color,
+                                            color,
+                                            Z_DATA,
+                                        );
                                     }
                                 }
                             }
@@ -361,7 +377,9 @@ impl Widget for &RadialPlot {
                     PolarPlotType::Line => {
                         // Marker at data point
                         if sx >= area.x && sx < area.x + area.width && sy >= py && sy < py + ph {
-                            let ch = s.marker.map_or(self.theme.chars.marker.default_point, |m| m.char());
+                            let ch = s
+                                .marker
+                                .map_or(self.theme.chars.marker.default_point, |m| m.char());
                             pb.set_char(sx, sy, ch, color, Z_MARKER);
                         }
                         // Connect to previous point using Braille sub-pixel rendering

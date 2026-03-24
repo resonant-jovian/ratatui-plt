@@ -116,8 +116,8 @@ fn main() -> color_eyre::Result<()> {
             .marker(*shape);
         marker_plot = marker_plot.series(series);
         // Add label annotation below each marker
-        marker_plot = marker_plot
-            .annotation(Annotation::new(*name, col, 2.0 - row - 0.3).color(theme.muted));
+        marker_plot =
+            marker_plot.annotation(Annotation::new(*name, col, 2.0 - row - 0.3).color(theme.muted));
     }
 
     // ---- Panel B: Arrow Styles — four ArrowCharSet variants ----

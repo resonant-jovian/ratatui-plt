@@ -40,7 +40,6 @@ pub struct CharSet {
     pub depth: DepthChars,
 }
 
-
 /// Half-block and fill characters for area rendering.
 #[derive(Clone, Debug)]
 pub struct FillChars {

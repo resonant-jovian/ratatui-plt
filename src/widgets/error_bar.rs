@@ -281,7 +281,13 @@ impl Widget for &ErrorBarPlot {
 
             // Draw center point
             if pa.contains(xi, yi) {
-                pb.set_char(xi, yi, self.theme.chars.marker.default_point, color, Z_MARKER);
+                pb.set_char(
+                    xi,
+                    yi,
+                    self.theme.chars.marker.default_point,
+                    color,
+                    Z_MARKER,
+                );
             }
         }
 

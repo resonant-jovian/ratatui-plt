@@ -503,7 +503,10 @@ impl Histogram {
         let y_hi = if y_max == 0.0 { 1.0 } else { y_max * 1.1 };
 
         // Force y-axis to start at 0 — histogram counts are never negative
-        let y_axis_fixed = self.y_axis.clone().bounds(crate::axis::Bounds::Manual(y_lo, y_hi));
+        let y_axis_fixed = self
+            .y_axis
+            .clone()
+            .bounds(crate::axis::Bounds::Manual(y_lo, y_hi));
         let frame = PlotFrame::new(&self.x_axis, &y_axis_fixed, &self.theme)
             .title(self.title.as_deref())
             .spines(self.spines.clone())
@@ -599,7 +602,10 @@ impl Histogram {
         let y_hi = if y_max == 0.0 { 1.0 } else { y_max * 1.1 };
 
         // Force y-axis to start at 0 — histogram counts are never negative
-        let y_axis_fixed = self.y_axis.clone().bounds(crate::axis::Bounds::Manual(y_lo, y_hi));
+        let y_axis_fixed = self
+            .y_axis
+            .clone()
+            .bounds(crate::axis::Bounds::Manual(y_lo, y_hi));
         let frame = PlotFrame::new(&self.x_axis, &y_axis_fixed, &self.theme)
             .title(self.title.as_deref())
             .spines(self.spines.clone())
@@ -781,12 +787,24 @@ impl Histogram {
                     // Draw only the outline (top edge + sides)
                     for x in rect.x_start..rect.x_end {
                         if pa.contains(x, rect.y_top) {
-                            pb.set_char(x, rect.y_top, self.theme.chars.border.horizontal, color, Z_DATA);
+                            pb.set_char(
+                                x,
+                                rect.y_top,
+                                self.theme.chars.border.horizontal,
+                                color,
+                                Z_DATA,
+                            );
                         }
                     }
                     for y in rect.y_top..rect.y_bot {
                         if pa.contains(rect.x_start, y) {
-                            pb.set_char(rect.x_start, y, self.theme.chars.border.vertical, color, Z_DATA);
+                            pb.set_char(
+                                rect.x_start,
+                                y,
+                                self.theme.chars.border.vertical,
+                                color,
+                                Z_DATA,
+                            );
                         }
                     }
                     if rect.x_end > 0 {
@@ -802,7 +820,13 @@ impl Histogram {
                     self.draw_bar_region(pa, &rect, color, pb);
                     for x in rect.x_start..rect.x_end {
                         if pa.contains(x, rect.y_top) {
-                            pb.set_char(x, rect.y_top, self.theme.chars.fill.half_upper, color, Z_DATA);
+                            pb.set_char(
+                                x,
+                                rect.y_top,
+                                self.theme.chars.fill.half_upper,
+                                color,
+                                Z_DATA,
+                            );
                         }
                     }
                 }

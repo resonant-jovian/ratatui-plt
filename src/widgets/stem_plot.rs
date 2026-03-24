@@ -173,7 +173,13 @@ impl Widget for &StemPlot {
         let base_yi = base_sy.round() as u16;
         if base_yi >= pa.y && base_yi < pa.y + pa.height {
             for x in pa.x..pa.x + pa.width {
-                pb.set_char(x, base_yi, self.theme.chars.border.horizontal, self.theme.axis_color, Z_CHROME);
+                pb.set_char(
+                    x,
+                    base_yi,
+                    self.theme.chars.border.horizontal,
+                    self.theme.axis_color,
+                    Z_CHROME,
+                );
             }
         }
 
@@ -194,7 +200,13 @@ impl Widget for &StemPlot {
             let y_bot = yi.max(base_yi);
             for row in y_top..=y_bot {
                 if pa.contains(xi, row) {
-                    pb.set_char(xi, row, self.theme.chars.border.vertical, resolved_color, Z_DATA);
+                    pb.set_char(
+                        xi,
+                        row,
+                        self.theme.chars.border.vertical,
+                        resolved_color,
+                        Z_DATA,
+                    );
                 }
             }
 
