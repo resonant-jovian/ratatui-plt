@@ -39,7 +39,7 @@
 ### How it works
 
 ```mermaid
-flowchart LR
+flowchart TD
     subgraph input["Your Data"]
         A1["Vec&lt;(f64,f64)&gt;"]
         A2["Vec&lt;Vec&lt;f64&gt;&gt;"]
