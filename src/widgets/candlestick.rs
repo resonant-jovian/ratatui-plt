@@ -90,8 +90,8 @@ impl Default for CandlestickChart {
             x_axis: Axis::new(),
             y_axis: Axis::new(),
             title: None,
-            bull_color: Color::Green,
-            bear_color: Color::Red,
+            bull_color: Theme::get_default().positive_color,
+            bear_color: Theme::get_default().negative_color,
             theme: Theme::get_default(),
             spines: Spines::default(),
             reference_lines: Vec::new(),
@@ -213,7 +213,11 @@ impl Widget for &CandlestickChart {
         let slot_width = pa.width / n_candles.max(1);
         // Body takes ~60% of slot, rest is gap. Force odd for centered wick.
         let body_w = (slot_width * 3 / 5).max(1);
-        let body_width = if body_w.is_multiple_of(2) { body_w + 1 } else { body_w };
+        let body_width = if body_w.is_multiple_of(2) {
+            body_w + 1
+        } else {
+            body_w
+        };
         let half_body = body_width / 2;
 
         // Draw each candle
@@ -267,7 +271,7 @@ impl Widget for &CandlestickChart {
             for y in body_top..=body_bot {
                 for x in body_left..=body_right {
                     if pa.contains(x, y) {
-                        pb.set_char(x, y, '█', color, Z_DATA);
+                        pb.set_char(x, y, self.theme.chars.fill.solid, color, Z_DATA);
                     }
                 }
             }
@@ -275,11 +279,11 @@ impl Widget for &CandlestickChart {
             // 3. Draw wicks on center column at Z_MARKER (on top of body fill)
             if wick_top < body_top {
                 if pa.contains(sx, wick_top) {
-                    pb.set_char(sx, wick_top, '┬', color, Z_MARKER);
+                    pb.set_char(sx, wick_top, self.theme.chars.tick.cap_top, color, Z_MARKER);
                 }
                 for y in (wick_top + 1)..body_top {
                     if pa.contains(sx, y) {
-                        pb.set_char(sx, y, '│', color, Z_MARKER);
+                        pb.set_char(sx, y, self.theme.chars.border.vertical, color, Z_MARKER);
                     }
                 }
             }
@@ -287,12 +291,18 @@ impl Widget for &CandlestickChart {
                 if wick_bot > body_bot + 1 {
                     for y in (body_bot + 1)..wick_bot {
                         if pa.contains(sx, y) {
-                            pb.set_char(sx, y, '│', color, Z_MARKER);
+                            pb.set_char(sx, y, self.theme.chars.border.vertical, color, Z_MARKER);
                         }
                     }
                 }
                 if pa.contains(sx, wick_bot) {
-                    pb.set_char(sx, wick_bot, '┴', color, Z_MARKER);
+                    pb.set_char(
+                        sx,
+                        wick_bot,
+                        self.theme.chars.tick.cap_bottom,
+                        color,
+                        Z_MARKER,
+                    );
                 }
             }
         }

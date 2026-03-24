@@ -452,36 +452,84 @@ impl Widget for &BoxPlot {
                 // Unfilled mode: draw box outline only
                 // Top edge (Q3) with corners
                 if pa.contains(box_left, sy_q3) {
-                    pb.set_char(box_left, sy_q3, '┌', border_fg, Z_DATA);
+                    pb.set_char(
+                        box_left,
+                        sy_q3,
+                        self.theme.chars.border.top_left,
+                        border_fg,
+                        Z_DATA,
+                    );
                 }
                 for x in (box_left + 1)..box_right.saturating_sub(1) {
                     if pa.contains(x, sy_q3) {
-                        pb.set_char(x, sy_q3, '─', border_fg, Z_DATA);
+                        pb.set_char(
+                            x,
+                            sy_q3,
+                            self.theme.chars.border.horizontal,
+                            border_fg,
+                            Z_DATA,
+                        );
                     }
                 }
                 if box_right > box_left + 1 && pa.contains(box_right - 1, sy_q3) {
-                    pb.set_char(box_right - 1, sy_q3, '┐', border_fg, Z_DATA);
+                    pb.set_char(
+                        box_right - 1,
+                        sy_q3,
+                        self.theme.chars.border.top_right,
+                        border_fg,
+                        Z_DATA,
+                    );
                 }
                 // Bottom edge (Q1) with corners
                 if pa.contains(box_left, sy_q1) {
-                    pb.set_char(box_left, sy_q1, '└', border_fg, Z_DATA);
+                    pb.set_char(
+                        box_left,
+                        sy_q1,
+                        self.theme.chars.border.bottom_left,
+                        border_fg,
+                        Z_DATA,
+                    );
                 }
                 for x in (box_left + 1)..box_right.saturating_sub(1) {
                     if pa.contains(x, sy_q1) {
-                        pb.set_char(x, sy_q1, '─', border_fg, Z_DATA);
+                        pb.set_char(
+                            x,
+                            sy_q1,
+                            self.theme.chars.border.horizontal,
+                            border_fg,
+                            Z_DATA,
+                        );
                     }
                 }
                 if box_right > box_left + 1 && pa.contains(box_right - 1, sy_q1) {
-                    pb.set_char(box_right - 1, sy_q1, '┘', border_fg, Z_DATA);
+                    pb.set_char(
+                        box_right - 1,
+                        sy_q1,
+                        self.theme.chars.border.bottom_right,
+                        border_fg,
+                        Z_DATA,
+                    );
                 }
                 // Side walls — always straight (no notch indentation in outline mode)
                 {
                     for y in (sy_q3 + 1)..sy_q1 {
                         if pa.contains(box_left, y) {
-                            pb.set_char(box_left, y, '│', border_fg, Z_DATA);
+                            pb.set_char(
+                                box_left,
+                                y,
+                                self.theme.chars.border.vertical,
+                                border_fg,
+                                Z_DATA,
+                            );
                         }
                         if box_right > 0 && pa.contains(box_right - 1, y) {
-                            pb.set_char(box_right - 1, y, '│', border_fg, Z_DATA);
+                            pb.set_char(
+                                box_right - 1,
+                                y,
+                                self.theme.chars.border.vertical,
+                                border_fg,
+                                Z_DATA,
+                            );
                         }
                     }
                 }
@@ -490,7 +538,13 @@ impl Widget for &BoxPlot {
             // Median line — thin horizontal, full box width
             for x in box_left..box_right {
                 if pa.contains(x, sy_median) {
-                    pb.set_char(x, sy_median, '─', border_fg, Z_DATA);
+                    pb.set_char(
+                        x,
+                        sy_median,
+                        self.theme.chars.border.horizontal,
+                        border_fg,
+                        Z_DATA,
+                    );
                 }
             }
 
@@ -511,10 +565,22 @@ impl Widget for &BoxPlot {
             let cap_right = center_x + box_width / 3;
             for x in cap_left..=cap_right {
                 if pa.contains(x, sy_whi) {
-                    pb.set_char(x, sy_whi, '─', border_fg, Z_DATA);
+                    pb.set_char(
+                        x,
+                        sy_whi,
+                        self.theme.chars.border.horizontal,
+                        border_fg,
+                        Z_DATA,
+                    );
                 }
                 if pa.contains(x, sy_wlo) {
-                    pb.set_char(x, sy_wlo, '─', border_fg, Z_DATA);
+                    pb.set_char(
+                        x,
+                        sy_wlo,
+                        self.theme.chars.border.horizontal,
+                        border_fg,
+                        Z_DATA,
+                    );
                 }
             }
 
@@ -526,11 +592,17 @@ impl Widget for &BoxPlot {
                             .round() as u16;
                     if pa.contains(center_x, sy) {
                         let marker_fg = if self.fill_boxes {
-                        crate::drawing::contrasting_color(d.color)
-                    } else {
-                        self.theme.foreground
-                    };
-                        pb.set_char(center_x, sy, '●', marker_fg, Z_MARKER);
+                            crate::drawing::contrasting_color(d.color)
+                        } else {
+                            self.theme.foreground
+                        };
+                        pb.set_char(
+                            center_x,
+                            sy,
+                            self.theme.chars.marker.default_point,
+                            marker_fg,
+                            Z_MARKER,
+                        );
                     }
                 }
             }
@@ -552,7 +624,13 @@ impl Widget for &BoxPlot {
                     } else {
                         self.theme.foreground
                     };
-                    pb.set_char(center_x, sy_mean, '●', marker_fg, Z_MARKER);
+                    pb.set_char(
+                        center_x,
+                        sy_mean,
+                        self.theme.chars.marker.default_point,
+                        marker_fg,
+                        Z_MARKER,
+                    );
                 }
             }
 

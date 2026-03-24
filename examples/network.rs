@@ -34,64 +34,68 @@ fn parse_theme() -> Theme {
 fn main() -> color_eyre::Result<()> {
     color_eyre::install()?;
     Theme::set_default(parse_theme());
+    let theme = Theme::get_default();
+    let community1 = theme.primary;
+    let community2 = theme.secondary;
+    let community3 = theme.accent;
     io::stdout().execute(EnterAlternateScreen)?;
     enable_raw_mode()?;
     let mut terminal = Terminal::new(CrosstermBackend::new(io::stdout()))?;
 
-    // Community 1 (Cyan): Alice, Bob, Carol — upper left triangle
-    // Community 2 (Yellow): Dave, Eve, Frank — upper right triangle
-    // Community 3 (Magenta): Grace, Hank — bottom center pair
+    // Community 1: Alice, Bob, Carol — upper left triangle
+    // Community 2: Dave, Eve, Frank — upper right triangle
+    // Community 3: Grace, Hank — bottom center pair
     //
     // Manual layout gives clean, readable edge orientations.
     let plot = NetworkPlot::new()
         // Community 1 — upper left
         .node(
             GraphNode::new("Alice")
-                .color(Color::Cyan)
+                .color(community1)
                 .position(-3.0, 2.0)
                 .marker(MarkerShape::FilledCircle),
         ) // 0
         .node(
             GraphNode::new("Bob")
-                .color(Color::Cyan)
+                .color(community1)
                 .position(-4.0, 0.0)
                 .marker(MarkerShape::FilledCircle),
         ) // 1
         .node(
             GraphNode::new("Carol")
-                .color(Color::Cyan)
+                .color(community1)
                 .position(-1.5, 0.0)
                 .marker(MarkerShape::FilledCircle),
         ) // 2
         // Community 2 — upper right
         .node(
             GraphNode::new("Dave")
-                .color(Color::Yellow)
+                .color(community2)
                 .position(1.5, 0.0)
                 .marker(MarkerShape::FilledCircle),
         ) // 3
         .node(
             GraphNode::new("Eve")
-                .color(Color::Yellow)
+                .color(community2)
                 .position(3.0, 2.0)
                 .marker(MarkerShape::FilledCircle),
         ) // 4
         .node(
             GraphNode::new("Frank")
-                .color(Color::Yellow)
+                .color(community2)
                 .position(4.0, 0.0)
                 .marker(MarkerShape::FilledCircle),
         ) // 5
         // Community 3 — bottom center
         .node(
             GraphNode::new("Grace")
-                .color(Color::Magenta)
+                .color(community3)
                 .position(-1.0, -2.5)
                 .marker(MarkerShape::FilledCircle),
         ) // 6
         .node(
             GraphNode::new("Hank")
-                .color(Color::Magenta)
+                .color(community3)
                 .position(1.0, -2.5)
                 .marker(MarkerShape::FilledCircle),
         ) // 7

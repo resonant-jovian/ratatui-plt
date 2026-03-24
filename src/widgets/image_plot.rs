@@ -256,10 +256,8 @@ impl ImagePlot {
                 let v11 = data[r1][c1];
                 // If any neighbor is non-finite, fall back to nearest
                 if !v00.is_finite() || !v01.is_finite() || !v10.is_finite() || !v11.is_finite() {
-                    let nearest_r =
-                        if fr < 0.5 { r0 } else { r1 };
-                    let nearest_c =
-                        if fc < 0.5 { c0 } else { c1 };
+                    let nearest_r = if fr < 0.5 { r0 } else { r1 };
+                    let nearest_c = if fc < 0.5 { c0 } else { c1 };
                     return self.sample_color(nearest_r, nearest_c);
                 }
                 let val = v00 * (1.0 - fr) * (1.0 - fc)
@@ -403,19 +401,22 @@ impl Widget for &ImagePlot {
                 let top_row_f = (cy as usize * 2) as f64 / effective_height as f64;
                 let top_col_f = cx as f64 / aw as f64;
 
-                let top_color = self.resolve_pixel_color(
-                    top_row_f, top_col_f, nrows, ncols,
-                );
+                let top_color = self.resolve_pixel_color(top_row_f, top_col_f, nrows, ncols);
 
                 // Bottom half-pixel
                 let bot_row_f = (cy as usize * 2 + 1) as f64 / effective_height as f64;
 
-                let bot_color = self.resolve_pixel_color(
-                    bot_row_f, top_col_f, nrows, ncols,
-                );
+                let bot_color = self.resolve_pixel_color(bot_row_f, top_col_f, nrows, ncols);
 
                 // Use ▀ (upper half block): fg = top color, bg = bottom color
-                pb.set_cell(screen_x, screen_y, '\u{2580}', top_color, bot_color, Z_DATA);
+                pb.set_cell(
+                    screen_x,
+                    screen_y,
+                    self.theme.chars.fill.half_upper,
+                    top_color,
+                    bot_color,
+                    Z_DATA,
+                );
             }
         }
 
@@ -462,17 +463,16 @@ impl ImagePlot {
 
         match self.interpolation {
             Interpolation::Nearest => {
-                let data_row =
-                    (effective_row_frac * nrows as f64).min((nrows - 1) as f64).max(0.0) as usize;
-                let data_col =
-                    (col_frac * ncols as f64).min((ncols - 1) as f64).max(0.0) as usize;
+                let data_row = (effective_row_frac * nrows as f64)
+                    .min((nrows - 1) as f64)
+                    .max(0.0) as usize;
+                let data_col = (col_frac * ncols as f64).min((ncols - 1) as f64).max(0.0) as usize;
                 self.sample_color(data_row, data_col)
             }
             Interpolation::Bilinear => {
                 let data_row_f =
                     (effective_row_frac * nrows as f64 - 0.5).clamp(0.0, (nrows - 1) as f64);
-                let data_col_f =
-                    (col_frac * ncols as f64 - 0.5).clamp(0.0, (ncols - 1) as f64);
+                let data_col_f = (col_frac * ncols as f64 - 0.5).clamp(0.0, (ncols - 1) as f64);
                 self.sample_color_bilinear(data_row_f, data_col_f, nrows, ncols)
             }
         }

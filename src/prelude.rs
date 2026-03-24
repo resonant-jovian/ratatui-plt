@@ -12,6 +12,7 @@ pub use crate::axis::{
     set_cell_aspect, terminal_cell_aspect,
 };
 pub use crate::brushing::{BrushState, SharedBrush, shared_brush};
+pub use crate::chars::CharSet;
 pub use crate::collections::{LineCollection, PathCollection};
 pub use crate::color_cycle::ColorCycle;
 pub use crate::colormap::ColorbarExtend;
@@ -28,6 +29,7 @@ pub use crate::colormap::{
     Colorbar,
     Colormap,
     Coolwarm,
+    Cubehelix,
     Dark2,
     GnBu,
     Grayscale,
@@ -79,37 +81,40 @@ pub use crate::colormap::{
     YlOrBr,
     YlOrRd,
     // Registry
+    colormap_names,
     get_colormap,
 };
 pub use crate::config::{ConfigGuard, PlotConfig};
+#[cfg(feature = "export")]
+pub use crate::export::{ExportError, ExportOptions, buffer_to_png};
 pub use crate::export::{
     buffer_to_ansi, buffer_to_svg, buffer_to_text, render_to_buffer, save_ansi, save_svg, save_text,
 };
-#[cfg(feature = "export")]
-pub use crate::export::{ExportError, ExportOptions, buffer_to_png};
 #[cfg(feature = "kitty")]
 pub use crate::export::{buffer_to_kitty, print_kitty};
 #[cfg(feature = "sixel")]
 pub use crate::export::{buffer_to_sixel, print_sixel};
 pub use crate::frame::{BorderStyle, DataBounds, PlotArea, PlotFrame, RefLineDash, ReferenceLine};
-pub use crate::legend::{InteractiveLegend, Legend, LegendPosition, SharedLegendState, shared_legend_state};
+pub use crate::legend::{
+    InteractiveLegend, Legend, LegendPosition, SharedLegendState, shared_legend_state,
+};
 pub use crate::linked_view::{SharedView, SharedViewState, shared_view};
 pub use crate::norm::{
     AsinhNorm, BoundaryNorm, CenteredNorm, FuncNorm, LinearNorm, LogNorm, Normalize, PowerNorm,
     SymLogNorm, TwoSlopeNorm,
 };
 pub use crate::picking::{PickResult, pick_nearest};
+pub use crate::plot_buffer::{
+    PlotBuffer, Z_ANNOTATION, Z_BACKGROUND, Z_CHROME, Z_DATA, Z_FILL, Z_GRID, Z_MARKER,
+};
 pub use crate::series::{GridData, Series, Series3D, VectorFieldData, split_at_nan};
 pub use crate::spines::Spines;
 pub use crate::style::{DashPattern, FillStyle, HatchPattern, LineStyle, MarkerShape, PlotStyle};
-pub use crate::theme::{Theme, ThemeGuard};
+pub use crate::theme::{Theme, ThemeGuard, theme_names};
 pub use crate::ticker::{
     AutoMinorLocator, CategoricalFormatter, CategoricalLocator, FixedLocator, FuncFormatter,
     LogFormatter, LogLocator, MaxNLocator, MultipleLocator, NullFormatter, NullLocator,
     PercentFormatter, ScalarFormatter, SiFormatter, TickFormatter, TickLocator,
-};
-pub use crate::plot_buffer::{
-    PlotBuffer, Z_ANNOTATION, Z_BACKGROUND, Z_CHROME, Z_DATA, Z_FILL, Z_GRID, Z_MARKER,
 };
 pub use crate::transform::{Camera3D, Camera3DState, aspect_area, square_area};
 
@@ -131,22 +136,26 @@ pub use crate::widgets::gantt::{GanttChart, GanttTask};
 pub use crate::widgets::gauge::{GaugeChart, GaugeSector};
 pub use crate::widgets::heatmap::Heatmap;
 pub use crate::widgets::hexbin::HexbinPlot;
-pub use crate::widgets::image_plot::{ImageData, ImageOrigin, ImagePlot, Interpolation, matshow, spy};
 pub use crate::widgets::hist2d::Hist2D;
 pub use crate::widgets::histogram::Histogram;
+pub use crate::widgets::image_plot::{
+    ImageData, ImageOrigin, ImagePlot, Interpolation, matshow, spy,
+};
 pub use crate::widgets::joint_plot::{JointPlot, MarginalType};
 pub use crate::widgets::line_plot::LinePlot;
 pub use crate::widgets::network::{GraphEdge, GraphLayout, GraphNode, NetworkPlot};
 pub use crate::widgets::parallel_coords::{ParallelAxis, ParallelCoords, ParallelRecord};
 pub use crate::widgets::pcolormesh::Pcolormesh;
 pub use crate::widgets::pie_chart::{PieChart, PieSlice};
+pub use crate::widgets::rect_selector::RectangleSelector;
 pub use crate::widgets::rug::{RugDataset, RugPlot, RugSide};
 pub use crate::widgets::sankey::{SankeyDiagram, SankeyFlow, SankeyNode};
-pub use crate::widgets::rect_selector::RectangleSelector;
 pub use crate::widgets::scatter_plot::ScatterPlot;
 #[cfg(feature = "statistics")]
 pub use crate::widgets::scatter_plot::TrendlineType;
-pub use crate::widgets::span_selector::{SpanDirection, SpanSelector, SpanSelectorState, SharedSpanState, shared_span_state};
+pub use crate::widgets::span_selector::{
+    SharedSpanState, SpanDirection, SpanSelector, SpanSelectorState, shared_span_state,
+};
 pub use crate::widgets::stacked_area::StackedArea;
 pub use crate::widgets::stairs::{StairsDataset, StairsPlot};
 pub use crate::widgets::stem_plot::StemPlot;

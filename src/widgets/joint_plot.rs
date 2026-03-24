@@ -27,6 +27,7 @@ use ratatui::widgets::Widget;
 
 use crate::annotation::Annotation;
 use crate::axis::Axis;
+use crate::chars::CharSet;
 use crate::frame::{DataBounds, PlotFrame, ReferenceLine};
 use crate::legend::{Legend, LegendPosition};
 use crate::plot_buffer::{PlotBuffer, Z_MARKER};
@@ -274,7 +275,8 @@ impl Widget for &JointPlot {
                 let xi = sx.round() as u16;
                 let yi = sy.round() as u16;
                 if pa.contains(xi, yi) {
-                    pb.set_char(xi, yi, marker.char(), s.color, Z_MARKER);
+                    let color = s.color.unwrap_or(self.theme.primary);
+                    pb.set_char(xi, yi, marker.char(), color, Z_MARKER);
                 }
             }
         }
@@ -312,7 +314,8 @@ impl Widget for &JointPlot {
         let marginal_color = self
             .series
             .first()
-            .map_or(Color::Cyan, |s| s.color);
+            .and_then(|s| s.color)
+            .unwrap_or(self.theme.primary);
 
         // Top marginal (x-axis distribution)
         if has_top && top_height >= 2 {
@@ -331,18 +334,14 @@ impl Widget for &JointPlot {
                 plot_origin: pa.x,
                 plot_extent: pa.width,
                 color: marginal_color,
+                chars: &self.theme.chars,
             };
             render_marginal_top(buf, top_area, &cfg);
         }
 
         // Right marginal (y-axis distribution)
         if has_right && right_width >= 2 {
-            let right_area = Rect::new(
-                area.x + central_width,
-                pa.y,
-                right_width,
-                pa.height,
-            );
+            let right_area = Rect::new(area.x + central_width, pa.y, right_width, pa.height);
             let cfg = MarginalConfig {
                 data: &all_y,
                 marginal_type: &self.marginal_y,
@@ -352,6 +351,7 @@ impl Widget for &JointPlot {
                 plot_origin: pa.y,
                 plot_extent: pa.height,
                 color: marginal_color,
+                chars: &self.theme.chars,
             };
             render_marginal_right(buf, right_area, &cfg);
         }
@@ -370,6 +370,7 @@ struct MarginalConfig<'a> {
     /// Screen extent of the aligned axis in the central plot.
     plot_extent: u16,
     color: Color,
+    chars: &'a CharSet,
 }
 
 /// Render the top marginal distribution.
@@ -405,7 +406,9 @@ fn render_marginal_top(buf: &mut Buffer, area: Rect, cfg: &MarginalConfig<'_>) {
                 for dy in 0..bar_height {
                     let y = area.y + area.height - 1 - dy;
                     if xi >= area.x && xi < area.x + area.width && y >= area.y {
-                        buf[(xi, y)].set_char('\u{2588}').set_fg(cfg.color);
+                        buf[(xi, y)]
+                            .set_char(cfg.chars.fill.solid)
+                            .set_fg(cfg.color);
                     }
                 }
             }
@@ -428,13 +431,14 @@ fn render_marginal_top(buf: &mut Buffer, area: Rect, cfg: &MarginalConfig<'_>) {
                     (cfg.plot_origin + cfg.plot_extent - 1) as f64,
                 );
                 let xi = sx.round() as u16;
-                let bar_height =
-                    ((density / max_val) * area.height as f64).round() as u16;
+                let bar_height = ((density / max_val) * area.height as f64).round() as u16;
 
                 for dy in 0..bar_height {
                     let y = area.y + area.height - 1 - dy;
                     if xi >= area.x && xi < area.x + area.width && y >= area.y {
-                        buf[(xi, y)].set_char('\u{2591}').set_fg(cfg.color);
+                        buf[(xi, y)]
+                            .set_char(cfg.chars.fill.light)
+                            .set_fg(cfg.color);
                     }
                 }
             }
@@ -451,7 +455,9 @@ fn render_marginal_top(buf: &mut Buffer, area: Rect, cfg: &MarginalConfig<'_>) {
                 );
                 let xi = sx.round() as u16;
                 if xi >= area.x && xi < area.x + area.width && y >= area.y {
-                    buf[(xi, y)].set_char('\u{2502}').set_fg(cfg.color);
+                    buf[(xi, y)]
+                        .set_char(cfg.chars.border.vertical)
+                        .set_fg(cfg.color);
                 }
             }
         }
@@ -492,7 +498,9 @@ fn render_marginal_right(buf: &mut Buffer, area: Rect, cfg: &MarginalConfig<'_>)
                 for dx in 0..bar_width {
                     let x = area.x + dx;
                     if x < area.x + area.width && yi >= area.y && yi < area.y + area.height {
-                        buf[(x, yi)].set_char('\u{2588}').set_fg(cfg.color);
+                        buf[(x, yi)]
+                            .set_char(cfg.chars.fill.solid)
+                            .set_fg(cfg.color);
                     }
                 }
             }
@@ -515,13 +523,14 @@ fn render_marginal_right(buf: &mut Buffer, area: Rect, cfg: &MarginalConfig<'_>)
                     cfg.plot_origin as f64,
                 );
                 let yi = sy.round() as u16;
-                let bar_width =
-                    ((density / max_val) * area.width as f64).round() as u16;
+                let bar_width = ((density / max_val) * area.width as f64).round() as u16;
 
                 for dx in 0..bar_width {
                     let x = area.x + dx;
                     if x < area.x + area.width && yi >= area.y && yi < area.y + area.height {
-                        buf[(x, yi)].set_char('\u{2591}').set_fg(cfg.color);
+                        buf[(x, yi)]
+                            .set_char(cfg.chars.fill.light)
+                            .set_fg(cfg.color);
                     }
                 }
             }
@@ -538,7 +547,9 @@ fn render_marginal_right(buf: &mut Buffer, area: Rect, cfg: &MarginalConfig<'_>)
                 );
                 let yi = sy.round() as u16;
                 if yi >= area.y && yi < area.y + area.height && x < area.x + area.width {
-                    buf[(x, yi)].set_char('\u{2500}').set_fg(cfg.color);
+                    buf[(x, yi)]
+                        .set_char(cfg.chars.border.horizontal)
+                        .set_fg(cfg.color);
                 }
             }
         }

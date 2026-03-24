@@ -67,7 +67,7 @@ impl Heatmap {
             show_colorbar: true,
             aspect_ratio: AspectRatio::Auto,
             show_values: false,
-            bad_color: Color::DarkGray,
+            bad_color: Theme::get_default().bad_data_color,
             mask: None,
             theme: Theme::get_default(),
             spines: Spines::default(),
@@ -266,7 +266,14 @@ impl Widget for &Heatmap {
                 };
 
                 // Use ▀ (upper half block): fg = top color, bg = bottom color
-                pb.set_cell(screen_x, screen_y, '▀', top_color, bot_color, Z_DATA);
+                pb.set_cell(
+                    screen_x,
+                    screen_y,
+                    self.theme.chars.fill.half_upper,
+                    top_color,
+                    bot_color,
+                    Z_DATA,
+                );
             }
         }
 

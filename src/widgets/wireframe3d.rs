@@ -26,7 +26,7 @@ use crate::transform::{Camera3D, Camera3DState, data_to_screen};
 pub struct Wireframe3D {
     data: GridData,
     camera: Camera3D,
-    color: Color,
+    color: Option<Color>,
     title: Option<String>,
     theme: Theme,
 }
@@ -36,7 +36,7 @@ impl Wireframe3D {
         Self {
             data,
             camera: Camera3D::default(),
-            color: Color::Cyan,
+            color: None,
             title: None,
             theme: Theme::get_default(),
         }
@@ -47,7 +47,7 @@ impl Wireframe3D {
         self
     }
     pub fn color(mut self, c: Color) -> Self {
-        self.color = c;
+        self.color = Some(c);
         self
     }
     pub fn title(mut self, t: impl Into<String>) -> Self {
@@ -198,7 +198,8 @@ impl Wireframe3D {
         for seg in &segments {
             let brightness =
                 ((seg.depth - depth_min) / depth_range * 200.0 + 55.0).clamp(55.0, 255.0) as u8;
-            let (r, g, b) = match self.color {
+            let resolved_color = self.color.unwrap_or(self.theme.primary);
+            let (r, g, b) = match resolved_color {
                 Color::Rgb(r, g, b) => (r, g, b),
                 Color::Cyan => (0, 255, 255),
                 Color::Green => (0, 255, 0),
@@ -247,7 +248,11 @@ fn write_braille(buf: &mut Buffer, x: u16, y: u16, bits: u8, color: Color) {
     };
     let combined = existing_bits | bits;
     if let Some(ch) = char::from_u32(BRAILLE_BASE + combined as u32) {
-        let fg = if crate::drawing::colors_match(color, existing_bg) { crate::drawing::contrasting_color(color) } else { color };
+        let fg = if crate::drawing::colors_match(color, existing_bg) {
+            crate::drawing::contrasting_color(color)
+        } else {
+            color
+        };
         buf[(x, y)].set_char(ch).set_fg(fg).set_bg(existing_bg);
     }
 }

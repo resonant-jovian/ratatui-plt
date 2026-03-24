@@ -26,7 +26,7 @@ use crate::axis::Axis;
 use crate::drawing::draw_braille_line_pb;
 use crate::frame::{DataBounds, PlotFrame, ReferenceLine};
 use crate::legend::{Legend, LegendEntry, LegendPosition};
-use crate::plot_buffer::{PlotBuffer, Z_FILL};
+use crate::plot_buffer::{PlotBuffer, Z_DATA, Z_FILL};
 use crate::spines::Spines;
 use crate::theme::Theme;
 
@@ -254,7 +254,7 @@ impl Widget for &StairsPlot {
         };
 
         // Draw each dataset
-        for ds in &self.datasets {
+        for (si, ds) in self.datasets.iter().enumerate() {
             let n = ds.values.len();
             if n == 0 || ds.edges.len() != n + 1 {
                 continue;
@@ -292,12 +292,30 @@ impl Widget for &StairsPlot {
                     let sy = pa.screen_y(ds.values[i]);
 
                     // Horizontal segment at current value
-                    draw_braille_line_pb(&mut pb, sx_left, sy, sx_right, sy, ds.color, &pa);
+                    draw_braille_line_pb(
+                        &mut pb,
+                        sx_left,
+                        sy,
+                        sx_right,
+                        sy,
+                        ds.color,
+                        &pa,
+                        Z_DATA + si as u8,
+                    );
 
                     // Vertical segment at the right edge connecting to next value
                     if i + 1 < n {
                         let sy_next = pa.screen_y(ds.values[i + 1]);
-                        draw_braille_line_pb(&mut pb, sx_right, sy, sx_right, sy_next, ds.color, &pa);
+                        draw_braille_line_pb(
+                            &mut pb,
+                            sx_right,
+                            sy,
+                            sx_right,
+                            sy_next,
+                            ds.color,
+                            &pa,
+                            Z_DATA + si as u8,
+                        );
                     }
                 }
             }
@@ -319,7 +337,7 @@ impl Widget for &StairsPlot {
                 .map(|ds| LegendEntry {
                     name: ds.name.clone(),
                     color: ds.color,
-                    marker: Some('━'),
+                    marker: Some(self.theme.chars.marker.legend_line),
                 })
                 .collect();
             let legend = Legend::new(entries)

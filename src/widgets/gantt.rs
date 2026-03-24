@@ -187,11 +187,7 @@ impl Widget for &GanttChart {
 
         // Add padding
         let x_range = x_max - x_min;
-        let x_pad = if x_range == 0.0 {
-            1.0
-        } else {
-            x_range * 0.05
-        };
+        let x_pad = if x_range == 0.0 { 1.0 } else { x_range * 0.05 };
         let x_lo = x_min - x_pad;
         let x_hi = x_max + x_pad;
 
@@ -260,14 +256,9 @@ impl Widget for &GanttChart {
             let y_bot = screen_y_top.max(screen_y_bot);
 
             for &(start, dur) in &task.segments {
-                let screen_x_start = data_to_screen(
-                    start,
-                    x_lo,
-                    x_hi,
-                    pa.x as f64,
-                    (pa.x + pa.width - 1) as f64,
-                )
-                .round() as u16;
+                let screen_x_start =
+                    data_to_screen(start, x_lo, x_hi, pa.x as f64, (pa.x + pa.width - 1) as f64)
+                        .round() as u16;
                 let screen_x_end = data_to_screen(
                     start + dur,
                     x_lo,

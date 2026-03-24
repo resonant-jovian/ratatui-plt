@@ -30,6 +30,7 @@ colors = ["#e94560", "#0f3460", "#16c79a", "#f5a623", "#b721ff"]
 
     // Apply the theme to a plot.
     let _guard = theme.activate();
+    let theme = Theme::get_default();
 
     let series = Series::new("data")
         .data(
@@ -40,13 +41,13 @@ colors = ["#e94560", "#0f3460", "#16c79a", "#f5a623", "#b721ff"]
                 })
                 .collect(),
         )
-        .color(Color::Cyan);
+        .color(theme.primary);
 
     let plot = LinePlot::new()
         .series(series)
         .title("TOML Theme Demo")
         .x_axis(Axis::new().label("x"))
-        .y_axis(Axis::new().label("f(x)"));
+        .y_axis(Axis::new().label("f(x)").label_position(LabelPosition::End));
 
     let buf = render_to_buffer(&plot, 60, 20);
     let text = buffer_to_text(&buf);

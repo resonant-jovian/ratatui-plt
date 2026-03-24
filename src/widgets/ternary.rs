@@ -49,7 +49,7 @@ impl TernaryData {
         Self {
             label: label.into(),
             points: Vec::new(),
-            color: Color::White,
+            color: Theme::get_default().primary,
             marker: MarkerShape::FilledCircle,
         }
     }
@@ -255,6 +255,7 @@ impl Widget for &TernaryPlot {
             self.theme.axis_color,
             Z_CHROME,
             &clip,
+            &self.theme.chars.border,
         );
         draw_screen_line_pb(
             &mut pb,
@@ -265,6 +266,7 @@ impl Widget for &TernaryPlot {
             self.theme.axis_color,
             Z_CHROME,
             &clip,
+            &self.theme.chars.border,
         );
         draw_screen_line_pb(
             &mut pb,
@@ -275,6 +277,7 @@ impl Widget for &TernaryPlot {
             self.theme.axis_color,
             Z_CHROME,
             &clip,
+            &self.theme.chars.border,
         );
 
         // Draw grid lines
@@ -288,21 +291,51 @@ impl Widget for &TernaryPlot {
                 let (x1, y1) = ternary_to_cartesian(0.0, 1.0 - frac, frac);
                 let (sx0, sy0) = to_screen(x0, y0);
                 let (sx1, sy1) = to_screen(x1, y1);
-                draw_screen_line_pb(&mut pb, sx0, sy0, sx1, sy1, self.theme.grid_color, Z_GRID, &clip);
+                draw_screen_line_pb(
+                    &mut pb,
+                    sx0,
+                    sy0,
+                    sx1,
+                    sy1,
+                    self.theme.grid_color,
+                    Z_GRID,
+                    &clip,
+                    &self.theme.chars.border,
+                );
 
                 // Lines parallel to left edge (constant b)
                 let (x0, y0) = ternary_to_cartesian(1.0 - frac, frac, 0.0);
                 let (x1, y1) = ternary_to_cartesian(0.0, frac, 1.0 - frac);
                 let (sx0, sy0) = to_screen(x0, y0);
                 let (sx1, sy1) = to_screen(x1, y1);
-                draw_screen_line_pb(&mut pb, sx0, sy0, sx1, sy1, self.theme.grid_color, Z_GRID, &clip);
+                draw_screen_line_pb(
+                    &mut pb,
+                    sx0,
+                    sy0,
+                    sx1,
+                    sy1,
+                    self.theme.grid_color,
+                    Z_GRID,
+                    &clip,
+                    &self.theme.chars.border,
+                );
 
                 // Lines parallel to right edge (constant a)
                 let (x0, y0) = ternary_to_cartesian(frac, 1.0 - frac, 0.0);
                 let (x1, y1) = ternary_to_cartesian(frac, 0.0, 1.0 - frac);
                 let (sx0, sy0) = to_screen(x0, y0);
                 let (sx1, sy1) = to_screen(x1, y1);
-                draw_screen_line_pb(&mut pb, sx0, sy0, sx1, sy1, self.theme.grid_color, Z_GRID, &clip);
+                draw_screen_line_pb(
+                    &mut pb,
+                    sx0,
+                    sy0,
+                    sx1,
+                    sy1,
+                    self.theme.grid_color,
+                    Z_GRID,
+                    &clip,
+                    &self.theme.chars.border,
+                );
             }
         }
 
@@ -447,6 +480,7 @@ fn draw_screen_line_pb(
     color: Color,
     z: u8,
     clip: &TernaryClip,
+    border: &crate::chars::BorderChars,
 ) {
     let mut ix = x0.round() as i32;
     let mut iy = y0.round() as i32;
@@ -467,9 +501,9 @@ fn draw_screen_line_pb(
         {
             // Choose line character based on direction
             let ch = if dx > dy.abs() * 2 {
-                '─'
+                border.horizontal
             } else if dy.abs() > dx * 2 {
-                '│'
+                border.vertical
             } else if (ix1 > ix) == (iy1 > iy) {
                 '╲'
             } else {

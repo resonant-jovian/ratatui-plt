@@ -29,6 +29,7 @@ fn parse_theme() -> Theme {
 fn main() -> color_eyre::Result<()> {
     color_eyre::install()?;
     Theme::set_default(parse_theme());
+    let theme = Theme::get_default();
     io::stdout().execute(EnterAlternateScreen)?;
     enable_raw_mode()?;
     let mut terminal = Terminal::new(CrosstermBackend::new(io::stdout()))?;
@@ -55,7 +56,7 @@ fn main() -> color_eyre::Result<()> {
         .series(
             Series::new("spiral")
                 .data(scatter_points)
-                .color(Color::Cyan)
+                .color(theme.primary)
                 .marker(MarkerShape::FilledCircle),
         )
         .title("Spiral Scatter")
@@ -68,7 +69,7 @@ fn main() -> color_eyre::Result<()> {
         .dataset(BarDataset::new(
             "Values",
             vec![8.0, 15.0, 12.0, 20.0, 6.0],
-            Color::Cyan,
+            theme.primary,
         ))
         .title("Sample Bars");
 
@@ -86,8 +87,8 @@ fn main() -> color_eyre::Result<()> {
         })
         .collect();
     let line_plot = LinePlot::new()
-        .series(Series::new("sin").data(sine_data).color(Color::Cyan))
-        .series(Series::new("cos").data(cosine_data).color(Color::Yellow))
+        .series(Series::new("sin").data(sine_data).color(theme.primary))
+        .series(Series::new("cos").data(cosine_data).color(theme.secondary))
         .title("Sine & Cosine")
         .show_legend(true);
 

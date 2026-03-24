@@ -95,12 +95,20 @@ fn main() -> color_eyre::Result<()> {
         })
         .collect();
 
+    let theme = Theme::get_default();
+    let mut cycle = theme.color_cycle.clone();
+
     let plot = BoxenPlot::new()
-        .group(BoxenGroup::new("Server A", server_a, Color::Cyan))
-        .group(BoxenGroup::new("Server B", server_b, Color::Yellow))
-        .group(BoxenGroup::new("Server C", server_c, Color::Magenta))
+        .group(BoxenGroup::new("Server A", server_a, cycle.next_color()))
+        .group(BoxenGroup::new("Server B", server_b, cycle.next_color()))
+        .group(BoxenGroup::new("Server C", server_c, cycle.next_color()))
         .title("Letter-Value Plot: Server Latencies (q to quit)")
-        .y_axis(Axis::new().label("Latency (ms)").grid(true).label_position(LabelPosition::End));
+        .y_axis(
+            Axis::new()
+                .label("Latency (ms)")
+                .grid(true)
+                .label_position(LabelPosition::End),
+        );
 
     loop {
         terminal.draw(|frame| {

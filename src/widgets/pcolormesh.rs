@@ -361,7 +361,7 @@ impl Widget for &Pcolormesh {
                         if pa.contains(ux, uy)
                             && point_in_quad(sx as f64, sy as f64, &corners_screen)
                         {
-                            pb.set_cell(ux, uy, '█', color, color, Z_DATA);
+                            pb.set_cell(ux, uy, self.theme.chars.fill.solid, color, color, Z_DATA);
                         }
                     }
                 }

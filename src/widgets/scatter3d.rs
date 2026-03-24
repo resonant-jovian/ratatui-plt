@@ -155,7 +155,7 @@ impl Scatter3D {
                     let t = z_norm.normalize(val);
                     self.colormap.color_at(t)
                 } else {
-                    s.color
+                    s.color.unwrap_or(self.theme.primary)
                 };
 
                 all_points.push((sx, sy, depth, color));
@@ -238,31 +238,37 @@ impl Scatter3D {
         // X axis line and label
         let xx = data_to_screen(x_tip.0, sx_min, sx_max, px as f64, (px + pw - 1) as f64);
         let xy = data_to_screen(x_tip.1, sy_min, sy_max, py as f64, (py + ph - 1) as f64);
-        draw_braille_line(buf, ox, oy, xx, xy, Color::Red, &clip);
+        draw_braille_line(buf, ox, oy, xx, xy, self.theme.x_axis_3d_color, &clip);
         let xxi = xx.round() as u16;
         let xyi = xy.round() as u16;
         if xxi >= px && xxi < px + pw && xyi >= py && xyi < py + ph {
-            buf[(xxi, xyi)].set_char('X').set_fg(Color::Red);
+            buf[(xxi, xyi)]
+                .set_char('X')
+                .set_fg(self.theme.x_axis_3d_color);
         }
 
         // Y axis line and label
         let yx = data_to_screen(y_tip.0, sx_min, sx_max, px as f64, (px + pw - 1) as f64);
         let yy = data_to_screen(y_tip.1, sy_min, sy_max, py as f64, (py + ph - 1) as f64);
-        draw_braille_line(buf, ox, oy, yx, yy, Color::Green, &clip);
+        draw_braille_line(buf, ox, oy, yx, yy, self.theme.y_axis_3d_color, &clip);
         let yxi = yx.round() as u16;
         let yyi = yy.round() as u16;
         if yxi >= px && yxi < px + pw && yyi >= py && yyi < py + ph {
-            buf[(yxi, yyi)].set_char('Y').set_fg(Color::Green);
+            buf[(yxi, yyi)]
+                .set_char('Y')
+                .set_fg(self.theme.y_axis_3d_color);
         }
 
         // Z axis line and label
         let zx = data_to_screen(z_tip.0, sx_min, sx_max, px as f64, (px + pw - 1) as f64);
         let zy = data_to_screen(z_tip.1, sy_min, sy_max, py as f64, (py + ph - 1) as f64);
-        draw_braille_line(buf, ox, oy, zx, zy, Color::Blue, &clip);
+        draw_braille_line(buf, ox, oy, zx, zy, self.theme.z_axis_3d_color, &clip);
         let zxi = zx.round() as u16;
         let zyi = zy.round() as u16;
         if zxi >= px && zxi < px + pw && zyi >= py && zyi < py + ph {
-            buf[(zxi, zyi)].set_char('Z').set_fg(Color::Blue);
+            buf[(zxi, zyi)]
+                .set_char('Z')
+                .set_fg(self.theme.z_axis_3d_color);
         }
     }
 }
@@ -306,7 +312,11 @@ fn write_braille(buf: &mut Buffer, x: u16, y: u16, bits: u8, color: Color) {
     };
     let combined = existing_bits | bits;
     if let Some(ch) = char::from_u32(BRAILLE_BASE + combined as u32) {
-        let fg = if crate::drawing::colors_match(color, existing_bg) { crate::drawing::contrasting_color(color) } else { color };
+        let fg = if crate::drawing::colors_match(color, existing_bg) {
+            crate::drawing::contrasting_color(color)
+        } else {
+            color
+        };
         buf[(x, y)].set_char(ch).set_fg(fg).set_bg(existing_bg);
     }
 }

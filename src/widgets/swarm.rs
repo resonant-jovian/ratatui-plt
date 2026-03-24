@@ -194,7 +194,11 @@ impl Widget for &SwarmPlot {
         // Track occupied screen cells for collision avoidance
         let mut occupied: HashSet<(u16, u16)> = HashSet::new();
 
-        let marker = if self.point_size > 1 { '●' } else { '•' };
+        let marker = if self.point_size > 1 {
+            self.theme.chars.marker.default_point
+        } else {
+            self.theme.chars.marker.small_point
+        };
 
         // Max horizontal displacement (half the column width)
         let col_width = pa.width / n.max(1) as u16;

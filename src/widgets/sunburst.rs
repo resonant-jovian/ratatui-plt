@@ -295,7 +295,14 @@ impl Widget for &Sunburst {
                 // Find matching segment
                 for seg in &segments {
                     if seg.level == level && angle >= seg.angle_start && angle < seg.angle_end {
-                        pb.set_cell(screen_x, screen_y, '█', seg.color, seg.color, Z_DATA);
+                        pb.set_cell(
+                            screen_x,
+                            screen_y,
+                            self.theme.chars.fill.solid,
+                            seg.color,
+                            seg.color,
+                            Z_DATA,
+                        );
                         break;
                     }
                 }

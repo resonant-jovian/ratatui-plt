@@ -38,6 +38,8 @@ fn main() -> color_eyre::Result<()> {
     enable_raw_mode()?;
     let mut terminal = Terminal::new(CrosstermBackend::new(io::stdout()))?;
 
+    let theme = Theme::get_default();
+
     // Model: damped oscillation  y(t) = sin(2*pi*t/3) * exp(-t/8)
     // Uncertainty grows with time: sigma(t) = 0.08 + 0.10*t
     let n = 150;
@@ -83,24 +85,34 @@ fn main() -> color_eyre::Result<()> {
     let y_line_hi = y_center;
 
     let band_2sig = Band::new("\u{00b1}2\u{03c3} (95%)", x.clone(), y_2sig_lo, y_2sig_hi)
-        .color(Color::Blue)
-        .alpha_char('\u{2591}'); // light shade
+        .color(theme.secondary)
+        .alpha_char(theme.chars.fill.light);
 
     let band_1sig = Band::new("\u{00b1}1\u{03c3} (68%)", x.clone(), y_1sig_lo, y_1sig_hi)
-        .color(Color::Cyan)
-        .alpha_char('\u{2592}'); // medium shade
+        .color(theme.primary)
+        .alpha_char(theme.chars.fill.medium);
 
     let center_line = Band::new("Prediction", x.clone(), y_line_lo, y_line_hi)
-        .color(Color::White)
-        .alpha_char('\u{2501}'); // heavy horizontal
+        .color(theme.foreground)
+        .alpha_char(theme.chars.dash.bold_h);
 
     let plot = BandPlot::new()
         .band(band_2sig)
         .band(band_1sig)
         .band(center_line)
         .title("Model Uncertainty Band (q to quit)")
-        .x_axis(Axis::new().label("Time [s]").grid(true).label_position(LabelPosition::End))
-        .y_axis(Axis::new().label("Amplitude").grid(true).label_position(LabelPosition::End))
+        .x_axis(
+            Axis::new()
+                .label("Time [s]")
+                .grid(true)
+                .label_position(LabelPosition::End),
+        )
+        .y_axis(
+            Axis::new()
+                .label("Amplitude")
+                .grid(true)
+                .label_position(LabelPosition::End),
+        )
         .show_legend(true)
         .legend_position(LegendPosition::TopRight);
 
@@ -109,9 +121,8 @@ fn main() -> color_eyre::Result<()> {
             // Leave right margin for the End-positioned x-label box
             let fa = frame.area();
             let margin = 14; // label box width ("Time [s]" + borders + padding)
-            let avail = ratatui::layout::Rect::new(
-                fa.x, fa.y, fa.width.saturating_sub(margin), fa.height,
-            );
+            let avail =
+                ratatui::layout::Rect::new(fa.x, fa.y, fa.width.saturating_sub(margin), fa.height);
             frame.render_widget(&plot, square_area(avail));
         })?;
 

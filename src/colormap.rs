@@ -29,11 +29,20 @@ pub trait Colormap: Send + Sync {
     fn name(&self) -> &str;
 }
 
+impl Colormap for Box<dyn Colormap> {
+    fn color_at(&self, t: f64) -> Color {
+        (**self).color_at(t)
+    }
+    fn name(&self) -> &str {
+        (**self).name()
+    }
+}
+
 /// Interpolate between RGB color stops.
 fn lerp_color_stops(t: f64, stops: &[(f64, (u8, u8, u8))]) -> Color {
     let t = t.clamp(0.0, 1.0);
     if stops.is_empty() {
-        return Color::White;
+        return Color::Rgb(128, 128, 128);
     }
     if t <= stops[0].0 {
         let (r, g, b) = stops[0].1;
@@ -54,7 +63,7 @@ fn lerp_color_stops(t: f64, stops: &[(f64, (u8, u8, u8))]) -> Color {
             return Color::Rgb(r, g, b);
         }
     }
-    Color::White
+    Color::Rgb(128, 128, 128)
 }
 
 /// Viridis: perceptually uniform sequential colormap (dark purple → green → yellow).
@@ -349,6 +358,54 @@ impl Colormap for Hot {
 }
 
 /// User-defined colormap from a list of color stops.
+/// Cubehelix: perceptually monotonic spiral through color space (black → purple → teal → green → white).
+///
+/// Based on Green (2011), this colormap spirals through RGB while keeping perceived
+/// brightness monotonically increasing. Excellent for scientific data where grayscale
+/// printing must also work.
+#[derive(Clone, Copy, Debug)]
+pub struct Cubehelix;
+
+impl Colormap for Cubehelix {
+    fn color_at(&self, t: f64) -> Color {
+        let t = t.clamp(0.0, 1.0);
+        // 9-stop approximation of the default cubehelix (start=0.5, rotations=-1.5, hue=1.0)
+        const STOPS: [(f64, u8, u8, u8); 9] = [
+            (0.000, 0, 0, 0),
+            (0.125, 22, 17, 42),
+            (0.250, 15, 56, 62),
+            (0.375, 28, 98, 47),
+            (0.500, 87, 117, 58),
+            (0.625, 168, 115, 103),
+            (0.750, 196, 130, 182),
+            (0.875, 199, 180, 238),
+            (1.000, 255, 255, 255),
+        ];
+        // Find surrounding stops and interpolate
+        let mut lo = 0;
+        for (i, stop) in STOPS.iter().enumerate().skip(1) {
+            if stop.0 >= t {
+                lo = i - 1;
+                break;
+            }
+            lo = i;
+        }
+        let hi = (lo + 1).min(STOPS.len() - 1);
+        let (t0, r0, g0, b0) = STOPS[lo];
+        let (t1, r1, g1, b1) = STOPS[hi];
+        let frac = if (t1 - t0).abs() < 1e-12 {
+            0.0
+        } else {
+            (t - t0) / (t1 - t0)
+        };
+        let lerp = |a: u8, b: u8| -> u8 { (a as f64 + (b as f64 - a as f64) * frac) as u8 };
+        Color::Rgb(lerp(r0, r1), lerp(g0, g1), lerp(b0, b1))
+    }
+    fn name(&self) -> &str {
+        "cubehelix"
+    }
+}
+
 ///
 /// # Example
 ///
@@ -382,7 +439,7 @@ impl Colormap for ListedColormap {
     fn color_at(&self, t: f64) -> Color {
         let t = t.clamp(0.0, 1.0);
         if self.stops.is_empty() {
-            return Color::White;
+            return Color::Rgb(128, 128, 128);
         }
         if self.stops.len() == 1 {
             return self.stops[0].1;
@@ -403,7 +460,7 @@ impl Colormap for ListedColormap {
                 return lerp_colors(*c0, *c1, frac);
             }
         }
-        Color::White
+        Color::Rgb(128, 128, 128)
     }
 
     fn name(&self) -> &str {
@@ -820,7 +877,7 @@ define_colormap!(Spectral, "Spectral",
 /// Helper for qualitative colormaps: picks nearest color from a palette.
 fn qualitative_color(t: f64, colors: &[(u8, u8, u8)]) -> Color {
     if colors.is_empty() {
-        return Color::White;
+        return Color::Rgb(128, 128, 128);
     }
     let idx = (t.clamp(0.0, 1.0) * (colors.len() - 1) as f64).round() as usize;
     let (r, g, b) = colors[idx.min(colors.len() - 1)];
@@ -1109,8 +1166,71 @@ pub fn get_colormap(name: &str) -> Option<Box<dyn Colormap>> {
         "pastel2" => Some(Box::new(Pastel2)),
         "accent" => Some(Box::new(Accent)),
         "dark2" => Some(Box::new(Dark2)),
+        // Spiral
+        "cubehelix" => Some(Box::new(Cubehelix)),
         _ => None,
     }
+}
+
+/// All available named colormaps in the registry.
+pub fn colormap_names() -> &'static [&'static str] {
+    &[
+        "viridis",
+        "plasma",
+        "inferno",
+        "magma",
+        "cividis",
+        "hot",
+        "spring",
+        "summer",
+        "autumn",
+        "winter",
+        "blues",
+        "greens",
+        "reds",
+        "oranges",
+        "purples",
+        "greys",
+        "ylorbr",
+        "ylorrd",
+        "orrd",
+        "purd",
+        "rdpu",
+        "bupu",
+        "gnbu",
+        "pubu",
+        "ylgnbu",
+        "pubugn",
+        "bugn",
+        "ylgn",
+        "coolwarm",
+        "rdbu",
+        "seismic",
+        "piyg",
+        "prgn",
+        "brbg",
+        "puor",
+        "rdgy",
+        "rdylbu",
+        "rdylgn",
+        "spectral",
+        "twilight",
+        "hsv",
+        "jet",
+        "turbo",
+        "tab20",
+        "tab20b",
+        "tab20c",
+        "paired",
+        "set1",
+        "set2",
+        "set3",
+        "pastel1",
+        "pastel2",
+        "accent",
+        "dark2",
+        "cubehelix",
+    ]
 }
 
 /// Controls how out-of-range values are displayed on the colorbar.
@@ -1155,8 +1275,8 @@ pub struct Colorbar<'a> {
     n_ticks: usize,
     /// Width in characters.
     width: u16,
-    /// Color for tick labels.
-    label_color: Color,
+    /// Color for tick labels (`None` = use theme foreground).
+    label_color: Option<Color>,
     /// How to display out-of-range values.
     extend: ColorbarExtend,
 }
@@ -1171,14 +1291,14 @@ impl<'a> Colorbar<'a> {
             vmax,
             n_ticks: 5,
             width: 4,
-            label_color: Color::White,
+            label_color: None,
             extend: ColorbarExtend::Neither,
         }
     }
 
     /// Set the label color.
     pub fn label_color(mut self, color: Color) -> Self {
-        self.label_color = color;
+        self.label_color = Some(color);
         self
     }
 
@@ -1212,6 +1332,7 @@ impl Widget for &Colorbar<'_> {
         if area.width < 2 || area.height < 2 {
             return;
         }
+        let theme = crate::theme::Theme::get_default();
 
         let bar_width = self.width.min(area.width.saturating_sub(6));
         let label_x = area.x + bar_width + 1;
@@ -1227,7 +1348,9 @@ impl Widget for &Colorbar<'_> {
             let color = self.cmap.color_at(1.0);
             let mid = area.x + bar_width / 2;
             if mid < area.x + area.width {
-                buf[(mid, area.y)].set_char('▲').set_fg(color);
+                buf[(mid, area.y)]
+                    .set_char(theme.chars.colorbar.extend_max)
+                    .set_fg(color);
             }
         }
 
@@ -1239,7 +1362,7 @@ impl Widget for &Colorbar<'_> {
                 let x = area.x + col;
                 let y = grad_start + row;
                 if x < area.x + area.width && y < area.y + area.height {
-                    buf[(x, y)].set_char('█').set_fg(color);
+                    buf[(x, y)].set_char(theme.chars.fill.solid).set_fg(color);
                 }
             }
         }
@@ -1250,7 +1373,9 @@ impl Widget for &Colorbar<'_> {
             let mid = area.x + bar_width / 2;
             let y = grad_start + grad_height;
             if mid < area.x + area.width && y < area.y + area.height {
-                buf[(mid, y)].set_char('▼').set_fg(color);
+                buf[(mid, y)]
+                    .set_char(theme.chars.colorbar.extend_min)
+                    .set_fg(color);
             }
         }
 
@@ -1272,9 +1397,9 @@ impl Widget for &Colorbar<'_> {
                     for (j, ch) in label.chars().enumerate() {
                         let x = label_x + j as u16;
                         if x < area.x + area.width {
-                            buf[(x, y)]
-                                .set_char(ch)
-                                .set_style(Style::default().fg(self.label_color));
+                            buf[(x, y)].set_char(ch).set_style(
+                                Style::default().fg(self.label_color.unwrap_or(theme.foreground)),
+                            );
                         }
                     }
                 }

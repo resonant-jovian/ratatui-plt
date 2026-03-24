@@ -6,7 +6,6 @@
 
 use ratatui::buffer::Buffer;
 use ratatui::layout::Rect;
-use ratatui::style::Color;
 use ratatui::widgets::Widget;
 
 use crate::annotation::Annotation;
@@ -19,22 +18,11 @@ use crate::spines::Spines;
 use crate::theme::Theme;
 use crate::transform::data_to_screen;
 
-/// Default color cycle for stacked series.
-const COLOR_CYCLE: &[Color] = &[
-    Color::Cyan,
-    Color::Yellow,
-    Color::Magenta,
-    Color::Green,
-    Color::Red,
-    Color::Blue,
-    Color::LightCyan,
-    Color::LightYellow,
-    Color::LightMagenta,
-    Color::LightGreen,
-];
-
-/// Fill density characters from lightest to heaviest.
-const FILL_CHARS: &[char] = &['░', '▒', '▓', '█'];
+/// Fill density characters from lightest to heaviest, pulled from theme.
+fn fill_chars(theme: &Theme) -> [char; 4] {
+    let f = &theme.chars.fill;
+    [f.light, f.medium, f.dense, f.solid]
+}
 
 /// A stacked area chart widget.
 ///
@@ -262,11 +250,7 @@ impl Widget for &StackedArea {
                 )
                 .round() as u16;
 
-                let color = if filtered[si].color != Color::White {
-                    filtered[si].color
-                } else {
-                    COLOR_CYCLE[si % COLOR_CYCLE.len()]
-                };
+                let color = filtered[si].color.unwrap_or(self.theme.color_cycle.at(si));
 
                 let y_top = sy_upper.max(pa.y);
                 let y_bot = sy_lower.min(pa.y + pa.height - 1);
@@ -293,12 +277,9 @@ impl Widget for &StackedArea {
                 .iter()
                 .enumerate()
                 .map(|(i, s)| {
-                    let color = if s.color != Color::White {
-                        s.color
-                    } else {
-                        COLOR_CYCLE[i % COLOR_CYCLE.len()]
-                    };
-                    let fill_ch = FILL_CHARS[i % FILL_CHARS.len()];
+                    let color = s.color.unwrap_or(self.theme.color_cycle.at(i));
+                    let fc = fill_chars(&self.theme);
+                    let fill_ch = fc[i % fc.len()];
                     LegendEntry {
                         name: s.name.clone(),
                         color,

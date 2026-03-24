@@ -221,8 +221,22 @@ impl Widget for &LinePlot {
 
         let clip = ClipRect::from_plot_area(&pa);
 
+        // Resolve series colors: use explicitly set color, or auto-assign from theme color cycle
+        let mut color_cycle = self.theme.color_cycle.clone();
+        let resolved_colors: Vec<Color> = self
+            .series
+            .iter()
+            .map(|s| {
+                if let Some(c) = s.color {
+                    c
+                } else {
+                    color_cycle.next_color()
+                }
+            })
+            .collect();
+
         // Draw fill regions
-        for s in &self.series {
+        for (si, s) in self.series.iter().enumerate() {
             if let Some(ref fill_to) = s.fill_to {
                 let baseline = match fill_to {
                     crate::series::FillTo::Baseline(y) => *y,
@@ -240,7 +254,7 @@ impl Widget for &LinePlot {
                     if xi >= pa.x && xi < pa.x + pa.width {
                         for y in y_top..=y_bot {
                             if pa.contains(xi, y) {
-                                pb.set_bg(xi, y, s.color, Z_FILL);
+                                pb.set_bg(xi, y, resolved_colors[si], Z_FILL);
                             }
                         }
                     }
@@ -249,7 +263,8 @@ impl Widget for &LinePlot {
         }
 
         // Draw error bars
-        for s in &self.series {
+        for (si, s) in self.series.iter().enumerate() {
+            let color = resolved_colors[si];
             if s.y_err_low.is_some() || s.y_err_high.is_some() {
                 for (i, &(x, y)) in s.data.iter().enumerate() {
                     let sx = pa.screen_x(x);
@@ -269,22 +284,23 @@ impl Widget for &LinePlot {
 
                     for ey in y_top..=y_bot {
                         if pa.contains(xi, ey) {
-                            pb.set_char(xi, ey, '│', s.color, Z_DATA);
+                            pb.set_char(xi, ey, self.theme.chars.border.vertical, color, Z_DATA);
                         }
                     }
                     // Caps
                     if pa.contains(xi, y_top) {
-                        pb.set_char(xi, y_top, '┬', s.color, Z_DATA);
+                        pb.set_char(xi, y_top, self.theme.chars.tick.cap_top, color, Z_DATA);
                     }
                     if pa.contains(xi, y_bot) {
-                        pb.set_char(xi, y_bot, '┴', s.color, Z_DATA);
+                        pb.set_char(xi, y_bot, self.theme.chars.tick.cap_bottom, color, Z_DATA);
                     }
                 }
             }
         }
 
         // Draw line series
-        for s in &self.series {
+        for (si, s) in self.series.iter().enumerate() {
+            let color = resolved_colors[si];
             if s.data.len() < 2 {
                 // Just draw markers for single-point series
                 for &(x, y) in &s.data {
@@ -293,8 +309,10 @@ impl Widget for &LinePlot {
                     let xi = sx.round() as u16;
                     let yi = sy.round() as u16;
                     if pa.contains(xi, yi) {
-                        let ch = s.marker.map_or('●', |m| m.char());
-                        pb.set_char(xi, yi, ch, s.color, Z_MARKER);
+                        let ch = s
+                            .marker
+                            .map_or(self.theme.chars.marker.default_point, |m| m.char());
+                        pb.set_char(xi, yi, ch, color, Z_MARKER);
                     }
                 }
                 continue;
@@ -325,9 +343,10 @@ impl Widget for &LinePlot {
                                 x1: sx1,
                                 y1: sy1,
                             },
-                            s.color,
+                            color,
                             &s.line_style.pattern,
                             &clip,
+                            Z_DATA + si as u8,
                         );
                     }
                     StepMode::Pre => {
@@ -345,9 +364,10 @@ impl Widget for &LinePlot {
                                 x1: sx1,
                                 y1: sy0,
                             },
-                            s.color,
+                            color,
                             &s.line_style.pattern,
                             &clip,
+                            Z_DATA + si as u8,
                         );
                         // Vertical segment at x1
                         draw_line_pb(
@@ -358,9 +378,10 @@ impl Widget for &LinePlot {
                                 x1: sx1,
                                 y1: sy1,
                             },
-                            s.color,
+                            color,
                             &s.line_style.pattern,
                             &clip,
+                            Z_DATA + si as u8,
                         );
                     }
                     StepMode::Post => {
@@ -378,9 +399,10 @@ impl Widget for &LinePlot {
                                 x1: sx0,
                                 y1: sy1,
                             },
-                            s.color,
+                            color,
                             &s.line_style.pattern,
                             &clip,
+                            Z_DATA + si as u8,
                         );
                         // Horizontal segment at y1
                         draw_line_pb(
@@ -391,9 +413,10 @@ impl Widget for &LinePlot {
                                 x1: sx1,
                                 y1: sy1,
                             },
-                            s.color,
+                            color,
                             &s.line_style.pattern,
                             &clip,
+                            Z_DATA + si as u8,
                         );
                     }
                     StepMode::Mid => {
@@ -413,9 +436,10 @@ impl Widget for &LinePlot {
                                 x1: smx,
                                 y1: sy0,
                             },
-                            s.color,
+                            color,
                             &s.line_style.pattern,
                             &clip,
+                            Z_DATA + si as u8,
                         );
                         // Vertical at mid from y0 to y1
                         draw_line_pb(
@@ -426,9 +450,10 @@ impl Widget for &LinePlot {
                                 x1: smx,
                                 y1: sy1,
                             },
-                            s.color,
+                            color,
                             &s.line_style.pattern,
                             &clip,
+                            Z_DATA + si as u8,
                         );
                         // Horizontal at y1 from mid to x1
                         draw_line_pb(
@@ -439,9 +464,10 @@ impl Widget for &LinePlot {
                                 x1: sx1,
                                 y1: sy1,
                             },
-                            s.color,
+                            color,
                             &s.line_style.pattern,
                             &clip,
+                            Z_DATA + si as u8,
                         );
                     }
                 }
@@ -458,7 +484,7 @@ impl Widget for &LinePlot {
                     let xi = sx.round() as u16;
                     let yi = sy.round() as u16;
                     if pa.contains(xi, yi) {
-                        pb.set_char(xi, yi, marker.char(), s.color, Z_MARKER);
+                        pb.set_char(xi, yi, marker.char(), color, Z_MARKER);
                     }
                 }
             }
@@ -553,13 +579,14 @@ struct LineSegment {
 }
 
 /// Draw a line between two screen points using Bresenham's at braille sub-pixel resolution,
-/// writing into a [`PlotBuffer`] at Z_DATA.
+/// writing into a [`PlotBuffer`] at the given Z-level.
 fn draw_line_pb(
     pb: &mut PlotBuffer,
     seg: &LineSegment,
     color: Color,
     pattern: &DashPattern,
     clip: &ClipRect,
+    z: u8,
 ) {
     let LineSegment { x0, y0, x1, y1 } = *seg;
     // Scale to braille sub-pixel coordinates (2x horizontal, 4x vertical)
@@ -621,7 +648,7 @@ fn draw_line_pb(
                 let dot_col = (ix0 % 2) as usize;
                 let dot_row = (iy0 % 4) as usize;
                 let bit = BRAILLE_BITS[dot_col][dot_row];
-                pb.set_braille(cell_x, cell_y, bit, color, Z_DATA);
+                pb.set_braille(cell_x, cell_y, bit, color, z);
             }
         }
 

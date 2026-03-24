@@ -83,18 +83,21 @@ fn main() -> color_eyre::Result<()> {
         .map(|_| lcg_normal(&mut state, 130.0, 25.0))
         .collect();
 
+    let theme = Theme::get_default();
+    let mut cycle = theme.color_cycle.clone();
     let plot = SwarmPlot::new()
-        .group(SwarmGroup::new("Chrome", chrome, Color::Rgb(80, 200, 255)))
-        .group(SwarmGroup::new(
-            "Firefox",
-            firefox,
-            Color::Rgb(255, 160, 40),
-        ))
-        .group(SwarmGroup::new("Safari", safari, Color::Rgb(220, 100, 255)))
-        .group(SwarmGroup::new("Edge", edge, Color::Rgb(100, 220, 100)))
+        .group(SwarmGroup::new("Chrome", chrome, cycle.next_color()))
+        .group(SwarmGroup::new("Firefox", firefox, cycle.next_color()))
+        .group(SwarmGroup::new("Safari", safari, cycle.next_color()))
+        .group(SwarmGroup::new("Edge", edge, cycle.next_color()))
         .title("Beeswarm: Response Times by Browser (q to quit)")
         .point_size(2)
-        .y_axis(Axis::new().label("Response Time (ms)").grid(true));
+        .y_axis(
+            Axis::new()
+                .label("Response Time (ms)")
+                .label_position(LabelPosition::End)
+                .grid(true),
+        );
 
     loop {
         terminal.draw(|frame| {

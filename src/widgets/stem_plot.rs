@@ -7,9 +7,8 @@ use ratatui::widgets::Widget;
 
 use crate::annotation::Annotation;
 use crate::axis::Axis;
-use crate::drawing::draw_braille_line_pb;
 use crate::frame::{DataBounds, PlotFrame, ReferenceLine};
-use crate::plot_buffer::{PlotBuffer, Z_CHROME, Z_MARKER};
+use crate::plot_buffer::{PlotBuffer, Z_CHROME, Z_DATA, Z_MARKER};
 use crate::spines::Spines;
 use crate::style::MarkerShape;
 use crate::theme::Theme;
@@ -32,7 +31,7 @@ use crate::theme::Theme;
 pub struct StemPlot {
     data: Vec<(f64, f64)>,
     baseline: f64,
-    color: Color,
+    color: Option<Color>,
     marker: MarkerShape,
     title: Option<String>,
     x_axis: Axis,
@@ -48,7 +47,7 @@ impl StemPlot {
         Self {
             data,
             baseline: 0.0,
-            color: Color::Cyan,
+            color: None,
             marker: MarkerShape::FilledCircle,
             title: None,
             x_axis: Axis::new(),
@@ -66,7 +65,7 @@ impl StemPlot {
     }
 
     pub fn color(mut self, c: Color) -> Self {
-        self.color = c;
+        self.color = Some(c);
         self
     }
 
@@ -174,7 +173,13 @@ impl Widget for &StemPlot {
         let base_yi = base_sy.round() as u16;
         if base_yi >= pa.y && base_yi < pa.y + pa.height {
             for x in pa.x..pa.x + pa.width {
-                pb.set_char(x, base_yi, '─', self.theme.axis_color, Z_CHROME);
+                pb.set_char(
+                    x,
+                    base_yi,
+                    self.theme.chars.border.horizontal,
+                    self.theme.axis_color,
+                    Z_CHROME,
+                );
             }
         }
 
@@ -189,12 +194,25 @@ impl Widget for &StemPlot {
                 continue;
             }
 
-            // Draw stem line using Braille sub-pixel rendering
-            draw_braille_line_pb(&mut pb, sx, base_sy, sx, sy, self.color, &pa);
+            // Draw stem line using vertical line characters
+            let resolved_color = self.color.unwrap_or(self.theme.primary);
+            let y_top = yi.min(base_yi);
+            let y_bot = yi.max(base_yi);
+            for row in y_top..=y_bot {
+                if pa.contains(xi, row) {
+                    pb.set_char(
+                        xi,
+                        row,
+                        self.theme.chars.border.vertical,
+                        resolved_color,
+                        Z_DATA,
+                    );
+                }
+            }
 
             // Draw marker at data point
             if pa.contains(xi, yi) {
-                pb.set_char(xi, yi, self.marker.char(), self.color, Z_MARKER);
+                pb.set_char(xi, yi, self.marker.char(), resolved_color, Z_MARKER);
             }
         }
 

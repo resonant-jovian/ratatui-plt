@@ -235,7 +235,7 @@ impl Widget for &ContourPlot {
                     let sx = pa.x + cx;
                     let sy = pa.y + cy;
                     if pa.in_area(sx, sy) {
-                        pb.set_cell(sx, sy, '▀', top, bot, Z_DATA);
+                        pb.set_cell(sx, sy, self.theme.chars.fill.half_upper, top, bot, Z_DATA);
                     }
                 }
             }
@@ -330,7 +330,16 @@ impl Widget for &ContourPlot {
                             let sx1 = pa.screen_x(dx1);
                             let sy1 = pa.screen_y(dy1);
 
-                            draw_braille_line_pb(&mut pb, sx0, sy0, sx1, sy1, color, &pa);
+                            draw_braille_line_pb(
+                                &mut pb,
+                                sx0,
+                                sy0,
+                                sx1,
+                                sy1,
+                                color,
+                                &pa,
+                                Z_DATA + level_idx as u8,
+                            );
                         }
                     }
                 }

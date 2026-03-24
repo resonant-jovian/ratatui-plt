@@ -52,12 +52,19 @@ fn main() -> color_eyre::Result<()> {
     enable_raw_mode()?;
     let mut terminal = Terminal::new(CrosstermBackend::new(io::stdout()))?;
 
+    let theme = Theme::get_default();
+
     let make_groups = || {
+        let mut cycle = theme.color_cycle.clone();
         vec![
-            BoxData::new("Ctrl", generate_data(42, 500, 5.0, 2.0), Color::Cyan),
-            BoxData::new("DrA", generate_data(123, 500, 7.5, 3.0), Color::Yellow),
-            BoxData::new("DrB", generate_data(999, 500, 6.0, 1.5), Color::Magenta),
-            BoxData::new("DrC", generate_data(7777, 500, 8.0, 2.5), Color::Green),
+            BoxData::new("Ctrl", generate_data(42, 500, 5.0, 2.0), cycle.next_color()),
+            BoxData::new("DrA", generate_data(123, 500, 7.5, 3.0), cycle.next_color()),
+            BoxData::new("DrB", generate_data(999, 500, 6.0, 1.5), cycle.next_color()),
+            BoxData::new(
+                "DrC",
+                generate_data(7777, 500, 8.0, 2.5),
+                cycle.next_color(),
+            ),
         ]
     };
 
@@ -65,9 +72,14 @@ fn main() -> color_eyre::Result<()> {
     let filled = {
         let mut p = BoxPlot::new()
             .title("Filled")
-            .y_axis(Axis::new().label("Value").grid(true).label_position(LabelPosition::End))
+            .y_axis(
+                Axis::new()
+                    .label("Value")
+                    .grid(true)
+                    .label_position(LabelPosition::End),
+            )
             .show_means(true)
-            .reference_line(ReferenceLine::hline_dashed(6.5, Color::DarkGray));
+            .reference_line(ReferenceLine::hline_dashed(6.5, theme.muted));
         for g in make_groups() {
             p = p.box_data(g);
         }
@@ -78,7 +90,12 @@ fn main() -> color_eyre::Result<()> {
     let outline = {
         let mut p = BoxPlot::new()
             .title("Outline")
-            .y_axis(Axis::new().label("Value").grid(true).label_position(LabelPosition::End))
+            .y_axis(
+                Axis::new()
+                    .label("Value")
+                    .grid(true)
+                    .label_position(LabelPosition::End),
+            )
             .fill_boxes(false)
             .show_means(true);
         for g in make_groups() {
@@ -92,10 +109,7 @@ fn main() -> color_eyre::Result<()> {
             let area = square_area(frame.area());
             let cols = Layout::default()
                 .direction(Direction::Horizontal)
-                .constraints([
-                    Constraint::Ratio(1, 2),
-                    Constraint::Ratio(1, 2),
-                ])
+                .constraints([Constraint::Ratio(1, 2), Constraint::Ratio(1, 2)])
                 .split(area);
 
             frame.render_widget(&filled, cols[0]);

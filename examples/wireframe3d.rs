@@ -38,8 +38,9 @@ fn main() -> color_eyre::Result<()> {
         (-(x * x + y * y)).exp()
     });
 
+    let theme = Theme::get_default();
     let wireframe = Wireframe3D::new(data)
-        .color(Color::Rgb(0, 80, 200))
+        .color(theme.primary)
         .title("Gaussian Bump - Arrow keys: rotate, +/-: zoom, q: quit");
 
     let mut camera_state = Camera3DState::default();

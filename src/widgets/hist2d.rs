@@ -265,7 +265,14 @@ impl Widget for &Hist2D {
                 let bot_t = norm.normalize(bot_val);
                 let bot_color = self.colormap.color_at(bot_t);
 
-                pb.set_cell(screen_x, screen_y, '▀', top_color, bot_color, Z_DATA);
+                pb.set_cell(
+                    screen_x,
+                    screen_y,
+                    self.theme.chars.fill.half_upper,
+                    top_color,
+                    bot_color,
+                    Z_DATA,
+                );
             }
         }
 

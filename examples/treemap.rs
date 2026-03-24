@@ -37,24 +37,26 @@ fn main() -> color_eyre::Result<()> {
     enable_raw_mode()?;
     let mut terminal = Terminal::new(CrosstermBackend::new(io::stdout()))?;
 
+    let theme = Theme::get_default();
+    let mut cycle = theme.color_cycle.clone();
     let root = TreemapNode::new("Storage", 0.0)
         .child(
             TreemapNode::new("Documents", 0.0)
-                .color(Color::Cyan)
+                .color(cycle.next_color())
                 .child(TreemapNode::new("PDFs", 450.0))
                 .child(TreemapNode::new("Spreadsheets", 280.0))
                 .child(TreemapNode::new("Reports", 190.0)),
         )
         .child(
             TreemapNode::new("Media", 0.0)
-                .color(Color::Yellow)
+                .color(cycle.next_color())
                 .child(TreemapNode::new("Photos", 1200.0))
                 .child(TreemapNode::new("Videos", 3400.0))
                 .child(TreemapNode::new("Music", 800.0)),
         )
         .child(
             TreemapNode::new("Code", 0.0)
-                .color(Color::Green)
+                .color(cycle.next_color())
                 .child(TreemapNode::new("Repos", 650.0))
                 .child(TreemapNode::new("Dependencies", 1100.0)),
         );

@@ -7,6 +7,7 @@ use ratatui::buffer::Buffer;
 use ratatui::style::Color;
 
 use crate::frame::PlotArea;
+use crate::theme::Theme;
 
 /// A crosshair cursor overlay widget.
 ///
@@ -45,7 +46,7 @@ impl Crosshair {
         Self {
             data_x,
             data_y,
-            color: Color::Yellow,
+            color: Theme::get_default().highlight,
             show_labels: true,
             format: None,
         }
@@ -74,6 +75,7 @@ impl Crosshair {
     /// This should be called after the main widget has been rendered,
     /// using the `PlotArea` returned by `PlotFrame::render`.
     pub fn render_on(&self, pa: &PlotArea, buf: &mut Buffer) {
+        let theme = Theme::get_default();
         let sx = pa.screen_x(self.data_x);
         let sy = pa.screen_y(self.data_y);
         let xi = sx.round() as u16;
@@ -86,7 +88,7 @@ impl Crosshair {
                 if ((x - pa.x) % 4) < 2 {
                     // Skip the intersection point itself (drawn separately)
                     if x != xi {
-                        buf[(x, yi)].set_char('╌').set_fg(self.color);
+                        buf[(x, yi)].set_char(theme.chars.dash.h).set_fg(self.color);
                     }
                 }
             }
@@ -99,7 +101,7 @@ impl Crosshair {
                 if (y - pa.y).is_multiple_of(2) {
                     // Skip the intersection point itself
                     if y != yi {
-                        buf[(xi, y)].set_char('╎').set_fg(self.color);
+                        buf[(xi, y)].set_char(theme.chars.dash.v).set_fg(self.color);
                     }
                 }
             }
@@ -107,7 +109,9 @@ impl Crosshair {
 
         // Draw intersection marker
         if pa.contains(xi, yi) {
-            buf[(xi, yi)].set_char('●').set_fg(self.color);
+            buf[(xi, yi)]
+                .set_char(theme.chars.marker.default_point)
+                .set_fg(self.color);
         }
 
         // Draw coordinate labels if enabled

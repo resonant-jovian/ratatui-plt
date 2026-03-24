@@ -44,10 +44,10 @@ pub struct Band {
     pub y_lower: Vec<f64>,
     /// Upper y boundary values (one per x).
     pub y_upper: Vec<f64>,
-    /// Band color.
-    pub color: Color,
-    /// Fill character: '\u{2591}' (light), '\u{2592}' (medium), '\u{2593}' (dense).
-    pub alpha_char: char,
+    /// Band color (None = use theme primary).
+    pub color: Option<Color>,
+    /// Fill character (`None` = use theme light fill).
+    pub alpha_char: Option<char>,
 }
 
 impl Band {
@@ -58,22 +58,20 @@ impl Band {
             x,
             y_lower,
             y_upper,
-            color: Color::Cyan,
-            alpha_char: '\u{2591}', // ░
+            color: None,
+            alpha_char: None,
         }
     }
 
     /// Set the band color.
     pub fn color(mut self, color: Color) -> Self {
-        self.color = color;
+        self.color = Some(color);
         self
     }
 
     /// Set the fill character for the band interior.
-    ///
-    /// Common choices: '\u{2591}' (░ light), '\u{2592}' (▒ medium), '\u{2593}' (▓ dense).
     pub fn alpha_char(mut self, ch: char) -> Self {
-        self.alpha_char = ch;
+        self.alpha_char = Some(ch);
         self
     }
 }
@@ -222,7 +220,8 @@ impl Widget for &BandPlot {
         };
 
         // Draw each band
-        for band in &self.bands {
+        for (si, band) in self.bands.iter().enumerate() {
+            let band_color = band.color.unwrap_or(self.theme.primary);
             let n = band.x.len().min(band.y_lower.len()).min(band.y_upper.len());
 
             // Fill the region between y_lower and y_upper using column interpolation.
@@ -259,8 +258,9 @@ impl Widget for &BandPlot {
                                     prev_y,
                                     screen_x as f64,
                                     sy_top_f,
-                                    band.color,
+                                    band_color,
                                     &pa,
+                                    Z_DATA + si as u8,
                                 );
                             }
                             prev_zero_y_draw = Some(sy_top_f);
@@ -283,18 +283,32 @@ impl Widget for &BandPlot {
                             match (top_in, bot_in) {
                                 (true, true) => {
                                     // Both halves: fully opaque
-                                    pb.set_cell(screen_x, cell_y, ' ', band.color, band.color, Z_DATA);
+                                    pb.set_cell(
+                                        screen_x, cell_y, ' ', band_color, band_color, Z_DATA,
+                                    );
                                 }
                                 (true, false) => {
                                     // Top half only: '▀' fg=band_color, bg inherited
-                                    pb.set_char(screen_x, cell_y, '▀', band.color, Z_DATA);
+                                    pb.set_char(
+                                        screen_x,
+                                        cell_y,
+                                        self.theme.chars.fill.half_upper,
+                                        band_color,
+                                        Z_DATA,
+                                    );
                                     // Also set bg so outermost edges have a color
-                                    pb.set_bg(screen_x, cell_y, band.color, Z_FILL);
+                                    pb.set_bg(screen_x, cell_y, band_color, Z_FILL);
                                 }
                                 (false, true) => {
                                     // Bottom half only: '▄' fg=band_color, bg inherited
-                                    pb.set_char(screen_x, cell_y, '▄', band.color, Z_DATA);
-                                    pb.set_bg(screen_x, cell_y, band.color, Z_FILL);
+                                    pb.set_char(
+                                        screen_x,
+                                        cell_y,
+                                        self.theme.chars.fill.half_lower,
+                                        band_color,
+                                        Z_DATA,
+                                    );
+                                    pb.set_bg(screen_x, cell_y, band_color, Z_FILL);
                                 }
                                 (false, false) => {}
                             }
@@ -302,7 +316,6 @@ impl Widget for &BandPlot {
                     }
                 }
             }
-
         }
 
         // Draw annotations
@@ -321,8 +334,8 @@ impl Widget for &BandPlot {
                 .iter()
                 .map(|b| LegendEntry {
                     name: b.name.clone(),
-                    color: b.color,
-                    marker: Some('█'),
+                    color: b.color.unwrap_or(self.theme.primary),
+                    marker: Some(self.theme.chars.fill.solid),
                 })
                 .collect();
             let legend = Legend::new(entries)
@@ -400,4 +413,3 @@ fn interpolate_at(xs: &[f64], ys: &[f64], x: f64) -> Option<f64> {
     let t = (x - x0) / (x1 - x0);
     Some(y0 + t * (y1 - y0))
 }
-

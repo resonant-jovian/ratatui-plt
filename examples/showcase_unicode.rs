@@ -57,13 +57,14 @@ fn parse_theme() -> Theme {
 fn main() -> color_eyre::Result<()> {
     color_eyre::install()?;
     Theme::set_default(parse_theme());
+    let theme = Theme::get_default();
     io::stdout().execute(EnterAlternateScreen)?;
     enable_raw_mode()?;
     let mut terminal = Terminal::new(CrosstermBackend::new(io::stdout()))?;
 
-    let blue_dark = Color::Rgb(31, 119, 180);
-    let blue_mid = Color::Rgb(70, 130, 180);
-    let blue_light = Color::Rgb(100, 149, 237);
+    let blue_dark = theme.color_cycle.at(0);
+    let blue_mid = theme.color_cycle.at(1);
+    let blue_light = theme.color_cycle.at(2);
 
     // ---- Panel A: Marker Gallery — all 27 MarkerShape variants ----
     let markers: Vec<(MarkerShape, &str)> = vec![
@@ -115,9 +116,8 @@ fn main() -> color_eyre::Result<()> {
             .marker(*shape);
         marker_plot = marker_plot.series(series);
         // Add label annotation below each marker
-        marker_plot = marker_plot.annotation(
-            Annotation::new(*name, col, 2.0 - row - 0.3).color(Color::DarkGray),
-        );
+        marker_plot =
+            marker_plot.annotation(Annotation::new(*name, col, 2.0 - row - 0.3).color(theme.muted));
     }
 
     // ---- Panel B: Arrow Styles — four ArrowCharSet variants ----
@@ -131,8 +131,7 @@ fn main() -> color_eyre::Result<()> {
     // Build 4 separate VectorField plots; we'll composite them in the mosaic panel
     let mut arrow_fields = Vec::new();
     for (char_set, label) in &arrow_styles {
-        let field =
-            VectorFieldData::from_fn((-2.0, 2.0), (-2.0, 2.0), 6, 6, |x, y| (-y, x));
+        let field = VectorFieldData::from_fn((-2.0, 2.0), (-2.0, 2.0), 6, 6, |x, y| (-y, x));
         let plot = VectorField::new(field)
             .title(format!("B: Arrows ({label})"))
             .color_by_magnitude(true)
@@ -167,7 +166,12 @@ fn main() -> color_eyre::Result<()> {
         .bins(30)
         .title("D: Histogram (eighth-block precision)")
         .x_axis(Axis::new().label("Value").grid(true))
-        .y_axis(Axis::new().label("Count").grid(true))
+        .y_axis(
+            Axis::new()
+                .label("Count")
+                .label_position(LabelPosition::End)
+                .grid(true),
+        )
         .show_legend(false);
 
     // ---- Panel E: Enclosed Numbers — annotations with circled digits ----
@@ -189,9 +193,8 @@ fn main() -> color_eyre::Result<()> {
         .show_legend(false);
 
     for (i, &(x, y)) in scatter_pts.iter().enumerate() {
-        enc_plot = enc_plot.annotation(
-            Annotation::new(enclosed_number(i + 1), x + 0.3, y + 0.3).color(blue_mid),
-        );
+        enc_plot = enc_plot
+            .annotation(Annotation::new(enclosed_number(i + 1), x + 0.3, y + 0.3).color(blue_mid));
     }
 
     // ---- Assemble 2x3 mosaic: "ABC\nDEF" ----
@@ -291,8 +294,7 @@ fn main() -> color_eyre::Result<()> {
             // We render directly into the buffer since this is a custom demo.
             let theme = Theme::get_default();
             let title = "F: Fill Levels (V + H)";
-            let title_start =
-                area.x + area.width.saturating_sub(title.len() as u16) / 2;
+            let title_start = area.x + area.width.saturating_sub(title.len() as u16) / 2;
             for (i, ch) in title.chars().enumerate() {
                 let x = title_start + i as u16;
                 if x < area.x + area.width {
@@ -323,7 +325,7 @@ fn main() -> color_eyre::Result<()> {
                     let y = content_y + 1 + row;
                     if y < area.y + area.height && x < area.x + area.width {
                         if fill_ch == ' ' {
-                            buf[(x, y)].set_char('.').set_fg(Color::DarkGray);
+                            buf[(x, y)].set_char('.').set_fg(theme.muted);
                         } else {
                             buf[(x, y)].set_char(fill_ch).set_fg(blue_dark);
                         }
@@ -336,7 +338,7 @@ fn main() -> color_eyre::Result<()> {
                     for (ci, ch) in label.chars().enumerate() {
                         let lx = x + ci as u16;
                         if lx < area.x + area.width {
-                            buf[(lx, ly)].set_char(ch).set_fg(Color::DarkGray);
+                            buf[(lx, ly)].set_char(ch).set_fg(theme.muted);
                         }
                     }
                 }
@@ -363,7 +365,7 @@ fn main() -> color_eyre::Result<()> {
                     let x = h_start_x + 1 + col;
                     if x < area.x + area.width {
                         if fill_ch == ' ' {
-                            buf[(x, y)].set_char('.').set_fg(Color::DarkGray);
+                            buf[(x, y)].set_char('.').set_fg(theme.muted);
                         } else {
                             buf[(x, y)].set_char(fill_ch).set_fg(blue_light);
                         }
@@ -375,7 +377,7 @@ fn main() -> color_eyre::Result<()> {
                 for (ci, ch) in label.chars().enumerate() {
                     let x = lx + ci as u16;
                     if x < area.x + area.width {
-                        buf[(x, y)].set_char(ch).set_fg(Color::DarkGray);
+                        buf[(x, y)].set_char(ch).set_fg(theme.muted);
                     }
                 }
             }

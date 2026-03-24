@@ -37,6 +37,9 @@ fn main() -> color_eyre::Result<()> {
     enable_raw_mode()?;
     let mut terminal = Terminal::new(CrosstermBackend::new(io::stdout()))?;
 
+    let theme = Theme::get_default();
+    let mut cycle = theme.color_cycle.clone();
+
     let n = 100;
     let s1 = Series::new("sin(x)")
         .data(
@@ -47,7 +50,7 @@ fn main() -> color_eyre::Result<()> {
                 })
                 .collect(),
         )
-        .color(Color::Rgb(80, 200, 255));
+        .color(cycle.next_color());
 
     let s2 = Series::new("cos(x)")
         .data(
@@ -58,7 +61,7 @@ fn main() -> color_eyre::Result<()> {
                 })
                 .collect(),
         )
-        .color(Color::Rgb(255, 180, 50));
+        .color(cycle.next_color());
 
     let s3 = Series::new("sin(2x)")
         .data(
@@ -69,7 +72,7 @@ fn main() -> color_eyre::Result<()> {
                 })
                 .collect(),
         )
-        .color(Color::Rgb(100, 255, 100));
+        .color(cycle.next_color());
 
     let all_series = vec![s1, s2, s3];
     let legend_state = shared_legend_state(all_series.len());

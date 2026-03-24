@@ -5,7 +5,7 @@
 
 use ratatui::buffer::Buffer;
 use ratatui::layout::Rect;
-use ratatui::style::{Color, Style};
+use ratatui::style::Style;
 use ratatui::widgets::Widget;
 
 use crate::axis::Axis;
@@ -185,7 +185,7 @@ impl Widget for &Spectrogram {
                     (cx as f64 / aw as f64 * ncols as f64).min((ncols - 1) as f64) as usize;
                 let top_val = self.data.values[top_data_row][top_data_col];
                 let top_color = if !top_val.is_finite() {
-                    Color::DarkGray
+                    self.theme.grid_color
                 } else {
                     let t = self.norm.normalize(top_val);
                     self.colormap.color_at(t)
@@ -198,14 +198,14 @@ impl Widget for &Spectrogram {
                 let bot_data_col = top_data_col;
                 let bot_val = self.data.values[bot_data_row][bot_data_col];
                 let bot_color = if !bot_val.is_finite() {
-                    Color::DarkGray
+                    self.theme.grid_color
                 } else {
                     let t = self.norm.normalize(bot_val);
                     self.colormap.color_at(t)
                 };
 
                 buf[(screen_x, screen_y)]
-                    .set_char('\u{2580}')
+                    .set_char(self.theme.chars.fill.half_upper)
                     .set_style(Style::default().fg(top_color).bg(bot_color));
             }
         }

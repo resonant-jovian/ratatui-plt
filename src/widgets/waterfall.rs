@@ -83,16 +83,17 @@ pub struct WaterfallChart {
 
 impl Default for WaterfallChart {
     fn default() -> Self {
+        let theme = Theme::get_default();
         Self {
+            positive_color: theme.positive_color,
+            negative_color: theme.negative_color,
+            total_color: theme.neutral_color,
             entries: Vec::new(),
-            positive_color: Color::Green,
-            negative_color: Color::Red,
-            total_color: Color::Blue,
             connector_line: true,
             title: None,
             x_axis: Axis::new(),
             y_axis: Axis::new(),
-            theme: Theme::get_default(),
+            theme,
             spines: Spines::default(),
             reference_lines: Vec::new(),
             annotations: Vec::new(),
@@ -333,7 +334,13 @@ impl Widget for &WaterfallChart {
                 if conn_screen_y >= pa.y && conn_screen_y < pa.y + pa.height {
                     for x in conn_x_start..conn_x_end {
                         if pa.contains(x, conn_screen_y) {
-                            pb.set_char(x, conn_screen_y, '\u{2500}', self.theme.axis_color, Z_DATA);
+                            pb.set_char(
+                                x,
+                                conn_screen_y,
+                                self.theme.chars.border.horizontal,
+                                self.theme.axis_color,
+                                Z_DATA,
+                            );
                         }
                     }
                 }

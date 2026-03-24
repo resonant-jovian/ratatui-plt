@@ -68,6 +68,7 @@ fn gaussian_kde(data: &[f64], bandwidth: f64, n_points: usize) -> Vec<(f64, f64)
 fn main() -> color_eyre::Result<()> {
     color_eyre::install()?;
     Theme::set_default(parse_theme());
+    let theme = Theme::get_default();
     io::stdout().execute(EnterAlternateScreen)?;
     enable_raw_mode()?;
     let mut terminal = Terminal::new(CrosstermBackend::new(io::stdout()))?;
@@ -96,7 +97,7 @@ fn main() -> color_eyre::Result<()> {
     let hist = Histogram::new(magnitudes.clone())
         .bins(20)
         .norm_mode(HistNorm::Density)
-        .color(Color::Rgb(80, 120, 180))
+        .color(theme.primary)
         .title("Earthquake Magnitudes: Histogram + KDE + Rug (q to quit)")
         .x_axis(
             Axis::new()
@@ -107,12 +108,13 @@ fn main() -> color_eyre::Result<()> {
         .y_axis(
             Axis::new()
                 .label("Density")
+                .label_position(LabelPosition::End)
                 .bounds(Bounds::Manual(y_lo, y_hi))
                 .grid(true),
         );
 
     // Build rug plot for individual observations
-    let rug_ds = RugDataset::new("Earthquakes", magnitudes, Color::Red);
+    let rug_ds = RugDataset::new("Earthquakes", magnitudes, theme.negative_color);
     let rug = RugPlot::new()
         .dataset(rug_ds)
         .side(RugSide::Bottom)
@@ -187,7 +189,7 @@ fn main() -> color_eyre::Result<()> {
                         let px = (sx0 as f64 + t * (sx1 - sx0) as f64).round() as u16;
                         let py = (sy0 as f64 + t * (sy1 - sy0) as f64).round() as u16;
                         if pa.contains(px, py) {
-                            buf[(px, py)].set_char('*').set_fg(Color::Yellow);
+                            buf[(px, py)].set_char('*').set_fg(theme.highlight);
                         }
                     }
                 }

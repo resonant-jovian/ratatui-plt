@@ -291,8 +291,7 @@ impl Widget for &HexbinPlot {
                 let top_frac_y = (cy as usize * 2) as f64 / effective_height as f64;
                 let top_data_y = y_hi - top_frac_y * (y_hi - y_lo);
                 let top_color = if has_edges {
-                    let (key, edge) =
-                        pixel_to_hex_with_edge(data_x - x_lo, top_data_y - y_lo, s);
+                    let (key, edge) = pixel_to_hex_with_edge(data_x - x_lo, top_data_y - y_lo, s);
                     if edge > edge_threshold {
                         bg_color
                     } else {
@@ -309,8 +308,7 @@ impl Widget for &HexbinPlot {
                 let bot_frac_y = (cy as usize * 2 + 1) as f64 / effective_height as f64;
                 let bot_data_y = y_hi - bot_frac_y * (y_hi - y_lo);
                 let bot_color = if has_edges {
-                    let (key, edge) =
-                        pixel_to_hex_with_edge(data_x - x_lo, bot_data_y - y_lo, s);
+                    let (key, edge) = pixel_to_hex_with_edge(data_x - x_lo, bot_data_y - y_lo, s);
                     if edge > edge_threshold {
                         bg_color
                     } else {
@@ -323,7 +321,14 @@ impl Widget for &HexbinPlot {
                     self.colormap.color_at(norm.normalize(val))
                 };
 
-                pb.set_cell(screen_x, screen_y, '▀', top_color, bot_color, Z_DATA);
+                pb.set_cell(
+                    screen_x,
+                    screen_y,
+                    self.theme.chars.fill.half_upper,
+                    top_color,
+                    bot_color,
+                    Z_DATA,
+                );
             }
         }
 

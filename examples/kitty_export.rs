@@ -9,6 +9,8 @@ use ratatui_plt::export::{ExportOptions, buffer_to_kitty, render_to_buffer};
 use ratatui_plt::prelude::*;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let theme = Theme::get_default();
+
     let series = Series::new("sin(x)")
         .data(
             (0..100)
@@ -18,13 +20,17 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 })
                 .collect(),
         )
-        .color(Color::Cyan);
+        .color(theme.primary);
 
     let plot = LinePlot::new()
         .series(series)
         .title("Kitty Export Demo")
         .x_axis(Axis::new().label("x"))
-        .y_axis(Axis::new().label("sin(x)"));
+        .y_axis(
+            Axis::new()
+                .label("sin(x)")
+                .label_position(LabelPosition::End),
+        );
 
     let buf = render_to_buffer(&plot, 80, 24);
     let options = ExportOptions::default();

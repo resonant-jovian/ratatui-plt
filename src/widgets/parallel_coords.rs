@@ -30,7 +30,7 @@ use crate::annotation::Annotation;
 use crate::drawing::draw_braille_line_pb;
 use crate::frame::PlotArea;
 use crate::legend::{Legend, LegendEntry, LegendPosition};
-use crate::plot_buffer::{PlotBuffer, Z_ANNOTATION, Z_CHROME, Z_MARKER};
+use crate::plot_buffer::{PlotBuffer, Z_ANNOTATION, Z_CHROME, Z_DATA, Z_MARKER};
 use crate::spines::Spines;
 use crate::theme::Theme;
 use crate::transform::data_to_screen;
@@ -73,7 +73,7 @@ impl ParallelRecord {
     pub fn new(values: Vec<f64>) -> Self {
         Self {
             values,
-            color: Color::White,
+            color: Theme::get_default().primary,
             name: None,
         }
     }
@@ -260,7 +260,13 @@ impl Widget for &ParallelCoords {
             };
             for y in plot_top..=plot_bottom {
                 if ax_x >= area.x && ax_x < area.x + area.width {
-                    pb.set_char(ax_x, y, '\u{2502}', axis_color, Z_CHROME); // │
+                    pb.set_char(
+                        ax_x,
+                        y,
+                        self.theme.chars.border.vertical,
+                        axis_color,
+                        Z_CHROME,
+                    );
                 }
             }
 
@@ -302,7 +308,7 @@ impl Widget for &ParallelCoords {
         };
 
         // Draw polylines for each record using Braille line drawing
-        for rec in &self.records {
+        for (si, rec) in self.records.iter().enumerate() {
             let n_values = rec.values.len().min(n_axes);
             if n_values < 2 {
                 continue;
@@ -325,7 +331,16 @@ impl Widget for &ParallelCoords {
                 let sx1 = axis_positions[i + 1] as f64;
                 let sy1 = data_to_screen(v1, ax1.min, ax1.max, plot_bottom as f64, plot_top as f64);
 
-                draw_braille_line_pb(&mut pb, sx0, sy0, sx1, sy1, rec.color, &pa);
+                draw_braille_line_pb(
+                    &mut pb,
+                    sx0,
+                    sy0,
+                    sx1,
+                    sy1,
+                    rec.color,
+                    &pa,
+                    Z_DATA + si as u8,
+                );
             }
 
             // Draw value markers on each axis
@@ -348,7 +363,13 @@ impl Widget for &ParallelCoords {
                     && *ax_x >= area.x
                     && *ax_x < area.x + area.width
                 {
-                    pb.set_char(*ax_x, sy, '\u{25CF}', rec.color, Z_MARKER); // ●
+                    pb.set_char(
+                        *ax_x,
+                        sy,
+                        self.theme.chars.marker.default_point,
+                        rec.color,
+                        Z_MARKER,
+                    );
                 }
             }
         }
@@ -362,7 +383,13 @@ impl Widget for &ParallelCoords {
                 for (j, ch) in ann.text.chars().enumerate() {
                     let x = xi + j as u16;
                     if x >= area.x && x < area.x + area.width {
-                        pb.set_char(x, yi, ch, ann.color, Z_ANNOTATION);
+                        pb.set_char(
+                            x,
+                            yi,
+                            ch,
+                            ann.color.unwrap_or(self.theme.foreground),
+                            Z_ANNOTATION,
+                        );
                     }
                 }
             }
@@ -381,7 +408,7 @@ impl Widget for &ParallelCoords {
                     .map(|r| LegendEntry {
                         name: r.name.clone().unwrap_or_default(),
                         color: r.color,
-                        marker: Some('\u{2501}'), // ━
+                        marker: Some(self.theme.chars.dash.bold_h),
                     })
                     .collect();
                 let legend = Legend::new(entries)

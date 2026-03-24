@@ -104,7 +104,7 @@ pub struct Histogram {
     bins: usize,
     range: Option<(f64, f64)>,
     norm_mode: HistNorm,
-    color: Color,
+    color: Option<Color>,
     title: Option<String>,
     x_axis: Axis,
     y_axis: Axis,
@@ -131,7 +131,7 @@ impl Histogram {
             bins: 20,
             range: None,
             norm_mode: HistNorm::Count,
-            color: Color::Cyan,
+            color: None,
             title: None,
             x_axis: Axis::new(),
             y_axis: Axis::new(),
@@ -170,7 +170,7 @@ impl Histogram {
 
     /// Set the bar color.
     pub fn color(mut self, color: Color) -> Self {
-        self.color = color;
+        self.color = Some(color);
         self
     }
 
@@ -502,8 +502,12 @@ impl Histogram {
         let y_lo = 0.0;
         let y_hi = if y_max == 0.0 { 1.0 } else { y_max * 1.1 };
 
-        // Create and render the plot frame
-        let frame = PlotFrame::new(&self.x_axis, &self.y_axis, &self.theme)
+        // Force y-axis to start at 0 — histogram counts are never negative
+        let y_axis_fixed = self
+            .y_axis
+            .clone()
+            .bounds(crate::axis::Bounds::Manual(y_lo, y_hi));
+        let frame = PlotFrame::new(&self.x_axis, &y_axis_fixed, &self.theme)
             .title(self.title.as_deref())
             .spines(self.spines.clone())
             .reference_lines(&self.reference_lines);
@@ -522,11 +526,12 @@ impl Histogram {
         };
 
         // Draw bars
+        let resolved_color = self.color.unwrap_or(self.theme.primary);
         self.draw_bars(
             &pa,
             &edges,
             &heights,
-            self.color,
+            resolved_color,
             pb,
             BarSlotLayout {
                 ds_index: 0,
@@ -596,7 +601,12 @@ impl Histogram {
         let y_lo = 0.0;
         let y_hi = if y_max == 0.0 { 1.0 } else { y_max * 1.1 };
 
-        let frame = PlotFrame::new(&self.x_axis, &self.y_axis, &self.theme)
+        // Force y-axis to start at 0 — histogram counts are never negative
+        let y_axis_fixed = self
+            .y_axis
+            .clone()
+            .bounds(crate::axis::Bounds::Manual(y_lo, y_hi));
+        let frame = PlotFrame::new(&self.x_axis, &y_axis_fixed, &self.theme)
             .title(self.title.as_deref())
             .spines(self.spines.clone())
             .reference_lines(&self.reference_lines);
@@ -638,8 +648,14 @@ impl Histogram {
 
                 for (ds_i, ds) in self.datasets.iter().enumerate() {
                     let heights = &all_heights[ds_i];
+                    // Use incrementing Z so later datasets don't overwrite
+                    // earlier ones at shared boundary cells.
+                    let z_level = Z_FILL + ds_i as u8;
                     for i in 0..n {
                         let h = heights.get(i).copied().unwrap_or(0.0);
+                        if h == 0.0 {
+                            continue;
+                        }
                         let bottom = bottoms[i];
                         let top = bottom + h;
 
@@ -651,24 +667,19 @@ impl Histogram {
                         let bar_top_y = pa.screen_y(top);
                         let bar_bottom_y = pa.screen_y(bottom);
 
-                        let x_start = (bar_left + offset).floor() as u16;
-                        let x_end = (bar_right - offset).ceil() as u16;
+                        let x_start = (bar_left + offset).round() as u16;
+                        let x_end = (bar_right - offset).round() as u16;
                         let y_top = bar_top_y.floor() as u16;
-                        let y_bot = bar_bottom_y.round() as u16;
+                        let y_bot = bar_bottom_y.ceil() as u16;
 
-                        self.draw_bar_region(
-                            &pa,
-                            &BarRect {
-                                x_start,
-                                x_end,
-                                y_top,
-                                y_bot,
-                                #[cfg(feature = "unicode-extended")]
-                                top_frac: bar_top_y.fract(),
-                            },
-                            ds.color,
-                            pb,
-                        );
+                        // Draw stacked bar region directly with per-dataset Z
+                        for x in x_start..x_end {
+                            for y in y_top..y_bot {
+                                if pa.contains(x, y) {
+                                    pb.set_bg(x, y, ds.color, z_level);
+                                }
+                            }
+                        }
                         bottoms[i] = top;
                     }
                 }
@@ -721,7 +732,7 @@ impl Histogram {
                 .map(|ds| LegendEntry {
                     name: ds.name.clone(),
                     color: ds.color,
-                    marker: Some('█'),
+                    marker: Some(self.theme.chars.fill.solid),
                 })
                 .collect();
             let legend = Legend::new(entries)
@@ -759,11 +770,9 @@ impl Histogram {
             let bar_top = pa.screen_y(heights[i]);
             let bar_bottom = pa.screen_y(0.0);
 
-            // Use floor for left edge and ceil for right edge so that
-            // adjacent bins share the boundary pixel without gaps.
             let rect = BarRect {
-                x_start: x_start_f.floor() as u16,
-                x_end: x_end_f.ceil() as u16,
+                x_start: x_start_f.round() as u16,
+                x_end: x_end_f.round() as u16,
                 y_top: bar_top.floor() as u16,
                 y_bot: bar_bottom.round() as u16,
                 #[cfg(feature = "unicode-extended")]
@@ -778,19 +787,31 @@ impl Histogram {
                     // Draw only the outline (top edge + sides)
                     for x in rect.x_start..rect.x_end {
                         if pa.contains(x, rect.y_top) {
-                            pb.set_char(x, rect.y_top, '─', color, Z_DATA);
+                            pb.set_char(
+                                x,
+                                rect.y_top,
+                                self.theme.chars.border.horizontal,
+                                color,
+                                Z_DATA,
+                            );
                         }
                     }
                     for y in rect.y_top..rect.y_bot {
                         if pa.contains(rect.x_start, y) {
-                            pb.set_char(rect.x_start, y, '│', color, Z_DATA);
+                            pb.set_char(
+                                rect.x_start,
+                                y,
+                                self.theme.chars.border.vertical,
+                                color,
+                                Z_DATA,
+                            );
                         }
                     }
                     if rect.x_end > 0 {
                         let rx = rect.x_end.saturating_sub(1);
                         for y in rect.y_top..rect.y_bot {
                             if pa.contains(rx, y) {
-                                pb.set_char(rx, y, '│', color, Z_DATA);
+                                pb.set_char(rx, y, self.theme.chars.border.vertical, color, Z_DATA);
                             }
                         }
                     }
@@ -799,7 +820,13 @@ impl Histogram {
                     self.draw_bar_region(pa, &rect, color, pb);
                     for x in rect.x_start..rect.x_end {
                         if pa.contains(x, rect.y_top) {
-                            pb.set_char(x, rect.y_top, '▀', color, Z_DATA);
+                            pb.set_char(
+                                x,
+                                rect.y_top,
+                                self.theme.chars.fill.half_upper,
+                                color,
+                                Z_DATA,
+                            );
                         }
                     }
                 }

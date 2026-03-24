@@ -52,7 +52,7 @@ pub struct StreamPlot {
     /// Seed grid density multiplier (1 = default spacing).
     density: usize,
     /// Base colour for streamlines (when not colouring by magnitude).
-    color: Color,
+    color: Option<Color>,
     /// Whether to colour streamlines by local velocity magnitude.
     color_by_magnitude: bool,
     /// Colormap used when `color_by_magnitude` is true.
@@ -75,7 +75,7 @@ impl StreamPlot {
             y_axis: Axis::new(),
             title: None,
             density: 1,
-            color: Color::Cyan,
+            color: None,
             color_by_magnitude: false,
             colormap: Box::new(Viridis),
             arrow_scale: 1.0,
@@ -112,7 +112,7 @@ impl StreamPlot {
 
     /// Set the base streamline colour.
     pub fn color(mut self, c: Color) -> Self {
-        self.color = c;
+        self.color = Some(c);
         self
     }
 
@@ -244,6 +244,7 @@ fn draw_braille_line_stream(
     pa_y: u16,
     pa_w: u16,
     pa_h: u16,
+    z: u8,
 ) {
     let mut ix0 = (x0 * 2.0).round() as i32;
     let mut iy0 = (y0 * 4.0).round() as i32;
@@ -260,15 +261,11 @@ fn draw_braille_line_stream(
         if ix0 >= 0 && iy0 >= 0 {
             let cell_x = (ix0 / 2) as u16;
             let cell_y = (iy0 / 4) as u16;
-            if cell_x >= pa_x
-                && cell_x < pa_x + pa_w
-                && cell_y >= pa_y
-                && cell_y < pa_y + pa_h
-            {
+            if cell_x >= pa_x && cell_x < pa_x + pa_w && cell_y >= pa_y && cell_y < pa_y + pa_h {
                 let dot_col = (ix0 % 2) as usize;
                 let dot_row = (iy0 % 4) as usize;
                 let bit = BRAILLE_BITS[dot_col][dot_row];
-                pb.set_braille(cell_x, cell_y, bit, color, Z_DATA);
+                pb.set_braille(cell_x, cell_y, bit, color, z);
             }
         }
 
@@ -288,22 +285,22 @@ fn draw_braille_line_stream(
 }
 
 /// Choose an arrow character for the direction.
-fn arrow_char(dx: f64, dy: f64) -> char {
+fn arrow_char(dx: f64, dy: f64, arrows: &crate::chars::ArrowChars) -> char {
     if dx.abs() < 1e-10 && dy.abs() < 1e-10 {
         return '·';
     }
     let angle = dy.atan2(dx);
     let octant = ((angle + std::f64::consts::PI) / (std::f64::consts::PI / 4.0)).round() as i32 % 8;
     match octant {
-        0 => '←',
-        1 => '↙',
-        2 => '↓',
-        3 => '↘',
-        4 => '→',
-        5 => '↗',
-        6 => '↑',
-        7 => '↖',
-        _ => '→',
+        0 => arrows.left,
+        1 => arrows.sw,
+        2 => arrows.down,
+        3 => arrows.se,
+        4 => arrows.right,
+        5 => arrows.ne,
+        6 => arrows.up,
+        7 => arrows.nw,
+        _ => arrows.right,
     }
 }
 
@@ -421,18 +418,20 @@ impl Widget for &StreamPlot {
                         let t = norm.normalize(mag);
                         self.colormap.color_at(t)
                     } else {
-                        self.color
+                        self.color.unwrap_or(self.theme.primary)
                     };
 
                     // Draw braille line from previous point
                     if let Some((prev_x, prev_y)) = prev_screen {
-                        draw_braille_line_stream(&mut pb, prev_x, prev_y, scr_x, scr_y, color, px, py, pw, ph);
+                        draw_braille_line_stream(
+                            &mut pb, prev_x, prev_y, scr_x, scr_y, color, px, py, pw, ph, Z_DATA,
+                        );
                     }
 
                     // Arrow head at intervals (cell resolution, drawn on top)
                     if idx % arrow_interval == arrow_interval / 2 && idx > 0 {
                         let (fdx, fdy) = interpolate_field(&self.field, ptx, pty);
-                        let ch = arrow_char(fdx, -fdy);
+                        let ch = arrow_char(fdx, -fdy, &self.theme.chars.arrow);
                         pb.set_char(xi, yi, ch, color, Z_MARKER);
                     }
 

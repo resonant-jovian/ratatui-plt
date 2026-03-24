@@ -36,7 +36,7 @@ use crate::triangulation::Triangulation;
 /// ```
 pub struct TriPlot {
     triangulation: Triangulation,
-    edge_color: Color,
+    edge_color: Option<Color>,
     title: Option<String>,
     x_axis: Axis,
     y_axis: Axis,
@@ -50,7 +50,7 @@ impl TriPlot {
     pub fn new(triangulation: Triangulation) -> Self {
         Self {
             triangulation,
-            edge_color: Color::White,
+            edge_color: None,
             title: None,
             x_axis: Axis::new(),
             y_axis: Axis::new(),
@@ -62,7 +62,7 @@ impl TriPlot {
 
     /// Set the edge color.
     pub fn edge_color(mut self, color: Color) -> Self {
-        self.edge_color = color;
+        self.edge_color = Some(color);
         self
     }
 
@@ -148,7 +148,8 @@ impl Widget for &TriPlot {
             let sx1 = pa.screen_x(x1);
             let sy1 = pa.screen_y(y1);
 
-            draw_braille_line(buf, sx0, sy0, sx1, sy1, self.edge_color, &pa);
+            let color = self.edge_color.unwrap_or(self.theme.primary);
+            draw_braille_line(buf, sx0, sy0, sx1, sy1, color, &pa);
         }
     }
 }

@@ -385,20 +385,21 @@ impl Widget for &Treemap {
                         continue;
                     }
 
+                    let bc = &self.theme.chars.border;
                     let ch = if dx == 0 && dy == 0 {
-                        '┌'
+                        bc.top_left
                     } else if dx == r.w - 1 && dy == 0 {
-                        '┐'
+                        bc.top_right
                     } else if dx == 0 && dy == r.h - 1 {
-                        '└'
+                        bc.bottom_left
                     } else if dx == r.w - 1 && dy == r.h - 1 {
-                        '┘'
+                        bc.bottom_right
                     } else if dy == 0 || dy == r.h - 1 {
-                        '─'
+                        bc.horizontal
                     } else if dx == 0 || dx == r.w - 1 {
-                        '│'
+                        bc.vertical
                     } else {
-                        '█'
+                        self.theme.chars.fill.solid
                     };
 
                     let color = if dx == 0 || dx == r.w - 1 || dy == 0 || dy == r.h - 1 {
@@ -412,7 +413,7 @@ impl Widget for &Treemap {
                     } else {
                         Z_DATA
                     };
-                    if ch == '█' {
+                    if ch == self.theme.chars.fill.solid {
                         pb.set_cell(x, y, ch, color, color, z);
                     } else {
                         pb.set_char(x, y, ch, color, z);

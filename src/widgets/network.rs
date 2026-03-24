@@ -28,7 +28,7 @@ use ratatui::widgets::Widget;
 use crate::axis::{AspectRatio, Axis};
 use crate::drawing::draw_braille_line_pb;
 use crate::frame::{DataBounds, PlotFrame, ReferenceLine};
-use crate::plot_buffer::{PlotBuffer, Z_ANNOTATION, Z_MARKER};
+use crate::plot_buffer::{PlotBuffer, Z_ANNOTATION, Z_DATA, Z_MARKER};
 use crate::spines::Spines;
 use crate::style::MarkerShape;
 use crate::theme::Theme;
@@ -39,7 +39,7 @@ pub struct GraphNode {
     /// Display label.
     pub label: String,
     /// Node color.
-    pub color: Color,
+    pub color: Option<Color>,
     /// Optional fixed position (x, y) in data coordinates.
     pub position: Option<(f64, f64)>,
     /// Marker shape for the node.
@@ -51,7 +51,7 @@ impl GraphNode {
     pub fn new(label: impl Into<String>) -> Self {
         Self {
             label: label.into(),
-            color: Color::White,
+            color: None,
             position: None,
             marker: MarkerShape::FilledCircle,
         }
@@ -59,7 +59,7 @@ impl GraphNode {
 
     /// Set the node color.
     pub fn color(mut self, color: Color) -> Self {
-        self.color = color;
+        self.color = Some(color);
         self
     }
 
@@ -450,7 +450,7 @@ impl Widget for &NetworkPlot {
 
             let edge_color = edge.color.unwrap_or(self.theme.grid_color);
 
-            draw_braille_line_pb(&mut pb, sx0, sy0, sx1, sy1, edge_color, &pa);
+            draw_braille_line_pb(&mut pb, sx0, sy0, sx1, sy1, edge_color, &pa, Z_DATA);
         }
 
         // Draw nodes on top of edges
@@ -463,9 +463,10 @@ impl Widget for &NetworkPlot {
             let sy = pa.screen_y(y);
             let xi = sx.round() as u16;
             let yi = sy.round() as u16;
+            let node_color = node.color.unwrap_or_else(|| self.theme.color_cycle.at(i));
 
             if pa.contains(xi, yi) {
-                pb.set_char(xi, yi, node.marker.char(), node.color, Z_MARKER);
+                pb.set_char(xi, yi, node.marker.char(), node_color, Z_MARKER);
             }
 
             // Draw label next to node

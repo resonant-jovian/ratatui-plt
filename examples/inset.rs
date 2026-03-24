@@ -44,10 +44,12 @@ fn main() -> color_eyre::Result<()> {
         })
         .collect();
 
+    let theme = Theme::get_default();
+
     // Main plot: full range
     let main_series = Series::new("Damped sine")
         .data(data.clone())
-        .color(Color::Cyan);
+        .color(theme.primary);
 
     // Inset: zoomed into x=[1,3] region around the first peak
     let inset_data: Vec<(f64, f64)> = data
@@ -73,16 +75,16 @@ fn main() -> color_eyre::Result<()> {
         .title("Damped Sine + Inset (q to quit)")
         .x_axis(Axis::new().label("x").grid(true))
         .y_axis(Axis::new().label("y").grid(true))
-        .reference_line(ReferenceLine::hline_dashed(0.0, Color::DarkGray))
+        .reference_line(ReferenceLine::hline_dashed(0.0, theme.muted))
         .reference_line(ReferenceLine::vspan_bounded(
             1.0,
             3.0,
             inset_y_min - y_margin,
             inset_y_max + y_margin,
-            Color::Rgb(40, 40, 60),
+            theme.surface,
         ));
 
-    let inset_series = Series::new("Peak").data(inset_data).color(Color::Yellow);
+    let inset_series = Series::new("Peak").data(inset_data).color(theme.highlight);
 
     let inset_plot = LinePlot::new()
         .series(inset_series)
@@ -94,7 +96,7 @@ fn main() -> color_eyre::Result<()> {
     // Place inset in the right half, below the title, with enough room for labels
     let inset = InsetAxes::new(0.55, 0.10, 0.40, 0.42)
         .border(true)
-        .border_color(Color::Yellow);
+        .border_color(theme.highlight);
 
     loop {
         terminal.draw(|frame| {

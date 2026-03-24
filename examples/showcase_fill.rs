@@ -16,20 +16,19 @@ use ratatui_plt::prelude::*;
 fn main() -> color_eyre::Result<()> {
     color_eyre::install()?;
     Theme::set_default(Theme::light());
+    let theme = Theme::get_default();
     io::stdout().execute(EnterAlternateScreen)?;
     enable_raw_mode()?;
     let mut terminal = Terminal::new(CrosstermBackend::new(io::stdout()))?;
 
-    // Blue shades
-    let blue_dark = Color::Rgb(31, 119, 180);
-    let blue_mid = Color::Rgb(70, 130, 180);
-    let blue_light = Color::Rgb(174, 199, 232);
+    // Series colors from theme color cycle
+    let blue_dark = theme.color_cycle.at(0);
+    let blue_mid = theme.color_cycle.at(1);
+    let blue_light = theme.color_cycle.at(2);
 
     // ---- Panel A: BandPlot (fill_between two curves) ----
     let n_band = 100;
-    let x_band: Vec<f64> = (0..n_band)
-        .map(|i| i as f64 * 0.1)
-        .collect();
+    let x_band: Vec<f64> = (0..n_band).map(|i| i as f64 * 0.1).collect();
 
     // Upper curve: sin(x) + 1.5
     let y_upper: Vec<f64> = x_band
@@ -43,18 +42,15 @@ fn main() -> color_eyre::Result<()> {
         .map(|&x| x.sin() - 0.5 - 0.2 * (3.0 * x).cos())
         .collect();
 
-    let filled_band = Band::new("Filled region", x_band.clone(), y_lower, y_upper)
-        .color(blue_light);
+    let filled_band =
+        Band::new("Filled region", x_band.clone(), y_lower, y_upper).color(blue_light);
 
     // Center reference line (y_center for visual reference)
-    let y_center_lo: Vec<f64> = x_band
-        .iter()
-        .map(|&x| x.sin() + 0.5)
-        .collect();
+    let y_center_lo: Vec<f64> = x_band.iter().map(|&x| x.sin() + 0.5).collect();
     let y_center_hi = y_center_lo.clone();
 
-    let center_line = Band::new("Center", x_band.clone(), y_center_lo, y_center_hi)
-        .color(blue_dark);
+    let center_line =
+        Band::new("Center", x_band.clone(), y_center_lo, y_center_hi).color(blue_dark);
 
     let band_plot = BandPlot::new()
         .band(filled_band)
@@ -107,7 +103,12 @@ fn main() -> color_eyre::Result<()> {
         .series(series_c)
         .title("Stacked Area Plot")
         .x_axis(Axis::new().label("Time").grid(true))
-        .y_axis(Axis::new().label("Value").grid(true));
+        .y_axis(
+            Axis::new()
+                .label("Value")
+                .label_position(LabelPosition::End)
+                .grid(true),
+        );
 
     // ---- MultiPanel: 2 rows x 1 col ----
     let panel = MultiPanel::new(2, 1)

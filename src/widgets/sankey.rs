@@ -33,7 +33,7 @@ pub struct SankeyNode {
     /// Display label for the node.
     pub label: String,
     /// Fill color for the node box.
-    pub color: Color,
+    pub color: Option<Color>,
 }
 
 impl SankeyNode {
@@ -41,13 +41,13 @@ impl SankeyNode {
     pub fn new(label: impl Into<String>) -> Self {
         Self {
             label: label.into(),
-            color: Color::White,
+            color: None,
         }
     }
 
     /// Set the node color.
     pub fn color(mut self, color: Color) -> Self {
-        self.color = color;
+        self.color = Some(color);
         self
     }
 }
@@ -319,10 +319,13 @@ impl Widget for &SankeyDiagram {
                 continue;
             }
 
-            let flow_color = flow.color.unwrap_or_else(|| {
+            let source_color = self.nodes[flow.source]
+                .color
+                .unwrap_or_else(|| self.theme.color_cycle.at(flow.source));
+            let flow_color = flow.color.unwrap_or({
                 // Derive a saturated flow color from the source node color at ~65% brightness.
                 // This avoids near-white flow bands that lack contrast against the background.
-                match self.nodes[flow.source].color {
+                match source_color {
                     Color::Rgb(r, g, b) => {
                         // Scale to ~65% brightness for better visibility
                         Color::Rgb(
@@ -331,7 +334,6 @@ impl Widget for &SankeyDiagram {
                             (b as f64 * 0.65) as u8,
                         )
                     }
-                    Color::White => Color::Rgb(170, 170, 170),
                     Color::Yellow => Color::Rgb(200, 200, 50),
                     Color::Cyan => Color::Rgb(50, 200, 200),
                     Color::Red | Color::LightRed => Color::Rgb(200, 60, 60),
@@ -379,26 +381,71 @@ impl Widget for &SankeyDiagram {
                         if y == y_first && y == y_last {
                             let top_half = top - y as f64;
                             if top_half > 0.5 {
-                                pb.set_char(x, y, '▄', flow_color, Z_DATA);
+                                pb.set_char(
+                                    x,
+                                    y,
+                                    self.theme.chars.fill.half_lower,
+                                    flow_color,
+                                    Z_DATA,
+                                );
                             } else {
-                                pb.set_char(x, y, '▀', flow_color, Z_DATA);
+                                pb.set_char(
+                                    x,
+                                    y,
+                                    self.theme.chars.fill.half_upper,
+                                    flow_color,
+                                    Z_DATA,
+                                );
                             }
                         } else if y == y_first {
                             let top_frac = top - y as f64;
                             if top_frac > 0.5 {
-                                pb.set_char(x, y, '▄', flow_color, Z_DATA);
+                                pb.set_char(
+                                    x,
+                                    y,
+                                    self.theme.chars.fill.half_lower,
+                                    flow_color,
+                                    Z_DATA,
+                                );
                             } else {
-                                pb.set_cell(x, y, '█', flow_color, flow_color, Z_DATA);
+                                pb.set_cell(
+                                    x,
+                                    y,
+                                    self.theme.chars.fill.solid,
+                                    flow_color,
+                                    flow_color,
+                                    Z_DATA,
+                                );
                             }
                         } else if y == y_last {
                             let bot_frac = bot - y as f64;
                             if bot_frac < 0.5 {
-                                pb.set_char(x, y, '▀', flow_color, Z_DATA);
+                                pb.set_char(
+                                    x,
+                                    y,
+                                    self.theme.chars.fill.half_upper,
+                                    flow_color,
+                                    Z_DATA,
+                                );
                             } else {
-                                pb.set_cell(x, y, '█', flow_color, flow_color, Z_DATA);
+                                pb.set_cell(
+                                    x,
+                                    y,
+                                    self.theme.chars.fill.solid,
+                                    flow_color,
+                                    flow_color,
+                                    Z_DATA,
+                                );
                             }
                         } else {
-                            pb.set_cell(x, y, '█', flow_color, flow_color, Z_DATA);
+                            pb.set_cell(
+                                x,
+                                y,
+                                self.theme.chars.fill.solid,
+                                flow_color,
+                                flow_color,
+                                Z_DATA,
+                            );
                         }
                     }
                 }
@@ -411,6 +458,7 @@ impl Widget for &SankeyDiagram {
             let nx = col_x[col];
             let ny = node_y[i].round() as u16;
             let nh = node_h[i].round().max(1.0) as u16;
+            let node_color = node.color.unwrap_or_else(|| self.theme.color_cycle.at(i));
 
             // Draw filled box
             for dy in 0..nh {
@@ -418,7 +466,14 @@ impl Widget for &SankeyDiagram {
                     let x = nx + dx;
                     let y = ny + dy;
                     if x < area.x + area.width && y >= py && y < py + ph {
-                        pb.set_cell(x, y, '█', node.color, node.color, Z_DATA);
+                        pb.set_cell(
+                            x,
+                            y,
+                            self.theme.chars.fill.solid,
+                            node_color,
+                            node_color,
+                            Z_DATA,
+                        );
                     }
                 }
             }

@@ -46,15 +46,12 @@ impl Triangulation {
             .map(|&(x, y)| delaunator::Point { x, y })
             .collect();
 
-        let triangles = if let Some(result) = delaunator::triangulate(&coords) {
-            result
-                .triangles
-                .chunks(3)
-                .map(|tri| (tri[0], tri[1], tri[2]))
-                .collect()
-        } else {
-            Vec::new()
-        };
+        let result = delaunator::triangulate(&coords);
+        let triangles = result
+            .triangles
+            .chunks(3)
+            .map(|tri| (tri[0], tri[1], tri[2]))
+            .collect();
 
         let vertices = points.to_vec();
 

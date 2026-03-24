@@ -33,15 +33,16 @@ fn box_muller(seed: &mut u64, mean: f64, std: f64) -> f64 {
 fn main() -> color_eyre::Result<()> {
     color_eyre::install()?;
     Theme::set_default(Theme::light());
+    let theme = Theme::get_default();
     io::stdout().execute(EnterAlternateScreen)?;
     enable_raw_mode()?;
     let mut terminal = Terminal::new(CrosstermBackend::new(io::stdout()))?;
 
-    // Blue shades used throughout
-    let blue_dark = Color::Rgb(31, 119, 180);
-    let blue_mid = Color::Rgb(70, 130, 180);
-    let blue_light = Color::Rgb(174, 199, 232);
-    let blue_pale = Color::Rgb(198, 219, 239);
+    // Series colors from theme color cycle
+    let blue_dark = theme.color_cycle.at(0);
+    let blue_mid = theme.color_cycle.at(1);
+    let blue_light = theme.color_cycle.at(2);
+    let blue_pale = theme.color_cycle.at(3);
 
     // ---- Panel A: LinePlot (3 series) ----
     let mut seed_a = 42u64;
@@ -66,9 +67,7 @@ fn main() -> color_eyre::Result<()> {
             (x, x.sin())
         })
         .collect();
-    let sine_series = Series::new("sin(x)")
-        .data(sine_data)
-        .color(blue_mid);
+    let sine_series = Series::new("sin(x)").data(sine_data).color(blue_mid);
 
     // (c) Filled sine with circle markers (fewer points)
     let filled_data: Vec<(f64, f64)> = (0..30)
@@ -98,9 +97,7 @@ fn main() -> color_eyre::Result<()> {
     let scatter_pts: Vec<(f64, f64)> = (0..n_scatter)
         .map(|_| (lcg(&mut seed_b) * 10.0, lcg(&mut seed_b) * 10.0))
         .collect();
-    let scatter_colors: Vec<f64> = (0..n_scatter)
-        .map(|_| lcg(&mut seed_b))
-        .collect();
+    let scatter_colors: Vec<f64> = (0..n_scatter).map(|_| lcg(&mut seed_b)).collect();
 
     let scatter_s = Series::new("points")
         .data(scatter_pts)
@@ -135,7 +132,12 @@ fn main() -> color_eyre::Result<()> {
         .bins(20)
         .title("Histogram")
         .x_axis(Axis::new().label("Value").grid(true))
-        .y_axis(Axis::new().label("Count").grid(true))
+        .y_axis(
+            Axis::new()
+                .label("Count")
+                .label_position(LabelPosition::End)
+                .grid(true),
+        )
         .show_legend(false);
 
     // ---- Panel E: PieChart ----

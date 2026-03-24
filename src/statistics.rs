@@ -269,9 +269,7 @@ impl Kde {
     /// Evaluate the kernel function at u.
     fn kernel_fn(&self, u: f64) -> f64 {
         match &self.kernel {
-            Kernel::Gaussian => {
-                (1.0 / (2.0 * std::f64::consts::PI).sqrt()) * (-0.5 * u * u).exp()
-            }
+            Kernel::Gaussian => (1.0 / (2.0 * std::f64::consts::PI).sqrt()) * (-0.5 * u * u).exp(),
             Kernel::Epanechnikov => {
                 if u.abs() <= 1.0 {
                     0.75 * (1.0 - u * u)
@@ -547,12 +545,7 @@ pub struct LowessResult {
 impl LowessResult {
     /// Convert to a `Series` for plotting.
     pub fn to_series(&self, name: &str, color: Color) -> Series {
-        let data: Vec<(f64, f64)> = self
-            .x
-            .iter()
-            .copied()
-            .zip(self.y.iter().copied())
-            .collect();
+        let data: Vec<(f64, f64)> = self.x.iter().copied().zip(self.y.iter().copied()).collect();
         Series::new(name).data(data).color(color)
     }
 }
@@ -584,9 +577,7 @@ pub fn lowess(x: &[f64], y: &[f64], frac: f64) -> Option<LowessResult> {
         let xi = sorted_x[i];
 
         // Find k nearest neighbors by distance
-        let mut dists: Vec<(usize, f64)> = (0..n)
-            .map(|j| (j, (sorted_x[j] - xi).abs()))
-            .collect();
+        let mut dists: Vec<(usize, f64)> = (0..n).map(|j| (j, (sorted_x[j] - xi).abs())).collect();
         dists.sort_by(|a, b| a.1.partial_cmp(&b.1).unwrap_or(std::cmp::Ordering::Equal));
 
         let max_dist = dists[k - 1].1;

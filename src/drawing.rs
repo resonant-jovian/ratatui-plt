@@ -21,8 +21,8 @@ pub const BRAILLE_BASE: u32 = 0x2800;
 /// Horizontal fill levels using left-side eighth blocks.
 #[cfg(feature = "unicode-extended")]
 pub const HORIZONTAL_FILL_LEVELS: [char; 9] = [
-    ' ', '\u{258F}', '\u{258E}', '\u{258D}', '\u{258C}',
-    '\u{258B}', '\u{258A}', '\u{2589}', '\u{2588}',
+    ' ', '\u{258F}', '\u{258E}', '\u{258D}', '\u{258C}', '\u{258B}', '\u{258A}', '\u{2589}',
+    '\u{2588}',
 ];
 
 /// Convenience: map a 0.0..=1.0 fraction to a horizontal fill character.
@@ -35,8 +35,8 @@ pub fn horizontal_fill_char(fraction: f64) -> char {
 /// Vertical fill levels using lower eighth blocks.
 #[cfg(feature = "unicode-extended")]
 pub const VERTICAL_FILL_LEVELS: [char; 9] = [
-    ' ', '\u{2581}', '\u{2582}', '\u{2583}', '\u{2584}',
-    '\u{2585}', '\u{2586}', '\u{2587}', '\u{2588}',
+    ' ', '\u{2581}', '\u{2582}', '\u{2583}', '\u{2584}', '\u{2585}', '\u{2586}', '\u{2587}',
+    '\u{2588}',
 ];
 
 /// Convenience: map a 0.0..=1.0 fraction to a vertical fill character.
@@ -50,22 +50,70 @@ pub fn vertical_fill_char(fraction: f64) -> char {
 #[cfg(feature = "unicode-extended")]
 pub fn sextant_char(bits: u8) -> char {
     const TABLE: [char; 64] = [
-        ' ',         '\u{1FB00}', '\u{1FB01}', '\u{1FB02}',
-        '\u{1FB03}', '\u{1FB04}', '\u{1FB05}', '\u{1FB06}',
-        '\u{1FB07}', '\u{1FB08}', '\u{1FB09}', '\u{1FB0A}',
-        '\u{1FB0B}', '\u{1FB0C}', '\u{1FB0D}', '\u{1FB0E}',
-        '\u{1FB0F}', '\u{1FB10}', '\u{1FB11}', '\u{1FB12}',
-        '\u{1FB13}', '\u{2580}',  '\u{1FB14}', '\u{1FB15}',
-        '\u{1FB16}', '\u{1FB17}', '\u{1FB18}', '\u{1FB19}',
-        '\u{1FB1A}', '\u{1FB1B}', '\u{1FB1C}', '\u{1FB1D}',
-        '\u{1FB1E}', '\u{1FB1F}', '\u{1FB20}', '\u{1FB21}',
-        '\u{1FB22}', '\u{1FB23}', '\u{1FB24}', '\u{1FB25}',
-        '\u{1FB26}', '\u{1FB27}', '\u{2584}',  '\u{1FB28}',
-        '\u{1FB29}', '\u{1FB2A}', '\u{1FB2B}', '\u{1FB2C}',
-        '\u{1FB2D}', '\u{1FB2E}', '\u{1FB2F}', '\u{1FB30}',
-        '\u{1FB31}', '\u{1FB32}', '\u{1FB33}', '\u{1FB34}',
-        '\u{1FB35}', '\u{1FB36}', '\u{1FB37}', '\u{1FB38}',
-        '\u{1FB39}', '\u{1FB3A}', '\u{1FB3B}', '\u{2588}',
+        ' ',
+        '\u{1FB00}',
+        '\u{1FB01}',
+        '\u{1FB02}',
+        '\u{1FB03}',
+        '\u{1FB04}',
+        '\u{1FB05}',
+        '\u{1FB06}',
+        '\u{1FB07}',
+        '\u{1FB08}',
+        '\u{1FB09}',
+        '\u{1FB0A}',
+        '\u{1FB0B}',
+        '\u{1FB0C}',
+        '\u{1FB0D}',
+        '\u{1FB0E}',
+        '\u{1FB0F}',
+        '\u{1FB10}',
+        '\u{1FB11}',
+        '\u{1FB12}',
+        '\u{1FB13}',
+        '\u{2580}',
+        '\u{1FB14}',
+        '\u{1FB15}',
+        '\u{1FB16}',
+        '\u{1FB17}',
+        '\u{1FB18}',
+        '\u{1FB19}',
+        '\u{1FB1A}',
+        '\u{1FB1B}',
+        '\u{1FB1C}',
+        '\u{1FB1D}',
+        '\u{1FB1E}',
+        '\u{1FB1F}',
+        '\u{1FB20}',
+        '\u{1FB21}',
+        '\u{1FB22}',
+        '\u{1FB23}',
+        '\u{1FB24}',
+        '\u{1FB25}',
+        '\u{1FB26}',
+        '\u{1FB27}',
+        '\u{2584}',
+        '\u{1FB28}',
+        '\u{1FB29}',
+        '\u{1FB2A}',
+        '\u{1FB2B}',
+        '\u{1FB2C}',
+        '\u{1FB2D}',
+        '\u{1FB2E}',
+        '\u{1FB2F}',
+        '\u{1FB30}',
+        '\u{1FB31}',
+        '\u{1FB32}',
+        '\u{1FB33}',
+        '\u{1FB34}',
+        '\u{1FB35}',
+        '\u{1FB36}',
+        '\u{1FB37}',
+        '\u{1FB38}',
+        '\u{1FB39}',
+        '\u{1FB3A}',
+        '\u{1FB3B}',
+        '\u{2588}',
     ];
     TABLE[(bits & 0x3F) as usize]
 }
@@ -74,10 +122,9 @@ pub fn sextant_char(bits: u8) -> char {
 #[cfg(feature = "unicode-extended")]
 pub fn quadrant_char(bits: u8) -> char {
     const TABLE: [char; 16] = [
-        ' ',        '\u{2598}', '\u{259D}', '\u{2580}',
-        '\u{2596}', '\u{258C}', '\u{259E}', '\u{259B}',
-        '\u{2597}', '\u{259A}', '\u{2590}', '\u{259C}',
-        '\u{2584}', '\u{2599}', '\u{259F}', '\u{2588}',
+        ' ', '\u{2598}', '\u{259D}', '\u{2580}', '\u{2596}', '\u{258C}', '\u{259E}', '\u{259B}',
+        '\u{2597}', '\u{259A}', '\u{2590}', '\u{259C}', '\u{2584}', '\u{2599}', '\u{259F}',
+        '\u{2588}',
     ];
     TABLE[(bits & 0x0F) as usize]
 }
@@ -85,9 +132,7 @@ pub fn quadrant_char(bits: u8) -> char {
 /// Check if two colors are effectively the same (for contrast detection).
 pub fn colors_match(a: Color, b: Color) -> bool {
     match (a, b) {
-        (Color::Rgb(r1, g1, b1), Color::Rgb(r2, g2, b2)) => {
-            r1 == r2 && g1 == g2 && b1 == b2
-        }
+        (Color::Rgb(r1, g1, b1), Color::Rgb(r2, g2, b2)) => r1 == r2 && g1 == g2 && b1 == b2,
         (Color::Reset, Color::Reset) => true,
         _ => a == b,
     }
@@ -203,11 +248,11 @@ pub fn draw_braille_line(
     }
 }
 
-/// OR a braille dot into the [`PlotBuffer`] at the given cell, using `Z_DATA` priority.
+/// OR a braille dot into the [`PlotBuffer`] at the given cell at the specified Z-level.
 ///
 /// This is the `PlotBuffer` counterpart of [`write_braille`].
-pub fn write_braille_pb(pb: &mut PlotBuffer, x: u16, y: u16, bits: u8, color: Color) {
-    pb.set_braille(x, y, bits, color, crate::plot_buffer::Z_DATA);
+pub fn write_braille_pb(pb: &mut PlotBuffer, x: u16, y: u16, bits: u8, color: Color, z: u8) {
+    pb.set_braille(x, y, bits, color, z);
 }
 
 /// Draw a line between two screen-space points using Bresenham's algorithm
@@ -215,7 +260,9 @@ pub fn write_braille_pb(pb: &mut PlotBuffer, x: u16, y: u16, bits: u8, color: Co
 ///
 /// This is the `PlotBuffer` counterpart of [`draw_braille_line`].
 /// Coordinates are in terminal cell space (floating point). The line is clipped
-/// to the given plot area bounds.
+/// to the given plot area bounds. The `z` parameter controls the Z-level for
+/// compositing (use `Z_DATA + series_index` for per-series ordering).
+#[allow(clippy::too_many_arguments)]
 pub fn draw_braille_line_pb(
     pb: &mut PlotBuffer,
     x0: f64,
@@ -224,6 +271,7 @@ pub fn draw_braille_line_pb(
     y1: f64,
     color: Color,
     pa: &PlotArea,
+    z: u8,
 ) {
     // Scale to braille sub-pixel coordinates (2x horizontal, 4x vertical)
     let mut ix0 = (x0 * 2.0).round() as i32;
@@ -249,7 +297,7 @@ pub fn draw_braille_line_pb(
                 let dot_col = (ix0 % 2) as usize;
                 let dot_row = (iy0 % 4) as usize;
                 let bit = BRAILLE_BITS[dot_col][dot_row];
-                write_braille_pb(pb, cell_x, cell_y, bit, color);
+                write_braille_pb(pb, cell_x, cell_y, bit, color, z);
             }
         }
 

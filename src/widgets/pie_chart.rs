@@ -34,7 +34,7 @@ pub struct PieSlice {
     /// Numeric value (proportion is computed from sum of all slices).
     pub value: f64,
     /// Fill color for the slice.
-    pub color: Color,
+    pub color: Option<Color>,
     /// Explode offset as a fraction of the radius (0.0 = no offset).
     pub explode: f64,
 }
@@ -45,14 +45,14 @@ impl PieSlice {
         Self {
             label: label.into(),
             value,
-            color: Color::White,
+            color: None,
             explode: 0.0,
         }
     }
 
     /// Set the slice color.
     pub fn color(mut self, color: Color) -> Self {
-        self.color = color;
+        self.color = Some(color);
         self
     }
 
@@ -205,6 +205,14 @@ impl Widget for &PieChart {
             angle_start += sweep;
         }
 
+        // Pre-resolve slice colors
+        let slice_colors: Vec<Color> = self
+            .slices
+            .iter()
+            .enumerate()
+            .map(|(i, s)| s.color.unwrap_or_else(|| self.theme.color_cycle.at(i)))
+            .collect();
+
         // For each cell in the drawing area, determine which slice it belongs to
         for screen_y in py..py + ph {
             for screen_x in area.x..area.x + pw {
@@ -219,7 +227,9 @@ impl Widget for &PieChart {
                 }
 
                 // Find which slice this angle belongs to
-                for (slice, &(a_start, a_end)) in self.slices.iter().zip(angles.iter()) {
+                for (si, (slice, &(a_start, a_end))) in
+                    self.slices.iter().zip(angles.iter()).enumerate()
+                {
                     // Handle exploded slices by shifting the centre
                     let (ecx, ecy) = if slice.explode > 0.0 {
                         let mid_angle = (a_start + a_end) / 2.0;
@@ -250,28 +260,23 @@ impl Widget for &PieChart {
                     }
 
                     if ea >= a_start && ea < a_end {
-                        pb.set_cell(screen_x, screen_y, '█', slice.color, slice.color, Z_DATA);
+                        let sc = slice_colors[si];
+                        pb.set_cell(
+                            screen_x,
+                            screen_y,
+                            self.theme.chars.fill.solid,
+                            sc,
+                            sc,
+                            Z_DATA,
+                        );
                         break;
                     }
                 }
             }
         }
 
-        // Draw slice border outlines (use thin ring on the outer and inner edges)
-        // Draw radial borders between slices
-        for &(a_start, _a_end) in &angles {
-            let steps = (r_screen_x.max(r_screen_y) * 1.5) as usize;
-            for s in 0..=steps {
-                let frac = inner_ratio + (1.0 - inner_ratio) * s as f64 / steps as f64;
-                let sx = cx + frac * r_screen_x * a_start.cos();
-                let sy = cy + frac * r_screen_y * a_start.sin();
-                let xi = sx.round() as u16;
-                let yi = sy.round() as u16;
-                if xi >= area.x && xi < area.x + area.width && yi >= py && yi < py + ph {
-                    pb.set_char(xi, yi, '▪', Color::DarkGray, Z_CHROME);
-                }
-            }
-        }
+        // Slice colors provide visual separation; radial borders are omitted
+        // to avoid dotted-line artifacts at slice boundaries.
 
         // When unicode-extended is enabled, draw arc quadrant characters along the
         // outer rim for smoother circular edges.
@@ -292,12 +297,12 @@ impl Widget for &PieChart {
                     //   ◜ upper-left   ◝ upper-right
                     //   ◟ lower-left   ◞ lower-right
                     let arc_ch = match (theta.cos() >= 0.0, theta.sin() < 0.0) {
-                        (false, true) => '◜',  // upper-left quadrant
-                        (true, true) => '◝',   // upper-right quadrant
-                        (true, false) => '◞',  // lower-right quadrant
-                        (false, false) => '◟', // lower-left quadrant
+                        (false, true) => self.theme.chars.arc.top_left, // upper-left quadrant
+                        (true, true) => self.theme.chars.arc.top_right, // upper-right quadrant
+                        (true, false) => self.theme.chars.arc.bottom_right, // lower-right quadrant
+                        (false, false) => self.theme.chars.arc.bottom_left, // lower-left quadrant
                     };
-                    pb.set_char(xi, yi, arc_ch, Color::DarkGray, Z_CHROME);
+                    pb.set_char(xi, yi, arc_ch, self.theme.muted, Z_CHROME);
                 }
             }
         }
@@ -342,7 +347,7 @@ impl Widget for &PieChart {
                     for (j, ch) in text.chars().enumerate() {
                         let x = xi + j as i32;
                         if x >= area.x as i32 && x < (area.x + area.width) as i32 {
-                            pb.set_char(x as u16, yi, ch, slice.color, Z_CHROME);
+                            pb.set_char(x as u16, yi, ch, slice_colors[i], Z_CHROME);
                         }
                     }
                 }

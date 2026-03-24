@@ -8,34 +8,36 @@
 //!
 //! | Level | Purpose |
 //! |-------|---------|
-//! | [`Z_BACKGROUND`] | Plot area background |
-//! | [`Z_FILL`] | Fill regions, reference spans |
-//! | [`Z_GRID`] | Grid lines |
-//! | [`Z_DATA`] | Lines, braille curves, half-blocks |
-//! | [`Z_MARKER`] | Scatter points, line markers |
-//! | [`Z_ANNOTATION`] | Text annotations, arrows |
-//! | [`Z_CHROME`] | Legend, colorbar, axis labels, spines |
+//! | [`Z_BACKGROUND`] (0) | Plot area background |
+//! | [`Z_FILL`] (16) | Fill regions, reference spans |
+//! | [`Z_GRID`] (32) | Grid lines |
+//! | [`Z_DATA`] (48) | Lines, braille curves, half-blocks (series use Z_DATA, Z_DATA+1, ...) |
+//! | [`Z_MARKER`] (128) | Scatter points, line markers |
+//! | [`Z_ANNOTATION`] (160) | Text annotations, arrows |
+//! | [`Z_CHROME`] (192) | Legend, colorbar, axis labels, spines |
 
 use ratatui::buffer::Buffer;
 use ratatui::layout::Rect;
 use ratatui::style::Color;
 
-use crate::drawing::{colors_match, contrasting_color, BRAILLE_BASE};
+use crate::drawing::{BRAILLE_BASE, colors_match, contrasting_color};
 
 /// Plot area background.
 pub const Z_BACKGROUND: u8 = 0;
 /// Fill regions, reference spans (background-color only).
-pub const Z_FILL: u8 = 1;
+pub const Z_FILL: u8 = 16;
 /// Grid lines (foreground characters).
-pub const Z_GRID: u8 = 2;
+pub const Z_GRID: u8 = 32;
 /// Lines, braille curves, half-block data.
-pub const Z_DATA: u8 = 3;
+/// Multi-series widgets use Z_DATA, Z_DATA+1, Z_DATA+2, ... so that
+/// higher-indexed series replace lower-indexed ones in shared cells.
+pub const Z_DATA: u8 = 48;
 /// Scatter points, line markers.
-pub const Z_MARKER: u8 = 4;
+pub const Z_MARKER: u8 = 128;
 /// Text annotations, arrows.
-pub const Z_ANNOTATION: u8 = 5;
+pub const Z_ANNOTATION: u8 = 160;
 /// Legend, colorbar, axis labels, spines.
-pub const Z_CHROME: u8 = 6;
+pub const Z_CHROME: u8 = 192;
 
 /// Per-cell compositing state tracking background, foreground, and braille
 /// contributions at different Z-levels.
@@ -88,10 +90,7 @@ impl PlotBuffer {
             && y >= self.area.y
             && y < self.area.y + self.area.height
         {
-            Some(
-                (y - self.area.y) as usize * self.area.width as usize
-                    + (x - self.area.x) as usize,
-            )
+            Some((y - self.area.y) as usize * self.area.width as usize + (x - self.area.x) as usize)
         } else {
             None
         }

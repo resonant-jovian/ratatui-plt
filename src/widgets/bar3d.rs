@@ -19,8 +19,8 @@ pub struct Bar3DData {
     pub y: f64,
     /// Height of the bar (z extent from 0).
     pub height: f64,
-    /// Bar color (top face).
-    pub color: Color,
+    /// Bar color (top face). `None` uses `theme.primary`.
+    pub color: Option<Color>,
     /// Bar width in data units (default 0.8).
     pub width: f64,
 }
@@ -32,14 +32,14 @@ impl Bar3DData {
             x,
             y,
             height,
-            color: Color::Cyan,
+            color: None,
             width: 0.8,
         }
     }
 
     /// Set the bar color.
     pub fn color(mut self, color: Color) -> Self {
-        self.color = color;
+        self.color = Some(color);
         self
     }
 
@@ -209,9 +209,10 @@ impl Bar3D {
                 })
                 .collect();
 
-            let top_color = bar.color;
-            let front_color = scale_color(bar.color, 0.7);
-            let side_color = scale_color(bar.color, 0.5);
+            let resolved_color = bar.color.unwrap_or(self.theme.primary);
+            let top_color = resolved_color;
+            let front_color = scale_color(resolved_color, 0.7);
+            let side_color = scale_color(resolved_color, 0.5);
 
             // Top face: corners 4, 5, 6, 7
             let top_depth =
@@ -225,7 +226,7 @@ impl Bar3D {
                 ],
                 depth: top_depth,
                 color: top_color,
-                char_fill: '█',
+                char_fill: self.theme.chars.depth.front,
             });
 
             // Front face: corners 0, 1, 5, 4
@@ -240,7 +241,7 @@ impl Bar3D {
                 ],
                 depth: front_depth,
                 color: front_color,
-                char_fill: '▓',
+                char_fill: self.theme.chars.depth.side_near,
             });
 
             // Right side face: corners 1, 2, 6, 5
@@ -255,7 +256,7 @@ impl Bar3D {
                 ],
                 depth: right_depth,
                 color: side_color,
-                char_fill: '▒',
+                char_fill: self.theme.chars.depth.side_far,
             });
 
             // Back face: corners 2, 3, 7, 6
@@ -270,7 +271,7 @@ impl Bar3D {
                 ],
                 depth: back_depth,
                 color: front_color,
-                char_fill: '▓',
+                char_fill: self.theme.chars.depth.top_near,
             });
 
             // Left side face: corners 3, 0, 4, 7
@@ -285,7 +286,7 @@ impl Bar3D {
                 ],
                 depth: left_depth,
                 color: side_color,
-                char_fill: '▒',
+                char_fill: self.theme.chars.depth.top_far,
             });
         }
 
@@ -351,31 +352,37 @@ impl Bar3D {
         // X axis line and label
         let xx = to_sx(x_tip.0);
         let xy = to_sy(x_tip.1);
-        draw_braille_line(buf, ox, oy, xx, xy, Color::Red, &pa);
+        draw_braille_line(buf, ox, oy, xx, xy, self.theme.x_axis_3d_color, &pa);
         let xxi = xx.round() as u16;
         let xyi = xy.round() as u16;
         if xxi >= px && xxi < px + pw && xyi >= py && xyi < py + ph {
-            buf[(xxi, xyi)].set_char('X').set_fg(Color::Red);
+            buf[(xxi, xyi)]
+                .set_char('X')
+                .set_fg(self.theme.x_axis_3d_color);
         }
 
         // Y axis line and label
         let yx = to_sx(y_tip.0);
         let yy = to_sy(y_tip.1);
-        draw_braille_line(buf, ox, oy, yx, yy, Color::Green, &pa);
+        draw_braille_line(buf, ox, oy, yx, yy, self.theme.y_axis_3d_color, &pa);
         let yxi = yx.round() as u16;
         let yyi = yy.round() as u16;
         if yxi >= px && yxi < px + pw && yyi >= py && yyi < py + ph {
-            buf[(yxi, yyi)].set_char('Y').set_fg(Color::Green);
+            buf[(yxi, yyi)]
+                .set_char('Y')
+                .set_fg(self.theme.y_axis_3d_color);
         }
 
         // Z axis line and label
         let zx = to_sx(z_tip.0);
         let zy = to_sy(z_tip.1);
-        draw_braille_line(buf, ox, oy, zx, zy, Color::Blue, &pa);
+        draw_braille_line(buf, ox, oy, zx, zy, self.theme.z_axis_3d_color, &pa);
         let zxi = zx.round() as u16;
         let zyi = zy.round() as u16;
         if zxi >= px && zxi < px + pw && zyi >= py && zyi < py + ph {
-            buf[(zxi, zyi)].set_char('Z').set_fg(Color::Blue);
+            buf[(zxi, zyi)]
+                .set_char('Z')
+                .set_fg(self.theme.z_axis_3d_color);
         }
 
         // Rasterize each face (after axis lines, so bars occlude axes)

@@ -36,12 +36,15 @@ fn main() -> color_eyre::Result<()> {
     let mut terminal = Terminal::new(CrosstermBackend::new(io::stdout()))?;
 
     // Auto-detect terminal cell aspect ratio for accurate equal aspect plots
-    if let Ok(size) = crossterm::terminal::window_size() {
-        if size.width > 0 && size.height > 0 && size.columns > 0 && size.rows > 0 {
-            let cell_w = size.width as f64 / size.columns as f64;
-            let cell_h = size.height as f64 / size.rows as f64;
-            set_cell_aspect(cell_w / cell_h);
-        }
+    if let Ok(size) = crossterm::terminal::window_size()
+        && size.width > 0
+        && size.height > 0
+        && size.columns > 0
+        && size.rows > 0
+    {
+        let cell_w = size.width as f64 / size.columns as f64;
+        let cell_h = size.height as f64 / size.rows as f64;
+        set_cell_aspect(cell_w / cell_h);
     }
 
     // Left panel: large 2D Gaussian heatmap

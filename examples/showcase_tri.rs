@@ -75,6 +75,7 @@ fn scalar_fn(x: f64, y: f64) -> f64 {
 fn main() -> color_eyre::Result<()> {
     color_eyre::install()?;
     Theme::set_default(Theme::light());
+    let theme = Theme::get_default();
     io::stdout().execute(EnterAlternateScreen)?;
     enable_raw_mode()?;
     let mut terminal = Terminal::new(CrosstermBackend::new(io::stdout()))?;
@@ -86,7 +87,7 @@ fn main() -> color_eyre::Result<()> {
     let (verts_a, tris_a) = make_triangulation(grid_n, &mut seed_a);
     let triplot = TriPlot::new(Triangulation::from_explicit(verts_a, tris_a))
         .title("TriPlot (mesh)")
-        .edge_color(Color::Rgb(31, 119, 180))
+        .edge_color(theme.primary)
         .x_axis(Axis::new().label("x").grid(true))
         .y_axis(Axis::new().label("y").grid(true));
 
@@ -94,27 +95,25 @@ fn main() -> color_eyre::Result<()> {
     let mut seed_b = 100_u64; // same seed for identical mesh
     let (verts_b, tris_b) = make_triangulation(grid_n, &mut seed_b);
     let vals_b: Vec<f64> = verts_b.iter().map(|&(x, y)| scalar_fn(x, y)).collect();
-    let tricontour_unfilled =
-        TriContour::new(Triangulation::from_explicit(verts_b, tris_b))
-            .vertex_values(vals_b)
-            .levels_auto(10)
-            .colormap(Viridis)
-            .title("TriContour (unfilled)")
-            .x_axis(Axis::new().label("x").grid(true))
-            .y_axis(Axis::new().label("y").grid(true));
+    let tricontour_unfilled = TriContour::new(Triangulation::from_explicit(verts_b, tris_b))
+        .vertex_values(vals_b)
+        .levels_auto(10)
+        .colormap(Viridis)
+        .title("TriContour (unfilled)")
+        .x_axis(Axis::new().label("x").grid(true))
+        .y_axis(Axis::new().label("y").grid(true));
 
     // ── C: TriContour (denser levels) ───────────────────────────────────
     let mut seed_c = 100_u64;
     let (verts_c, tris_c) = make_triangulation(grid_n, &mut seed_c);
     let vals_c: Vec<f64> = verts_c.iter().map(|&(x, y)| scalar_fn(x, y)).collect();
-    let tricontour_filled =
-        TriContour::new(Triangulation::from_explicit(verts_c, tris_c))
-            .vertex_values(vals_c)
-            .levels_auto(20)
-            .colormap(Plasma)
-            .title("TriContour (dense)")
-            .x_axis(Axis::new().label("x").grid(true))
-            .y_axis(Axis::new().label("y").grid(true));
+    let tricontour_filled = TriContour::new(Triangulation::from_explicit(verts_c, tris_c))
+        .vertex_values(vals_c)
+        .levels_auto(20)
+        .colormap(Plasma)
+        .title("TriContour (dense)")
+        .x_axis(Axis::new().label("x").grid(true))
+        .y_axis(Axis::new().label("y").grid(true));
 
     // ── D: TriColor (filled faces) ──────────────────────────────────────
     let mut seed_d = 100_u64;

@@ -61,8 +61,10 @@ fn main() -> color_eyre::Result<()> {
         })
         .collect();
 
-    let sin_ds = StairsDataset::new("sin(x)", edges.clone(), sin_values, Color::Cyan);
-    let cos_ds = StairsDataset::new("cos(x)", edges, cos_values, Color::Yellow);
+    let theme = Theme::get_default();
+    let mut cycle = theme.color_cycle.clone();
+    let sin_ds = StairsDataset::new("sin(x)", edges.clone(), sin_values, cycle.next_color());
+    let cos_ds = StairsDataset::new("cos(x)", edges, cos_values, cycle.next_color());
 
     let plot = StairsPlot::new()
         .dataset(sin_ds)

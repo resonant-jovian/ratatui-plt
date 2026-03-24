@@ -28,17 +28,19 @@ fn parse_theme() -> Theme {
 fn main() -> color_eyre::Result<()> {
     color_eyre::install()?;
     Theme::set_default(parse_theme());
+    let theme = Theme::get_default();
+    let mut cycle = theme.color_cycle.clone();
     io::stdout().execute(EnterAlternateScreen)?;
     enable_raw_mode()?;
     let mut terminal = Terminal::new(CrosstermBackend::new(io::stdout()))?;
 
     let chart = PieChart::new()
-        .slice(PieSlice::new("Python", 28.1).color(Color::Cyan))
-        .slice(PieSlice::new("JS", 17.4).color(Color::Yellow))
-        .slice(PieSlice::new("Java", 15.8).color(Color::Red))
-        .slice(PieSlice::new("C/C++", 12.3).color(Color::Green))
-        .slice(PieSlice::new("C#", 7.5).color(Color::Magenta))
-        .slice(PieSlice::new("Other", 18.9).color(Color::Gray))
+        .slice(PieSlice::new("Python", 28.1).color(cycle.next_color()))
+        .slice(PieSlice::new("JS", 17.4).color(cycle.next_color()))
+        .slice(PieSlice::new("Java", 15.8).color(cycle.next_color()))
+        .slice(PieSlice::new("C/C++", 12.3).color(cycle.next_color()))
+        .slice(PieSlice::new("C#", 7.5).color(cycle.next_color()))
+        .slice(PieSlice::new("Other", 18.9).color(theme.muted))
         .donut_ratio(0.35)
         .show_labels(true)
         .title("Programming Language Market Share (q to quit)");

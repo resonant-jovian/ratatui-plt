@@ -38,22 +38,35 @@ fn normal_vec(seed: &mut u64, n: usize, mean: f64, std: f64) -> Vec<f64> {
 fn main() -> color_eyre::Result<()> {
     color_eyre::install()?;
     Theme::set_default(Theme::light());
+    let theme = Theme::get_default();
     io::stdout().execute(EnterAlternateScreen)?;
     enable_raw_mode()?;
     let mut terminal = Terminal::new(CrosstermBackend::new(io::stdout()))?;
 
-    // Blue shades
-    let blue_dark = Color::Rgb(31, 119, 180);
-    let blue_mid = Color::Rgb(70, 130, 180);
-    let blue_light = Color::Rgb(174, 199, 232);
-    let blue_steel = Color::Rgb(100, 149, 237);
+    // Series colors from theme color cycle
+    let blue_dark = theme.color_cycle.at(0);
+    let blue_mid = theme.color_cycle.at(1);
+    let blue_light = theme.color_cycle.at(2);
+    let blue_steel = theme.color_cycle.at(3);
 
     // ---- Panel A: BoxPlot (4 groups) ----
     let mut seed_box = 42u64;
-    let box_group1 = BoxData::new("Group 1", normal_vec(&mut seed_box, 50, 5.0, 1.0), blue_dark);
+    let box_group1 = BoxData::new(
+        "Group 1",
+        normal_vec(&mut seed_box, 50, 5.0, 1.0),
+        blue_dark,
+    );
     let box_group2 = BoxData::new("Group 2", normal_vec(&mut seed_box, 50, 7.0, 2.0), blue_mid);
-    let box_group3 = BoxData::new("Group 3", normal_vec(&mut seed_box, 50, 4.0, 1.5), blue_light);
-    let box_group4 = BoxData::new("Group 4", normal_vec(&mut seed_box, 50, 6.0, 0.8), blue_steel);
+    let box_group3 = BoxData::new(
+        "Group 3",
+        normal_vec(&mut seed_box, 50, 4.0, 1.5),
+        blue_light,
+    );
+    let box_group4 = BoxData::new(
+        "Group 4",
+        normal_vec(&mut seed_box, 50, 6.0, 0.8),
+        blue_steel,
+    );
 
     let box_plot = BoxPlot::new()
         .box_data(box_group1)
@@ -62,28 +75,22 @@ fn main() -> color_eyre::Result<()> {
         .box_data(box_group4)
         .show_means(true)
         .title("Box Plot")
-        .y_axis(Axis::new().label("Value").grid(true));
+        .y_axis(
+            Axis::new()
+                .label("Value")
+                .label_position(LabelPosition::End)
+                .grid(true),
+        );
 
     // ---- Panel B: ViolinPlot (3 distributions) ----
     let mut seed_v = 777u64;
     // Narrow distribution
-    let violin_narrow = ViolinData::new(
-        "Narrow",
-        normal_vec(&mut seed_v, 200, 5.0, 0.5),
-        blue_dark,
-    );
+    let violin_narrow =
+        ViolinData::new("Narrow", normal_vec(&mut seed_v, 200, 5.0, 0.5), blue_dark);
     // Medium distribution
-    let violin_medium = ViolinData::new(
-        "Medium",
-        normal_vec(&mut seed_v, 200, 5.0, 1.5),
-        blue_mid,
-    );
+    let violin_medium = ViolinData::new("Medium", normal_vec(&mut seed_v, 200, 5.0, 1.5), blue_mid);
     // Wide distribution
-    let violin_wide = ViolinData::new(
-        "Wide",
-        normal_vec(&mut seed_v, 200, 5.0, 3.0),
-        blue_light,
-    );
+    let violin_wide = ViolinData::new("Wide", normal_vec(&mut seed_v, 200, 5.0, 3.0), blue_light);
 
     let violin_plot = ViolinPlot::new()
         .dataset(violin_narrow)
@@ -91,7 +98,12 @@ fn main() -> color_eyre::Result<()> {
         .dataset(violin_wide)
         .show_box(false)
         .title("Violin Plot")
-        .y_axis(Axis::new().label("Value").grid(true));
+        .y_axis(
+            Axis::new()
+                .label("Value")
+                .label_position(LabelPosition::End)
+                .grid(true),
+        );
 
     // ---- Panel C: ErrorBarPlot ----
     let n_err = 10;
@@ -103,12 +115,8 @@ fn main() -> color_eyre::Result<()> {
             (x, 0.3 * x * x + noise)
         })
         .collect();
-    let err_low: Vec<f64> = (0..n_err)
-        .map(|i| 0.5 + (i as f64) * 0.15)
-        .collect();
-    let err_high: Vec<f64> = (0..n_err)
-        .map(|i| 0.8 + (i as f64) * 0.2)
-        .collect();
+    let err_low: Vec<f64> = (0..n_err).map(|i| 0.5 + (i as f64) * 0.15).collect();
+    let err_high: Vec<f64> = (0..n_err).map(|i| 0.8 + (i as f64) * 0.2).collect();
 
     let error_bar_plot = ErrorBarPlot::new()
         .data(err_points, err_low, err_high)
@@ -127,7 +135,12 @@ fn main() -> color_eyre::Result<()> {
         .dataset(ecdf_ds)
         .title("ECDF Plot")
         .x_axis(Axis::new().label("Value").grid(true))
-        .y_axis(Axis::new().label("F(x)").grid(true))
+        .y_axis(
+            Axis::new()
+                .label("F(x)")
+                .label_position(LabelPosition::End)
+                .grid(true),
+        )
         .show_legend(true)
         .legend_position(LegendPosition::BottomRight);
 
@@ -137,9 +150,9 @@ fn main() -> color_eyre::Result<()> {
         blue_mid,
         blue_light,
         blue_steel,
-        Color::Rgb(31, 80, 140),
-        Color::Rgb(50, 100, 160),
-        Color::Rgb(80, 140, 200),
+        theme.color_cycle.at(4),
+        theme.color_cycle.at(5),
+        theme.color_cycle.at(6),
     ];
 
     let groups: Vec<EventGroup> = (0..7)

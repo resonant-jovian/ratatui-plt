@@ -5,6 +5,8 @@
 [![Crates.io](https://img.shields.io/crates/v/ratatui-plt.svg)](https://crates.io/crates/ratatui-plt)
 [![docs.rs](https://docs.rs/ratatui-plt/badge.svg)](https://docs.rs/ratatui-plt)
 [![License: GPL-3.0](https://img.shields.io/badge/License-GPL--3.0-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)
+[![Support on thanks.dev](https://img.shields.io/badge/Support-thanks.dev-green)](https://thanks.dev/u/gh/resonant-jovian)
+
 [![Rust](https://github.com/resonant-jovian/ratatui-plt/actions/workflows/test.yml/badge.svg)](https://github.com/resonant-jovian/ratatui-plt/actions/workflows/test.yml)
 [![rust-clippy analyze](https://github.com/resonant-jovian/ratatui-plt/actions/workflows/clippy.yml/badge.svg)](https://github.com/resonant-jovian/ratatui-plt/actions/workflows/clippy.yml)
 
@@ -38,20 +40,17 @@
 
 ### How it works
 
-```
-                          ratatui-plt data flow
+```mermaid
+%%{init: {'theme': 'neutral'}}%%
+flowchart LR
+    A["<b>Your Data</b><br/>Vec&lt;(f64,f64)&gt;<br/>Vec&lt;Vec&lt;f64&gt;&gt;<br/>OHLC tuples<br/>3D points"]
+    B["<b>Data Containers</b><br/>Series &middot; GridData<br/>Series3D &middot; VectorFieldData"]
+    C["<b>Widgets</b><br/>LinePlot &middot; Heatmap<br/>Surface3D &middot; ..."]
+    D["<b>Config</b><br/>Axis &middot; Colormap<br/>Normalize &middot; Theme"]
+    E["<b>Terminal</b><br/>ratatui Frame"]
 
-   Your Data          Data Containers        Widgets            Terminal
-  ──────────────     ──────────────────     ───────────       ───────────
-  Vec<(f64,f64)> ──> Series             ─┐
-  Vec<Vec<f64>>  ──> GridData            ├──> LinePlot    ─┐
-  OHLC tuples    ──> Series              │    Heatmap      ├──> ratatui
-  3D points      ──> Series3D            │    Surface3D    │    Frame
-  vectors        ──> VectorFieldData    ─┘    ...          │    ::render_widget()
-                                                           │
-                       Axis + Scale + Tickers              │
-                       Colormap + Normalize  ──────────────┘
-                       Theme
+    A --> B --> C --> E
+    D --> E
 ```
 
 Each widget follows a **builder pattern** — configure data, axes, colors, and theme, then hand it to ratatui's rendering loop.
@@ -231,9 +230,9 @@ All 3D widgets support interactive camera control via `Camera3DState` (arrow key
 
 ### MathText
 
-- Greek letters: `\alpha` -> a, `\beta` -> b, `\Sigma` -> S
-- Superscripts: `x^2` -> x2, `10^{-3}` -> 10-3
-- Subscripts: `x_0` -> x0
+- Greek letters: `\alpha` → α, `\beta` → β, `\Sigma` → Σ
+- Superscripts: `x^2` → x², `10^{-3}` → 10⁻³
+- Subscripts: `x_0` → x₀
 - Scientific notation formatting
 
 ### Annotations & Legend
@@ -297,10 +296,13 @@ cargo run --example sixel_export --features sixel
 cargo run --example toml_theme --features toml-themes
 ```
 
-Run all examples in sequence:
+Run examples with `dev.sh`:
 ```bash
-./run_examples.sh        # default light theme
-./run_examples.sh dark   # dark theme
+./dev.sh examples line_plot              # single example
+./dev.sh examples line_plot --theme dark # with theme
+./dev.sh examples --group 3d            # all 3D examples
+./dev.sh examples --all --theme dark    # all examples, dark theme
+./dev.sh examples --list                # list groups
 ```
 
 #### Showcase Examples (matplotlib reference replicas)
@@ -451,6 +453,10 @@ cargo doc --open                     # Build and view docs
 > See the [API documentation on docs.rs](https://docs.rs/ratatui-plt) for full type-level documentation.
 
 ---
+
+## Support
+
+If ratatui-plt is useful to your projects, consider supporting development via [thanks.dev](https://thanks.dev/u/gh/resonant-jovian).
 
 ## License
 

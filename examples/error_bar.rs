@@ -46,13 +46,19 @@ fn main() -> color_eyre::Result<()> {
     let x_err_low: Vec<f64> = vec![0.3; n];
     let x_err_high: Vec<f64> = vec![0.3; n];
 
+    let theme = Theme::get_default();
+
     let plot = ErrorBarPlot::new()
         .data(points, err_low, err_high)
         .x_errors(x_err_low, x_err_high)
-        .color(Color::Cyan)
+        .color(theme.primary)
         .title("Noisy Quadratic with Error Bars (q to quit)")
         .x_axis(Axis::new().label("x"))
-        .y_axis(Axis::new().label("y = 0.5x\u{00b2} + noise"));
+        .y_axis(
+            Axis::new()
+                .label("y = 0.5x\u{00b2} + noise")
+                .label_position(LabelPosition::End),
+        );
 
     loop {
         terminal.draw(|frame| {

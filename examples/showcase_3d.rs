@@ -38,6 +38,7 @@ fn lcg_normal(seed: &mut u64) -> f64 {
 fn main() -> color_eyre::Result<()> {
     color_eyre::install()?;
     Theme::set_default(Theme::light());
+    let theme = Theme::get_default();
     io::stdout().execute(EnterAlternateScreen)?;
     enable_raw_mode()?;
     io::stdout().execute(crossterm::event::EnableMouseCapture)?;
@@ -60,7 +61,7 @@ fn main() -> color_eyre::Result<()> {
         r.sin() / r
     });
     let wireframe = Wireframe3D::new(wire_data)
-        .color(Color::Rgb(31, 119, 180))
+        .color(theme.primary)
         .camera(Camera3D::new().azimuth(-60.0).elevation(30.0))
         .title("Wireframe3D: sinc(r)");
 
@@ -92,10 +93,10 @@ fn main() -> color_eyre::Result<()> {
 
     // ── 4. Bar3D: small grid of bars ────────────────────────────────────
     let bar_colors = [
-        Color::Rgb(31, 119, 180),
-        Color::Rgb(44, 160, 44),
-        Color::Rgb(214, 39, 40),
-        Color::Rgb(148, 103, 189),
+        theme.color_cycle.at(0),
+        theme.color_cycle.at(1),
+        theme.color_cycle.at(2),
+        theme.color_cycle.at(3),
     ];
     let bar_seed = 999_u64;
     let bar_rows = 4_usize;
@@ -136,10 +137,11 @@ fn main() -> color_eyre::Result<()> {
                     let dz = 0.1 * scale;
                     let mag = (dx * dx + dy * dy + dz * dz).sqrt();
                     let intensity = (mag * 600.0).min(255.0) as u8;
-                    Some(
-                        Arrow3D::new(x, y, z, dx, dy, dz)
-                            .color(Color::Rgb(31, 119, intensity.max(80))),
-                    )
+                    Some(Arrow3D::new(x, y, z, dx, dy, dz).color(Color::Rgb(
+                        31,
+                        119,
+                        intensity.max(80),
+                    )))
                 })
             })
         })
@@ -167,11 +169,7 @@ fn main() -> color_eyre::Result<()> {
                 .split(area);
 
             let title = "ratatui-plt 3D Showcase  (arrows: rotate, +/-: zoom, q: quit)";
-            let start = outer[0].x
-                + outer[0]
-                    .width
-                    .saturating_sub(title.len() as u16)
-                    / 2;
+            let start = outer[0].x + outer[0].width.saturating_sub(title.len() as u16) / 2;
             for (i, ch) in title.chars().enumerate() {
                 let tx = start + i as u16;
                 if tx < outer[0].x + outer[0].width {

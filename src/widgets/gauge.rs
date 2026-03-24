@@ -129,18 +129,18 @@ impl GaugeChart {
         {
             return last.color;
         }
-        // Default green-yellow-red gradient
+        // Default gradient using theme semantic colors
         let range = self.max - self.min;
         if range <= 0.0 {
-            return Color::Green;
+            return self.theme.positive_color;
         }
         let fraction = ((val - self.min) / range).clamp(0.0, 1.0);
         if fraction < 0.33 {
-            Color::Green
+            self.theme.positive_color
         } else if fraction < 0.66 {
-            Color::Yellow
+            self.theme.highlight
         } else {
-            Color::Red
+            self.theme.negative_color
         }
     }
 }
@@ -229,7 +229,14 @@ impl Widget for &GaugeChart {
 
                 let color = self.color_for_value(val);
 
-                pb.set_cell(screen_x, screen_y, '\u{2588}', color, color, Z_DATA);
+                pb.set_cell(
+                    screen_x,
+                    screen_y,
+                    self.theme.chars.fill.solid,
+                    color,
+                    color,
+                    Z_DATA,
+                );
             }
         }
 
@@ -251,12 +258,16 @@ impl Widget for &GaugeChart {
                 let xi = nx.round() as u16;
                 let yi = ny.round() as u16;
 
-                if xi >= area.x
-                    && xi < area.x + area.width
-                    && yi >= draw_y
-                    && yi < draw_y + draw_h
+                if xi >= area.x && xi < area.x + area.width && yi >= draw_y && yi < draw_y + draw_h
                 {
-                    pb.set_cell(xi, yi, '\u{2588}', self.theme.foreground, self.theme.foreground, Z_CHROME);
+                    pb.set_cell(
+                        xi,
+                        yi,
+                        self.theme.chars.fill.solid,
+                        self.theme.foreground,
+                        self.theme.foreground,
+                        Z_CHROME,
+                    );
                 }
             }
 
@@ -268,7 +279,13 @@ impl Widget for &GaugeChart {
                 && hub_y >= area.y
                 && hub_y < area.y + area.height
             {
-                pb.set_char(hub_x, hub_y, '\u{25CF}', self.theme.foreground, Z_CHROME);
+                pb.set_char(
+                    hub_x,
+                    hub_y,
+                    self.theme.chars.marker.gauge_hub,
+                    self.theme.foreground,
+                    Z_CHROME,
+                );
             }
         }
 

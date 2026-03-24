@@ -15,6 +15,8 @@ use crate::frame::{DataBounds, PlotFrame, ReferenceLine};
 use crate::legend::{Legend, LegendPosition};
 use crate::linked_view::SharedView;
 use crate::norm::{LinearNorm, Normalize};
+#[cfg(feature = "statistics")]
+use crate::plot_buffer::Z_DATA;
 use crate::plot_buffer::{PlotBuffer, Z_MARKER};
 use crate::series::Series;
 use crate::spines::Spines;
@@ -296,15 +298,16 @@ impl Widget for &ScatterPlot {
                 let yi = sy.round() as u16;
 
                 if pa.contains(xi, yi) {
+                    let fallback = s.color.unwrap_or(self.theme.primary);
                     let color = if let Some(ref cv) = self.color_values {
                         if global_point_idx < cv.len() {
                             let t = self.color_norm.normalize(cv[global_point_idx]);
                             self.colormap.color_at(t)
                         } else {
-                            s.color
+                            fallback
                         }
                     } else {
-                        s.color
+                        fallback
                     };
                     pb.set_char(xi, yi, marker.char(), color, Z_MARKER);
                 }
@@ -330,7 +333,10 @@ impl Widget for &ScatterPlot {
                 .collect();
 
             let trend_color = self.trendline_color.unwrap_or_else(|| {
-                self.series.first().map_or(Color::White, |s| s.color)
+                self.series
+                    .first()
+                    .and_then(|s| s.color)
+                    .unwrap_or(self.theme.primary)
             });
 
             // Generate evaluation x values across the plot range
@@ -340,15 +346,11 @@ impl Widget for &ScatterPlot {
                 .collect();
 
             let eval_ys: Option<Vec<f64>> = match ttype {
-                TrendlineType::Linear => {
-                    crate::statistics::linear_regression(&all_x, &all_y).map(|fit| {
-                        eval_xs.iter().map(|&x| fit.eval(x)).collect()
-                    })
-                }
+                TrendlineType::Linear => crate::statistics::linear_regression(&all_x, &all_y)
+                    .map(|fit| eval_xs.iter().map(|&x| fit.eval(x)).collect()),
                 TrendlineType::Polynomial(degree) => {
-                    crate::statistics::poly_fit(&all_x, &all_y, *degree).map(|fit| {
-                        eval_xs.iter().map(|&x| fit.eval(x)).collect()
-                    })
+                    crate::statistics::poly_fit(&all_x, &all_y, *degree)
+                        .map(|fit| eval_xs.iter().map(|&x| fit.eval(x)).collect())
                 }
                 TrendlineType::Lowess(frac) => {
                     crate::statistics::lowess(&all_x, &all_y, *frac).map(|result| {
@@ -368,7 +370,7 @@ impl Widget for &ScatterPlot {
                     let sy0 = pa.screen_y(ys[i]);
                     let sx1 = pa.screen_x(eval_xs[i + 1]);
                     let sy1 = pa.screen_y(ys[i + 1]);
-                    draw_braille_line_pb(&mut pb, sx0, sy0, sx1, sy1, trend_color, &pa);
+                    draw_braille_line_pb(&mut pb, sx0, sy0, sx1, sy1, trend_color, &pa, Z_DATA);
                 }
             }
         }

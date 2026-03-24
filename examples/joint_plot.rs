@@ -20,7 +20,9 @@ fn parse_theme() -> Theme {
         Some("dark") => Theme::dark(),
         None => Theme::auto(),
         Some(other) => {
-            eprintln!("Unknown theme '{other}'. Available: dark, light, minimal, publication, solarized");
+            eprintln!(
+                "Unknown theme '{other}'. Available: dark, light, minimal, publication, solarized"
+            );
             std::process::exit(1);
         }
     }
@@ -44,9 +46,11 @@ fn main() -> color_eyre::Result<()> {
         points.push((x, y));
     }
 
+    let theme = Theme::get_default();
+
     let series = Series::new("data")
         .data(points)
-        .color(Color::Cyan)
+        .color(theme.primary)
         .marker(MarkerShape::Dot);
 
     let plot = JointPlot::new()

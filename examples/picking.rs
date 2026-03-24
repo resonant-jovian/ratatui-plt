@@ -34,6 +34,7 @@ fn parse_theme() -> Theme {
 fn main() -> color_eyre::Result<()> {
     color_eyre::install()?;
     Theme::set_default(parse_theme());
+    let theme = Theme::get_default();
     io::stdout().execute(EnterAlternateScreen)?;
     enable_raw_mode()?;
     let mut terminal = Terminal::new(CrosstermBackend::new(io::stdout()))?;
@@ -48,7 +49,7 @@ fn main() -> color_eyre::Result<()> {
                 })
                 .collect(),
         )
-        .color(Color::Rgb(80, 200, 255))
+        .color(theme.primary)
         .marker(MarkerShape::FilledCircle);
 
     let s2 = Series::new("cos(x)")
@@ -60,7 +61,7 @@ fn main() -> color_eyre::Result<()> {
                 })
                 .collect(),
         )
-        .color(Color::Rgb(255, 180, 50))
+        .color(theme.secondary)
         .marker(MarkerShape::FilledCircle);
 
     let all_series = vec![s1.clone(), s2.clone()];
@@ -126,7 +127,7 @@ fn main() -> color_eyre::Result<()> {
 
             // Draw crosshair at cursor
             let ch = Crosshair::new(cursor_x, cursor_y)
-                .color(Color::Gray)
+                .color(theme.muted)
                 .show_labels(true);
             ch.render_on(&pa, buf);
 
@@ -135,7 +136,7 @@ fn main() -> color_eyre::Result<()> {
                 let sx = pa.screen_x(p.data_x).round() as u16;
                 let sy = pa.screen_y(p.data_y).round() as u16;
                 if pa.contains(sx, sy) {
-                    buf[(sx, sy)].set_char('*').set_fg(Color::White);
+                    buf[(sx, sy)].set_char('*').set_fg(theme.foreground);
                 }
             }
         })?;

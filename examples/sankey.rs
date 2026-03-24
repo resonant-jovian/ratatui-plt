@@ -34,6 +34,8 @@ fn parse_theme() -> Theme {
 fn main() -> color_eyre::Result<()> {
     color_eyre::install()?;
     Theme::set_default(parse_theme());
+    let theme = Theme::get_default();
+    let mut cycle = theme.color_cycle.clone();
     io::stdout().execute(EnterAlternateScreen)?;
     enable_raw_mode()?;
     let mut terminal = Terminal::new(CrosstermBackend::new(io::stdout()))?;
@@ -43,16 +45,16 @@ fn main() -> color_eyre::Result<()> {
     // Column 2: End-use sectors
     let diagram = SankeyDiagram::new()
         // Sources (column 0)
-        .node(SankeyNode::new("Solar").color(Color::Yellow)) // 0
-        .node(SankeyNode::new("Wind").color(Color::Cyan)) // 1
-        .node(SankeyNode::new("Grid").color(Color::LightRed)) // 2
+        .node(SankeyNode::new("Solar").color(cycle.next_color())) // 0
+        .node(SankeyNode::new("Wind").color(cycle.next_color())) // 1
+        .node(SankeyNode::new("Grid").color(cycle.next_color())) // 2
         // Intermediate (column 1)
-        .node(SankeyNode::new("Electricity").color(Color::White)) // 3
-        .node(SankeyNode::new("Heat").color(Color::Red)) // 4
+        .node(SankeyNode::new("Electricity").color(theme.foreground)) // 3
+        .node(SankeyNode::new("Heat").color(cycle.next_color())) // 4
         // End-use (column 2)
-        .node(SankeyNode::new("Industrial").color(Color::Magenta)) // 5
-        .node(SankeyNode::new("Residential").color(Color::Green)) // 6
-        .node(SankeyNode::new("Transport").color(Color::Blue)) // 7
+        .node(SankeyNode::new("Industrial").color(cycle.next_color())) // 5
+        .node(SankeyNode::new("Residential").color(cycle.next_color())) // 6
+        .node(SankeyNode::new("Transport").color(cycle.next_color())) // 7
         // Flows: sources -> intermediate
         .flow(SankeyFlow::new(0, 3, 30.0)) // Solar -> Electricity
         .flow(SankeyFlow::new(1, 3, 25.0)) // Wind -> Electricity
