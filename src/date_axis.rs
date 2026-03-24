@@ -26,7 +26,7 @@ pub struct TimeSeries {
     name: String,
     timestamps: Vec<DateTime<Utc>>,
     values: Vec<f64>,
-    color: ratatui::style::Color,
+    color: Option<ratatui::style::Color>,
 }
 
 impl TimeSeries {
@@ -36,7 +36,7 @@ impl TimeSeries {
             name: name.into(),
             timestamps: Vec::new(),
             values: Vec::new(),
-            color: ratatui::style::Color::White,
+            color: None,
         }
     }
 
@@ -49,7 +49,7 @@ impl TimeSeries {
 
     /// Set the color.
     pub fn color(mut self, color: ratatui::style::Color) -> Self {
-        self.color = color;
+        self.color = Some(color);
         self
     }
 
@@ -61,7 +61,11 @@ impl TimeSeries {
             .zip(&self.values)
             .map(|(t, v)| (t.timestamp() as f64, *v))
             .collect();
-        Series::new(&self.name).data(data).color(self.color)
+        let mut s = Series::new(&self.name).data(data);
+        if let Some(c) = self.color {
+            s = s.color(c);
+        }
+        s
     }
 
     /// Get the time range.

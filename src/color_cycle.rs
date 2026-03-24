@@ -88,7 +88,3 @@ impl ColorCycle {
     }
 }
 
-/// Check if a color is the default (White), meaning it should be auto-assigned.
-pub fn is_default_color(color: Color) -> bool {
-    matches!(color, Color::White)
-}

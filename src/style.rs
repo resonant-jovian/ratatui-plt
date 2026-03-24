@@ -278,8 +278,8 @@ impl HatchPattern {
 /// Fill style for regions between curves or under curves.
 #[derive(Clone, Debug)]
 pub struct FillStyle {
-    /// Fill color.
-    pub color: Color,
+    /// Fill color (`None` = use theme foreground).
+    pub color: Option<Color>,
     /// Opacity approximation (uses different fill characters).
     pub density: FillDensity,
     /// Optional hatch pattern overlay.
@@ -289,7 +289,7 @@ pub struct FillStyle {
 impl Default for FillStyle {
     fn default() -> Self {
         Self {
-            color: Color::White,
+            color: None,
             density: FillDensity::Medium,
             hatch: None,
         }

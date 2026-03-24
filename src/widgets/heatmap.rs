@@ -67,7 +67,7 @@ impl Heatmap {
             show_colorbar: true,
             aspect_ratio: AspectRatio::Auto,
             show_values: false,
-            bad_color: Color::DarkGray,
+            bad_color: Theme::get_default().bad_data_color,
             mask: None,
             theme: Theme::get_default(),
             spines: Spines::default(),

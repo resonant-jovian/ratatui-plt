@@ -379,6 +379,7 @@ impl Surface3D {
                 sy_min,
                 sy_max,
             },
+            &self.theme,
         );
     }
 }
@@ -439,7 +440,13 @@ struct ScreenBounds {
 }
 
 /// Draw 3D axis lines (X, Y, Z) at the edges of the data bounding box.
-fn draw_axis_lines(camera: &Camera3D, buf: &mut Buffer, pa: &PlotArea, sb: &ScreenBounds) {
+fn draw_axis_lines(
+    camera: &Camera3D,
+    buf: &mut Buffer,
+    pa: &PlotArea,
+    sb: &ScreenBounds,
+    theme: &Theme,
+) {
     let (px, pw, py, ph) = (pa.x, pa.width, pa.y, pa.height);
 
     // Project axis origin and tips from normalized [-1,1] space
@@ -457,30 +464,36 @@ fn draw_axis_lines(camera: &Camera3D, buf: &mut Buffer, pa: &PlotArea, sb: &Scre
     // X axis line and label
     let xx = to_sx(x_tip.0);
     let xy = to_sy(x_tip.1);
-    draw_braille_line(buf, ox, oy, xx, xy, Color::Red, pa);
+    draw_braille_line(buf, ox, oy, xx, xy, theme.x_axis_3d_color, pa);
     let xxi = xx.round() as u16;
     let xyi = xy.round() as u16;
     if xxi >= px && xxi < px + pw && xyi >= py && xyi < py + ph {
-        buf[(xxi, xyi)].set_char('X').set_fg(Color::Red);
+        buf[(xxi, xyi)]
+            .set_char('X')
+            .set_fg(theme.x_axis_3d_color);
     }
 
     // Y axis line and label
     let yx = to_sx(y_tip.0);
     let yy = to_sy(y_tip.1);
-    draw_braille_line(buf, ox, oy, yx, yy, Color::Green, pa);
+    draw_braille_line(buf, ox, oy, yx, yy, theme.y_axis_3d_color, pa);
     let yxi = yx.round() as u16;
     let yyi = yy.round() as u16;
     if yxi >= px && yxi < px + pw && yyi >= py && yyi < py + ph {
-        buf[(yxi, yyi)].set_char('Y').set_fg(Color::Green);
+        buf[(yxi, yyi)]
+            .set_char('Y')
+            .set_fg(theme.y_axis_3d_color);
     }
 
     // Z axis line and label
     let zx = to_sx(z_tip.0);
     let zy = to_sy(z_tip.1);
-    draw_braille_line(buf, ox, oy, zx, zy, Color::Blue, pa);
+    draw_braille_line(buf, ox, oy, zx, zy, theme.z_axis_3d_color, pa);
     let zxi = zx.round() as u16;
     let zyi = zy.round() as u16;
     if zxi >= px && zxi < px + pw && zyi >= py && zyi < py + ph {
-        buf[(zxi, zyi)].set_char('Z').set_fg(Color::Blue);
+        buf[(zxi, zyi)]
+            .set_char('Z')
+            .set_fg(theme.z_axis_3d_color);
     }
 }

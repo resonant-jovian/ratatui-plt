@@ -11,6 +11,7 @@ use ratatui::buffer::Buffer;
 use ratatui::style::Color;
 
 use crate::frame::PlotArea;
+use crate::theme::Theme;
 
 /// Direction of the span selection.
 #[derive(Clone, Debug, Default)]
@@ -73,7 +74,7 @@ impl SpanSelector {
         Self {
             state,
             direction: SpanDirection::default(),
-            color: Color::Cyan,
+            color: Theme::get_default().accent,
             fill_char: '░',
         }
     }

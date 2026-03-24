@@ -44,8 +44,8 @@ pub struct Band {
     pub y_lower: Vec<f64>,
     /// Upper y boundary values (one per x).
     pub y_upper: Vec<f64>,
-    /// Band color.
-    pub color: Color,
+    /// Band color (None = use theme primary).
+    pub color: Option<Color>,
     /// Fill character: '\u{2591}' (light), '\u{2592}' (medium), '\u{2593}' (dense).
     pub alpha_char: char,
 }
@@ -58,14 +58,14 @@ impl Band {
             x,
             y_lower,
             y_upper,
-            color: Color::Cyan,
+            color: None,
             alpha_char: '\u{2591}', // ░
         }
     }
 
     /// Set the band color.
     pub fn color(mut self, color: Color) -> Self {
-        self.color = color;
+        self.color = Some(color);
         self
     }
 
@@ -223,6 +223,7 @@ impl Widget for &BandPlot {
 
         // Draw each band
         for (si, band) in self.bands.iter().enumerate() {
+            let band_color = band.color.unwrap_or(self.theme.primary);
             let n = band.x.len().min(band.y_lower.len()).min(band.y_upper.len());
 
             // Fill the region between y_lower and y_upper using column interpolation.
@@ -259,7 +260,7 @@ impl Widget for &BandPlot {
                                     prev_y,
                                     screen_x as f64,
                                     sy_top_f,
-                                    band.color,
+                                    band_color,
                                     &pa,
                                     Z_DATA + si as u8,
                                 );
@@ -285,19 +286,19 @@ impl Widget for &BandPlot {
                                 (true, true) => {
                                     // Both halves: fully opaque
                                     pb.set_cell(
-                                        screen_x, cell_y, ' ', band.color, band.color, Z_DATA,
+                                        screen_x, cell_y, ' ', band_color, band_color, Z_DATA,
                                     );
                                 }
                                 (true, false) => {
                                     // Top half only: '▀' fg=band_color, bg inherited
-                                    pb.set_char(screen_x, cell_y, '▀', band.color, Z_DATA);
+                                    pb.set_char(screen_x, cell_y, '▀', band_color, Z_DATA);
                                     // Also set bg so outermost edges have a color
-                                    pb.set_bg(screen_x, cell_y, band.color, Z_FILL);
+                                    pb.set_bg(screen_x, cell_y, band_color, Z_FILL);
                                 }
                                 (false, true) => {
                                     // Bottom half only: '▄' fg=band_color, bg inherited
-                                    pb.set_char(screen_x, cell_y, '▄', band.color, Z_DATA);
-                                    pb.set_bg(screen_x, cell_y, band.color, Z_FILL);
+                                    pb.set_char(screen_x, cell_y, '▄', band_color, Z_DATA);
+                                    pb.set_bg(screen_x, cell_y, band_color, Z_FILL);
                                 }
                                 (false, false) => {}
                             }
@@ -323,7 +324,7 @@ impl Widget for &BandPlot {
                 .iter()
                 .map(|b| LegendEntry {
                     name: b.name.clone(),
-                    color: b.color,
+                    color: b.color.unwrap_or(self.theme.primary),
                     marker: Some('█'),
                 })
                 .collect();

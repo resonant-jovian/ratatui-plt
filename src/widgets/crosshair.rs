@@ -7,6 +7,7 @@ use ratatui::buffer::Buffer;
 use ratatui::style::Color;
 
 use crate::frame::PlotArea;
+use crate::theme::Theme;
 
 /// A crosshair cursor overlay widget.
 ///
@@ -45,7 +46,7 @@ impl Crosshair {
         Self {
             data_x,
             data_y,
-            color: Color::Yellow,
+            color: Theme::get_default().highlight,
             show_labels: true,
             format: None,
         }

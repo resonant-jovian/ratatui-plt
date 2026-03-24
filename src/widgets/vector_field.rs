@@ -55,7 +55,7 @@ pub struct VectorField {
     y_axis: Axis,
     title: Option<String>,
     aspect_ratio: AspectRatio,
-    color: Color,
+    color: Option<Color>,
     color_by_magnitude: bool,
     colormap: Box<dyn Colormap>,
     norm: Box<dyn Normalize>,
@@ -76,7 +76,7 @@ impl VectorField {
             y_axis: Axis::new(),
             title: None,
             aspect_ratio: AspectRatio::Auto,
-            color: Color::Cyan,
+            color: None,
             color_by_magnitude: false,
             colormap: Box::new(Viridis),
             norm: Box::new(LinearNorm::new(
@@ -109,7 +109,7 @@ impl VectorField {
         self
     }
     pub fn color(mut self, c: Color) -> Self {
-        self.color = c;
+        self.color = Some(c);
         self
     }
 
@@ -279,7 +279,7 @@ impl Widget for &VectorField {
                     let t = self.norm.normalize(mag);
                     self.colormap.color_at(t)
                 } else {
-                    self.color
+                    self.color.unwrap_or(self.theme.primary)
                 };
 
                 let ch = arrow_char(dx, -dy, &self.arrow_char_set); // Negate dy because screen y is inverted

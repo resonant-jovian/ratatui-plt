@@ -104,7 +104,7 @@ pub struct Histogram {
     bins: usize,
     range: Option<(f64, f64)>,
     norm_mode: HistNorm,
-    color: Color,
+    color: Option<Color>,
     title: Option<String>,
     x_axis: Axis,
     y_axis: Axis,
@@ -131,7 +131,7 @@ impl Histogram {
             bins: 20,
             range: None,
             norm_mode: HistNorm::Count,
-            color: Color::Cyan,
+            color: None,
             title: None,
             x_axis: Axis::new(),
             y_axis: Axis::new(),
@@ -170,7 +170,7 @@ impl Histogram {
 
     /// Set the bar color.
     pub fn color(mut self, color: Color) -> Self {
-        self.color = color;
+        self.color = Some(color);
         self
     }
 
@@ -522,11 +522,12 @@ impl Histogram {
         };
 
         // Draw bars
+        let resolved_color = self.color.unwrap_or(self.theme.primary);
         self.draw_bars(
             &pa,
             &edges,
             &heights,
-            self.color,
+            resolved_color,
             pb,
             BarSlotLayout {
                 ds_index: 0,

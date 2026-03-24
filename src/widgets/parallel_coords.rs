@@ -371,7 +371,13 @@ impl Widget for &ParallelCoords {
                 for (j, ch) in ann.text.chars().enumerate() {
                     let x = xi + j as u16;
                     if x >= area.x && x < area.x + area.width {
-                        pb.set_char(x, yi, ch, ann.color, Z_ANNOTATION);
+                        pb.set_char(
+                            x,
+                            yi,
+                            ch,
+                            ann.color.unwrap_or(self.theme.foreground),
+                            Z_ANNOTATION,
+                        );
                     }
                 }
             }

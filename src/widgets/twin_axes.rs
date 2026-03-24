@@ -255,7 +255,8 @@ impl Widget for &TwinAxes {
                         let color = self
                             .primary_series
                             .first()
-                            .map_or(self.theme.axis_color, |s| s.color);
+                            .and_then(|s| s.color)
+                            .unwrap_or(self.theme.axis_color);
                         buf[(lx, yi)].set_char(ch).set_fg(color);
                     }
                 }
@@ -276,7 +277,8 @@ impl Widget for &TwinAxes {
                         let color = self
                             .secondary_series
                             .first()
-                            .map_or(self.theme.axis_color, |s| s.color);
+                            .and_then(|s| s.color)
+                            .unwrap_or(self.theme.axis_color);
                         buf[(lx, yi)].set_char(ch).set_fg(color);
                     }
                 }
@@ -284,7 +286,8 @@ impl Widget for &TwinAxes {
         }
 
         // Draw primary series lines
-        for s in &self.primary_series {
+        for (si, s) in self.primary_series.iter().enumerate() {
+            let color = s.color.unwrap_or_else(|| self.theme.color_cycle.at(si));
             for i in 0..s.data.len().saturating_sub(1) {
                 let (x0, y0) = s.data[i];
                 let (x1, y1) = s.data[i + 1];
@@ -301,7 +304,7 @@ impl Widget for &TwinAxes {
                     sy0,
                     sx1,
                     sy1,
-                    s.color,
+                    color,
                     &ClipRect {
                         x_min: px,
                         y_min: py,
@@ -313,7 +316,8 @@ impl Widget for &TwinAxes {
         }
 
         // Draw secondary series lines
-        for s in &self.secondary_series {
+        for (si, s) in self.secondary_series.iter().enumerate() {
+            let color = s.color.unwrap_or_else(|| self.theme.color_cycle.at(si));
             for i in 0..s.data.len().saturating_sub(1) {
                 let (x0, y0) = s.data[i];
                 let (x1, y1) = s.data[i + 1];
@@ -330,7 +334,7 @@ impl Widget for &TwinAxes {
                     sy0,
                     sx1,
                     sy1,
-                    s.color,
+                    color,
                     &ClipRect {
                         x_min: px,
                         y_min: py,

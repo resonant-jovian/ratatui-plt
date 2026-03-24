@@ -25,8 +25,8 @@ pub struct Series {
     pub name: String,
     /// (x, y) data points.
     pub data: Vec<(f64, f64)>,
-    /// Line/marker color.
-    pub color: Color,
+    /// Line/marker color (`None` = auto-assign from theme color cycle).
+    pub color: Option<Color>,
     /// Line drawing style.
     pub line_style: LineStyle,
     /// Marker shape at data points (`None` for no markers).
@@ -55,7 +55,7 @@ impl Series {
         Self {
             name: name.into(),
             data: Vec::new(),
-            color: Color::White,
+            color: None,
             line_style: LineStyle::default(),
             marker: None,
             y_err_low: None,
@@ -72,7 +72,7 @@ impl Series {
 
     /// Set the display color.
     pub fn color(mut self, color: Color) -> Self {
-        self.color = color;
+        self.color = Some(color);
         self
     }
 
@@ -241,8 +241,8 @@ pub struct Series3D {
     pub name: String,
     /// (x, y, z) data points.
     pub data: Vec<(f64, f64, f64)>,
-    /// Color for rendering.
-    pub color: Color,
+    /// Color for rendering (`None` = auto-assign from theme color cycle).
+    pub color: Option<Color>,
     /// Optional per-point value for color mapping.
     pub values: Option<Vec<f64>>,
 }
@@ -253,7 +253,7 @@ impl Series3D {
         Self {
             name: name.into(),
             data: Vec::new(),
-            color: Color::White,
+            color: None,
             values: None,
         }
     }
@@ -266,7 +266,7 @@ impl Series3D {
 
     /// Set the display color.
     pub fn color(mut self, color: Color) -> Self {
-        self.color = color;
+        self.color = Some(color);
         self
     }
 

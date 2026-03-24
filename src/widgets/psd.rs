@@ -195,7 +195,8 @@ impl Widget for &PsdPlot {
         let clip = ClipRect::from_plot_area(&pa);
 
         // Draw line series
-        for s in &self.series {
+        for (si, s) in self.series.iter().enumerate() {
+            let color = s.color.unwrap_or_else(|| self.theme.color_cycle.at(si));
             if s.data.len() < 2 {
                 for &(x, y) in &s.data {
                     let sx = pa.screen_x(x);
@@ -203,7 +204,7 @@ impl Widget for &PsdPlot {
                     let xi = sx.round() as u16;
                     let yi = sy.round() as u16;
                     if pa.contains(xi, yi) {
-                        buf[(xi, yi)].set_char('\u{25cf}').set_fg(s.color);
+                        buf[(xi, yi)].set_char('\u{25cf}').set_fg(color);
                     }
                 }
                 continue;
@@ -229,7 +230,7 @@ impl Widget for &PsdPlot {
                         x1: sx1,
                         y1: sy1,
                     },
-                    s.color,
+                    color,
                     &s.line_style.pattern,
                     &clip,
                 );
@@ -246,7 +247,7 @@ impl Widget for &PsdPlot {
                     let xi = sx.round() as u16;
                     let yi = sy.round() as u16;
                     if pa.contains(xi, yi) {
-                        buf[(xi, yi)].set_char(marker.char()).set_fg(s.color);
+                        buf[(xi, yi)].set_char(marker.char()).set_fg(color);
                     }
                 }
             }

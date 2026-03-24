@@ -52,7 +52,7 @@ pub struct StreamPlot {
     /// Seed grid density multiplier (1 = default spacing).
     density: usize,
     /// Base colour for streamlines (when not colouring by magnitude).
-    color: Color,
+    color: Option<Color>,
     /// Whether to colour streamlines by local velocity magnitude.
     color_by_magnitude: bool,
     /// Colormap used when `color_by_magnitude` is true.
@@ -75,7 +75,7 @@ impl StreamPlot {
             y_axis: Axis::new(),
             title: None,
             density: 1,
-            color: Color::Cyan,
+            color: None,
             color_by_magnitude: false,
             colormap: Box::new(Viridis),
             arrow_scale: 1.0,
@@ -112,7 +112,7 @@ impl StreamPlot {
 
     /// Set the base streamline colour.
     pub fn color(mut self, c: Color) -> Self {
-        self.color = c;
+        self.color = Some(c);
         self
     }
 
@@ -418,7 +418,7 @@ impl Widget for &StreamPlot {
                         let t = norm.normalize(mag);
                         self.colormap.color_at(t)
                     } else {
-                        self.color
+                        self.color.unwrap_or(self.theme.primary)
                     };
 
                     // Draw braille line from previous point

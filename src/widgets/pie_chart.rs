@@ -268,7 +268,7 @@ impl Widget for &PieChart {
                 let xi = sx.round() as u16;
                 let yi = sy.round() as u16;
                 if xi >= area.x && xi < area.x + area.width && yi >= py && yi < py + ph {
-                    pb.set_char(xi, yi, '▪', Color::DarkGray, Z_CHROME);
+                    pb.set_char(xi, yi, '▪', self.theme.muted, Z_CHROME);
                 }
             }
         }
@@ -297,7 +297,7 @@ impl Widget for &PieChart {
                         (true, false) => '◞',  // lower-right quadrant
                         (false, false) => '◟', // lower-left quadrant
                     };
-                    pb.set_char(xi, yi, arc_ch, Color::DarkGray, Z_CHROME);
+                    pb.set_char(xi, yi, arc_ch, self.theme.muted, Z_CHROME);
                 }
             }
         }

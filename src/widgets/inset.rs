@@ -16,6 +16,8 @@ use ratatui::buffer::Buffer;
 use ratatui::layout::Rect;
 use ratatui::style::Color;
 
+use crate::theme::Theme;
+
 /// Configuration for an inset axes area within a parent widget.
 ///
 /// Bounds are fractional (0.0–1.0) relative to the parent area.
@@ -44,7 +46,7 @@ impl InsetAxes {
             width: width.clamp(0.0, 1.0),
             height: height.clamp(0.0, 1.0),
             border: true,
-            border_color: Color::Gray,
+            border_color: Theme::get_default().muted,
         }
     }
 

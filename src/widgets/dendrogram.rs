@@ -200,17 +200,6 @@ impl Dendrogram {
 
     /// Assign colors to links based on the color threshold.
     fn compute_colors(&self) -> Vec<Color> {
-        let cluster_colors = [
-            Color::Cyan,
-            Color::Red,
-            Color::Green,
-            Color::Yellow,
-            Color::Magenta,
-            Color::Blue,
-            Color::LightCyan,
-            Color::LightRed,
-        ];
-
         let n = self.links.len();
         let mut colors = vec![self.theme.foreground; n];
 
@@ -218,7 +207,7 @@ impl Dendrogram {
             let mut color_idx = 0;
             for (i, link) in self.links.iter().enumerate() {
                 if link.distance <= threshold {
-                    colors[i] = cluster_colors[color_idx % cluster_colors.len()];
+                    colors[i] = self.theme.color_cycle.at(color_idx);
                     color_idx += 1;
                 }
             }

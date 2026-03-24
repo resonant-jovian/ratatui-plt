@@ -282,7 +282,8 @@ impl Widget for &RadialPlot {
         }
 
         // Draw series data
-        for s in &self.series {
+        for (si, s) in self.series.iter().enumerate() {
+            let color = s.color.unwrap_or_else(|| self.theme.color_cycle.at(si));
             let mut prev: Option<(u16, u16)> = None;
             // For Bar mode: track previous transformed theta and r_frac for gap filling
             let mut prev_bar: Option<(f64, f64)> = None;
@@ -297,7 +298,7 @@ impl Widget for &RadialPlot {
                         // Only markers, no lines
                         if sx >= area.x && sx < area.x + area.width && sy >= py && sy < py + ph {
                             let ch = s.marker.map_or('●', |m| m.char());
-                            pb.set_char(sx, sy, ch, s.color, Z_MARKER);
+                            pb.set_char(sx, sy, ch, color, Z_MARKER);
                         }
                     }
                     PolarPlotType::Bar => {
@@ -310,7 +311,7 @@ impl Widget for &RadialPlot {
                             let by = (cy as f64 + frac * r_screen_y * t.sin()).round() as u16;
                             if bx >= area.x && bx < area.x + area.width && by >= py && by < py + ph
                             {
-                                pb.set_cell(bx, by, '█', s.color, s.color, Z_DATA);
+                                pb.set_cell(bx, by, '█', color, color, Z_DATA);
                             }
                         }
                         // Fill gap to previous bar by sweeping the arc at each radius level
@@ -336,7 +337,7 @@ impl Widget for &RadialPlot {
                                         && by >= py
                                         && by < py + ph
                                     {
-                                        pb.set_cell(bx, by, '█', s.color, s.color, Z_DATA);
+                                        pb.set_cell(bx, by, '█', color, color, Z_DATA);
                                     }
                                 }
                             }
@@ -353,7 +354,7 @@ impl Widget for &RadialPlot {
                             let by = (cy as f64 + frac * r_screen_y * t.sin()).round() as u16;
                             if bx >= area.x && bx < area.x + area.width && by >= py && by < py + ph
                             {
-                                pb.set_bg(bx, by, s.color, Z_FILL);
+                                pb.set_bg(bx, by, color, Z_FILL);
                             }
                         }
                     }
@@ -361,7 +362,7 @@ impl Widget for &RadialPlot {
                         // Marker at data point
                         if sx >= area.x && sx < area.x + area.width && sy >= py && sy < py + ph {
                             let ch = s.marker.map_or('●', |m| m.char());
-                            pb.set_char(sx, sy, ch, s.color, Z_MARKER);
+                            pb.set_char(sx, sy, ch, color, Z_MARKER);
                         }
                         // Connect to previous point using Braille sub-pixel rendering
                         if let Some((px, py_prev)) = prev
@@ -373,7 +374,7 @@ impl Widget for &RadialPlot {
                                 py_prev as f64,
                                 sx as f64,
                                 sy as f64,
-                                s.color,
+                                color,
                                 Z_DATA,
                                 &ClipRect {
                                     x: area.x,

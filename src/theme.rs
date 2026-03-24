@@ -41,6 +41,48 @@ pub struct Theme {
     pub grid_pattern: DashPattern,
     /// Whether titles should be bold.
     pub bold_title: bool,
+
+    // --- Named palette ---
+
+    /// Primary data color (main series, single-dataset widgets).
+    pub primary: Color,
+    /// Secondary data color (second series, comparisons).
+    pub secondary: Color,
+    /// Accent color (interactive selectors, emphasis).
+    pub accent: Color,
+    /// Highlight color (crosshair, callouts, annotations).
+    pub highlight: Color,
+    /// Muted color (outlines, low-priority chrome, decorative arcs).
+    pub muted: Color,
+    /// Surface color (panel/inset backgrounds, filled regions).
+    pub surface: Color,
+
+    // --- Semantic colors ---
+
+    /// Positive-value color (waterfall gains, upward trends).
+    pub positive_color: Color,
+    /// Negative-value color (waterfall losses, downward trends).
+    pub negative_color: Color,
+    /// Neutral/total color (waterfall totals, baselines).
+    pub neutral_color: Color,
+
+    // --- 3D axis colors ---
+
+    /// X-axis color in 3D plots.
+    pub x_axis_3d_color: Color,
+    /// Y-axis color in 3D plots.
+    pub y_axis_3d_color: Color,
+    /// Z-axis color in 3D plots.
+    pub z_axis_3d_color: Color,
+
+    // --- Chrome / decoration ---
+
+    /// Color for disabled/hidden UI elements (e.g. hidden legend entries).
+    pub disabled_color: Color,
+    /// Color for bad/missing data cells (NaN in heatmaps).
+    pub bad_data_color: Color,
+    /// Default color for text annotations.
+    pub annotation_color: Color,
 }
 
 impl Default for Theme {
@@ -62,6 +104,21 @@ impl Theme {
             grid_visible: true,
             grid_pattern: DashPattern::Solid,
             bold_title: true,
+            primary: Color::Rgb(31, 119, 180),
+            secondary: Color::Rgb(255, 127, 14),
+            accent: Color::Cyan,
+            highlight: Color::Yellow,
+            muted: Color::DarkGray,
+            surface: Color::Rgb(40, 40, 40),
+            positive_color: Color::Green,
+            negative_color: Color::Red,
+            neutral_color: Color::Blue,
+            x_axis_3d_color: Color::Red,
+            y_axis_3d_color: Color::Green,
+            z_axis_3d_color: Color::Blue,
+            disabled_color: Color::DarkGray,
+            bad_data_color: Color::DarkGray,
+            annotation_color: Color::White,
         }
     }
 
@@ -77,6 +134,21 @@ impl Theme {
             grid_visible: true,
             grid_pattern: DashPattern::Solid,
             bold_title: true,
+            primary: Color::Rgb(31, 119, 180),
+            secondary: Color::Rgb(255, 127, 14),
+            accent: Color::Rgb(0, 150, 150),
+            highlight: Color::Rgb(180, 150, 0),
+            muted: Color::Rgb(180, 180, 180),
+            surface: Color::Rgb(240, 240, 240),
+            positive_color: Color::Rgb(44, 160, 44),
+            negative_color: Color::Rgb(214, 39, 40),
+            neutral_color: Color::Rgb(31, 119, 180),
+            x_axis_3d_color: Color::Rgb(214, 39, 40),
+            y_axis_3d_color: Color::Rgb(44, 160, 44),
+            z_axis_3d_color: Color::Rgb(31, 119, 180),
+            disabled_color: Color::Rgb(180, 180, 180),
+            bad_data_color: Color::Rgb(180, 180, 180),
+            annotation_color: Color::Black,
         }
     }
 
@@ -92,6 +164,21 @@ impl Theme {
             grid_visible: false,
             grid_pattern: DashPattern::Solid,
             bold_title: false,
+            primary: Color::Rgb(31, 119, 180),
+            secondary: Color::Rgb(255, 127, 14),
+            accent: Color::Cyan,
+            highlight: Color::Yellow,
+            muted: Color::Rgb(80, 80, 80),
+            surface: Color::Rgb(30, 30, 30),
+            positive_color: Color::Green,
+            negative_color: Color::Red,
+            neutral_color: Color::Blue,
+            x_axis_3d_color: Color::Red,
+            y_axis_3d_color: Color::Green,
+            z_axis_3d_color: Color::Blue,
+            disabled_color: Color::Rgb(80, 80, 80),
+            bad_data_color: Color::Rgb(80, 80, 80),
+            annotation_color: Color::White,
         }
     }
 
@@ -112,6 +199,21 @@ impl Theme {
             grid_visible: true,
             grid_pattern: DashPattern::Solid,
             bold_title: true,
+            primary: Color::White,
+            secondary: Color::Rgb(200, 200, 200),
+            accent: Color::Rgb(150, 150, 150),
+            highlight: Color::White,
+            muted: Color::Rgb(100, 100, 100),
+            surface: Color::Rgb(30, 30, 30),
+            positive_color: Color::Rgb(200, 200, 200),
+            negative_color: Color::Rgb(150, 150, 150),
+            neutral_color: Color::White,
+            x_axis_3d_color: Color::Rgb(200, 200, 200),
+            y_axis_3d_color: Color::Rgb(150, 150, 150),
+            z_axis_3d_color: Color::White,
+            disabled_color: Color::Rgb(80, 80, 80),
+            bad_data_color: Color::Rgb(80, 80, 80),
+            annotation_color: Color::White,
         }
     }
 
@@ -136,6 +238,21 @@ impl Theme {
             grid_visible: true,
             grid_pattern: DashPattern::Solid,
             bold_title: true,
+            primary: Color::Rgb(38, 139, 210),   // blue
+            secondary: Color::Rgb(211, 54, 130),  // magenta
+            accent: Color::Rgb(42, 161, 152),     // cyan
+            highlight: Color::Rgb(181, 137, 0),    // yellow
+            muted: Color::Rgb(88, 110, 117),       // base01
+            surface: Color::Rgb(7, 54, 66),        // base02
+            positive_color: Color::Rgb(133, 153, 0),   // green
+            negative_color: Color::Rgb(220, 50, 47),    // red
+            neutral_color: Color::Rgb(38, 139, 210),    // blue
+            x_axis_3d_color: Color::Rgb(220, 50, 47),   // red
+            y_axis_3d_color: Color::Rgb(133, 153, 0),   // green
+            z_axis_3d_color: Color::Rgb(38, 139, 210),  // blue
+            disabled_color: Color::Rgb(88, 110, 117),    // base01
+            bad_data_color: Color::Rgb(88, 110, 117),    // base01
+            annotation_color: Color::Rgb(131, 148, 150), // base0
         }
     }
 
@@ -283,6 +400,10 @@ impl From<std::io::Error> for ThemeError {
 #[derive(serde::Deserialize)]
 struct TomlTheme {
     colors: Option<TomlColors>,
+    palette: Option<TomlPalette>,
+    semantic: Option<TomlSemantic>,
+    axes_3d: Option<TomlAxes3d>,
+    chrome: Option<TomlChrome>,
     grid: Option<TomlGrid>,
     cycle: Option<TomlCycle>,
 }
@@ -309,6 +430,41 @@ struct TomlGrid {
 #[derive(serde::Deserialize)]
 struct TomlCycle {
     colors: Option<Vec<String>>,
+}
+
+#[cfg(feature = "toml-themes")]
+#[derive(serde::Deserialize)]
+struct TomlPalette {
+    primary: Option<String>,
+    secondary: Option<String>,
+    accent: Option<String>,
+    highlight: Option<String>,
+    muted: Option<String>,
+    surface: Option<String>,
+}
+
+#[cfg(feature = "toml-themes")]
+#[derive(serde::Deserialize)]
+struct TomlSemantic {
+    positive: Option<String>,
+    negative: Option<String>,
+    neutral: Option<String>,
+}
+
+#[cfg(feature = "toml-themes")]
+#[derive(serde::Deserialize)]
+struct TomlAxes3d {
+    x_axis: Option<String>,
+    y_axis: Option<String>,
+    z_axis: Option<String>,
+}
+
+#[cfg(feature = "toml-themes")]
+#[derive(serde::Deserialize)]
+struct TomlChrome {
+    disabled: Option<String>,
+    bad_data: Option<String>,
+    annotation: Option<String>,
 }
 
 /// Parse a color string into a ratatui [`Color`].
@@ -387,6 +543,29 @@ fn parse_pattern(s: &str) -> Result<DashPattern, ThemeError> {
 /// minor_grid = "#222222"
 /// axis = "gray"
 ///
+/// [palette]
+/// primary = "#1f77b4"
+/// secondary = "#ff7f0e"
+/// accent = "cyan"
+/// highlight = "yellow"
+/// muted = "darkgray"
+/// surface = "#282828"
+///
+/// [semantic]
+/// positive = "green"
+/// negative = "red"
+/// neutral = "blue"
+///
+/// [axes_3d]
+/// x_axis = "red"
+/// y_axis = "green"
+/// z_axis = "blue"
+///
+/// [chrome]
+/// disabled = "darkgray"
+/// bad_data = "darkgray"
+/// annotation = "white"
+///
 /// [grid]
 /// visible = true
 /// pattern = "dashed"    # "solid", "dashed", "dotted", "dashdot"
@@ -417,6 +596,63 @@ pub fn theme_from_toml(toml_str: &str) -> Result<Theme, ThemeError> {
         }
         if let Some(ref s) = colors.axis {
             theme.axis_color = parse_color(s)?;
+        }
+    }
+
+    if let Some(palette) = parsed.palette {
+        if let Some(ref s) = palette.primary {
+            theme.primary = parse_color(s)?;
+        }
+        if let Some(ref s) = palette.secondary {
+            theme.secondary = parse_color(s)?;
+        }
+        if let Some(ref s) = palette.accent {
+            theme.accent = parse_color(s)?;
+        }
+        if let Some(ref s) = palette.highlight {
+            theme.highlight = parse_color(s)?;
+        }
+        if let Some(ref s) = palette.muted {
+            theme.muted = parse_color(s)?;
+        }
+        if let Some(ref s) = palette.surface {
+            theme.surface = parse_color(s)?;
+        }
+    }
+
+    if let Some(semantic) = parsed.semantic {
+        if let Some(ref s) = semantic.positive {
+            theme.positive_color = parse_color(s)?;
+        }
+        if let Some(ref s) = semantic.negative {
+            theme.negative_color = parse_color(s)?;
+        }
+        if let Some(ref s) = semantic.neutral {
+            theme.neutral_color = parse_color(s)?;
+        }
+    }
+
+    if let Some(axes_3d) = parsed.axes_3d {
+        if let Some(ref s) = axes_3d.x_axis {
+            theme.x_axis_3d_color = parse_color(s)?;
+        }
+        if let Some(ref s) = axes_3d.y_axis {
+            theme.y_axis_3d_color = parse_color(s)?;
+        }
+        if let Some(ref s) = axes_3d.z_axis {
+            theme.z_axis_3d_color = parse_color(s)?;
+        }
+    }
+
+    if let Some(chrome) = parsed.chrome {
+        if let Some(ref s) = chrome.disabled {
+            theme.disabled_color = parse_color(s)?;
+        }
+        if let Some(ref s) = chrome.bad_data {
+            theme.bad_data_color = parse_color(s)?;
+        }
+        if let Some(ref s) = chrome.annotation {
+            theme.annotation_color = parse_color(s)?;
         }
     }
 

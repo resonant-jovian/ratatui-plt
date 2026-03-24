@@ -53,7 +53,7 @@ impl LegendEntry {
     pub fn from_series(series: &Series) -> Self {
         Self {
             name: series.name.clone(),
-            color: series.color,
+            color: series.color.unwrap_or(Theme::get_default().foreground),
             marker: series.marker.map(|m| m.char()),
         }
     }

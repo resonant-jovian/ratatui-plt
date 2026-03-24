@@ -274,7 +274,8 @@ impl Widget for &JointPlot {
                 let xi = sx.round() as u16;
                 let yi = sy.round() as u16;
                 if pa.contains(xi, yi) {
-                    pb.set_char(xi, yi, marker.char(), s.color, Z_MARKER);
+                    let color = s.color.unwrap_or(self.theme.primary);
+                    pb.set_char(xi, yi, marker.char(), color, Z_MARKER);
                 }
             }
         }
@@ -309,7 +310,11 @@ impl Widget for &JointPlot {
             .filter(|v| v.is_finite())
             .collect();
 
-        let marginal_color = self.series.first().map_or(Color::Cyan, |s| s.color);
+        let marginal_color = self
+            .series
+            .first()
+            .and_then(|s| s.color)
+            .unwrap_or(self.theme.primary);
 
         // Top marginal (x-axis distribution)
         if has_top && top_height >= 2 {

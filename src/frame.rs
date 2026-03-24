@@ -967,7 +967,7 @@ impl<'a> PlotFrame<'a> {
                 for (j, ch) in ann.text.chars().enumerate() {
                     let x = xi + j as u16;
                     if x >= pa.x && x < pa.x + pa.width {
-                        buf[(x, yi)].set_char(ch).set_fg(ann.color);
+                        buf[(x, yi)].set_char(ch).set_fg(ann.color.unwrap_or(Theme::get_default().annotation_color));
                     }
                 }
             }
@@ -982,7 +982,7 @@ impl<'a> PlotFrame<'a> {
                     if arrow_ch != ' ' {
                         buf[(target_sx, target_sy)]
                             .set_char(arrow_ch)
-                            .set_fg(ann.color);
+                            .set_fg(ann.color.unwrap_or(Theme::get_default().annotation_color));
                     }
                 }
             }
@@ -1530,7 +1530,9 @@ impl<'a> PlotFrame<'a> {
     }
 
     pub fn draw_annotations_pb(pa: &PlotArea, annotations: &[Annotation], pb: &mut PlotBuffer) {
+        let default_color = Theme::get_default().annotation_color;
         for ann in annotations {
+            let color = ann.color.unwrap_or(default_color);
             let sx = pa.screen_x(ann.text_x);
             let sy = pa.screen_y(ann.text_y);
             let xi = sx.round() as u16;
@@ -1539,7 +1541,7 @@ impl<'a> PlotFrame<'a> {
                 for (j, ch) in ann.text.chars().enumerate() {
                     let x = xi + j as u16;
                     if x >= pa.x && x < pa.x + pa.width {
-                        pb.set_char(x, yi, ch, ann.color, Z_ANNOTATION);
+                        pb.set_char(x, yi, ch, color, Z_ANNOTATION);
                     }
                 }
             }
@@ -1552,7 +1554,7 @@ impl<'a> PlotFrame<'a> {
                     let dy = target_sy as f64 - yi as f64;
                     let arrow_ch = ann.arrow_char(dx, dy);
                     if arrow_ch != ' ' {
-                        pb.set_char(target_sx, target_sy, arrow_ch, ann.color, Z_ANNOTATION);
+                        pb.set_char(target_sx, target_sy, arrow_ch, color, Z_ANNOTATION);
                     }
                 }
             }

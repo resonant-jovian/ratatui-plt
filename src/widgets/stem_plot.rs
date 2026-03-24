@@ -32,7 +32,7 @@ use crate::theme::Theme;
 pub struct StemPlot {
     data: Vec<(f64, f64)>,
     baseline: f64,
-    color: Color,
+    color: Option<Color>,
     marker: MarkerShape,
     title: Option<String>,
     x_axis: Axis,
@@ -48,7 +48,7 @@ impl StemPlot {
         Self {
             data,
             baseline: 0.0,
-            color: Color::Cyan,
+            color: None,
             marker: MarkerShape::FilledCircle,
             title: None,
             x_axis: Axis::new(),
@@ -66,7 +66,7 @@ impl StemPlot {
     }
 
     pub fn color(mut self, c: Color) -> Self {
-        self.color = c;
+        self.color = Some(c);
         self
     }
 
@@ -190,11 +190,12 @@ impl Widget for &StemPlot {
             }
 
             // Draw stem line using Braille sub-pixel rendering
-            draw_braille_line_pb(&mut pb, sx, base_sy, sx, sy, self.color, &pa, Z_DATA);
+            let resolved_color = self.color.unwrap_or(self.theme.primary);
+            draw_braille_line_pb(&mut pb, sx, base_sy, sx, sy, resolved_color, &pa, Z_DATA);
 
             // Draw marker at data point
             if pa.contains(xi, yi) {
-                pb.set_char(xi, yi, self.marker.char(), self.color, Z_MARKER);
+                pb.set_char(xi, yi, self.marker.char(), resolved_color, Z_MARKER);
             }
         }
 

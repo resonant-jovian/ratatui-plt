@@ -27,8 +27,8 @@ pub struct Arrow3D {
     pub dy: f64,
     /// Z component of the direction vector.
     pub dz: f64,
-    /// Color of this arrow.
-    pub color: Color,
+    /// Color of this arrow (None = use theme primary).
+    pub color: Option<Color>,
 }
 
 impl Arrow3D {
@@ -41,13 +41,13 @@ impl Arrow3D {
             dx,
             dy,
             dz,
-            color: Color::Cyan,
+            color: None,
         }
     }
 
     /// Set the arrow color.
     pub fn color(mut self, color: Color) -> Self {
-        self.color = color;
+        self.color = Some(color);
         self
     }
 }
@@ -207,7 +207,7 @@ impl Quiver3D {
                 sx1: s1x,
                 sy1: s1y,
                 avg_depth: (d0 + d1) / 2.0,
-                color: a.color,
+                color: a.color.unwrap_or(self.theme.primary),
             });
         }
 

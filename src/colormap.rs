@@ -33,7 +33,7 @@ pub trait Colormap: Send + Sync {
 fn lerp_color_stops(t: f64, stops: &[(f64, (u8, u8, u8))]) -> Color {
     let t = t.clamp(0.0, 1.0);
     if stops.is_empty() {
-        return Color::White;
+        return Color::Rgb(128, 128, 128);
     }
     if t <= stops[0].0 {
         let (r, g, b) = stops[0].1;
@@ -54,7 +54,7 @@ fn lerp_color_stops(t: f64, stops: &[(f64, (u8, u8, u8))]) -> Color {
             return Color::Rgb(r, g, b);
         }
     }
-    Color::White
+    Color::Rgb(128, 128, 128)
 }
 
 /// Viridis: perceptually uniform sequential colormap (dark purple → green → yellow).
@@ -382,7 +382,7 @@ impl Colormap for ListedColormap {
     fn color_at(&self, t: f64) -> Color {
         let t = t.clamp(0.0, 1.0);
         if self.stops.is_empty() {
-            return Color::White;
+            return Color::Rgb(128, 128, 128);
         }
         if self.stops.len() == 1 {
             return self.stops[0].1;
@@ -403,7 +403,7 @@ impl Colormap for ListedColormap {
                 return lerp_colors(*c0, *c1, frac);
             }
         }
-        Color::White
+        Color::Rgb(128, 128, 128)
     }
 
     fn name(&self) -> &str {
@@ -820,7 +820,7 @@ define_colormap!(Spectral, "Spectral",
 /// Helper for qualitative colormaps: picks nearest color from a palette.
 fn qualitative_color(t: f64, colors: &[(u8, u8, u8)]) -> Color {
     if colors.is_empty() {
-        return Color::White;
+        return Color::Rgb(128, 128, 128);
     }
     let idx = (t.clamp(0.0, 1.0) * (colors.len() - 1) as f64).round() as usize;
     let (r, g, b) = colors[idx.min(colors.len() - 1)];
@@ -1155,8 +1155,8 @@ pub struct Colorbar<'a> {
     n_ticks: usize,
     /// Width in characters.
     width: u16,
-    /// Color for tick labels.
-    label_color: Color,
+    /// Color for tick labels (`None` = use theme foreground).
+    label_color: Option<Color>,
     /// How to display out-of-range values.
     extend: ColorbarExtend,
 }
@@ -1171,14 +1171,14 @@ impl<'a> Colorbar<'a> {
             vmax,
             n_ticks: 5,
             width: 4,
-            label_color: Color::White,
+            label_color: None,
             extend: ColorbarExtend::Neither,
         }
     }
 
     /// Set the label color.
     pub fn label_color(mut self, color: Color) -> Self {
-        self.label_color = color;
+        self.label_color = Some(color);
         self
     }
 
@@ -1274,7 +1274,7 @@ impl Widget for &Colorbar<'_> {
                         if x < area.x + area.width {
                             buf[(x, y)]
                                 .set_char(ch)
-                                .set_style(Style::default().fg(self.label_color));
+                                .set_style(Style::default().fg(self.label_color.unwrap_or(Color::White)));
                         }
                     }
                 }

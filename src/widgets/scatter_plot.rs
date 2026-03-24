@@ -298,15 +298,16 @@ impl Widget for &ScatterPlot {
                 let yi = sy.round() as u16;
 
                 if pa.contains(xi, yi) {
+                    let fallback = s.color.unwrap_or(self.theme.primary);
                     let color = if let Some(ref cv) = self.color_values {
                         if global_point_idx < cv.len() {
                             let t = self.color_norm.normalize(cv[global_point_idx]);
                             self.colormap.color_at(t)
                         } else {
-                            s.color
+                            fallback
                         }
                     } else {
-                        s.color
+                        fallback
                     };
                     pb.set_char(xi, yi, marker.char(), color, Z_MARKER);
                 }
@@ -331,9 +332,12 @@ impl Widget for &ScatterPlot {
                 .filter(|v| v.is_finite())
                 .collect();
 
-            let trend_color = self
-                .trendline_color
-                .unwrap_or_else(|| self.series.first().map_or(Color::White, |s| s.color));
+            let trend_color = self.trendline_color.unwrap_or_else(|| {
+                self.series
+                    .first()
+                    .and_then(|s| s.color)
+                    .unwrap_or(self.theme.primary)
+            });
 
             // Generate evaluation x values across the plot range
             let n_eval = self.trendline_n_points;

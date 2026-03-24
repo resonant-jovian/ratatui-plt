@@ -83,16 +83,17 @@ pub struct WaterfallChart {
 
 impl Default for WaterfallChart {
     fn default() -> Self {
+        let theme = Theme::get_default();
         Self {
+            positive_color: theme.positive_color,
+            negative_color: theme.negative_color,
+            total_color: theme.neutral_color,
             entries: Vec::new(),
-            positive_color: Color::Green,
-            negative_color: Color::Red,
-            total_color: Color::Blue,
             connector_line: true,
             title: None,
             x_axis: Axis::new(),
             y_axis: Axis::new(),
-            theme: Theme::get_default(),
+            theme,
             spines: Spines::default(),
             reference_lines: Vec::new(),
             annotations: Vec::new(),

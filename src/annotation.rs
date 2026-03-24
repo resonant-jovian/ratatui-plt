@@ -69,8 +69,8 @@ pub struct Annotation {
     pub target: Option<(f64, f64)>,
     /// Arrow style.
     pub arrow_style: ArrowStyle,
-    /// Text color.
-    pub color: Color,
+    /// Text color (`None` = use theme annotation color).
+    pub color: Option<Color>,
 }
 
 impl Annotation {
@@ -82,7 +82,7 @@ impl Annotation {
             text_y: y,
             target: None,
             arrow_style: ArrowStyle::None,
-            color: Color::White,
+            color: None,
         }
     }
 
@@ -101,7 +101,7 @@ impl Annotation {
 
     /// Set the text color.
     pub fn color(mut self, color: Color) -> Self {
-        self.color = color;
+        self.color = Some(color);
         self
     }
 

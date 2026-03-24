@@ -9,6 +9,7 @@ use ratatui::style::Color;
 
 use crate::brushing::SharedBrush;
 use crate::frame::PlotArea;
+use crate::theme::Theme;
 
 /// A rectangle selector overlay widget.
 ///
@@ -43,7 +44,7 @@ impl RectangleSelector {
     pub fn new(brush: SharedBrush) -> Self {
         Self {
             brush,
-            color: Color::Cyan,
+            color: Theme::get_default().accent,
             fill_char: '░',
             border: true,
         }
