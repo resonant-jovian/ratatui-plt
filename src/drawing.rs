@@ -203,11 +203,11 @@ pub fn draw_braille_line(
     }
 }
 
-/// OR a braille dot into the [`PlotBuffer`] at the given cell, using `Z_DATA` priority.
+/// OR a braille dot into the [`PlotBuffer`] at the given cell at the specified Z-level.
 ///
 /// This is the `PlotBuffer` counterpart of [`write_braille`].
-pub fn write_braille_pb(pb: &mut PlotBuffer, x: u16, y: u16, bits: u8, color: Color) {
-    pb.set_braille(x, y, bits, color, crate::plot_buffer::Z_DATA);
+pub fn write_braille_pb(pb: &mut PlotBuffer, x: u16, y: u16, bits: u8, color: Color, z: u8) {
+    pb.set_braille(x, y, bits, color, z);
 }
 
 /// Draw a line between two screen-space points using Bresenham's algorithm
@@ -215,7 +215,9 @@ pub fn write_braille_pb(pb: &mut PlotBuffer, x: u16, y: u16, bits: u8, color: Co
 ///
 /// This is the `PlotBuffer` counterpart of [`draw_braille_line`].
 /// Coordinates are in terminal cell space (floating point). The line is clipped
-/// to the given plot area bounds.
+/// to the given plot area bounds. The `z` parameter controls the Z-level for
+/// compositing (use `Z_DATA + series_index` for per-series ordering).
+#[allow(clippy::too_many_arguments)]
 pub fn draw_braille_line_pb(
     pb: &mut PlotBuffer,
     x0: f64,
@@ -224,6 +226,7 @@ pub fn draw_braille_line_pb(
     y1: f64,
     color: Color,
     pa: &PlotArea,
+    z: u8,
 ) {
     // Scale to braille sub-pixel coordinates (2x horizontal, 4x vertical)
     let mut ix0 = (x0 * 2.0).round() as i32;
@@ -249,7 +252,7 @@ pub fn draw_braille_line_pb(
                 let dot_col = (ix0 % 2) as usize;
                 let dot_row = (iy0 % 4) as usize;
                 let bit = BRAILLE_BITS[dot_col][dot_row];
-                write_braille_pb(pb, cell_x, cell_y, bit, color);
+                write_braille_pb(pb, cell_x, cell_y, bit, color, z);
             }
         }
 

@@ -222,7 +222,7 @@ impl Widget for &BandPlot {
         };
 
         // Draw each band
-        for band in &self.bands {
+        for (si, band) in self.bands.iter().enumerate() {
             let n = band.x.len().min(band.y_lower.len()).min(band.y_upper.len());
 
             // Fill the region between y_lower and y_upper using column interpolation.
@@ -261,6 +261,7 @@ impl Widget for &BandPlot {
                                     sy_top_f,
                                     band.color,
                                     &pa,
+                                    Z_DATA + si as u8,
                                 );
                             }
                             prev_zero_y_draw = Some(sy_top_f);

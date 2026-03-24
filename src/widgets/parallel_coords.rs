@@ -30,7 +30,7 @@ use crate::annotation::Annotation;
 use crate::drawing::draw_braille_line_pb;
 use crate::frame::PlotArea;
 use crate::legend::{Legend, LegendEntry, LegendPosition};
-use crate::plot_buffer::{PlotBuffer, Z_ANNOTATION, Z_CHROME, Z_MARKER};
+use crate::plot_buffer::{PlotBuffer, Z_ANNOTATION, Z_CHROME, Z_DATA, Z_MARKER};
 use crate::spines::Spines;
 use crate::theme::Theme;
 use crate::transform::data_to_screen;
@@ -302,7 +302,7 @@ impl Widget for &ParallelCoords {
         };
 
         // Draw polylines for each record using Braille line drawing
-        for rec in &self.records {
+        for (si, rec) in self.records.iter().enumerate() {
             let n_values = rec.values.len().min(n_axes);
             if n_values < 2 {
                 continue;
@@ -325,7 +325,7 @@ impl Widget for &ParallelCoords {
                 let sx1 = axis_positions[i + 1] as f64;
                 let sy1 = data_to_screen(v1, ax1.min, ax1.max, plot_bottom as f64, plot_top as f64);
 
-                draw_braille_line_pb(&mut pb, sx0, sy0, sx1, sy1, rec.color, &pa);
+                draw_braille_line_pb(&mut pb, sx0, sy0, sx1, sy1, rec.color, &pa, Z_DATA + si as u8);
             }
 
             // Draw value markers on each axis

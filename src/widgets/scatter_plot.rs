@@ -15,6 +15,8 @@ use crate::frame::{DataBounds, PlotFrame, ReferenceLine};
 use crate::legend::{Legend, LegendPosition};
 use crate::linked_view::SharedView;
 use crate::norm::{LinearNorm, Normalize};
+#[cfg(feature = "statistics")]
+use crate::plot_buffer::Z_DATA;
 use crate::plot_buffer::{PlotBuffer, Z_MARKER};
 use crate::series::Series;
 use crate::spines::Spines;
@@ -368,7 +370,7 @@ impl Widget for &ScatterPlot {
                     let sy0 = pa.screen_y(ys[i]);
                     let sx1 = pa.screen_x(eval_xs[i + 1]);
                     let sy1 = pa.screen_y(ys[i + 1]);
-                    draw_braille_line_pb(&mut pb, sx0, sy0, sx1, sy1, trend_color, &pa);
+                    draw_braille_line_pb(&mut pb, sx0, sy0, sx1, sy1, trend_color, &pa, Z_DATA);
                 }
             }
         }

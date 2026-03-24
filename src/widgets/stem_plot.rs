@@ -9,7 +9,7 @@ use crate::annotation::Annotation;
 use crate::axis::Axis;
 use crate::drawing::draw_braille_line_pb;
 use crate::frame::{DataBounds, PlotFrame, ReferenceLine};
-use crate::plot_buffer::{PlotBuffer, Z_CHROME, Z_MARKER};
+use crate::plot_buffer::{PlotBuffer, Z_CHROME, Z_DATA, Z_MARKER};
 use crate::spines::Spines;
 use crate::style::MarkerShape;
 use crate::theme::Theme;
@@ -190,7 +190,7 @@ impl Widget for &StemPlot {
             }
 
             // Draw stem line using Braille sub-pixel rendering
-            draw_braille_line_pb(&mut pb, sx, base_sy, sx, sy, self.color, &pa);
+            draw_braille_line_pb(&mut pb, sx, base_sy, sx, sy, self.color, &pa, Z_DATA);
 
             // Draw marker at data point
             if pa.contains(xi, yi) {

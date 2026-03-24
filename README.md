@@ -38,20 +38,37 @@
 
 ### How it works
 
-```
-                          ratatui-plt data flow
-
-   Your Data          Data Containers        Widgets            Terminal
-  ──────────────     ──────────────────     ───────────       ───────────
-  Vec<(f64,f64)> ──> Series             ─┐
-  Vec<Vec<f64>>  ──> GridData            ├──> LinePlot    ─┐
-  OHLC tuples    ──> Series              │    Heatmap      ├──> ratatui
-  3D points      ──> Series3D            │    Surface3D    │    Frame
-  vectors        ──> VectorFieldData    ─┘    ...          │    ::render_widget()
-                                                           │
-                       Axis + Scale + Tickers              │
-                       Colormap + Normalize  ──────────────┘
-                       Theme
+```mermaid
+flowchart LR
+    subgraph input["Your Data"]
+        A1["Vec&lt;(f64,f64)&gt;"]
+        A2["Vec&lt;Vec&lt;f64&gt;&gt;"]
+        A3["OHLC tuples"]
+        A4["3D points"]
+        A5["vectors"]
+    end
+    subgraph containers["Data Containers"]
+        B1[Series]
+        B2[GridData]
+        B3[Series3D]
+        B4[VectorFieldData]
+    end
+    subgraph widgets["Widgets"]
+        C1[LinePlot]
+        C2[Heatmap]
+        C3[Surface3D]
+        C4["..."]
+    end
+    subgraph config["Configuration"]
+        D1["Axis + Scale + Tickers"]
+        D2["Colormap + Normalize"]
+        D3[Theme]
+    end
+    subgraph render["Terminal"]
+        E["ratatui Frame::render_widget()"]
+    end
+    input --> containers --> widgets --> render
+    config --> render
 ```
 
 Each widget follows a **builder pattern** — configure data, axes, colors, and theme, then hand it to ratatui's rendering loop.
@@ -231,9 +248,9 @@ All 3D widgets support interactive camera control via `Camera3DState` (arrow key
 
 ### MathText
 
-- Greek letters: `\alpha` -> a, `\beta` -> b, `\Sigma` -> S
-- Superscripts: `x^2` -> x2, `10^{-3}` -> 10-3
-- Subscripts: `x_0` -> x0
+- Greek letters: `\alpha` → α, `\beta` → β, `\Sigma` → Σ
+- Superscripts: `x^2` → x², `10^{-3}` → 10⁻³
+- Subscripts: `x_0` → x₀
 - Scientific notation formatting
 
 ### Annotations & Legend
