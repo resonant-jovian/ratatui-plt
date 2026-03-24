@@ -39,13 +39,16 @@ fn main() -> color_eyre::Result<()> {
     io::stdout().execute(crossterm::event::EnableMouseCapture)?;
     let mut terminal = Terminal::new(CrosstermBackend::new(io::stdout()))?;
 
+    let theme = Theme::get_default();
+    let mut cycle = theme.color_cycle.clone();
+
     // Sales data: 4 regions x 3 quarters (deterministic values)
     // Regions along x-axis, quarters along y-axis
     let region_colors = [
-        Color::Rgb(0, 180, 220), // North - cyan
-        Color::Rgb(220, 180, 0), // South - gold
-        Color::Rgb(0, 180, 80),  // East  - green
-        Color::Rgb(200, 80, 80), // West  - red
+        cycle.next_color(), // North
+        cycle.next_color(), // South
+        cycle.next_color(), // East
+        cycle.next_color(), // West
     ];
 
     // Sales figures (in thousands): [region][quarter]

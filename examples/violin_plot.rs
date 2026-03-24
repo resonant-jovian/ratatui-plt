@@ -55,10 +55,12 @@ fn main() -> color_eyre::Result<()> {
     enable_raw_mode()?;
     let mut terminal = Terminal::new(CrosstermBackend::new(io::stdout()))?;
 
-    let normal = ViolinData::new("Normal", generate_data(42, 800, 5.0, 2.0), Color::Cyan);
-    let bimodal = ViolinData::new("Bimodal", bimodal_data(123, 800), Color::Yellow);
-    let skewed = ViolinData::new("Skewed", generate_data(999, 800, 3.0, 1.0), Color::Magenta);
-    let wide = ViolinData::new("Wide", generate_data(777, 800, 5.0, 5.0), Color::Green);
+    let theme = Theme::get_default();
+    let mut cycle = theme.color_cycle.clone();
+    let normal = ViolinData::new("Normal", generate_data(42, 800, 5.0, 2.0), cycle.next_color());
+    let bimodal = ViolinData::new("Bimodal", bimodal_data(123, 800), cycle.next_color());
+    let skewed = ViolinData::new("Skewed", generate_data(999, 800, 3.0, 1.0), cycle.next_color());
+    let wide = ViolinData::new("Wide", generate_data(777, 800, 5.0, 5.0), cycle.next_color());
 
     let plot = ViolinPlot::new()
         .dataset(normal)

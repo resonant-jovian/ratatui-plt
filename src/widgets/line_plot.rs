@@ -283,15 +283,15 @@ impl Widget for &LinePlot {
 
                     for ey in y_top..=y_bot {
                         if pa.contains(xi, ey) {
-                            pb.set_char(xi, ey, '│', color, Z_DATA);
+                            pb.set_char(xi, ey, self.theme.chars.border.vertical, color, Z_DATA);
                         }
                     }
                     // Caps
                     if pa.contains(xi, y_top) {
-                        pb.set_char(xi, y_top, '┬', color, Z_DATA);
+                        pb.set_char(xi, y_top, self.theme.chars.tick.cap_top, color, Z_DATA);
                     }
                     if pa.contains(xi, y_bot) {
-                        pb.set_char(xi, y_bot, '┴', color, Z_DATA);
+                        pb.set_char(xi, y_bot, self.theme.chars.tick.cap_bottom, color, Z_DATA);
                     }
                 }
             }
@@ -308,7 +308,7 @@ impl Widget for &LinePlot {
                     let xi = sx.round() as u16;
                     let yi = sy.round() as u16;
                     if pa.contains(xi, yi) {
-                        let ch = s.marker.map_or('●', |m| m.char());
+                        let ch = s.marker.map_or(self.theme.chars.marker.default_point, |m| m.char());
                         pb.set_char(xi, yi, ch, color, Z_MARKER);
                     }
                 }

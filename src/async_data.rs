@@ -91,11 +91,11 @@ impl AsyncSeriesSender {
         let max = self.max_points;
         self.tx.send_modify(|data| {
             data.extend_from_slice(points);
-            if let Some(max) = max {
-                if data.len() > max {
-                    let excess = data.len() - max;
-                    data.drain(..excess);
-                }
+            if let Some(max) = max
+                && data.len() > max
+            {
+                let excess = data.len() - max;
+                data.drain(..excess);
             }
         });
     }

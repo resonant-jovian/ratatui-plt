@@ -32,6 +32,9 @@ fn main() -> color_eyre::Result<()> {
     enable_raw_mode()?;
     let mut terminal = Terminal::new(CrosstermBackend::new(io::stdout()))?;
 
+    let theme = Theme::get_default();
+    let mut cycle = theme.color_cycle.clone();
+
     // Temperature and humidity over 24 hours (inversely correlated)
     let temp = Series::new("Temperature")
         .data(
@@ -43,7 +46,7 @@ fn main() -> color_eyre::Result<()> {
                 })
                 .collect(),
         )
-        .color(Color::Red);
+        .color(cycle.next_color());
 
     let humidity = Series::new("Humidity")
         .data(
@@ -55,7 +58,7 @@ fn main() -> color_eyre::Result<()> {
                 })
                 .collect(),
         )
-        .color(Color::Blue);
+        .color(cycle.next_color());
 
     let plot = TwinAxes::new()
         .primary(temp)

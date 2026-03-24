@@ -37,21 +37,11 @@ fn main() -> color_eyre::Result<()> {
     enable_raw_mode()?;
     let mut terminal = Terminal::new(CrosstermBackend::new(io::stdout()))?;
 
+    let theme = Theme::get_default();
+    let mut cycle = theme.color_cycle.clone();
+
     // Build a line collection: 12 radial segments, each with a distinct color
-    let segment_colors = [
-        Color::Red,
-        Color::Rgb(255, 127, 0), // orange
-        Color::Yellow,
-        Color::Rgb(127, 255, 0), // lime
-        Color::Green,
-        Color::Rgb(0, 255, 127), // spring
-        Color::Cyan,
-        Color::Rgb(0, 127, 255), // azure
-        Color::Blue,
-        Color::Rgb(127, 0, 255), // violet
-        Color::Magenta,
-        Color::Rgb(255, 0, 127), // rose
-    ];
+    let segment_colors: Vec<Color> = (0..12).map(|_| cycle.next_color()).collect();
     let mut lc = LineCollection::new();
     for (i, &color) in segment_colors.iter().enumerate() {
         let theta = i as f64 * std::f64::consts::TAU / 12.0;
@@ -65,9 +55,9 @@ fn main() -> color_eyre::Result<()> {
     // Build a path collection: triangle, square, hexagon
     let mut pc = PathCollection::new();
     let shapes: [(usize, f64, Color); 3] = [
-        (3, 1.0, Color::Cyan),    // triangle
-        (4, 1.8, Color::Yellow),  // square
-        (6, 2.5, Color::Magenta), // hexagon
+        (3, 1.0, theme.primary),   // triangle
+        (4, 1.8, theme.secondary), // square
+        (6, 2.5, theme.accent),    // hexagon
     ];
     for (n_sides, radius, color) in shapes {
         let verts: Vec<(f64, f64)> = (0..=n_sides)

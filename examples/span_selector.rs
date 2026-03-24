@@ -37,6 +37,7 @@ fn main() -> color_eyre::Result<()> {
     enable_raw_mode()?;
     let mut terminal = Terminal::new(CrosstermBackend::new(io::stdout()))?;
 
+    let theme = Theme::get_default();
     let n = 200;
     let s = Series::new("sin(x)")
         .data(
@@ -47,7 +48,7 @@ fn main() -> color_eyre::Result<()> {
                 })
                 .collect(),
         )
-        .color(Color::Rgb(80, 200, 255));
+        .color(theme.primary);
 
     let span_state = shared_span_state();
     span_state.borrow_mut().start = Some(2.0);
@@ -94,17 +95,17 @@ fn main() -> color_eyre::Result<()> {
                     let sy1 = pa.screen_y(y1).round() as u16;
                     // Simple point-based rendering
                     if pa.contains(sx0, sy0) {
-                        buf[(sx0, sy0)].set_char('·').set_fg(s.color.unwrap_or(Color::White));
+                        buf[(sx0, sy0)].set_char('·').set_fg(s.color.unwrap_or(theme.foreground));
                     }
                     if pa.contains(sx1, sy1) {
-                        buf[(sx1, sy1)].set_char('·').set_fg(s.color.unwrap_or(Color::White));
+                        buf[(sx1, sy1)].set_char('·').set_fg(s.color.unwrap_or(theme.foreground));
                     }
                 }
 
                 // Draw span selector overlay
                 let selector = SpanSelector::new(span_state.clone())
                     .direction(SpanDirection::Horizontal)
-                    .color(Color::Rgb(100, 100, 200));
+                    .color(theme.secondary);
                 selector.render_on(&pa, buf);
             }
         })?;

@@ -52,12 +52,15 @@ fn main() -> color_eyre::Result<()> {
     enable_raw_mode()?;
     let mut terminal = Terminal::new(CrosstermBackend::new(io::stdout()))?;
 
+    let theme = Theme::get_default();
+
     let make_groups = || {
+        let mut cycle = theme.color_cycle.clone();
         vec![
-            BoxData::new("Ctrl", generate_data(42, 500, 5.0, 2.0), Color::Cyan),
-            BoxData::new("DrA", generate_data(123, 500, 7.5, 3.0), Color::Yellow),
-            BoxData::new("DrB", generate_data(999, 500, 6.0, 1.5), Color::Magenta),
-            BoxData::new("DrC", generate_data(7777, 500, 8.0, 2.5), Color::Green),
+            BoxData::new("Ctrl", generate_data(42, 500, 5.0, 2.0), cycle.next_color()),
+            BoxData::new("DrA", generate_data(123, 500, 7.5, 3.0), cycle.next_color()),
+            BoxData::new("DrB", generate_data(999, 500, 6.0, 1.5), cycle.next_color()),
+            BoxData::new("DrC", generate_data(7777, 500, 8.0, 2.5), cycle.next_color()),
         ]
     };
 
@@ -72,7 +75,7 @@ fn main() -> color_eyre::Result<()> {
                     .label_position(LabelPosition::End),
             )
             .show_means(true)
-            .reference_line(ReferenceLine::hline_dashed(6.5, Color::DarkGray));
+            .reference_line(ReferenceLine::hline_dashed(6.5, theme.muted));
         for g in make_groups() {
             p = p.box_data(g);
         }

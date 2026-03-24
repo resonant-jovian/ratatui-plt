@@ -722,7 +722,7 @@ impl Histogram {
                 .map(|ds| LegendEntry {
                     name: ds.name.clone(),
                     color: ds.color,
-                    marker: Some('█'),
+                    marker: Some(self.theme.chars.fill.solid),
                 })
                 .collect();
             let legend = Legend::new(entries)
@@ -779,19 +779,19 @@ impl Histogram {
                     // Draw only the outline (top edge + sides)
                     for x in rect.x_start..rect.x_end {
                         if pa.contains(x, rect.y_top) {
-                            pb.set_char(x, rect.y_top, '─', color, Z_DATA);
+                            pb.set_char(x, rect.y_top, self.theme.chars.border.horizontal, color, Z_DATA);
                         }
                     }
                     for y in rect.y_top..rect.y_bot {
                         if pa.contains(rect.x_start, y) {
-                            pb.set_char(rect.x_start, y, '│', color, Z_DATA);
+                            pb.set_char(rect.x_start, y, self.theme.chars.border.vertical, color, Z_DATA);
                         }
                     }
                     if rect.x_end > 0 {
                         let rx = rect.x_end.saturating_sub(1);
                         for y in rect.y_top..rect.y_bot {
                             if pa.contains(rx, y) {
-                                pb.set_char(rx, y, '│', color, Z_DATA);
+                                pb.set_char(rx, y, self.theme.chars.border.vertical, color, Z_DATA);
                             }
                         }
                     }
@@ -800,7 +800,7 @@ impl Histogram {
                     self.draw_bar_region(pa, &rect, color, pb);
                     for x in rect.x_start..rect.x_end {
                         if pa.contains(x, rect.y_top) {
-                            pb.set_char(x, rect.y_top, '▀', color, Z_DATA);
+                            pb.set_char(x, rect.y_top, self.theme.chars.fill.half_upper, color, Z_DATA);
                         }
                     }
                 }

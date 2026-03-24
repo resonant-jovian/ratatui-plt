@@ -38,40 +38,48 @@ fn main() -> color_eyre::Result<()> {
     enable_raw_mode()?;
     let mut terminal = Terminal::new(CrosstermBackend::new(io::stdout()))?;
 
+    let theme = Theme::get_default();
+    let mut cycle = theme.color_cycle.clone();
+    let c_asia = cycle.next_color();
+    let c_africa = cycle.next_color();
+    let c_europe = cycle.next_color();
+    let c_americas = cycle.next_color();
+    let c_oceania = cycle.next_color();
+
     // Population values in millions (approximate)
     let root = SunburstNode::new("World", 0.0)
         .child(
             SunburstNode::new("Asia", 0.0)
-                .color(Color::Rgb(220, 60, 60))
-                .child(SunburstNode::new("East Asia", 1700.0).color(Color::Rgb(240, 100, 100)))
-                .child(SunburstNode::new("South Asia", 2000.0).color(Color::Rgb(200, 50, 50)))
-                .child(SunburstNode::new("SE Asia", 700.0).color(Color::Rgb(180, 70, 70))),
+                .color(c_asia)
+                .child(SunburstNode::new("East Asia", 1700.0).color(c_asia))
+                .child(SunburstNode::new("South Asia", 2000.0).color(c_asia))
+                .child(SunburstNode::new("SE Asia", 700.0).color(c_asia)),
         )
         .child(
             SunburstNode::new("Africa", 0.0)
-                .color(Color::Rgb(230, 190, 40))
-                .child(SunburstNode::new("East Africa", 500.0).color(Color::Rgb(250, 220, 80)))
-                .child(SunburstNode::new("West Africa", 450.0).color(Color::Rgb(220, 180, 30)))
-                .child(SunburstNode::new("North Africa", 250.0).color(Color::Rgb(200, 170, 50))),
+                .color(c_africa)
+                .child(SunburstNode::new("East Africa", 500.0).color(c_africa))
+                .child(SunburstNode::new("West Africa", 450.0).color(c_africa))
+                .child(SunburstNode::new("North Africa", 250.0).color(c_africa)),
         )
         .child(
             SunburstNode::new("Europe", 0.0)
-                .color(Color::Rgb(60, 180, 200))
-                .child(SunburstNode::new("Western EU", 400.0).color(Color::Rgb(100, 210, 230)))
-                .child(SunburstNode::new("Eastern EU", 300.0).color(Color::Rgb(50, 160, 180))),
+                .color(c_europe)
+                .child(SunburstNode::new("Western EU", 400.0).color(c_europe))
+                .child(SunburstNode::new("Eastern EU", 300.0).color(c_europe)),
         )
         .child(
             SunburstNode::new("Americas", 0.0)
-                .color(Color::Rgb(60, 180, 80))
-                .child(SunburstNode::new("N. America", 380.0).color(Color::Rgb(100, 220, 110)))
-                .child(SunburstNode::new("S. America", 440.0).color(Color::Rgb(50, 170, 70)))
-                .child(SunburstNode::new("C. America", 180.0).color(Color::Rgb(70, 200, 90))),
+                .color(c_americas)
+                .child(SunburstNode::new("N. America", 380.0).color(c_americas))
+                .child(SunburstNode::new("S. America", 440.0).color(c_americas))
+                .child(SunburstNode::new("C. America", 180.0).color(c_americas)),
         )
         .child(
             SunburstNode::new("Oceania", 0.0)
-                .color(Color::Rgb(180, 80, 200))
-                .child(SunburstNode::new("Australia/NZ", 32.0).color(Color::Rgb(210, 120, 240)))
-                .child(SunburstNode::new("Pacific Is.", 13.0).color(Color::Rgb(160, 70, 190))),
+                .color(c_oceania)
+                .child(SunburstNode::new("Australia/NZ", 32.0).color(c_oceania))
+                .child(SunburstNode::new("Pacific Is.", 13.0).color(c_oceania)),
         );
 
     let chart = Sunburst::new(root).title("World Population Sunburst (q to quit)");

@@ -235,7 +235,7 @@ impl Widget for &ContourPlot {
                     let sx = pa.x + cx;
                     let sy = pa.y + cy;
                     if pa.in_area(sx, sy) {
-                        pb.set_cell(sx, sy, '▀', top, bot, Z_DATA);
+                        pb.set_cell(sx, sy, self.theme.chars.fill.half_upper, top, bot, Z_DATA);
                     }
                 }
             }

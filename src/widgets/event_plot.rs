@@ -48,7 +48,7 @@ pub struct EventGroup {
     /// Event positions along the data axis. NaN values are filtered out.
     pub positions: Vec<f64>,
     /// Colour for the event ticks.
-    pub color: Color,
+    pub color: Option<Color>,
 }
 
 impl EventGroup {
@@ -57,13 +57,13 @@ impl EventGroup {
         Self {
             label: label.into(),
             positions,
-            color: Color::White,
+            color: None,
         }
     }
 
     /// Set the tick colour.
     pub fn color(mut self, color: Color) -> Self {
-        self.color = color;
+        self.color = Some(color);
         self
     }
 
@@ -270,6 +270,7 @@ impl EventPlot {
 
         // Draw each group
         for (gi, group) in self.events.iter().enumerate() {
+            let group_color = group.color.unwrap_or_else(|| self.theme.color_cycle.at(gi));
             let lane_center_y = pa.y as f64 + (gi as f64 + 0.5) * lane_height;
             let lane_y = lane_center_y.round() as u16;
 
@@ -284,7 +285,7 @@ impl EventPlot {
                 for (j, ch) in label.chars().enumerate() {
                     let lx = label_start + j as u16;
                     if lx >= area.x && lx < pa.x.saturating_sub(1) {
-                        pb.set_char(lx, lane_y, ch, group.color, Z_CHROME);
+                        pb.set_char(lx, lane_y, ch, group_color, Z_CHROME);
                     }
                 }
 
@@ -310,7 +311,7 @@ impl EventPlot {
                 let y_bot = (lane_y + tick_half).min(pa.y + pa.height - 1);
                 for ty in y_top..=y_bot {
                     if ty >= pa.y && ty < pa.y + pa.height && xi < area.x + area.width {
-                        pb.set_char(xi, ty, '│', group.color, Z_DATA);
+                        pb.set_char(xi, ty, '│', group_color, Z_DATA);
                     }
                 }
             }
@@ -375,6 +376,7 @@ impl EventPlot {
 
         // Draw each group
         for (gi, group) in self.events.iter().enumerate() {
+            let group_color = group.color.unwrap_or_else(|| self.theme.color_cycle.at(gi));
             let lane_center_x = pa.x as f64 + (gi as f64 + 0.5) * lane_width;
             let lane_x = lane_center_x.round() as u16;
 
@@ -390,7 +392,7 @@ impl EventPlot {
                 for (j, ch) in label.chars().enumerate() {
                     let lx = label_start + j as u16;
                     if lx >= pa.x && lx < pa.x + pa.width {
-                        pb.set_char(lx, label_y, ch, group.color, Z_CHROME);
+                        pb.set_char(lx, label_y, ch, group_color, Z_CHROME);
                     }
                 }
             }
@@ -417,7 +419,7 @@ impl EventPlot {
                 let x_right = (lane_x + tick_half).min(pa.x + pa.width - 1);
                 for tx in x_left..=x_right {
                     if tx >= pa.x && tx < pa.x + pa.width && yi < area.y + area.height {
-                        pb.set_char(tx, yi, '─', group.color, Z_DATA);
+                        pb.set_char(tx, yi, '─', group_color, Z_DATA);
                     }
                 }
             }

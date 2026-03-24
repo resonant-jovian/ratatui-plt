@@ -170,7 +170,7 @@ fn main() -> color_eyre::Result<()> {
 
                 // Render crosshair overlay
                 let crosshair = Crosshair::new(cursor_x, cursor_y)
-                    .color(Color::Yellow)
+                    .color(theme.highlight)
                     .show_labels(true)
                     .format(|x, y| format!("({:.1}, {:.1})", x, y));
                 crosshair.render_on(&pa, buf);

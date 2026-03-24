@@ -39,7 +39,7 @@ pub struct ErrorBarPlot {
     x_err_low: Vec<f64>,
     x_err_high: Vec<f64>,
     direction: ErrorDirection,
-    color: Color,
+    color: Option<Color>,
     name: Option<String>,
     title: Option<String>,
     x_axis: Axis,
@@ -61,7 +61,7 @@ impl Default for ErrorBarPlot {
             x_err_low: Vec::new(),
             x_err_high: Vec::new(),
             direction: ErrorDirection::Vertical,
-            color: Color::White,
+            color: None,
             name: None,
             title: None,
             x_axis: Axis::new(),
@@ -105,7 +105,7 @@ impl ErrorBarPlot {
     }
 
     pub fn color(mut self, c: Color) -> Self {
-        self.color = c;
+        self.color = Some(c);
         self
     }
 
@@ -216,6 +216,8 @@ impl Widget for &ErrorBarPlot {
             return;
         };
 
+        let color = self.color.unwrap_or(self.theme.primary);
+
         // Draw error bars and points
         for (i, &(x, y)) in self.points.iter().enumerate() {
             let sx = pa.screen_x(x);
@@ -238,14 +240,14 @@ impl Widget for &ErrorBarPlot {
                 if xi >= pa.x && xi < pa.x + pa.width {
                     for ey in y_top..=y_bot {
                         if ey >= pa.y && ey < pa.y + pa.height {
-                            pb.set_char(xi, ey, '│', self.color, Z_DATA);
+                            pb.set_char(xi, ey, self.theme.chars.border.vertical, color, Z_DATA);
                         }
                     }
                     if y_top >= pa.y && y_top < pa.y + pa.height {
-                        pb.set_char(xi, y_top, '┬', self.color, Z_DATA);
+                        pb.set_char(xi, y_top, self.theme.chars.tick.cap_top, color, Z_DATA);
                     }
                     if y_bot >= pa.y && y_bot < pa.y + pa.height {
-                        pb.set_char(xi, y_bot, '┴', self.color, Z_DATA);
+                        pb.set_char(xi, y_bot, self.theme.chars.tick.cap_bottom, color, Z_DATA);
                     }
                 }
             }
@@ -265,21 +267,21 @@ impl Widget for &ErrorBarPlot {
                 if yi >= pa.y && yi < pa.y + pa.height {
                     for ex in x_left..=x_right {
                         if ex >= pa.x && ex < pa.x + pa.width {
-                            pb.set_char(ex, yi, '─', self.color, Z_DATA);
+                            pb.set_char(ex, yi, self.theme.chars.border.horizontal, color, Z_DATA);
                         }
                     }
                     if x_left >= pa.x && x_left < pa.x + pa.width {
-                        pb.set_char(x_left, yi, '├', self.color, Z_DATA);
+                        pb.set_char(x_left, yi, self.theme.chars.tick.cap_left, color, Z_DATA);
                     }
                     if x_right >= pa.x && x_right < pa.x + pa.width {
-                        pb.set_char(x_right, yi, '┤', self.color, Z_DATA);
+                        pb.set_char(x_right, yi, self.theme.chars.tick.cap_right, color, Z_DATA);
                     }
                 }
             }
 
             // Draw center point
             if pa.contains(xi, yi) {
-                pb.set_char(xi, yi, '●', self.color, Z_MARKER);
+                pb.set_char(xi, yi, self.theme.chars.marker.default_point, color, Z_MARKER);
             }
         }
 
@@ -297,8 +299,8 @@ impl Widget for &ErrorBarPlot {
         {
             let entries = vec![LegendEntry {
                 name: name.clone(),
-                color: self.color,
-                marker: Some('●'),
+                color,
+                marker: Some(self.theme.chars.marker.default_point),
             }];
             let legend = Legend::new(entries)
                 .position(self.legend_position.clone())

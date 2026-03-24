@@ -38,6 +38,7 @@ fn lcg_normal(seed: &mut u64) -> f64 {
 fn main() -> color_eyre::Result<()> {
     color_eyre::install()?;
     Theme::set_default(Theme::light());
+    let theme = Theme::get_default();
     io::stdout().execute(EnterAlternateScreen)?;
     enable_raw_mode()?;
     io::stdout().execute(crossterm::event::EnableMouseCapture)?;
@@ -60,7 +61,7 @@ fn main() -> color_eyre::Result<()> {
         r.sin() / r
     });
     let wireframe = Wireframe3D::new(wire_data)
-        .color(Color::Rgb(31, 119, 180))
+        .color(theme.primary)
         .camera(Camera3D::new().azimuth(-60.0).elevation(30.0))
         .title("Wireframe3D: sinc(r)");
 
@@ -92,10 +93,10 @@ fn main() -> color_eyre::Result<()> {
 
     // ── 4. Bar3D: small grid of bars ────────────────────────────────────
     let bar_colors = [
-        Color::Rgb(31, 119, 180),
-        Color::Rgb(44, 160, 44),
-        Color::Rgb(214, 39, 40),
-        Color::Rgb(148, 103, 189),
+        theme.color_cycle.at(0),
+        theme.color_cycle.at(1),
+        theme.color_cycle.at(2),
+        theme.color_cycle.at(3),
     ];
     let bar_seed = 999_u64;
     let bar_rows = 4_usize;

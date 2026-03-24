@@ -38,15 +38,16 @@ fn normal_vec(seed: &mut u64, n: usize, mean: f64, std: f64) -> Vec<f64> {
 fn main() -> color_eyre::Result<()> {
     color_eyre::install()?;
     Theme::set_default(Theme::light());
+    let theme = Theme::get_default();
     io::stdout().execute(EnterAlternateScreen)?;
     enable_raw_mode()?;
     let mut terminal = Terminal::new(CrosstermBackend::new(io::stdout()))?;
 
-    // Blue shades
-    let blue_dark = Color::Rgb(31, 119, 180);
-    let blue_mid = Color::Rgb(70, 130, 180);
-    let blue_light = Color::Rgb(174, 199, 232);
-    let blue_steel = Color::Rgb(100, 149, 237);
+    // Series colors from theme color cycle
+    let blue_dark = theme.color_cycle.at(0);
+    let blue_mid = theme.color_cycle.at(1);
+    let blue_light = theme.color_cycle.at(2);
+    let blue_steel = theme.color_cycle.at(3);
 
     // ---- Panel A: BoxPlot (4 groups) ----
     let mut seed_box = 42u64;
@@ -149,9 +150,9 @@ fn main() -> color_eyre::Result<()> {
         blue_mid,
         blue_light,
         blue_steel,
-        Color::Rgb(31, 80, 140),
-        Color::Rgb(50, 100, 160),
-        Color::Rgb(80, 140, 200),
+        theme.color_cycle.at(4),
+        theme.color_cycle.at(5),
+        theme.color_cycle.at(6),
     ];
 
     let groups: Vec<EventGroup> = (0..7)

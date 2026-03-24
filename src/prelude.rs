@@ -7,6 +7,7 @@
 pub use ratatui::style::Color;
 
 pub use crate::annotation::{Annotation, enclosed_number};
+pub use crate::chars::CharSet;
 pub use crate::axis::{
     AspectRatio, Axis, Bounds, GridConfig, LabelPosition, LabelRotation, Scale, TickDirection,
     set_cell_aspect, terminal_cell_aspect,
@@ -28,6 +29,7 @@ pub use crate::colormap::{
     Colorbar,
     Colormap,
     Coolwarm,
+    Cubehelix,
     Dark2,
     GnBu,
     Grayscale,
@@ -79,7 +81,7 @@ pub use crate::colormap::{
     YlOrBr,
     YlOrRd,
     // Registry
-    get_colormap,
+    colormap_names, get_colormap,
 };
 pub use crate::config::{ConfigGuard, PlotConfig};
 #[cfg(feature = "export")]
@@ -107,7 +109,7 @@ pub use crate::plot_buffer::{
 pub use crate::series::{GridData, Series, Series3D, VectorFieldData, split_at_nan};
 pub use crate::spines::Spines;
 pub use crate::style::{DashPattern, FillStyle, HatchPattern, LineStyle, MarkerShape, PlotStyle};
-pub use crate::theme::{Theme, ThemeGuard};
+pub use crate::theme::{Theme, ThemeGuard, theme_names};
 pub use crate::ticker::{
     AutoMinorLocator, CategoricalFormatter, CategoricalLocator, FixedLocator, FuncFormatter,
     LogFormatter, LogLocator, MaxNLocator, MultipleLocator, NullFormatter, NullLocator,

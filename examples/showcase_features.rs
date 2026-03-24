@@ -52,11 +52,12 @@ fn parse_theme() -> Theme {
 fn main() -> color_eyre::Result<()> {
     color_eyre::install()?;
     Theme::set_default(parse_theme());
+    let theme = Theme::get_default();
     io::stdout().execute(EnterAlternateScreen)?;
     enable_raw_mode()?;
     let mut terminal = Terminal::new(CrosstermBackend::new(io::stdout()))?;
 
-    let blue_dark = Color::Rgb(31, 119, 180);
+    let blue_dark = theme.primary;
 
     // ---- Panel A: ScatterPlot with polynomial(2) trendline ----
     let mut seed_a = 42u64;
@@ -78,7 +79,7 @@ fn main() -> color_eyre::Result<()> {
     let trendline_plot = ScatterPlot::new()
         .series(scatter_series)
         .trendline(TrendlineType::Polynomial(2))
-        .trendline_color(Color::Rgb(255, 127, 14))
+        .trendline_color(theme.secondary)
         .title("A: Quadratic Trendline")
         .x_axis(Axis::new().label("x").grid(true))
         .y_axis(Axis::new().label("y").grid(true))
@@ -128,9 +129,9 @@ fn main() -> color_eyre::Result<()> {
     let gauge = GaugeChart::new(73.0)
         .min(0.0)
         .max(100.0)
-        .sector(GaugeSector::new(0.0, 40.0, Color::Green))
-        .sector(GaugeSector::new(40.0, 70.0, Color::Yellow))
-        .sector(GaugeSector::new(70.0, 100.0, Color::Red))
+        .sector(GaugeSector::new(0.0, 40.0, theme.positive_color))
+        .sector(GaugeSector::new(40.0, 70.0, theme.highlight))
+        .sector(GaugeSector::new(70.0, 100.0, theme.negative_color))
         .title("D: Gauge (KPI = 73%)");
 
     // ---- Assemble 2x2 MultiPanel ----

@@ -32,12 +32,15 @@ fn main() -> color_eyre::Result<()> {
     enable_raw_mode()?;
     let mut terminal = Terminal::new(CrosstermBackend::new(io::stdout()))?;
 
+    let theme = Theme::get_default();
+    let mut cycle = theme.color_cycle.clone();
+
     let chart = FunnelChart::new()
-        .entry(FunnelEntry::new("Visitors", 10000.0).color(Color::Cyan))
-        .entry(FunnelEntry::new("Leads", 6500.0).color(Color::Blue))
-        .entry(FunnelEntry::new("Qualified", 3200.0).color(Color::Yellow))
-        .entry(FunnelEntry::new("Proposals", 1800.0).color(Color::Green))
-        .entry(FunnelEntry::new("Closed Won", 950.0).color(Color::Magenta))
+        .entry(FunnelEntry::new("Visitors", 10000.0).color(cycle.next_color()))
+        .entry(FunnelEntry::new("Leads", 6500.0).color(cycle.next_color()))
+        .entry(FunnelEntry::new("Qualified", 3200.0).color(cycle.next_color()))
+        .entry(FunnelEntry::new("Proposals", 1800.0).color(cycle.next_color()))
+        .entry(FunnelEntry::new("Closed Won", 950.0).color(cycle.next_color()))
         .show_percentages(true)
         .show_values(true)
         .title("Sales Funnel (q to quit)");

@@ -320,6 +320,16 @@ impl FillDensity {
             Self::Solid => '█',
         }
     }
+
+    /// Resolve the fill character using the theme's [`FillChars`](crate::chars::FillChars).
+    pub fn char_with(&self, chars: &crate::chars::FillChars) -> char {
+        match self {
+            Self::Light => chars.light,
+            Self::Medium => chars.medium,
+            Self::Dense => chars.dense,
+            Self::Solid => chars.solid,
+        }
+    }
 }
 
 /// Overall plot styling.

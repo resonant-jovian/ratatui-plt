@@ -9,6 +9,7 @@ use ratatui_plt::export::{ExportOptions, buffer_to_sixel, render_to_buffer};
 use ratatui_plt::prelude::*;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let theme = Theme::get_default();
     let series = Series::new("cos(x)")
         .data(
             (0..100)
@@ -18,7 +19,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 })
                 .collect(),
         )
-        .color(Color::Magenta);
+        .color(theme.accent);
 
     let plot = LinePlot::new()
         .series(series)

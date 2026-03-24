@@ -75,6 +75,7 @@ fn scalar_fn(x: f64, y: f64) -> f64 {
 fn main() -> color_eyre::Result<()> {
     color_eyre::install()?;
     Theme::set_default(Theme::light());
+    let theme = Theme::get_default();
     io::stdout().execute(EnterAlternateScreen)?;
     enable_raw_mode()?;
     let mut terminal = Terminal::new(CrosstermBackend::new(io::stdout()))?;
@@ -86,7 +87,7 @@ fn main() -> color_eyre::Result<()> {
     let (verts_a, tris_a) = make_triangulation(grid_n, &mut seed_a);
     let triplot = TriPlot::new(Triangulation::from_explicit(verts_a, tris_a))
         .title("TriPlot (mesh)")
-        .edge_color(Color::Rgb(31, 119, 180))
+        .edge_color(theme.primary)
         .x_axis(Axis::new().label("x").grid(true))
         .y_axis(Axis::new().label("y").grid(true));
 

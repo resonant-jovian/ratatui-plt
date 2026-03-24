@@ -89,12 +89,13 @@ fn main() -> color_eyre::Result<()> {
                 .split(area);
 
             // Render header line
+            let default_theme = Theme::get_default();
             let header = ratatui::widgets::Paragraph::new(
                 "Built-in Theme Gallery  |  q to quit  |  Tip: try light/dark terminal backgrounds",
             )
             .style(
                 ratatui::style::Style::default()
-                    .fg(Color::Cyan)
+                    .fg(default_theme.primary)
                     .add_modifier(ratatui::style::Modifier::BOLD),
             )
             .alignment(ratatui::layout::Alignment::Center);

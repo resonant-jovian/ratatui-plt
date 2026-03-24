@@ -2097,15 +2097,15 @@ fn test_sankey_diagram_renders() {
     let d = SankeyDiagram::new()
         .node(SankeyNode {
             label: "A".into(),
-            color: Color::Red,
+            color: Some(Color::Red),
         })
         .node(SankeyNode {
             label: "B".into(),
-            color: Color::Blue,
+            color: Some(Color::Blue),
         })
         .node(SankeyNode {
             label: "C".into(),
-            color: Color::Green,
+            color: Some(Color::Green),
         })
         .flow(SankeyFlow {
             source: 0,
@@ -2198,13 +2198,13 @@ fn test_network_plot_renders() {
     let plot = NetworkPlot::new()
         .node(GraphNode {
             label: "A".into(),
-            color: Color::Cyan,
+            color: Some(Color::Cyan),
             position: None,
             marker: MarkerShape::FilledCircle,
         })
         .node(GraphNode {
             label: "B".into(),
-            color: Color::Yellow,
+            color: Some(Color::Yellow),
             position: None,
             marker: MarkerShape::FilledCircle,
         })

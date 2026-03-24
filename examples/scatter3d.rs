@@ -28,6 +28,7 @@ fn parse_theme() -> Theme {
 fn main() -> color_eyre::Result<()> {
     color_eyre::install()?;
     Theme::set_default(parse_theme());
+    let theme = Theme::get_default();
     io::stdout().execute(EnterAlternateScreen)?;
     enable_raw_mode()?;
     io::stdout().execute(crossterm::event::EnableMouseCapture)?;
@@ -45,7 +46,7 @@ fn main() -> color_eyre::Result<()> {
 
     let s = Series3D::new("Helix")
         .data(data)
-        .color(Color::Cyan)
+        .color(theme.primary)
         .values(values);
     let scatter = Scatter3D::new()
         .series(s)

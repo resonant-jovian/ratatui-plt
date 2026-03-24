@@ -17,6 +17,7 @@
 
 use ratatui::style::Color;
 
+use crate::chars::CharSet;
 use crate::color_cycle::ColorCycle;
 use crate::style::DashPattern;
 
@@ -83,6 +84,9 @@ pub struct Theme {
     pub bad_data_color: Color,
     /// Default color for text annotations.
     pub annotation_color: Color,
+
+    /// Character set for all rendering glyphs.
+    pub chars: CharSet,
 }
 
 impl Default for Theme {
@@ -119,6 +123,7 @@ impl Theme {
             disabled_color: Color::DarkGray,
             bad_data_color: Color::DarkGray,
             annotation_color: Color::White,
+            chars: CharSet::default(),
         }
     }
 
@@ -149,6 +154,7 @@ impl Theme {
             disabled_color: Color::Rgb(180, 180, 180),
             bad_data_color: Color::Rgb(180, 180, 180),
             annotation_color: Color::Black,
+            chars: CharSet::default(),
         }
     }
 
@@ -179,6 +185,7 @@ impl Theme {
             disabled_color: Color::Rgb(80, 80, 80),
             bad_data_color: Color::Rgb(80, 80, 80),
             annotation_color: Color::White,
+            chars: CharSet::default(),
         }
     }
 
@@ -214,6 +221,7 @@ impl Theme {
             disabled_color: Color::Rgb(80, 80, 80),
             bad_data_color: Color::Rgb(80, 80, 80),
             annotation_color: Color::White,
+            chars: CharSet::default(),
         }
     }
 
@@ -253,6 +261,59 @@ impl Theme {
             disabled_color: Color::Rgb(88, 110, 117),    // base01
             bad_data_color: Color::Rgb(88, 110, 117),    // base01
             annotation_color: Color::Rgb(131, 148, 150), // base0
+            chars: CharSet::default(),
+        }
+    }
+
+    /// Gruvbox theme — warm retro palette based on the gruvbox color scheme.
+    pub fn gruvbox() -> Self {
+        Self {
+            background: Color::Rgb(40, 40, 40),
+            foreground: Color::Rgb(235, 219, 178),
+            grid_color: Color::Rgb(80, 73, 69),
+            minor_grid_color: Color::Rgb(60, 56, 54),
+            axis_color: Color::Rgb(168, 153, 132),
+            color_cycle: ColorCycle::new(vec![
+                Color::Rgb(131, 165, 152), // aqua
+                Color::Rgb(184, 187, 38),  // green
+                Color::Rgb(211, 134, 155), // purple
+                Color::Rgb(251, 73, 52),   // red
+                Color::Rgb(250, 189, 47),  // yellow
+                Color::Rgb(69, 133, 136),  // teal
+                Color::Rgb(254, 128, 25),  // orange
+            ]),
+            grid_visible: true,
+            grid_pattern: DashPattern::Solid,
+            bold_title: true,
+            primary: Color::Rgb(131, 165, 152),   // aqua
+            secondary: Color::Rgb(184, 187, 38),   // green
+            accent: Color::Rgb(131, 165, 152),      // aqua
+            highlight: Color::Rgb(250, 189, 47),    // yellow
+            muted: Color::Rgb(146, 131, 116),       // gray
+            surface: Color::Rgb(60, 56, 54),         // bg1
+            positive_color: Color::Rgb(152, 151, 26),  // ok green
+            negative_color: Color::Rgb(204, 36, 29),   // error red
+            neutral_color: Color::Rgb(69, 133, 136),    // teal
+            x_axis_3d_color: Color::Rgb(204, 36, 29),
+            y_axis_3d_color: Color::Rgb(152, 151, 26),
+            z_axis_3d_color: Color::Rgb(69, 133, 136),
+            disabled_color: Color::Rgb(146, 131, 116),  // dim gray
+            bad_data_color: Color::Rgb(80, 73, 69),
+            annotation_color: Color::Rgb(215, 153, 33), // warn yellow
+            chars: CharSet::default(),
+        }
+    }
+
+    /// Look up a named theme preset. Returns `None` for unrecognized names.
+    pub fn from_name(name: &str) -> Option<Self> {
+        match name {
+            "dark" => Some(Self::dark()),
+            "light" => Some(Self::light()),
+            "solarized" => Some(Self::solarized()),
+            "gruvbox" => Some(Self::gruvbox()),
+            "minimal" => Some(Self::minimal()),
+            "publication" => Some(Self::publication()),
+            _ => None,
         }
     }
 
@@ -312,6 +373,18 @@ impl Theme {
     pub fn get_default() -> Theme {
         DEFAULT_THEME.with(|t| t.borrow().clone())
     }
+}
+
+/// All available named theme presets.
+pub fn theme_names() -> &'static [&'static str] {
+    &[
+        "dark",
+        "light",
+        "solarized",
+        "gruvbox",
+        "minimal",
+        "publication",
+    ]
 }
 
 std::thread_local! {

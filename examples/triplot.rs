@@ -74,9 +74,10 @@ fn main() -> color_eyre::Result<()> {
 
     // --- Left panel: TriPlot (mesh edges) ---
     let (verts, tris) = make_grid_triangulation();
+    let theme = Theme::get_default();
     let tri_plot = TriPlot::new(Triangulation::from_explicit(verts, tris))
         .title("Mesh Edges")
-        .edge_color(Color::Cyan)
+        .edge_color(theme.primary)
         .x_axis(Axis::new().locator(MaxNLocator::new(4)))
         .y_axis(Axis::new().locator(MaxNLocator::new(4)));
 

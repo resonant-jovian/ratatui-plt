@@ -33,15 +33,16 @@ fn box_muller(seed: &mut u64, mean: f64, std: f64) -> f64 {
 fn main() -> color_eyre::Result<()> {
     color_eyre::install()?;
     Theme::set_default(Theme::light());
+    let theme = Theme::get_default();
     io::stdout().execute(EnterAlternateScreen)?;
     enable_raw_mode()?;
     let mut terminal = Terminal::new(CrosstermBackend::new(io::stdout()))?;
 
-    // Blue shades used throughout
-    let blue_dark = Color::Rgb(31, 119, 180);
-    let blue_mid = Color::Rgb(70, 130, 180);
-    let blue_light = Color::Rgb(174, 199, 232);
-    let blue_pale = Color::Rgb(198, 219, 239);
+    // Series colors from theme color cycle
+    let blue_dark = theme.color_cycle.at(0);
+    let blue_mid = theme.color_cycle.at(1);
+    let blue_light = theme.color_cycle.at(2);
+    let blue_pale = theme.color_cycle.at(3);
 
     // ---- Panel A: LinePlot (3 series) ----
     let mut seed_a = 42u64;

@@ -38,6 +38,8 @@ fn main() -> color_eyre::Result<()> {
     enable_raw_mode()?;
     let mut terminal = Terminal::new(CrosstermBackend::new(io::stdout()))?;
 
+    let theme = Theme::get_default();
+
     // Model: damped oscillation  y(t) = sin(2*pi*t/3) * exp(-t/8)
     // Uncertainty grows with time: sigma(t) = 0.08 + 0.10*t
     let n = 150;
@@ -83,15 +85,15 @@ fn main() -> color_eyre::Result<()> {
     let y_line_hi = y_center;
 
     let band_2sig = Band::new("\u{00b1}2\u{03c3} (95%)", x.clone(), y_2sig_lo, y_2sig_hi)
-        .color(Color::Blue)
+        .color(theme.secondary)
         .alpha_char('\u{2591}'); // light shade
 
     let band_1sig = Band::new("\u{00b1}1\u{03c3} (68%)", x.clone(), y_1sig_lo, y_1sig_hi)
-        .color(Color::Cyan)
+        .color(theme.primary)
         .alpha_char('\u{2592}'); // medium shade
 
     let center_line = Band::new("Prediction", x.clone(), y_line_lo, y_line_hi)
-        .color(Color::White)
+        .color(theme.foreground)
         .alpha_char('\u{2501}'); // heavy horizontal
 
     let plot = BandPlot::new()

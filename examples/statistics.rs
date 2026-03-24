@@ -82,10 +82,12 @@ fn main() -> color_eyre::Result<()> {
         .map(|&x| x.sin() + 0.3 * rng.next_normal())
         .collect();
 
+    let theme = Theme::get_default();
+
     // Scatter series for raw data
     let scatter = Series::new("Data")
         .data(x_data.iter().copied().zip(y_data.iter().copied()).collect())
-        .color(Color::White)
+        .color(theme.foreground)
         .marker(MarkerShape::Circle);
 
     // Linear regression overlay
@@ -98,7 +100,7 @@ fn main() -> color_eyre::Result<()> {
         Some(
             Series::new(format!("Linear (R\u{00b2}={:.3})", fit.r_squared))
                 .data(fit_data)
-                .color(Color::Red),
+                .color(theme.negative_color),
         )
     } else {
         None
@@ -114,7 +116,7 @@ fn main() -> color_eyre::Result<()> {
                 200,
                 &format!("Quadratic (R\u{00b2}={:.3})", fit.r_squared),
             )
-            .color(Color::Yellow),
+            .color(theme.highlight),
         )
     } else {
         None
@@ -124,7 +126,7 @@ fn main() -> color_eyre::Result<()> {
     let lowess_result = lowess(&x_data, &y_data, 0.3);
     let lowess_series = lowess_result
         .as_ref()
-        .map(|res| res.to_series("LOWESS (f=0.3)", Color::Green));
+        .map(|res| res.to_series("LOWESS (f=0.3)", theme.positive_color));
 
     // Build the regression plot
     let mut plot = LinePlot::new()
@@ -146,22 +148,22 @@ fn main() -> color_eyre::Result<()> {
     }
 
     // Bootstrap CI for the mean at sliding windows -> shown as a band
-    let window = 15;
+    let window: usize = 15;
     let mut band_x = Vec::new();
     let mut band_lo = Vec::new();
     let mut band_hi = Vec::new();
-    for i in 0..n {
-        let start = if i >= window / 2 { i - window / 2 } else { 0 };
+    for (i, &xv) in x_data.iter().enumerate() {
+        let start = i.saturating_sub(window / 2);
         let end = (i + window / 2 + 1).min(n);
         let slice = &y_data[start..end];
         let ci = bootstrap_ci(slice, mean_estimator, 200, 0.95, i as u64);
-        band_x.push(x_data[i]);
+        band_x.push(xv);
         band_lo.push(ci.lower);
         band_hi.push(ci.upper);
     }
 
     let ci_band = Band::new("95% CI (mean)", band_x.clone(), band_lo, band_hi)
-        .color(Color::Cyan)
+        .color(theme.primary)
         .alpha_char('\u{2591}');
 
     let band_plot = BandPlot::new()
@@ -176,7 +178,7 @@ fn main() -> color_eyre::Result<()> {
     let (kde_x, kde_y) = kde.fit(&y_data);
     let kde_series = Series::new("KDE")
         .data(kde_x.into_iter().zip(kde_y).collect())
-        .color(Color::Magenta);
+        .color(theme.accent);
 
     let kde_plot = LinePlot::new()
         .series(kde_series)

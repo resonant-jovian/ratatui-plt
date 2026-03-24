@@ -129,18 +129,18 @@ impl GaugeChart {
         {
             return last.color;
         }
-        // Default green-yellow-red gradient
+        // Default gradient using theme semantic colors
         let range = self.max - self.min;
         if range <= 0.0 {
-            return Color::Green;
+            return self.theme.positive_color;
         }
         let fraction = ((val - self.min) / range).clamp(0.0, 1.0);
         if fraction < 0.33 {
-            Color::Green
+            self.theme.positive_color
         } else if fraction < 0.66 {
-            Color::Yellow
+            self.theme.highlight
         } else {
-            Color::Red
+            self.theme.negative_color
         }
     }
 }

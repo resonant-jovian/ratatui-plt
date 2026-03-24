@@ -32,6 +32,8 @@ fn main() -> color_eyre::Result<()> {
     enable_raw_mode()?;
     let mut terminal = Terminal::new(CrosstermBackend::new(io::stdout()))?;
 
+    let theme = Theme::get_default();
+    let mut cycle = theme.color_cycle.clone();
     let n = 500;
     let solar = Series::new("Solar")
         .data(
@@ -42,7 +44,7 @@ fn main() -> color_eyre::Result<()> {
                 })
                 .collect(),
         )
-        .color(Color::Yellow);
+        .color(cycle.next_color());
 
     let wind = Series::new("Wind")
         .data(
@@ -53,7 +55,7 @@ fn main() -> color_eyre::Result<()> {
                 })
                 .collect(),
         )
-        .color(Color::Cyan);
+        .color(cycle.next_color());
 
     let hydro = Series::new("Hydro")
         .data(
@@ -64,11 +66,11 @@ fn main() -> color_eyre::Result<()> {
                 })
                 .collect(),
         )
-        .color(Color::Blue);
+        .color(cycle.next_color());
 
     let nuclear = Series::new("Nuclear")
         .data((0..n).map(|i| (i as f64, 25.0)).collect())
-        .color(Color::Magenta);
+        .color(cycle.next_color());
 
     let plot = StackedArea::new()
         .series(solar)

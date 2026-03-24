@@ -27,6 +27,7 @@ use ratatui::widgets::Widget;
 
 use crate::annotation::Annotation;
 use crate::axis::Axis;
+use crate::chars::CharSet;
 use crate::frame::{DataBounds, PlotFrame, ReferenceLine};
 use crate::legend::{Legend, LegendPosition};
 use crate::plot_buffer::{PlotBuffer, Z_MARKER};
@@ -333,6 +334,7 @@ impl Widget for &JointPlot {
                 plot_origin: pa.x,
                 plot_extent: pa.width,
                 color: marginal_color,
+                chars: &self.theme.chars,
             };
             render_marginal_top(buf, top_area, &cfg);
         }
@@ -349,6 +351,7 @@ impl Widget for &JointPlot {
                 plot_origin: pa.y,
                 plot_extent: pa.height,
                 color: marginal_color,
+                chars: &self.theme.chars,
             };
             render_marginal_right(buf, right_area, &cfg);
         }
@@ -367,6 +370,7 @@ struct MarginalConfig<'a> {
     /// Screen extent of the aligned axis in the central plot.
     plot_extent: u16,
     color: Color,
+    chars: &'a CharSet,
 }
 
 /// Render the top marginal distribution.

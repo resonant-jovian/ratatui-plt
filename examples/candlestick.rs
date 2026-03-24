@@ -111,10 +111,12 @@ fn main() -> color_eyre::Result<()> {
         price = close;
     }
 
+    let theme = Theme::get_default();
+
     let chart = CandlestickChart::new()
         .candles(candles)
-        .bull_color(Color::Green)
-        .bear_color(Color::Red)
+        .bull_color(theme.positive_color)
+        .bear_color(theme.negative_color)
         .title("OHLC Price Action (q to quit)")
         .x_axis(Axis::new().label("Session").grid(true))
         .y_axis(

@@ -34,7 +34,7 @@ pub struct PieSlice {
     /// Numeric value (proportion is computed from sum of all slices).
     pub value: f64,
     /// Fill color for the slice.
-    pub color: Color,
+    pub color: Option<Color>,
     /// Explode offset as a fraction of the radius (0.0 = no offset).
     pub explode: f64,
 }
@@ -45,14 +45,14 @@ impl PieSlice {
         Self {
             label: label.into(),
             value,
-            color: Color::White,
+            color: None,
             explode: 0.0,
         }
     }
 
     /// Set the slice color.
     pub fn color(mut self, color: Color) -> Self {
-        self.color = color;
+        self.color = Some(color);
         self
     }
 
@@ -205,6 +205,14 @@ impl Widget for &PieChart {
             angle_start += sweep;
         }
 
+        // Pre-resolve slice colors
+        let slice_colors: Vec<Color> = self
+            .slices
+            .iter()
+            .enumerate()
+            .map(|(i, s)| s.color.unwrap_or_else(|| self.theme.color_cycle.at(i)))
+            .collect();
+
         // For each cell in the drawing area, determine which slice it belongs to
         for screen_y in py..py + ph {
             for screen_x in area.x..area.x + pw {
@@ -219,7 +227,7 @@ impl Widget for &PieChart {
                 }
 
                 // Find which slice this angle belongs to
-                for (slice, &(a_start, a_end)) in self.slices.iter().zip(angles.iter()) {
+                for (si, (slice, &(a_start, a_end))) in self.slices.iter().zip(angles.iter()).enumerate() {
                     // Handle exploded slices by shifting the centre
                     let (ecx, ecy) = if slice.explode > 0.0 {
                         let mid_angle = (a_start + a_end) / 2.0;
@@ -250,7 +258,8 @@ impl Widget for &PieChart {
                     }
 
                     if ea >= a_start && ea < a_end {
-                        pb.set_cell(screen_x, screen_y, '█', slice.color, slice.color, Z_DATA);
+                        let sc = slice_colors[si];
+                        pb.set_cell(screen_x, screen_y, '█', sc, sc, Z_DATA);
                         break;
                     }
                 }
@@ -342,7 +351,7 @@ impl Widget for &PieChart {
                     for (j, ch) in text.chars().enumerate() {
                         let x = xi + j as i32;
                         if x >= area.x as i32 && x < (area.x + area.width) as i32 {
-                            pb.set_char(x as u16, yi, ch, slice.color, Z_CHROME);
+                            pb.set_char(x as u16, yi, ch, slice_colors[i], Z_CHROME);
                         }
                     }
                 }

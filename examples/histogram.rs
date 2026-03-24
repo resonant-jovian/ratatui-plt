@@ -58,6 +58,9 @@ fn main() -> color_eyre::Result<()> {
     enable_raw_mode()?;
     let mut terminal = Terminal::new(CrosstermBackend::new(io::stdout()))?;
 
+    let theme = Theme::get_default();
+    let mut cycle = theme.color_cycle.clone();
+
     // Distribution A: centred at 0, moderate spread
     let dist_a = pseudo_normal(3000, 0.0, 3.0, 0.0);
     // Distribution B: centred at 2, narrower spread
@@ -67,12 +70,12 @@ fn main() -> color_eyre::Result<()> {
         .dataset(HistDataset::new(
             "Population A (n=3000)",
             dist_a,
-            Color::Cyan,
+            cycle.next_color(),
         ))
         .dataset(HistDataset::new(
             "Population B (n=2000)",
             dist_b,
-            Color::Magenta,
+            cycle.next_color(),
         ))
         .bins(35)
         .hist_mode(HistMode::Stacked)

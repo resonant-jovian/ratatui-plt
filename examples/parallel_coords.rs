@@ -70,6 +70,8 @@ fn generate_species(
 fn main() -> color_eyre::Result<()> {
     color_eyre::install()?;
     Theme::set_default(parse_theme());
+    let theme = Theme::get_default();
+    let mut cycle = theme.color_cycle.clone();
     io::stdout().execute(EnterAlternateScreen)?;
     enable_raw_mode()?;
     let mut terminal = Terminal::new(CrosstermBackend::new(io::stdout()))?;
@@ -93,7 +95,7 @@ fn main() -> color_eyre::Result<()> {
         15,
         [5.0, 3.4, 1.5, 0.25],
         [0.35, 0.35, 0.18, 0.10],
-        Color::Rgb(0, 255, 255), // bright cyan
+        cycle.next_color(),
         "Setosa",
     );
 
@@ -102,7 +104,7 @@ fn main() -> color_eyre::Result<()> {
         15,
         [5.9, 2.8, 4.3, 1.3],
         [0.50, 0.30, 0.45, 0.20],
-        Color::Rgb(255, 255, 0), // bright yellow
+        cycle.next_color(),
         "Versicolor",
     );
 
@@ -111,7 +113,7 @@ fn main() -> color_eyre::Result<()> {
         15,
         [6.6, 3.0, 5.6, 2.0],
         [0.60, 0.30, 0.50, 0.25],
-        Color::Rgb(255, 100, 255), // bright magenta
+        cycle.next_color(),
         "Virginica",
     );
 

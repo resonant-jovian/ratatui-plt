@@ -321,7 +321,7 @@ impl Widget for &HexbinPlot {
                     self.colormap.color_at(norm.normalize(val))
                 };
 
-                pb.set_cell(screen_x, screen_y, '▀', top_color, bot_color, Z_DATA);
+                pb.set_cell(screen_x, screen_y, self.theme.chars.fill.half_upper, top_color, bot_color, Z_DATA);
             }
         }
 

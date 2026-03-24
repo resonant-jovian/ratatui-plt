@@ -46,7 +46,7 @@ pub struct Band {
     pub y_upper: Vec<f64>,
     /// Band color (None = use theme primary).
     pub color: Option<Color>,
-    /// Fill character: '\u{2591}' (light), '\u{2592}' (medium), '\u{2593}' (dense).
+    /// Fill character: '░' (light), '▒' (medium), '▓' (dense).
     pub alpha_char: char,
 }
 
@@ -291,13 +291,13 @@ impl Widget for &BandPlot {
                                 }
                                 (true, false) => {
                                     // Top half only: '▀' fg=band_color, bg inherited
-                                    pb.set_char(screen_x, cell_y, '▀', band_color, Z_DATA);
+                                    pb.set_char(screen_x, cell_y, self.theme.chars.fill.half_upper, band_color, Z_DATA);
                                     // Also set bg so outermost edges have a color
                                     pb.set_bg(screen_x, cell_y, band_color, Z_FILL);
                                 }
                                 (false, true) => {
                                     // Bottom half only: '▄' fg=band_color, bg inherited
-                                    pb.set_char(screen_x, cell_y, '▄', band_color, Z_DATA);
+                                    pb.set_char(screen_x, cell_y, self.theme.chars.fill.half_lower, band_color, Z_DATA);
                                     pb.set_bg(screen_x, cell_y, band_color, Z_FILL);
                                 }
                                 (false, false) => {}
@@ -325,7 +325,7 @@ impl Widget for &BandPlot {
                 .map(|b| LegendEntry {
                     name: b.name.clone(),
                     color: b.color.unwrap_or(self.theme.primary),
-                    marker: Some('█'),
+                    marker: Some(self.theme.chars.fill.solid),
                 })
                 .collect();
             let legend = Legend::new(entries)

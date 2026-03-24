@@ -35,6 +35,7 @@ fn parse_theme() -> Theme {
 fn main() -> color_eyre::Result<()> {
     color_eyre::install()?;
     Theme::set_default(parse_theme());
+    let theme = Theme::get_default();
     io::stdout().execute(EnterAlternateScreen)?;
     enable_raw_mode()?;
     let mut terminal = Terminal::new(CrosstermBackend::new(io::stdout()))?;
@@ -52,7 +53,7 @@ fn main() -> color_eyre::Result<()> {
         .series(
             Series::new("Kinetic Energy")
                 .data(energy_data)
-                .color(Color::Cyan),
+                .color(theme.primary),
         )
         .title("Energy vs Time")
         .x_axis(Axis::new().label("t").grid(true))
@@ -60,12 +61,12 @@ fn main() -> color_eyre::Result<()> {
         .show_legend(true)
         .legend_position(LegendPosition::TopRight)
         .spines(Spines::new().top(false).right(false))
-        .reference_line(ReferenceLine::hline_dashed(0.5, Color::DarkGray))
-        .reference_line(ReferenceLine::hspan(0.0, 0.5, Color::Rgb(40, 20, 20)))
+        .reference_line(ReferenceLine::hline_dashed(0.5, theme.muted))
+        .reference_line(ReferenceLine::hspan(0.0, 0.5, theme.surface))
         .annotation(
             Annotation::new("equilibrium", 7.0, 1.5)
                 .arrow_to(8.0, 0.5)
-                .color(Color::Yellow),
+                .color(theme.highlight),
         );
 
     // --- Panel 2: Band plot for confidence intervals ---
@@ -96,12 +97,12 @@ fn main() -> color_eyre::Result<()> {
     let band_plot = BandPlot::new()
         .band(
             Band::new("95% CI", band_x.clone(), band_lower_95, band_upper_95)
-                .color(Color::Rgb(60, 60, 140))
+                .color(theme.color_cycle.at(0))
                 .alpha_char('\u{2591}'),
         )
         .band(
             Band::new("50% CI", band_x, band_lower_50, band_upper_50)
-                .color(Color::Rgb(80, 80, 200))
+                .color(theme.color_cycle.at(1))
                 .alpha_char('\u{2592}'),
         )
         .title("Prediction Interval")
@@ -110,7 +111,7 @@ fn main() -> color_eyre::Result<()> {
         .show_legend(true)
         .legend_position(LegendPosition::TopRight)
         .spines(Spines::new().top(false).right(false))
-        .reference_line(ReferenceLine::hline_dashed(0.0, Color::DarkGray));
+        .reference_line(ReferenceLine::hline_dashed(0.0, theme.muted));
 
     // --- Panel 3: Density heatmap ---
     let density = GridData::from_fn((-3.0, 3.0), (-3.0, 3.0), 300, 300, |x, y| {
@@ -158,11 +159,11 @@ fn main() -> color_eyre::Result<()> {
     };
 
     let ecdf_plot = EcdfPlot::new()
-        .dataset(EcdfDataset::new("Gaussian", gaussian_data, Color::Cyan))
+        .dataset(EcdfDataset::new("Gaussian", gaussian_data, theme.primary))
         .dataset(EcdfDataset::new(
             "Exponential",
             exponential_data,
-            Color::Yellow,
+            theme.secondary,
         ))
         .title("ECDF Comparison")
         .x_axis(Axis::new().label("Value").grid(true))
@@ -175,7 +176,7 @@ fn main() -> color_eyre::Result<()> {
         .show_legend(true)
         .legend_position(LegendPosition::BottomRight)
         .spines(Spines::new().top(false).right(false))
-        .reference_line(ReferenceLine::hline_dashed(0.5, Color::DarkGray));
+        .reference_line(ReferenceLine::hline_dashed(0.5, theme.muted));
 
     loop {
         terminal.draw(|frame| {

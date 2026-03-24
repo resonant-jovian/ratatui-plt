@@ -43,6 +43,7 @@
 pub mod annotation;
 pub mod axis;
 pub mod brushing;
+pub mod chars;
 pub mod collections;
 pub mod color_cycle;
 pub mod colormap;

@@ -32,12 +32,14 @@ fn main() -> color_eyre::Result<()> {
     enable_raw_mode()?;
     let mut terminal = Terminal::new(CrosstermBackend::new(io::stdout()))?;
 
+    let theme = Theme::get_default();
+
     let gauge = GaugeChart::new(72.0)
         .min(0.0)
         .max(100.0)
-        .sector(GaugeSector::new(0.0, 40.0, Color::Green))
-        .sector(GaugeSector::new(40.0, 70.0, Color::Yellow))
-        .sector(GaugeSector::new(70.0, 100.0, Color::Red))
+        .sector(GaugeSector::new(0.0, 40.0, theme.positive_color))
+        .sector(GaugeSector::new(40.0, 70.0, theme.highlight))
+        .sector(GaugeSector::new(70.0, 100.0, theme.negative_color))
         .title("CPU Usage (q to quit)");
 
     loop {

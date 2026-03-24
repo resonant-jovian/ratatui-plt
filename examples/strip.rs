@@ -65,15 +65,17 @@ fn main() -> color_eyre::Result<()> {
     //   B cells:        low expression (center 2.0, tight)
     //   Monocytes:      bimodal - some activated, some off (center 3.5, wide)
     //   Macrophages:    very low / off (center 0.8, wide due to noise)
-    let t_cells = StripGroup::new("T cells", lcg_data(42, 100, 8.5, 2.5), Color::Cyan);
-    let nk_cells = StripGroup::new("NK cells", lcg_data(137, 80, 5.0, 1.8), Color::Green);
-    let b_cells = StripGroup::new("B cells", lcg_data(271, 90, 2.0, 1.2), Color::Yellow);
+    let theme = Theme::get_default();
+    let mut cycle = theme.color_cycle.clone();
+    let t_cells = StripGroup::new("T cells", lcg_data(42, 100, 8.5, 2.5), cycle.next_color());
+    let nk_cells = StripGroup::new("NK cells", lcg_data(137, 80, 5.0, 1.8), cycle.next_color());
+    let b_cells = StripGroup::new("B cells", lcg_data(271, 90, 2.0, 1.2), cycle.next_color());
     let monocytes = StripGroup::new(
         "Monocytes",
         lcg_data(503, 70, 3.5, 3.0),
-        Color::Rgb(255, 140, 0),
+        cycle.next_color(),
     );
-    let macrophages = StripGroup::new("Macrophages", lcg_data(999, 60, 0.8, 2.0), Color::Magenta);
+    let macrophages = StripGroup::new("Macrophages", lcg_data(999, 60, 0.8, 2.0), cycle.next_color());
 
     let plot = StripPlot::new()
         .group(t_cells)
@@ -90,7 +92,7 @@ fn main() -> color_eyre::Result<()> {
                 .grid(true),
         )
         .spines(Spines::new().top(false).right(false))
-        .reference_line(ReferenceLine::hline_dashed(5.0, Color::DarkGray));
+        .reference_line(ReferenceLine::hline_dashed(5.0, theme.muted));
 
     loop {
         terminal.draw(|frame| {

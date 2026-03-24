@@ -34,6 +34,8 @@ fn parse_theme() -> Theme {
 fn main() -> color_eyre::Result<()> {
     color_eyre::install()?;
     Theme::set_default(parse_theme());
+    let theme = Theme::get_default();
+    let mut cycle = theme.color_cycle.clone();
     io::stdout().execute(EnterAlternateScreen)?;
     enable_raw_mode()?;
     let mut terminal = Terminal::new(CrosstermBackend::new(io::stdout()))?;
@@ -51,9 +53,10 @@ fn main() -> color_eyre::Result<()> {
         .map(|i| 0.1 + 0.05 * (i as f64 * 0.05).abs().sin())
         .collect();
 
+    let c1 = cycle.next_color();
     let sin_series = Series::new("sin(x)")
         .data(sin_data)
-        .color(Color::Cyan)
+        .color(c1)
         .y_err(sin_err);
 
     // Step-pre cos(x) - sampled at fewer points for visible steps
@@ -65,9 +68,10 @@ fn main() -> color_eyre::Result<()> {
         })
         .collect();
 
+    let c2 = cycle.next_color();
     let cos_series = Series::new("cos(x) [step-pre]")
         .data(cos_step_data)
-        .color(Color::Yellow)
+        .color(c2)
         .marker(MarkerShape::Diamond);
 
     // Step-post tan(x) clipped to [-2, 2] - sampled at fewer points
@@ -79,9 +83,10 @@ fn main() -> color_eyre::Result<()> {
         })
         .collect();
 
+    let c3 = cycle.next_color();
     let tan_series = Series::new("tan(x) clipped [step-post]")
         .data(tan_step_data)
-        .color(Color::Magenta)
+        .color(c3)
         .marker(MarkerShape::Triangle);
 
     // Custom dash pattern: x^0.5 with a long-short-short dash
@@ -92,9 +97,10 @@ fn main() -> color_eyre::Result<()> {
         })
         .collect();
 
+    let c4 = cycle.next_color();
     let sqrt_series = Series::new("\u{221a}x [custom dash]")
         .data(sqrt_data)
-        .color(Color::Green)
+        .color(c4)
         .line_style(LineStyle {
             pattern: DashPattern::Custom(vec![10, 4, 3, 4]),
             thickness: ratatui_plt::style::Thickness::Normal,
@@ -115,16 +121,16 @@ fn main() -> color_eyre::Result<()> {
         .show_legend(true)
         .legend_position(LegendPosition::TopRight)
         .step_mode(StepMode::None)
-        .reference_line(ReferenceLine::hline_dashed(0.0, Color::DarkGray))
+        .reference_line(ReferenceLine::hline_dashed(0.0, theme.muted))
         .annotation(
             Annotation::new("sin peak", peak_x + 0.5, peak_y + 0.3)
                 .arrow_to(peak_x, peak_y)
-                .color(Color::Cyan),
+                .color(c1),
         )
         .annotation(
             Annotation::new("cos=0", std::f64::consts::FRAC_PI_2 + 0.5, -0.4)
                 .arrow_to(std::f64::consts::FRAC_PI_2, 0.0)
-                .color(Color::Yellow),
+                .color(c2),
         );
 
     // Also create step-pre and step-post variants for a split layout
@@ -134,7 +140,7 @@ fn main() -> color_eyre::Result<()> {
         .x_axis(Axis::new().label("x").grid(true))
         .y_axis(Axis::new().label("y"))
         .step_mode(StepMode::Pre)
-        .reference_line(ReferenceLine::hline_dashed(0.0, Color::DarkGray))
+        .reference_line(ReferenceLine::hline_dashed(0.0, theme.muted))
         .show_legend(true);
 
     let plot_step_post = LinePlot::new()
@@ -143,7 +149,7 @@ fn main() -> color_eyre::Result<()> {
         .x_axis(Axis::new().label("x").grid(true))
         .y_axis(Axis::new().label("y"))
         .step_mode(StepMode::Post)
-        .reference_line(ReferenceLine::hline_dashed(0.0, Color::DarkGray))
+        .reference_line(ReferenceLine::hline_dashed(0.0, theme.muted))
         .show_legend(true);
 
     loop {

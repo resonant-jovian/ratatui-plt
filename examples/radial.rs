@@ -33,6 +33,8 @@ fn parse_theme() -> Theme {
 fn main() -> color_eyre::Result<()> {
     color_eyre::install()?;
     Theme::set_default(parse_theme());
+    let theme = Theme::get_default();
+    let mut cycle = theme.color_cycle.clone();
     io::stdout().execute(EnterAlternateScreen)?;
     enable_raw_mode()?;
     let mut terminal = Terminal::new(CrosstermBackend::new(io::stdout()))?;
@@ -51,7 +53,7 @@ fn main() -> color_eyre::Result<()> {
         .series(
             Series::new("Cardioid: r=1+cos(\u{03b8})")
                 .data(cardioid)
-                .color(Color::Rgb(0, 255, 255)), // bright cyan
+                .color(cycle.next_color()),
         )
         .title("Line (CCW)")
         .plot_type(PolarPlotType::Line)
@@ -71,7 +73,7 @@ fn main() -> color_eyre::Result<()> {
         .series(
             Series::new("Rose: r=|cos(3\u{03b8})|")
                 .data(rose)
-                .color(Color::Rgb(255, 255, 0)) // bright yellow
+                .color(cycle.next_color())
                 .marker(MarkerShape::Diamond),
         )
         .title("Scatter (CW, N=0)")
@@ -94,7 +96,7 @@ fn main() -> color_eyre::Result<()> {
         .series(
             Series::new("Wind speed")
                 .data(wind_data)
-                .color(Color::Rgb(0, 255, 100)), // bright green
+                .color(cycle.next_color()),
         )
         .title("Bar (CW compass)")
         .plot_type(PolarPlotType::Bar)
@@ -115,7 +117,7 @@ fn main() -> color_eyre::Result<()> {
         .series(
             Series::new("r=1+0.3sin(5\u{03b8})")
                 .data(fill_data)
-                .color(Color::Rgb(255, 100, 255)), // bright magenta
+                .color(cycle.next_color()),
         )
         .title("FillBetween (r_min=0.5)")
         .plot_type(PolarPlotType::FillBetween)

@@ -81,8 +81,7 @@ impl TimeSeries {
 
 /// Convert a f64 (seconds since epoch) back to DateTime<Utc>.
 fn epoch_to_datetime(secs: f64) -> DateTime<Utc> {
-    DateTime::from_timestamp(secs as i64, 0)
-        .unwrap_or_else(|| DateTime::from_timestamp(0, 0).unwrap())
+    DateTime::from_timestamp(secs as i64, 0).unwrap_or(DateTime::UNIX_EPOCH)
 }
 
 /// Date/time tick resolution.

@@ -32,32 +32,35 @@ fn main() -> color_eyre::Result<()> {
     enable_raw_mode()?;
     let mut terminal = Terminal::new(CrosstermBackend::new(io::stdout()))?;
 
+    let theme = Theme::get_default();
+    let mut cycle = theme.color_cycle.clone();
+
     let chart = GanttChart::new()
         .task(
             GanttTask::new("Research")
                 .segment(0.0, 3.0)
-                .color(Color::Cyan),
+                .color(cycle.next_color()),
         )
         .task(
             GanttTask::new("Design")
                 .segment(2.0, 4.0)
-                .color(Color::Blue),
+                .color(cycle.next_color()),
         )
         .task(
             GanttTask::new("Develop")
                 .segment(5.0, 6.0)
                 .segment(12.0, 2.0)
-                .color(Color::Green),
+                .color(cycle.next_color()),
         )
         .task(
             GanttTask::new("Testing")
                 .segment(10.0, 3.0)
-                .color(Color::Yellow),
+                .color(cycle.next_color()),
         )
         .task(
             GanttTask::new("Deploy")
                 .segment(13.0, 1.0)
-                .color(Color::Magenta),
+                .color(cycle.next_color()),
         )
         .show_grid(true)
         .title("Project Timeline (q to quit)");

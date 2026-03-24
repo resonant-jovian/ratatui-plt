@@ -70,22 +70,25 @@ fn main() -> color_eyre::Result<()> {
     enable_raw_mode()?;
     let mut terminal = Terminal::new(CrosstermBackend::new(io::stdout()))?;
 
+    let theme = Theme::get_default();
+    let mut cycle = theme.color_cycle.clone();
+
     // Sandy Loam: high sand (a), moderate silt (b), low clay (c)
     let sandy_loam = TernaryData::new("Sandy Loam")
         .points(generate_cluster((0.70, 0.18, 0.12), 10, 0.20, 42))
-        .color(Color::Yellow)
+        .color(cycle.next_color())
         .marker(MarkerShape::FilledCircle);
 
     // Clay: low sand (a), low silt (b), high clay (c)
     let clay = TernaryData::new("Clay")
         .points(generate_cluster((0.12, 0.15, 0.73), 10, 0.18, 137))
-        .color(Color::Red)
+        .color(cycle.next_color())
         .marker(MarkerShape::Triangle);
 
     // Silt Loam: low sand (a), high silt (b), moderate clay (c)
     let silt_loam = TernaryData::new("Silt Loam")
         .points(generate_cluster((0.15, 0.68, 0.17), 10, 0.18, 256))
-        .color(Color::Cyan)
+        .color(cycle.next_color())
         .marker(MarkerShape::Diamond);
 
     let plot = TernaryPlot::new()

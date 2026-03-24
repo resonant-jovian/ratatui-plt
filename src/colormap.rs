@@ -29,6 +29,15 @@ pub trait Colormap: Send + Sync {
     fn name(&self) -> &str;
 }
 
+impl Colormap for Box<dyn Colormap> {
+    fn color_at(&self, t: f64) -> Color {
+        (**self).color_at(t)
+    }
+    fn name(&self) -> &str {
+        (**self).name()
+    }
+}
+
 /// Interpolate between RGB color stops.
 fn lerp_color_stops(t: f64, stops: &[(f64, (u8, u8, u8))]) -> Color {
     let t = t.clamp(0.0, 1.0);
@@ -349,6 +358,54 @@ impl Colormap for Hot {
 }
 
 /// User-defined colormap from a list of color stops.
+/// Cubehelix: perceptually monotonic spiral through color space (black → purple → teal → green → white).
+///
+/// Based on Green (2011), this colormap spirals through RGB while keeping perceived
+/// brightness monotonically increasing. Excellent for scientific data where grayscale
+/// printing must also work.
+#[derive(Clone, Copy, Debug)]
+pub struct Cubehelix;
+
+impl Colormap for Cubehelix {
+    fn color_at(&self, t: f64) -> Color {
+        let t = t.clamp(0.0, 1.0);
+        // 9-stop approximation of the default cubehelix (start=0.5, rotations=-1.5, hue=1.0)
+        const STOPS: [(f64, u8, u8, u8); 9] = [
+            (0.000, 0, 0, 0),
+            (0.125, 22, 17, 42),
+            (0.250, 15, 56, 62),
+            (0.375, 28, 98, 47),
+            (0.500, 87, 117, 58),
+            (0.625, 168, 115, 103),
+            (0.750, 196, 130, 182),
+            (0.875, 199, 180, 238),
+            (1.000, 255, 255, 255),
+        ];
+        // Find surrounding stops and interpolate
+        let mut lo = 0;
+        for (i, stop) in STOPS.iter().enumerate().skip(1) {
+            if stop.0 >= t {
+                lo = i - 1;
+                break;
+            }
+            lo = i;
+        }
+        let hi = (lo + 1).min(STOPS.len() - 1);
+        let (t0, r0, g0, b0) = STOPS[lo];
+        let (t1, r1, g1, b1) = STOPS[hi];
+        let frac = if (t1 - t0).abs() < 1e-12 {
+            0.0
+        } else {
+            (t - t0) / (t1 - t0)
+        };
+        let lerp = |a: u8, b: u8| -> u8 { (a as f64 + (b as f64 - a as f64) * frac) as u8 };
+        Color::Rgb(lerp(r0, r1), lerp(g0, g1), lerp(b0, b1))
+    }
+    fn name(&self) -> &str {
+        "cubehelix"
+    }
+}
+
 ///
 /// # Example
 ///
@@ -1109,8 +1166,22 @@ pub fn get_colormap(name: &str) -> Option<Box<dyn Colormap>> {
         "pastel2" => Some(Box::new(Pastel2)),
         "accent" => Some(Box::new(Accent)),
         "dark2" => Some(Box::new(Dark2)),
+        // Spiral
+        "cubehelix" => Some(Box::new(Cubehelix)),
         _ => None,
     }
+}
+
+/// All available named colormaps in the registry.
+pub fn colormap_names() -> &'static [&'static str] {
+    &[
+        "viridis", "plasma", "inferno", "magma", "cividis", "hot", "spring", "summer", "autumn",
+        "winter", "blues", "greens", "reds", "oranges", "purples", "greys", "ylorbr", "ylorrd",
+        "orrd", "purd", "rdpu", "bupu", "gnbu", "pubu", "ylgnbu", "pubugn", "bugn", "ylgn",
+        "coolwarm", "rdbu", "seismic", "piyg", "prgn", "brbg", "puor", "rdgy", "rdylbu",
+        "rdylgn", "spectral", "twilight", "hsv", "jet", "turbo", "tab20", "tab20b", "tab20c",
+        "paired", "set1", "set2", "set3", "pastel1", "pastel2", "accent", "dark2", "cubehelix",
+    ]
 }
 
 /// Controls how out-of-range values are displayed on the colorbar.
