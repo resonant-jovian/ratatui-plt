@@ -84,13 +84,7 @@ fn main() -> color_eyre::Result<()> {
 
     // Scatter series for raw data
     let scatter = Series::new("Data")
-        .data(
-            x_data
-                .iter()
-                .copied()
-                .zip(y_data.iter().copied())
-                .collect(),
-        )
+        .data(x_data.iter().copied().zip(y_data.iter().copied()).collect())
         .color(Color::White)
         .marker(MarkerShape::Circle);
 
@@ -188,7 +182,12 @@ fn main() -> color_eyre::Result<()> {
         .series(kde_series)
         .title("KDE of y-values")
         .x_axis(Axis::new().label("y").grid(true))
-        .y_axis(Axis::new().label("Density").grid(true))
+        .y_axis(
+            Axis::new()
+                .label("Density")
+                .label_position(LabelPosition::End)
+                .grid(true),
+        )
         .show_legend(true);
 
     loop {

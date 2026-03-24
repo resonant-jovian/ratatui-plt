@@ -107,6 +107,7 @@ fn main() -> color_eyre::Result<()> {
         .y_axis(
             Axis::new()
                 .label("Density")
+                .label_position(LabelPosition::End)
                 .bounds(Bounds::Manual(y_lo, y_hi))
                 .grid(true),
         );

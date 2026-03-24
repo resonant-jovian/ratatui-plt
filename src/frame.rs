@@ -160,27 +160,55 @@ pub enum BorderStyle {
 impl BorderStyle {
     /// Top-left corner character.
     pub fn top_left(&self) -> char {
-        match self { Self::Single => '┌', Self::Rounded => '╭', Self::Double => '╔', Self::None => ' ' }
+        match self {
+            Self::Single => '┌',
+            Self::Rounded => '╭',
+            Self::Double => '╔',
+            Self::None => ' ',
+        }
     }
     /// Top-right corner character.
     pub fn top_right(&self) -> char {
-        match self { Self::Single => '┐', Self::Rounded => '╮', Self::Double => '╗', Self::None => ' ' }
+        match self {
+            Self::Single => '┐',
+            Self::Rounded => '╮',
+            Self::Double => '╗',
+            Self::None => ' ',
+        }
     }
     /// Bottom-left corner character.
     pub fn bottom_left(&self) -> char {
-        match self { Self::Single => '└', Self::Rounded => '╰', Self::Double => '╚', Self::None => ' ' }
+        match self {
+            Self::Single => '└',
+            Self::Rounded => '╰',
+            Self::Double => '╚',
+            Self::None => ' ',
+        }
     }
     /// Bottom-right corner character.
     pub fn bottom_right(&self) -> char {
-        match self { Self::Single => '┘', Self::Rounded => '╯', Self::Double => '╝', Self::None => ' ' }
+        match self {
+            Self::Single => '┘',
+            Self::Rounded => '╯',
+            Self::Double => '╝',
+            Self::None => ' ',
+        }
     }
     /// Horizontal line character.
     pub fn horizontal(&self) -> char {
-        match self { Self::Single | Self::Rounded => '─', Self::Double => '═', Self::None => ' ' }
+        match self {
+            Self::Single | Self::Rounded => '─',
+            Self::Double => '═',
+            Self::None => ' ',
+        }
     }
     /// Vertical line character.
     pub fn vertical(&self) -> char {
-        match self { Self::Single | Self::Rounded => '│', Self::Double => '║', Self::None => ' ' }
+        match self {
+            Self::Single | Self::Rounded => '│',
+            Self::Double => '║',
+            Self::None => ' ',
+        }
     }
 }
 
@@ -638,7 +666,11 @@ impl<'a> PlotFrame<'a> {
                 let xi = sx.round() as u16;
                 if xi >= px && xi < px + aw {
                     for y in py..py + ah {
-                        let ch = if buf[(xi, y)].symbol() == "─" { '┼' } else { '│' };
+                        let ch = if buf[(xi, y)].symbol() == "─" {
+                            '┼'
+                        } else {
+                            '│'
+                        };
                         buf[(xi, y)].set_char(ch).set_fg(self.theme.grid_color);
                     }
                 }
@@ -805,8 +837,10 @@ impl<'a> PlotFrame<'a> {
                                 buf[(label_x, y)].set_char('│').set_fg(fg);
                             }
                             if label_x + 1 < area.x + area.width {
-                                buf[(label_x + 1, y)].set_char(ch).set_fg(fg)
-                                    .set_style(ratatui::style::Style::default().add_modifier(ratatui::style::Modifier::BOLD));
+                                buf[(label_x + 1, y)].set_char(ch).set_fg(fg).set_style(
+                                    ratatui::style::Style::default()
+                                        .add_modifier(ratatui::style::Modifier::BOLD),
+                                );
                             }
                             if label_x + 2 < area.x + area.width {
                                 buf[(label_x + 2, y)].set_char('│').set_fg(fg);
@@ -873,7 +907,9 @@ impl<'a> PlotFrame<'a> {
                 }
             }
             if x + box_w - 1 < max_x {
-                buf[(x + box_w - 1, top_y)].set_char('┐').set_fg(border_color);
+                buf[(x + box_w - 1, top_y)]
+                    .set_char('┐')
+                    .set_fg(border_color);
             }
         }
 
@@ -888,10 +924,10 @@ impl<'a> PlotFrame<'a> {
             for (i, ch) in label.chars().enumerate() {
                 let cx = x + 2 + i as u16;
                 if cx < max_x {
-                    buf[(cx, y)]
-                        .set_char(ch)
-                        .set_fg(fg)
-                        .set_style(ratatui::style::Style::default().add_modifier(ratatui::style::Modifier::BOLD));
+                    buf[(cx, y)].set_char(ch).set_fg(fg).set_style(
+                        ratatui::style::Style::default()
+                            .add_modifier(ratatui::style::Modifier::BOLD),
+                    );
                 }
             }
             if x + label_len + 2 < max_x {
@@ -913,7 +949,9 @@ impl<'a> PlotFrame<'a> {
                 }
             }
             if x + box_w - 1 < max_x {
-                buf[(x + box_w - 1, bot_y)].set_char('┘').set_fg(border_color);
+                buf[(x + box_w - 1, bot_y)]
+                    .set_char('┘')
+                    .set_fg(border_color);
             }
         }
     }
@@ -997,10 +1035,7 @@ impl<'a> PlotFrame<'a> {
                     let bot = sy1.max(sy2).min(py + ah);
                     for y in top..bot {
                         for x in px..px + aw {
-                            buf[(x, y)]
-                                .set_char('░')
-                                .set_fg(*color)
-                                .set_bg(*color);
+                            buf[(x, y)].set_char('░').set_fg(*color).set_bg(*color);
                         }
                     }
                 }
@@ -1029,10 +1064,7 @@ impl<'a> PlotFrame<'a> {
                     };
                     for x in left..right {
                         for y in y_top..y_bottom {
-                            buf[(x, y)]
-                                .set_char('░')
-                                .set_fg(*color)
-                                .set_bg(*color);
+                            buf[(x, y)].set_char('░').set_fg(*color).set_bg(*color);
                         }
                     }
                 }
@@ -1283,7 +1315,11 @@ impl<'a> PlotFrame<'a> {
                 let xi = sx.round() as u16;
                 if xi >= px && xi < px + aw {
                     for y in py..py + ah {
-                        let ch = if h_grid_rows.contains(&y) { '┼' } else { '│' };
+                        let ch = if h_grid_rows.contains(&y) {
+                            '┼'
+                        } else {
+                            '│'
+                        };
                         pb.set_char(xi, y, ch, self.theme.grid_color, Z_GRID);
                     }
                 }
@@ -1398,7 +1434,15 @@ impl<'a> PlotFrame<'a> {
     ///
     /// This is the Z-buffered counterpart of [`PlotFrame::draw_annotations`].
     /// Draw the x-axis label to PlotBuffer.
-    fn draw_x_label_pb(&self, _pb: &mut PlotBuffer, _area: Rect, _px: u16, _py: u16, _aw: u16, _ah: u16) {
+    fn draw_x_label_pb(
+        &self,
+        _pb: &mut PlotBuffer,
+        _area: Rect,
+        _px: u16,
+        _py: u16,
+        _aw: u16,
+        _ah: u16,
+    ) {
         // All x-axis labels are rendered after composite via draw_end_labels()
         // for bold support and to avoid PB bounds clipping.
     }
@@ -1484,7 +1528,6 @@ impl<'a> PlotFrame<'a> {
     fn draw_y_label_pb(&self, _pb: &mut PlotBuffer, _area: Rect, _py: u16, _ah: u16) {
         // All y-axis labels are rendered after composite via draw_end_labels()
     }
-
 
     pub fn draw_annotations_pb(pa: &PlotArea, annotations: &[Annotation], pb: &mut PlotBuffer) {
         for ann in annotations {
@@ -1584,12 +1627,10 @@ impl<'a> PlotFrame<'a> {
                     let right = sx1.max(sx2).min(px + aw);
                     // Determine vertical extent: use bounded Y range if provided
                     let (y_top, y_bottom) = if let (Some(yl), Some(yh)) = (span_y_lo, span_y_hi) {
-                        let sy_lo =
-                            data_to_screen(*yl, y_lo, y_hi, (py + ah - 1) as f64, py as f64)
-                                .round() as u16;
-                        let sy_hi =
-                            data_to_screen(*yh, y_lo, y_hi, (py + ah - 1) as f64, py as f64)
-                                .round() as u16;
+                        let sy_lo = data_to_screen(*yl, y_lo, y_hi, (py + ah - 1) as f64, py as f64)
+                            .round() as u16;
+                        let sy_hi = data_to_screen(*yh, y_lo, y_hi, (py + ah - 1) as f64, py as f64)
+                            .round() as u16;
                         (sy_hi.min(sy_lo).max(py), sy_hi.max(sy_lo).min(py + ah))
                     } else {
                         (py, py + ah)

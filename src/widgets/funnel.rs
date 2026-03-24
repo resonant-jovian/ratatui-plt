@@ -178,11 +178,7 @@ impl Widget for &FunnelChart {
         }
 
         // Compute max value
-        let max_value = self
-            .entries
-            .iter()
-            .map(|e| e.value)
-            .fold(0.0f64, f64::max);
+        let max_value = self.entries.iter().map(|e| e.value).fold(0.0f64, f64::max);
         if max_value <= 0.0 {
             return;
         }
@@ -201,8 +197,7 @@ impl Widget for &FunnelChart {
             let bar_center_y = row_y + entry_height / 2;
 
             // Compute bar width proportional to value
-            let bar_width =
-                ((entry.value / max_value) * bar_area_w as f64).round() as u16;
+            let bar_width = ((entry.value / max_value) * bar_area_w as f64).round() as u16;
             let bar_width = bar_width.max(1).min(bar_area_w);
 
             // Center horizontally within bar area

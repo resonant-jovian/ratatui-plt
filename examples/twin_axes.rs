@@ -61,8 +61,16 @@ fn main() -> color_eyre::Result<()> {
         .primary(temp)
         .secondary(humidity)
         .x_axis(Axis::new().label("Hour"))
-        .primary_y_axis(Axis::new().label("Temperature (\u{00b0}C)"))
-        .secondary_y_axis(Axis::new().label("Humidity (%)"))
+        .primary_y_axis(
+            Axis::new()
+                .label("Temperature (\u{00b0}C)")
+                .label_position(LabelPosition::End),
+        )
+        .secondary_y_axis(
+            Axis::new()
+                .label("Humidity (%)")
+                .label_position(LabelPosition::End),
+        )
         .title("24h Weather: Temperature & Humidity (q to quit)");
 
     loop {

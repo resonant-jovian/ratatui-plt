@@ -43,7 +43,9 @@ fn main() -> color_eyre::Result<()> {
         vec![0.0, 3.0, 42.0, 5.0],
         vec![1.0, 0.0, 6.0, 48.0],
     ];
-    let confusion_plot = matshow(confusion).title("Confusion Matrix").colormap(Viridis);
+    let confusion_plot = matshow(confusion)
+        .title("Confusion Matrix")
+        .colormap(Viridis);
 
     // Panel 2: 2D Gaussian as scalar image with bilinear interpolation
     let size = 64;

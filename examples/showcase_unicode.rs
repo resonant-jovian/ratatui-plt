@@ -115,9 +115,8 @@ fn main() -> color_eyre::Result<()> {
             .marker(*shape);
         marker_plot = marker_plot.series(series);
         // Add label annotation below each marker
-        marker_plot = marker_plot.annotation(
-            Annotation::new(*name, col, 2.0 - row - 0.3).color(Color::DarkGray),
-        );
+        marker_plot = marker_plot
+            .annotation(Annotation::new(*name, col, 2.0 - row - 0.3).color(Color::DarkGray));
     }
 
     // ---- Panel B: Arrow Styles — four ArrowCharSet variants ----
@@ -131,8 +130,7 @@ fn main() -> color_eyre::Result<()> {
     // Build 4 separate VectorField plots; we'll composite them in the mosaic panel
     let mut arrow_fields = Vec::new();
     for (char_set, label) in &arrow_styles {
-        let field =
-            VectorFieldData::from_fn((-2.0, 2.0), (-2.0, 2.0), 6, 6, |x, y| (-y, x));
+        let field = VectorFieldData::from_fn((-2.0, 2.0), (-2.0, 2.0), 6, 6, |x, y| (-y, x));
         let plot = VectorField::new(field)
             .title(format!("B: Arrows ({label})"))
             .color_by_magnitude(true)
@@ -167,7 +165,7 @@ fn main() -> color_eyre::Result<()> {
         .bins(30)
         .title("D: Histogram (eighth-block precision)")
         .x_axis(Axis::new().label("Value").grid(true))
-        .y_axis(Axis::new().label("Count").grid(true))
+        .y_axis(Axis::new().label("Count").label_position(LabelPosition::End).grid(true))
         .show_legend(false);
 
     // ---- Panel E: Enclosed Numbers — annotations with circled digits ----
@@ -189,9 +187,8 @@ fn main() -> color_eyre::Result<()> {
         .show_legend(false);
 
     for (i, &(x, y)) in scatter_pts.iter().enumerate() {
-        enc_plot = enc_plot.annotation(
-            Annotation::new(enclosed_number(i + 1), x + 0.3, y + 0.3).color(blue_mid),
-        );
+        enc_plot = enc_plot
+            .annotation(Annotation::new(enclosed_number(i + 1), x + 0.3, y + 0.3).color(blue_mid));
     }
 
     // ---- Assemble 2x3 mosaic: "ABC\nDEF" ----
@@ -291,8 +288,7 @@ fn main() -> color_eyre::Result<()> {
             // We render directly into the buffer since this is a custom demo.
             let theme = Theme::get_default();
             let title = "F: Fill Levels (V + H)";
-            let title_start =
-                area.x + area.width.saturating_sub(title.len() as u16) / 2;
+            let title_start = area.x + area.width.saturating_sub(title.len() as u16) / 2;
             for (i, ch) in title.chars().enumerate() {
                 let x = title_start + i as u16;
                 if x < area.x + area.width {

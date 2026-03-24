@@ -51,7 +51,11 @@ fn main() -> color_eyre::Result<()> {
         .marker(MarkerShape::FilledCircle)
         .title("Discrete Event Sequence (150 events)")
         .x_axis(Axis::new().label("time"))
-        .y_axis(Axis::new().label("amplitude"));
+        .y_axis(
+            Axis::new()
+                .label("amplitude")
+                .label_position(LabelPosition::End),
+        );
 
     loop {
         terminal.draw(|frame| {

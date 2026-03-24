@@ -288,21 +288,48 @@ impl Widget for &TernaryPlot {
                 let (x1, y1) = ternary_to_cartesian(0.0, 1.0 - frac, frac);
                 let (sx0, sy0) = to_screen(x0, y0);
                 let (sx1, sy1) = to_screen(x1, y1);
-                draw_screen_line_pb(&mut pb, sx0, sy0, sx1, sy1, self.theme.grid_color, Z_GRID, &clip);
+                draw_screen_line_pb(
+                    &mut pb,
+                    sx0,
+                    sy0,
+                    sx1,
+                    sy1,
+                    self.theme.grid_color,
+                    Z_GRID,
+                    &clip,
+                );
 
                 // Lines parallel to left edge (constant b)
                 let (x0, y0) = ternary_to_cartesian(1.0 - frac, frac, 0.0);
                 let (x1, y1) = ternary_to_cartesian(0.0, frac, 1.0 - frac);
                 let (sx0, sy0) = to_screen(x0, y0);
                 let (sx1, sy1) = to_screen(x1, y1);
-                draw_screen_line_pb(&mut pb, sx0, sy0, sx1, sy1, self.theme.grid_color, Z_GRID, &clip);
+                draw_screen_line_pb(
+                    &mut pb,
+                    sx0,
+                    sy0,
+                    sx1,
+                    sy1,
+                    self.theme.grid_color,
+                    Z_GRID,
+                    &clip,
+                );
 
                 // Lines parallel to right edge (constant a)
                 let (x0, y0) = ternary_to_cartesian(frac, 1.0 - frac, 0.0);
                 let (x1, y1) = ternary_to_cartesian(frac, 0.0, 1.0 - frac);
                 let (sx0, sy0) = to_screen(x0, y0);
                 let (sx1, sy1) = to_screen(x1, y1);
-                draw_screen_line_pb(&mut pb, sx0, sy0, sx1, sy1, self.theme.grid_color, Z_GRID, &clip);
+                draw_screen_line_pb(
+                    &mut pb,
+                    sx0,
+                    sy0,
+                    sx1,
+                    sy1,
+                    self.theme.grid_color,
+                    Z_GRID,
+                    &clip,
+                );
             }
         }
 

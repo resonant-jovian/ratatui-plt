@@ -483,7 +483,13 @@ impl Widget for &ViolinPlot {
                             for dx in 0..=box_half {
                                 let positions = inner_positions(center_x, dx, side, &pa);
                                 for sx in positions {
-                                    pb.set_char(sx, sy_median, '━', self.theme.foreground, Z_MARKER);
+                                    pb.set_char(
+                                        sx,
+                                        sy_median,
+                                        '━',
+                                        self.theme.foreground,
+                                        Z_MARKER,
+                                    );
                                 }
                             }
                         }

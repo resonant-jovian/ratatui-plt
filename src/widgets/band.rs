@@ -284,7 +284,9 @@ impl Widget for &BandPlot {
                             match (top_in, bot_in) {
                                 (true, true) => {
                                     // Both halves: fully opaque
-                                    pb.set_cell(screen_x, cell_y, ' ', band.color, band.color, Z_DATA);
+                                    pb.set_cell(
+                                        screen_x, cell_y, ' ', band.color, band.color, Z_DATA,
+                                    );
                                 }
                                 (true, false) => {
                                     // Top half only: '▀' fg=band_color, bg inherited
@@ -303,7 +305,6 @@ impl Widget for &BandPlot {
                     }
                 }
             }
-
         }
 
         // Draw annotations
@@ -401,4 +402,3 @@ fn interpolate_at(xs: &[f64], ys: &[f64], x: f64) -> Option<f64> {
     let t = (x - x0) / (x1 - x0);
     Some(y0 + t * (y1 - y0))
 }
-

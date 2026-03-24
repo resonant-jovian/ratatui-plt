@@ -24,7 +24,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .series(series)
         .title("Sixel Export Demo")
         .x_axis(Axis::new().label("x"))
-        .y_axis(Axis::new().label("cos(x)"));
+        .y_axis(
+            Axis::new()
+                .label("cos(x)")
+                .label_position(LabelPosition::End),
+        );
 
     let buf = render_to_buffer(&plot, 80, 24);
     let options = ExportOptions::default();

@@ -52,7 +52,11 @@ fn main() -> color_eyre::Result<()> {
         .color(Color::Cyan)
         .title("Noisy Quadratic with Error Bars (q to quit)")
         .x_axis(Axis::new().label("x"))
-        .y_axis(Axis::new().label("y = 0.5x\u{00b2} + noise"));
+        .y_axis(
+            Axis::new()
+                .label("y = 0.5x\u{00b2} + noise")
+                .label_position(LabelPosition::End),
+        );
 
     loop {
         terminal.draw(|frame| {

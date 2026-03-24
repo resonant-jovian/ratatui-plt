@@ -146,13 +146,7 @@ fn main() -> color_eyre::Result<()> {
 
     // ── G: VectorField (quiver) ─────────────────────────────────────────
     // Rotational field: u = -y, v = x
-    let quiver_field = VectorFieldData::from_fn(
-        (-2.0, 2.0),
-        (-2.0, 2.0),
-        10,
-        10,
-        |x, y| (-y, x),
-    );
+    let quiver_field = VectorFieldData::from_fn((-2.0, 2.0), (-2.0, 2.0), 10, 10, |x, y| (-y, x));
     let vector_field = VectorField::new(quiver_field)
         .title("VectorField (quiver)")
         .color_by_magnitude(true)
@@ -164,13 +158,7 @@ fn main() -> color_eyre::Result<()> {
 
     // ── H: StreamPlot ───────────────────────────────────────────────────
     // Same rotational field
-    let stream_field = VectorFieldData::from_fn(
-        (-2.0, 2.0),
-        (-2.0, 2.0),
-        15,
-        15,
-        |x, y| (-y, x),
-    );
+    let stream_field = VectorFieldData::from_fn((-2.0, 2.0), (-2.0, 2.0), 15, 15, |x, y| (-y, x));
     let streamplot = StreamPlot::new(stream_field)
         .density(2)
         .arrow_scale(2.0)

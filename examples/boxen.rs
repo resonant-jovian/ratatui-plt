@@ -100,7 +100,12 @@ fn main() -> color_eyre::Result<()> {
         .group(BoxenGroup::new("Server B", server_b, Color::Yellow))
         .group(BoxenGroup::new("Server C", server_c, Color::Magenta))
         .title("Letter-Value Plot: Server Latencies (q to quit)")
-        .y_axis(Axis::new().label("Latency (ms)").grid(true).label_position(LabelPosition::End));
+        .y_axis(
+            Axis::new()
+                .label("Latency (ms)")
+                .grid(true)
+                .label_position(LabelPosition::End),
+        );
 
     loop {
         terminal.draw(|frame| {

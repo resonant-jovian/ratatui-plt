@@ -310,9 +310,30 @@ impl Widget for &Dendrogram {
 
             match self.orientation {
                 DendroOrientation::Bottom => {
-                    draw_vertical_segment_pb(&mut pb, &pa, left_pos, left_height, merge_height, color);
-                    draw_vertical_segment_pb(&mut pb, &pa, right_pos, right_height, merge_height, color);
-                    draw_horizontal_segment_pb(&mut pb, &pa, left_pos, right_pos, merge_height, color);
+                    draw_vertical_segment_pb(
+                        &mut pb,
+                        &pa,
+                        left_pos,
+                        left_height,
+                        merge_height,
+                        color,
+                    );
+                    draw_vertical_segment_pb(
+                        &mut pb,
+                        &pa,
+                        right_pos,
+                        right_height,
+                        merge_height,
+                        color,
+                    );
+                    draw_horizontal_segment_pb(
+                        &mut pb,
+                        &pa,
+                        left_pos,
+                        right_pos,
+                        merge_height,
+                        color,
+                    );
                 }
                 DendroOrientation::Top => {
                     let flip_h = |h: f64| height_hi - h;
@@ -342,7 +363,14 @@ impl Widget for &Dendrogram {
                     );
                 }
                 DendroOrientation::Left => {
-                    draw_horizontal_segment_h_pb(&mut pb, &pa, left_pos, left_height, merge_height, color);
+                    draw_horizontal_segment_h_pb(
+                        &mut pb,
+                        &pa,
+                        left_pos,
+                        left_height,
+                        merge_height,
+                        color,
+                    );
                     draw_horizontal_segment_h_pb(
                         &mut pb,
                         &pa,
@@ -351,7 +379,14 @@ impl Widget for &Dendrogram {
                         merge_height,
                         color,
                     );
-                    draw_vertical_segment_h_pb(&mut pb, &pa, left_pos, right_pos, merge_height, color);
+                    draw_vertical_segment_h_pb(
+                        &mut pb,
+                        &pa,
+                        left_pos,
+                        right_pos,
+                        merge_height,
+                        color,
+                    );
                 }
                 DendroOrientation::Right => {
                     let flip_h = |h: f64| height_hi - h;

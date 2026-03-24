@@ -330,11 +330,7 @@ impl Widget for &FacetGrid {
         let col_title_height: u16 = if self.col_titles { 1 } else { 0 };
         // Reserve space for row titles (right side)
         let row_title_width: u16 = if self.row_titles {
-            let max_len = row_keys
-                .iter()
-                .map(|k| k.len())
-                .max()
-                .unwrap_or(0) as u16;
+            let max_len = row_keys.iter().map(|k| k.len()).max().unwrap_or(0) as u16;
             max_len.saturating_add(2).min(area.width / 4)
         } else {
             0
@@ -531,7 +527,9 @@ fn render_line_cell(cfg: &CellConfig<'_>, area: Rect, buf: &mut Buffer) {
 fn render_scatter_cell(cfg: &CellConfig<'_>, area: Rect, buf: &mut Buffer) {
     let series_vec = build_cell_series(cfg);
 
-    let mut plot = ScatterPlot::new().show_legend(false).theme(cfg.theme.clone());
+    let mut plot = ScatterPlot::new()
+        .show_legend(false)
+        .theme(cfg.theme.clone());
 
     for s in series_vec {
         plot = plot.series(s);

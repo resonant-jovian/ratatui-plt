@@ -136,10 +136,11 @@ fn main() -> color_eyre::Result<()> {
                     let dz = 0.1 * scale;
                     let mag = (dx * dx + dy * dy + dz * dz).sqrt();
                     let intensity = (mag * 600.0).min(255.0) as u8;
-                    Some(
-                        Arrow3D::new(x, y, z, dx, dy, dz)
-                            .color(Color::Rgb(31, 119, intensity.max(80))),
-                    )
+                    Some(Arrow3D::new(x, y, z, dx, dy, dz).color(Color::Rgb(
+                        31,
+                        119,
+                        intensity.max(80),
+                    )))
                 })
             })
         })
@@ -167,11 +168,7 @@ fn main() -> color_eyre::Result<()> {
                 .split(area);
 
             let title = "ratatui-plt 3D Showcase  (arrows: rotate, +/-: zoom, q: quit)";
-            let start = outer[0].x
-                + outer[0]
-                    .width
-                    .saturating_sub(title.len() as u16)
-                    / 2;
+            let start = outer[0].x + outer[0].width.saturating_sub(title.len() as u16) / 2;
             for (i, ch) in title.chars().enumerate() {
                 let tx = start + i as u16;
                 if tx < outer[0].x + outer[0].width {

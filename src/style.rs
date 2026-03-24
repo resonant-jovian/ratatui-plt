@@ -161,20 +161,20 @@ impl MarkerShape {
             Self::Braille => '⣿',
             Self::FourPointedStar => '\u{2726}',  // ✦
             Self::SixPointedStar => '\u{2736}',   // ✶
-            Self::EightPointedStar => '\u{2734}',  // ✴
-            Self::Sparkle => '\u{2756}',           // ❖
-            Self::SmallCircle => '\u{2218}',       // ∘
-            Self::Ring => '\u{25CE}',              // ◎
-            Self::TriangleDown => '\u{25BC}',      // ▼
-            Self::TriangleRight => '\u{25B6}',     // ▶
-            Self::TriangleLeft => '\u{25C0}',      // ◀
-            Self::FilledDiamond => '\u{25C6}',     // ◆
-            Self::CircleHalfLeft => '\u{25D0}',    // ◐
-            Self::CircleHalfRight => '\u{25D1}',   // ◑
-            Self::CircleHalfTop => '\u{25D3}',     // ◓
-            Self::CircleHalfBottom => '\u{25D2}',  // ◒
-            Self::Pentagon => '\u{2B20}',          // ⬠
-            Self::Hexagon => '\u{2B21}',           // ⬡
+            Self::EightPointedStar => '\u{2734}', // ✴
+            Self::Sparkle => '\u{2756}',          // ❖
+            Self::SmallCircle => '\u{2218}',      // ∘
+            Self::Ring => '\u{25CE}',             // ◎
+            Self::TriangleDown => '\u{25BC}',     // ▼
+            Self::TriangleRight => '\u{25B6}',    // ▶
+            Self::TriangleLeft => '\u{25C0}',     // ◀
+            Self::FilledDiamond => '\u{25C6}',    // ◆
+            Self::CircleHalfLeft => '\u{25D0}',   // ◐
+            Self::CircleHalfRight => '\u{25D1}',  // ◑
+            Self::CircleHalfTop => '\u{25D3}',    // ◓
+            Self::CircleHalfBottom => '\u{25D2}', // ◒
+            Self::Pentagon => '\u{2B20}',         // ⬠
+            Self::Hexagon => '\u{2B21}',          // ⬡
         }
     }
 }

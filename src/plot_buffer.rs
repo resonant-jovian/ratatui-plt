@@ -20,7 +20,7 @@ use ratatui::buffer::Buffer;
 use ratatui::layout::Rect;
 use ratatui::style::Color;
 
-use crate::drawing::{colors_match, contrasting_color, BRAILLE_BASE};
+use crate::drawing::{BRAILLE_BASE, colors_match, contrasting_color};
 
 /// Plot area background.
 pub const Z_BACKGROUND: u8 = 0;
@@ -90,10 +90,7 @@ impl PlotBuffer {
             && y >= self.area.y
             && y < self.area.y + self.area.height
         {
-            Some(
-                (y - self.area.y) as usize * self.area.width as usize
-                    + (x - self.area.x) as usize,
-            )
+            Some((y - self.area.y) as usize * self.area.width as usize + (x - self.area.x) as usize)
         } else {
             None
         }

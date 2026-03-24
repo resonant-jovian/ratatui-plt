@@ -585,8 +585,7 @@ pub fn print_kitty<W: Widget>(
 #[cfg(feature = "sixel")]
 pub fn buffer_to_sixel(buf: &Buffer, options: &ExportOptions) -> Result<String, ExportError> {
     let png_bytes = buffer_to_png(buf, options)?;
-    let img = image::load_from_memory(&png_bytes)
-        .map_err(|e| ExportError::Image(e.to_string()))?;
+    let img = image::load_from_memory(&png_bytes).map_err(|e| ExportError::Image(e.to_string()))?;
     let rgba = img.to_rgba8();
     let (width, height) = (rgba.width(), rgba.height());
 

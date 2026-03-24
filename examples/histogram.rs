@@ -78,7 +78,12 @@ fn main() -> color_eyre::Result<()> {
         .hist_mode(HistMode::Stacked)
         .title("Stacked Histogram: Two Overlapping Distributions (q to quit)")
         .x_axis(Axis::new().label("value").grid(true))
-        .y_axis(Axis::new().label("count").grid(true))
+        .y_axis(
+            Axis::new()
+                .label("count")
+                .label_position(LabelPosition::End)
+                .grid(true),
+        )
         .show_legend(true)
         .legend_position(LegendPosition::TopRight);
 

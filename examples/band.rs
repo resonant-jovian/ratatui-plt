@@ -99,8 +99,18 @@ fn main() -> color_eyre::Result<()> {
         .band(band_1sig)
         .band(center_line)
         .title("Model Uncertainty Band (q to quit)")
-        .x_axis(Axis::new().label("Time [s]").grid(true).label_position(LabelPosition::End))
-        .y_axis(Axis::new().label("Amplitude").grid(true).label_position(LabelPosition::End))
+        .x_axis(
+            Axis::new()
+                .label("Time [s]")
+                .grid(true)
+                .label_position(LabelPosition::End),
+        )
+        .y_axis(
+            Axis::new()
+                .label("Amplitude")
+                .grid(true)
+                .label_position(LabelPosition::End),
+        )
         .show_legend(true)
         .legend_position(LegendPosition::TopRight);
 
@@ -109,9 +119,8 @@ fn main() -> color_eyre::Result<()> {
             // Leave right margin for the End-positioned x-label box
             let fa = frame.area();
             let margin = 14; // label box width ("Time [s]" + borders + padding)
-            let avail = ratatui::layout::Rect::new(
-                fa.x, fa.y, fa.width.saturating_sub(margin), fa.height,
-            );
+            let avail =
+                ratatui::layout::Rect::new(fa.x, fa.y, fa.width.saturating_sub(margin), fa.height);
             frame.render_widget(&plot, square_area(avail));
         })?;
 

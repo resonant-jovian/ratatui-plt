@@ -213,7 +213,11 @@ impl Widget for &CandlestickChart {
         let slot_width = pa.width / n_candles.max(1);
         // Body takes ~60% of slot, rest is gap. Force odd for centered wick.
         let body_w = (slot_width * 3 / 5).max(1);
-        let body_width = if body_w.is_multiple_of(2) { body_w + 1 } else { body_w };
+        let body_width = if body_w.is_multiple_of(2) {
+            body_w + 1
+        } else {
+            body_w
+        };
         let half_body = body_width / 2;
 
         // Draw each candle

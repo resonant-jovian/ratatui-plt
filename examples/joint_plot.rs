@@ -20,7 +20,9 @@ fn parse_theme() -> Theme {
         Some("dark") => Theme::dark(),
         None => Theme::auto(),
         Some(other) => {
-            eprintln!("Unknown theme '{other}'. Available: dark, light, minimal, publication, solarized");
+            eprintln!(
+                "Unknown theme '{other}'. Available: dark, light, minimal, publication, solarized"
+            );
             std::process::exit(1);
         }
     }

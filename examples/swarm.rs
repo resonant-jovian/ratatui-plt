@@ -94,7 +94,12 @@ fn main() -> color_eyre::Result<()> {
         .group(SwarmGroup::new("Edge", edge, Color::Rgb(100, 220, 100)))
         .title("Beeswarm: Response Times by Browser (q to quit)")
         .point_size(2)
-        .y_axis(Axis::new().label("Response Time (ms)").grid(true));
+        .y_axis(
+            Axis::new()
+                .label("Response Time (ms)")
+                .label_position(LabelPosition::End)
+                .grid(true),
+        );
 
     loop {
         terminal.draw(|frame| {

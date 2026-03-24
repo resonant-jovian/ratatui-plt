@@ -67,7 +67,11 @@ fn main() -> color_eyre::Result<()> {
         .dataset(wide)
         .show_box(false)
         .title("Distribution Shapes (q to quit)")
-        .y_axis(Axis::new().label("Value"));
+        .y_axis(
+            Axis::new()
+                .label("Value")
+                .label_position(LabelPosition::End),
+        );
 
     loop {
         terminal.draw(|frame| {

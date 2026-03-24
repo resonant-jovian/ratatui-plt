@@ -251,12 +251,16 @@ impl Widget for &GaugeChart {
                 let xi = nx.round() as u16;
                 let yi = ny.round() as u16;
 
-                if xi >= area.x
-                    && xi < area.x + area.width
-                    && yi >= draw_y
-                    && yi < draw_y + draw_h
+                if xi >= area.x && xi < area.x + area.width && yi >= draw_y && yi < draw_y + draw_h
                 {
-                    pb.set_cell(xi, yi, '\u{2588}', self.theme.foreground, self.theme.foreground, Z_CHROME);
+                    pb.set_cell(
+                        xi,
+                        yi,
+                        '\u{2588}',
+                        self.theme.foreground,
+                        self.theme.foreground,
+                        Z_CHROME,
+                    );
                 }
             }
 

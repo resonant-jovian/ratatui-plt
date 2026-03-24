@@ -2572,7 +2572,11 @@ fn test_spy_renders() {
 #[test]
 fn test_matshow_renders() {
     let matrix: Vec<Vec<f64>> = (0..5)
-        .map(|r| (0..5).map(|c| (r as f64 - 2.0) * (c as f64 - 2.0)).collect())
+        .map(|r| {
+            (0..5)
+                .map(|c| (r as f64 - 2.0) * (c as f64 - 2.0))
+                .collect()
+        })
         .collect();
     let plot = matshow(matrix);
 
@@ -2628,8 +2632,8 @@ mod export_tests {
 #[cfg(feature = "statistics")]
 mod statistics_tests {
     use ratatui_plt::statistics::{
-        Kde, bootstrap_ci, iqr, linear_regression, lowess, mean, mean_estimator,
-        median, median_estimator, percentile, poly_fit, std_dev, variance,
+        Kde, bootstrap_ci, iqr, linear_regression, lowess, mean, mean_estimator, median,
+        median_estimator, percentile, poly_fit, std_dev, variance,
     };
 
     #[test]
@@ -2687,9 +2691,21 @@ mod statistics_tests {
         let fit = fit.unwrap();
         // coefficients: [a2, a1, a0] for a2*x^2 + a1*x + a0
         assert_eq!(fit.coefficients.len(), 3);
-        assert!((fit.coefficients[0] - 1.0).abs() < 1e-8, "leading coeff: {}", fit.coefficients[0]);
-        assert!(fit.coefficients[1].abs() < 1e-8, "linear coeff: {}", fit.coefficients[1]);
-        assert!(fit.coefficients[2].abs() < 1e-8, "constant coeff: {}", fit.coefficients[2]);
+        assert!(
+            (fit.coefficients[0] - 1.0).abs() < 1e-8,
+            "leading coeff: {}",
+            fit.coefficients[0]
+        );
+        assert!(
+            fit.coefficients[1].abs() < 1e-8,
+            "linear coeff: {}",
+            fit.coefficients[1]
+        );
+        assert!(
+            fit.coefficients[2].abs() < 1e-8,
+            "constant coeff: {}",
+            fit.coefficients[2]
+        );
         assert!((fit.r_squared - 1.0).abs() < 1e-8);
     }
 
@@ -2760,7 +2776,9 @@ mod statistics_tests {
         let y: Vec<f64> = x.iter().map(|&xi| xi * 2.0).collect();
         let result = lowess(&x, &y, 0.5);
         assert!(result.is_some());
-        let s = result.unwrap().to_series("smooth", ratatui::style::Color::Cyan);
+        let s = result
+            .unwrap()
+            .to_series("smooth", ratatui::style::Color::Cyan);
         assert_eq!(s.name, "smooth");
         assert_eq!(s.data.len(), 10);
     }
@@ -2891,12 +2909,7 @@ fn test_joint_plot_rug_marginals() {
     use ratatui_plt::widgets::joint_plot::{JointPlot, MarginalType};
 
     let s = Series::new("pts")
-        .data(vec![
-            (1.0, 2.0),
-            (2.0, 3.0),
-            (3.0, 1.0),
-            (4.0, 4.0),
-        ])
+        .data(vec![(1.0, 2.0), (2.0, 3.0), (3.0, 1.0), (4.0, 4.0)])
         .color(Color::Yellow)
         .marker(MarkerShape::Dot);
     let plot = JointPlot::new()
@@ -3096,7 +3109,9 @@ fn test_rect_selector_renders() {
     let brush = shared_brush();
     brush.borrow_mut().set_selection(1.0, 2.0, 5.0, 8.0);
 
-    let selector = RectangleSelector::new(brush).color(Color::Yellow).border(true);
+    let selector = RectangleSelector::new(brush)
+        .color(Color::Yellow)
+        .border(true);
     selector.render_on(&pa, &mut buf);
 }
 
@@ -3369,7 +3384,7 @@ mod unicode_extended {
     use ratatui::style::Color;
     use ratatui::widgets::Widget;
 
-    use ratatui_plt::drawing::{sextant_char, vertical_fill_char, VERTICAL_FILL_LEVELS};
+    use ratatui_plt::drawing::{VERTICAL_FILL_LEVELS, sextant_char, vertical_fill_char};
     use ratatui_plt::widgets::histogram::Histogram;
 
     #[test]
@@ -3439,7 +3454,8 @@ mod unicode_extended {
         // Each level should be a distinct character
         for i in 0..8 {
             assert_ne!(
-                VERTICAL_FILL_LEVELS[i], VERTICAL_FILL_LEVELS[i + 1],
+                VERTICAL_FILL_LEVELS[i],
+                VERTICAL_FILL_LEVELS[i + 1],
                 "levels {} and {} should differ",
                 i,
                 i + 1,

@@ -102,7 +102,12 @@ fn main() -> color_eyre::Result<()> {
         .dataset(uniform_ds)
         .title("ECDF: Distribution Comparison (q to quit)")
         .x_axis(Axis::new().label("Value").grid(true))
-        .y_axis(Axis::new().label("F(x)").grid(true).label_position(LabelPosition::End))
+        .y_axis(
+            Axis::new()
+                .label("F(x)")
+                .grid(true)
+                .label_position(LabelPosition::End),
+        )
         .show_legend(true)
         .legend_position(LegendPosition::BottomRight);
 

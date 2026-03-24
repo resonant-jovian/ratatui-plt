@@ -65,7 +65,12 @@ fn main() -> color_eyre::Result<()> {
     let filled = {
         let mut p = BoxPlot::new()
             .title("Filled")
-            .y_axis(Axis::new().label("Value").grid(true).label_position(LabelPosition::End))
+            .y_axis(
+                Axis::new()
+                    .label("Value")
+                    .grid(true)
+                    .label_position(LabelPosition::End),
+            )
             .show_means(true)
             .reference_line(ReferenceLine::hline_dashed(6.5, Color::DarkGray));
         for g in make_groups() {
@@ -78,7 +83,12 @@ fn main() -> color_eyre::Result<()> {
     let outline = {
         let mut p = BoxPlot::new()
             .title("Outline")
-            .y_axis(Axis::new().label("Value").grid(true).label_position(LabelPosition::End))
+            .y_axis(
+                Axis::new()
+                    .label("Value")
+                    .grid(true)
+                    .label_position(LabelPosition::End),
+            )
             .fill_boxes(false)
             .show_means(true);
         for g in make_groups() {
@@ -92,10 +102,7 @@ fn main() -> color_eyre::Result<()> {
             let area = square_area(frame.area());
             let cols = Layout::default()
                 .direction(Direction::Horizontal)
-                .constraints([
-                    Constraint::Ratio(1, 2),
-                    Constraint::Ratio(1, 2),
-                ])
+                .constraints([Constraint::Ratio(1, 2), Constraint::Ratio(1, 2)])
                 .split(area);
 
             frame.render_widget(&filled, cols[0]);

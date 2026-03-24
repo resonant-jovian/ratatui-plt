@@ -50,7 +50,11 @@ fn main() -> color_eyre::Result<()> {
         .show_colorbar(true)
         .title("Correlated 2D Histogram (q to quit)")
         .x_axis(Axis::new().label("x"))
-        .y_axis(Axis::new().label("y = 0.7x + noise"));
+        .y_axis(
+            Axis::new()
+                .label("y = 0.7x + noise")
+                .label_position(LabelPosition::End),
+        );
 
     loop {
         terminal.draw(|frame| {

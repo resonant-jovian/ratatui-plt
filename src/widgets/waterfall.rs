@@ -333,7 +333,13 @@ impl Widget for &WaterfallChart {
                 if conn_screen_y >= pa.y && conn_screen_y < pa.y + pa.height {
                     for x in conn_x_start..conn_x_end {
                         if pa.contains(x, conn_screen_y) {
-                            pb.set_char(x, conn_screen_y, '\u{2500}', self.theme.axis_color, Z_DATA);
+                            pb.set_char(
+                                x,
+                                conn_screen_y,
+                                '\u{2500}',
+                                self.theme.axis_color,
+                                Z_DATA,
+                            );
                         }
                     }
                 }

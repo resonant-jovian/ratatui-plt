@@ -306,7 +306,11 @@ fn write_braille(buf: &mut Buffer, x: u16, y: u16, bits: u8, color: Color) {
     };
     let combined = existing_bits | bits;
     if let Some(ch) = char::from_u32(BRAILLE_BASE + combined as u32) {
-        let fg = if crate::drawing::colors_match(color, existing_bg) { crate::drawing::contrasting_color(color) } else { color };
+        let fg = if crate::drawing::colors_match(color, existing_bg) {
+            crate::drawing::contrasting_color(color)
+        } else {
+            color
+        };
         buf[(x, y)].set_char(ch).set_fg(fg).set_bg(existing_bg);
     }
 }

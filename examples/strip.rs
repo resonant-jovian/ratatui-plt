@@ -83,7 +83,12 @@ fn main() -> color_eyre::Result<()> {
         .group(macrophages)
         .jitter(0.38)
         .title("Single-Cell Gene Expression: CD3E (q to quit)")
-        .y_axis(Axis::new().label("log2(TPM + 1)").grid(true))
+        .y_axis(
+            Axis::new()
+                .label("log2(TPM + 1)")
+                .label_position(LabelPosition::End)
+                .grid(true),
+        )
         .spines(Spines::new().top(false).right(false))
         .reference_line(ReferenceLine::hline_dashed(5.0, Color::DarkGray));
 

@@ -526,10 +526,10 @@ impl Widget for &BoxPlot {
                             .round() as u16;
                     if pa.contains(center_x, sy) {
                         let marker_fg = if self.fill_boxes {
-                        crate::drawing::contrasting_color(d.color)
-                    } else {
-                        self.theme.foreground
-                    };
+                            crate::drawing::contrasting_color(d.color)
+                        } else {
+                            self.theme.foreground
+                        };
                         pb.set_char(center_x, sy, '●', marker_fg, Z_MARKER);
                     }
                 }

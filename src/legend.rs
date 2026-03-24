@@ -175,9 +175,7 @@ impl Widget for &Legend {
         for y in rect.y..rect.y + rect.height {
             for x in rect.x..rect.x + rect.width {
                 if x < area.x + area.width && y < area.y + area.height {
-                    buf[(x, y)]
-                        .set_char(' ')
-                        .set_style(Style::default().bg(bg));
+                    buf[(x, y)].set_char(' ').set_style(Style::default().bg(bg));
                 }
             }
         }
@@ -381,9 +379,7 @@ impl Widget for &InteractiveLegend {
         for y in rect.y..rect.y + rect.height {
             for x in rect.x..rect.x + rect.width {
                 if x < area.x + area.width && y < area.y + area.height {
-                    buf[(x, y)]
-                        .set_char(' ')
-                        .set_style(Style::default().bg(bg));
+                    buf[(x, y)].set_char(' ').set_style(Style::default().bg(bg));
                 }
             }
         }

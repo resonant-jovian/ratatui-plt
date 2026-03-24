@@ -261,11 +261,7 @@ fn draw_braille_line_stream(
         if ix0 >= 0 && iy0 >= 0 {
             let cell_x = (ix0 / 2) as u16;
             let cell_y = (iy0 / 4) as u16;
-            if cell_x >= pa_x
-                && cell_x < pa_x + pa_w
-                && cell_y >= pa_y
-                && cell_y < pa_y + pa_h
-            {
+            if cell_x >= pa_x && cell_x < pa_x + pa_w && cell_y >= pa_y && cell_y < pa_y + pa_h {
                 let dot_col = (ix0 % 2) as usize;
                 let dot_row = (iy0 % 4) as usize;
                 let bit = BRAILLE_BITS[dot_col][dot_row];
@@ -427,7 +423,9 @@ impl Widget for &StreamPlot {
 
                     // Draw braille line from previous point
                     if let Some((prev_x, prev_y)) = prev_screen {
-                        draw_braille_line_stream(&mut pb, prev_x, prev_y, scr_x, scr_y, color, px, py, pw, ph, Z_DATA);
+                        draw_braille_line_stream(
+                            &mut pb, prev_x, prev_y, scr_x, scr_y, color, px, py, pw, ph, Z_DATA,
+                        );
                     }
 
                     // Arrow head at intervals (cell resolution, drawn on top)

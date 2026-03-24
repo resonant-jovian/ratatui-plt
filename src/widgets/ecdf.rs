@@ -273,10 +273,28 @@ impl Widget for &EcdfPlot {
                 let sy1 = pa.screen_y(y1);
 
                 // Horizontal segment at y0 from x0 to x1
-                draw_braille_line_pb(&mut pb, sx0, sy0, sx1, sy0, ds.color, &pa, Z_DATA + si as u8);
+                draw_braille_line_pb(
+                    &mut pb,
+                    sx0,
+                    sy0,
+                    sx1,
+                    sy0,
+                    ds.color,
+                    &pa,
+                    Z_DATA + si as u8,
+                );
 
                 // Vertical segment at x1 from y0 to y1
-                draw_braille_line_pb(&mut pb, sx1, sy0, sx1, sy1, ds.color, &pa, Z_DATA + si as u8);
+                draw_braille_line_pb(
+                    &mut pb,
+                    sx1,
+                    sy0,
+                    sx1,
+                    sy1,
+                    ds.color,
+                    &pa,
+                    Z_DATA + si as u8,
+                );
             }
 
             // Extend the last step to the right edge of the plot
@@ -285,7 +303,16 @@ impl Widget for &EcdfPlot {
                 let sx_end = pa.screen_x(x_hi);
                 let sy = pa.screen_y(last_y);
 
-                draw_braille_line_pb(&mut pb, sx_last, sy, sx_end, sy, ds.color, &pa, Z_DATA + si as u8);
+                draw_braille_line_pb(
+                    &mut pb,
+                    sx_last,
+                    sy,
+                    sx_end,
+                    sy,
+                    ds.color,
+                    &pa,
+                    Z_DATA + si as u8,
+                );
             }
         }
 

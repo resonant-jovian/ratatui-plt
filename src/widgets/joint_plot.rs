@@ -309,10 +309,7 @@ impl Widget for &JointPlot {
             .filter(|v| v.is_finite())
             .collect();
 
-        let marginal_color = self
-            .series
-            .first()
-            .map_or(Color::Cyan, |s| s.color);
+        let marginal_color = self.series.first().map_or(Color::Cyan, |s| s.color);
 
         // Top marginal (x-axis distribution)
         if has_top && top_height >= 2 {
@@ -337,12 +334,7 @@ impl Widget for &JointPlot {
 
         // Right marginal (y-axis distribution)
         if has_right && right_width >= 2 {
-            let right_area = Rect::new(
-                area.x + central_width,
-                pa.y,
-                right_width,
-                pa.height,
-            );
+            let right_area = Rect::new(area.x + central_width, pa.y, right_width, pa.height);
             let cfg = MarginalConfig {
                 data: &all_y,
                 marginal_type: &self.marginal_y,
@@ -428,8 +420,7 @@ fn render_marginal_top(buf: &mut Buffer, area: Rect, cfg: &MarginalConfig<'_>) {
                     (cfg.plot_origin + cfg.plot_extent - 1) as f64,
                 );
                 let xi = sx.round() as u16;
-                let bar_height =
-                    ((density / max_val) * area.height as f64).round() as u16;
+                let bar_height = ((density / max_val) * area.height as f64).round() as u16;
 
                 for dy in 0..bar_height {
                     let y = area.y + area.height - 1 - dy;
@@ -515,8 +506,7 @@ fn render_marginal_right(buf: &mut Buffer, area: Rect, cfg: &MarginalConfig<'_>)
                     cfg.plot_origin as f64,
                 );
                 let yi = sy.round() as u16;
-                let bar_width =
-                    ((density / max_val) * area.width as f64).round() as u16;
+                let bar_width = ((density / max_val) * area.width as f64).round() as u16;
 
                 for dx in 0..bar_width {
                     let x = area.x + dx;

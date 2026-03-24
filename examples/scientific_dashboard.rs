@@ -166,7 +166,12 @@ fn main() -> color_eyre::Result<()> {
         ))
         .title("ECDF Comparison")
         .x_axis(Axis::new().label("Value").grid(true))
-        .y_axis(Axis::new().label("F(x)").grid(true))
+        .y_axis(
+            Axis::new()
+                .label("F(x)")
+                .label_position(LabelPosition::End)
+                .grid(true),
+        )
         .show_legend(true)
         .legend_position(LegendPosition::BottomRight)
         .spines(Spines::new().top(false).right(false))

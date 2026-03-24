@@ -77,7 +77,11 @@ fn main() -> color_eyre::Result<()> {
         .series(nuclear)
         .title("Energy Production by Source (q to quit)")
         .x_axis(Axis::new().label("Time (days)"))
-        .y_axis(Axis::new().label("Output (GW)"));
+        .y_axis(
+            Axis::new()
+                .label("Output (GW)")
+                .label_position(LabelPosition::End),
+        );
 
     loop {
         terminal.draw(|frame| {

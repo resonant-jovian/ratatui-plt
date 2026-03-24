@@ -331,9 +331,9 @@ impl Widget for &ScatterPlot {
                 .filter(|v| v.is_finite())
                 .collect();
 
-            let trend_color = self.trendline_color.unwrap_or_else(|| {
-                self.series.first().map_or(Color::White, |s| s.color)
-            });
+            let trend_color = self
+                .trendline_color
+                .unwrap_or_else(|| self.series.first().map_or(Color::White, |s| s.color));
 
             // Generate evaluation x values across the plot range
             let n_eval = self.trendline_n_points;
@@ -342,15 +342,11 @@ impl Widget for &ScatterPlot {
                 .collect();
 
             let eval_ys: Option<Vec<f64>> = match ttype {
-                TrendlineType::Linear => {
-                    crate::statistics::linear_regression(&all_x, &all_y).map(|fit| {
-                        eval_xs.iter().map(|&x| fit.eval(x)).collect()
-                    })
-                }
+                TrendlineType::Linear => crate::statistics::linear_regression(&all_x, &all_y)
+                    .map(|fit| eval_xs.iter().map(|&x| fit.eval(x)).collect()),
                 TrendlineType::Polynomial(degree) => {
-                    crate::statistics::poly_fit(&all_x, &all_y, *degree).map(|fit| {
-                        eval_xs.iter().map(|&x| fit.eval(x)).collect()
-                    })
+                    crate::statistics::poly_fit(&all_x, &all_y, *degree)
+                        .map(|fit| eval_xs.iter().map(|&x| fit.eval(x)).collect())
                 }
                 TrendlineType::Lowess(frac) => {
                     crate::statistics::lowess(&all_x, &all_y, *frac).map(|result| {

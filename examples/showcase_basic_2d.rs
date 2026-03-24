@@ -66,9 +66,7 @@ fn main() -> color_eyre::Result<()> {
             (x, x.sin())
         })
         .collect();
-    let sine_series = Series::new("sin(x)")
-        .data(sine_data)
-        .color(blue_mid);
+    let sine_series = Series::new("sin(x)").data(sine_data).color(blue_mid);
 
     // (c) Filled sine with circle markers (fewer points)
     let filled_data: Vec<(f64, f64)> = (0..30)
@@ -98,9 +96,7 @@ fn main() -> color_eyre::Result<()> {
     let scatter_pts: Vec<(f64, f64)> = (0..n_scatter)
         .map(|_| (lcg(&mut seed_b) * 10.0, lcg(&mut seed_b) * 10.0))
         .collect();
-    let scatter_colors: Vec<f64> = (0..n_scatter)
-        .map(|_| lcg(&mut seed_b))
-        .collect();
+    let scatter_colors: Vec<f64> = (0..n_scatter).map(|_| lcg(&mut seed_b)).collect();
 
     let scatter_s = Series::new("points")
         .data(scatter_pts)
@@ -135,7 +131,7 @@ fn main() -> color_eyre::Result<()> {
         .bins(20)
         .title("Histogram")
         .x_axis(Axis::new().label("Value").grid(true))
-        .y_axis(Axis::new().label("Count").grid(true))
+        .y_axis(Axis::new().label("Count").label_position(LabelPosition::End).grid(true))
         .show_legend(false);
 
     // ---- Panel E: PieChart ----

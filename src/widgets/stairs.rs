@@ -292,12 +292,30 @@ impl Widget for &StairsPlot {
                     let sy = pa.screen_y(ds.values[i]);
 
                     // Horizontal segment at current value
-                    draw_braille_line_pb(&mut pb, sx_left, sy, sx_right, sy, ds.color, &pa, Z_DATA + si as u8);
+                    draw_braille_line_pb(
+                        &mut pb,
+                        sx_left,
+                        sy,
+                        sx_right,
+                        sy,
+                        ds.color,
+                        &pa,
+                        Z_DATA + si as u8,
+                    );
 
                     // Vertical segment at the right edge connecting to next value
                     if i + 1 < n {
                         let sy_next = pa.screen_y(ds.values[i + 1]);
-                        draw_braille_line_pb(&mut pb, sx_right, sy, sx_right, sy_next, ds.color, &pa, Z_DATA + si as u8);
+                        draw_braille_line_pb(
+                            &mut pb,
+                            sx_right,
+                            sy,
+                            sx_right,
+                            sy_next,
+                            ds.color,
+                            &pa,
+                            Z_DATA + si as u8,
+                        );
                     }
                 }
             }

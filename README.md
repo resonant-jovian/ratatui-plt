@@ -7,6 +7,7 @@
 [![License: GPL-3.0](https://img.shields.io/badge/License-GPL--3.0-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)
 [![Rust](https://github.com/resonant-jovian/ratatui-plt/actions/workflows/test.yml/badge.svg)](https://github.com/resonant-jovian/ratatui-plt/actions/workflows/test.yml)
 [![rust-clippy analyze](https://github.com/resonant-jovian/ratatui-plt/actions/workflows/clippy.yml/badge.svg)](https://github.com/resonant-jovian/ratatui-plt/actions/workflows/clippy.yml)
+[![Support on thanks.dev](https://img.shields.io/badge/Support-thanks.dev-green)](https://thanks.dev/u/gh/resonant-jovian)
 
 ### Highlights
 
@@ -39,36 +40,16 @@
 ### How it works
 
 ```mermaid
-flowchart TD
-    subgraph input["Your Data"]
-        A1["Vec&lt;(f64,f64)&gt;"]
-        A2["Vec&lt;Vec&lt;f64&gt;&gt;"]
-        A3["OHLC tuples"]
-        A4["3D points"]
-        A5["vectors"]
-    end
-    subgraph containers["Data Containers"]
-        B1[Series]
-        B2[GridData]
-        B3[Series3D]
-        B4[VectorFieldData]
-    end
-    subgraph widgets["Widgets"]
-        C1[LinePlot]
-        C2[Heatmap]
-        C3[Surface3D]
-        C4["..."]
-    end
-    subgraph config["Configuration"]
-        D1["Axis + Scale + Tickers"]
-        D2["Colormap + Normalize"]
-        D3[Theme]
-    end
-    subgraph render["Terminal"]
-        E["ratatui Frame::render_widget()"]
-    end
-    input --> containers --> widgets --> render
-    config --> render
+%%{init: {'theme': 'neutral'}}%%
+flowchart LR
+    A["<b>Your Data</b><br/>Vec&lt;(f64,f64)&gt;<br/>Vec&lt;Vec&lt;f64&gt;&gt;<br/>OHLC tuples<br/>3D points"]
+    B["<b>Data Containers</b><br/>Series &middot; GridData<br/>Series3D &middot; VectorFieldData"]
+    C["<b>Widgets</b><br/>LinePlot &middot; Heatmap<br/>Surface3D &middot; ..."]
+    D["<b>Config</b><br/>Axis &middot; Colormap<br/>Normalize &middot; Theme"]
+    E["<b>Terminal</b><br/>ratatui Frame"]
+
+    A --> B --> C --> E
+    D --> E
 ```
 
 Each widget follows a **builder pattern** — configure data, axes, colors, and theme, then hand it to ratatui's rendering loop.
@@ -314,10 +295,13 @@ cargo run --example sixel_export --features sixel
 cargo run --example toml_theme --features toml-themes
 ```
 
-Run all examples in sequence:
+Run examples with `dev.sh`:
 ```bash
-./run_examples.sh        # default light theme
-./run_examples.sh dark   # dark theme
+./dev.sh examples line_plot              # single example
+./dev.sh examples line_plot --theme dark # with theme
+./dev.sh examples --group 3d            # all 3D examples
+./dev.sh examples --all --theme dark    # all examples, dark theme
+./dev.sh examples --list                # list groups
 ```
 
 #### Showcase Examples (matplotlib reference replicas)
@@ -468,6 +452,10 @@ cargo doc --open                     # Build and view docs
 > See the [API documentation on docs.rs](https://docs.rs/ratatui-plt) for full type-level documentation.
 
 ---
+
+## Support
+
+If ratatui-plt is useful to your projects, consider supporting development via [thanks.dev](https://thanks.dev/u/gh/resonant-jovian).
 
 ## License
 
