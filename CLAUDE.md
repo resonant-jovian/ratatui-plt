@@ -59,7 +59,7 @@ Raw data → `Series`/`GridData`/`VectorFieldData` → Widget (builder pattern) 
 
 ### Widgets (src/widgets/)
 
-59 widget files. Key ones: `line_plot`, `scatter_plot`, `heatmap`, `histogram`, `bar_chart`, `contour`, `surface3d`, `wireframe3d`, `scatter3d`, `multi_panel`, `radial`, `twin_axes`, `pie_chart`, `stacked_area`, `event_plot`, `hist2d`, `violin_plot`, `streamplot`, `candlestick`, `gauge`, `sankey`, `box_plot`, `waterfall`, `dendrogram`.
+80 widget files organized by category: Core (line_plot, scatter_plot, heatmap, histogram, bar_chart, area_chart, pie_chart, image_plot, data_table), Statistical (box_plot, violin_plot, kde_plot, regression_plot, ridgeline, qq_plot, dot_plot, confidence_ellipse, etc.), Scientific (contour, streamplot, horizon, carpet, smith_chart, choropleth, etc.), Financial (candlestick, waterfall, gantt, gauge, funnel, funnel_area), Hierarchical (treemap, sunburst, icicle, sankey, dendrogram, clustermap, parallel_categories, etc.), 3D (surface3d, scatter3d, line3d, mesh3d, voxels, isosurface, volume3d, streamtube, etc.), Layout (multi_panel, facet_grid, twin_axes, inset, joint_plot, pair_plot), Interaction (crosshair, span_selector, rect_selector, lasso_selector).
 
 ### Key conventions
 

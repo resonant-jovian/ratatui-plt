@@ -12,14 +12,15 @@
 
 ### Highlights
 
-- **58 plot widgets** — 2D, 3D, statistical, specialized, and layout
+- **80 plot widgets** — 2D, 3D, statistical, financial, hierarchical, scientific, and layout
 - **55+ colormaps** — sequential, diverging, cyclic, qualitative, and custom
 - **7 axis scales** — linear, log, symlog, power, logit, asinh, function
 - **6 export formats** — text, ANSI, SVG, PNG, Sixel, Kitty
+- **PlotBackend trait** — extensible rendering backend for Unicode, Kitty, Sixel
 - **72 runnable examples** — including 6 matplotlib showcase replicas
 
 > [!IMPORTANT]
-> **Status (0.0.2):** Early release. Most widgets work well, but the following have known rendering quality issues: **BandPlot** (fill gap artifacts), **BoxPlot / BoxenPlot** (outline alignment), **CandlestickPlot** (outline mismatches), **Contour3D** (surface artifacts), **VectorField 3D** (low contrast/density), **TernaryPlot** (staircase grid lines). Expect breaking API changes before 0.1.0.
+> **Status (0.0.3):** Rapidly evolving. 80 widgets covering the full matplotlib/seaborn/plotly chart taxonomy. Breaking API changes from 0.0.2: `StackedArea` renamed to `AreaChart`, `Wireframe3D` merged into `Surface3D` (use `SurfaceRenderMode::Wireframe`). Expect further breaking changes before 0.1.0.
 
 ## Contents
 
@@ -36,7 +37,7 @@
 
 ## For Everyone
 
-`ratatui-plt` is a comprehensive plotting library for terminal UIs built on [ratatui](https://ratatui.rs/). It provides 50+ plot widgets, colormaps, axis systems, and layout tools for scientific computing, simulation monitoring, and data exploration — all rendered in the terminal using Unicode characters for sub-cell resolution.
+`ratatui-plt` is a comprehensive plotting library for terminal UIs built on [ratatui](https://ratatui.rs/). It provides 80 plot widgets, colormaps, axis systems, and layout tools for scientific computing, simulation monitoring, and data exploration — all rendered in the terminal using Unicode characters for sub-cell resolution.
 
 ### How it works
 
@@ -59,7 +60,7 @@ Each widget follows a **builder pattern** — configure data, axes, colors, and 
 
 ```toml
 [dependencies]
-ratatui-plt = "0.0.2"
+ratatui-plt = "0.0.3"
 ratatui = "0.30"
 
 # Optional features:
@@ -97,72 +98,114 @@ frame.render_widget(&plot, area);
 
 ### Widgets
 
-**2D** — LinePlot, ScatterPlot, Heatmap, Histogram, BarChart, ContourPlot, and 20+ more
-**3D** — Surface3D, Wireframe3D, Scatter3D, Bar3D, Contour3D, Quiver3D (all with interactive camera via `Camera3DState`)
-**Statistical** — BoxPlot, ViolinPlot, Histogram, ECDF, ErrorBarPlot, JointPlot
-**Specialized** — RadialPlot, TernaryPlot, NetworkGraph, SankeyDiagram, SunburstChart, and more
-**Layout** — MultiPanel (GridSpec), FacetGrid, TwinAxes, InsetPlot
-**Interactive** — Crosshair, DataPicking, Brushing, InteractiveLegend, SpanSelector, LinkedView
+**Core** — LinePlot, ScatterPlot, Heatmap, Histogram, BarChart, AreaChart, PieChart, ImagePlot, DataTable
+**Statistical** — BoxPlot, BoxenPlot, ViolinPlot, KDEPlot, RegressionPlot, RidgelinePlot, QQPlot, DotPlot, ConfidenceEllipse, and more
+**Scientific** — ContourPlot, StreamPlot, VectorField, HorizonGraph, CarpetPlot, SmithChart, ChoroplethMap, and more
+**Financial** — CandlestickChart (with OHLC mode), WaterfallChart, GanttChart, GaugeChart, FunnelChart, FunnelArea
+**Hierarchical** — Treemap, Sunburst, IcicleChart, SankeyDiagram, Dendrogram, ClusterMap, ParallelCategories
+**3D** — Surface3D (with wireframe mode), Scatter3D, Line3D, Mesh3D, Bar3D, Voxels, Isosurface, Volume3D, Streamtube, and more
+**Polar** — RadialPlot (also RadarPlot), TernaryPlot
+**Layout** — MultiPanel, FacetGrid (with free scales, col_wrap), TwinAxes, InsetPlot, JointPlot, PairPlot
+**Interactive** — Crosshair, Brushing, InteractiveLegend, SpanSelector, RectangleSelector, LassoSelector, LinkedView
 
 <details>
-<summary><strong>All 58 widgets</strong></summary>
+<summary><strong>All 80 widgets</strong></summary>
 
-#### 2D Plots
-- **LinePlot** — multiple series, fill regions, step modes, dash patterns, markers
-- **ScatterPlot** — color-mapped point clouds, configurable markers, trendline overlays (linear/polynomial/LOWESS)
-- **Heatmap** — half-block rendering for 2x vertical resolution, colorbars
+#### Core Visualization
+- **LinePlot** — multiple series, spline interpolation, fill-to shading, CI aggregation, step modes, markers
+- **ScatterPlot** — color-mapped point clouds, bubble mode (size mapping), trendline overlays (linear/polynomial/LOWESS)
+- **Heatmap** — half-block rendering for 2x vertical resolution, colorbars, value annotations, center/robust scaling
 - **ImagePlot** — matrix/image display with `imshow`, `spy()`, `matshow()` convenience functions
-- **Histogram** — count/density/probability modes, stacked, cumulative
-- **BarChart** — grouped and stacked, horizontal/vertical
-- **ContourPlot** — filled contours and iso-lines via marching squares
-- **BoxPlot** — quartiles, whiskers, outliers, notched and bootstrap CI variants
-- **ViolinPlot** — KDE-based distribution shape with quartile markers
-- **StairsPlot** — step functions with fill-to-baseline
-- **StemPlot** — discrete event / impulse visualization
+- **Histogram** — count/density/probability/percent modes, stacked/layered/side-by-side, KDE overlay
+- **BarChart** — grouped, stacked, diverging stacked, horizontal/vertical, auto value labels
+- **AreaChart** — plain, stacked, normalized, streamgraph modes
+- **PieChart** — pie/donut charts with explode and labels
+- **DataTable** — styled data table with colormap cell backgrounds
+
+#### Statistical
+- **BoxPlot** — quartiles, whiskers, outliers, notched CI, show-all-points overlay
+- **BoxenPlot** — letter-value plots for large dataset distributions
+- **ViolinPlot** — KDE-based shape with split mode, density normalization (area/count/width)
+- **KDEPlot** — smooth 1D kernel density estimation curves with fill
+- **RegressionPlot** — scatter + fitted regression line + confidence interval band
+- **RidgelinePlot** — vertically offset overlapping KDE curves per category
+- **QQPlot** — quantile-quantile diagnostic with reference line
+- **DotPlot** — Wilkinson stacked dots in bins
+- **ConfidenceEllipse** — 2D covariance ellipse overlay on scatter
 - **ErrorBarPlot** — symmetric/asymmetric error bars
-- **StackedArea** — cumulative filled area charts
-- **EventPlot** — spike raster / event timing plots
+- **BandPlot** — uncertainty bands / confidence intervals
+- **SwarmPlot** — beeswarm non-overlapping plots
+- **StripPlot** — categorical strip plots with jitter
+- **EcdfPlot** — empirical cumulative distribution functions
+- **RugPlot** — marginal tick marks
+
+#### Scientific
+- **ContourPlot** — filled contours and iso-lines via marching squares
+- **StreamPlot** — vector field streamlines via Runge-Kutta integration
+- **VectorField** — 2D arrow glyph vector field
+- **HorizonGraph** — compact multi-band time-series visualization
 - **Hist2D** — 2D histogram rendered as heatmap
 - **HexbinPlot** — hexagonal binning for large datasets
-- **PieChart** — pie/donut charts with explode and labels
-- **BandPlot** — uncertainty bands / confidence intervals
-- **SwarmPlot** — beeswarm plots with jitter
-- **StripPlot** — categorical strip/dot plots
-- **CandlestickPlot** — OHLC financial charts
-- **ECDF** — empirical cumulative distribution functions
-- **RugPlot** — marginal tick marks
-- **JointPlot** — scatter with marginal histograms/KDE/rug distributions
-- **WaterfallChart** — cumulative positive/negative value bars for financial analysis
-- **FunnelChart** — centered decreasing-width bars for conversion funnels
-- **GaugeChart** — semicircular gauge with needle indicator for KPI dashboards
-- **GanttChart** — horizontal bar segments for scheduling/timeline visualization
+- **Pcolormesh** — pseudocolor plot of 2D array
+- **StairsPlot** — step functions with fill-to-baseline
+- **StemPlot** — discrete event / impulse visualization
+- **EventPlot** — spike raster / event timing plots
+- **CarpetPlot** — curvilinear parameter-space grid with coloring
+- **SmithChart** — RF impedance chart with constant-R/X circles
+- **ChoroplethMap** — tile-based geographic region coloring
+- **PSD** — power spectral density (fft feature)
+- **Spectrogram** — time-frequency display (fft feature)
 
-#### 3D Plots
-- **Surface3D** — colored surface with half-block shading and wireframe
-- **Wireframe3D** — depth-cued wireframe mesh with Braille lines
+#### Financial
+- **CandlestickChart** — OHLC financial charts (candlestick and OHLC bar modes)
+- **WaterfallChart** — cumulative positive/negative value bars
+- **GanttChart** — horizontal bar segments for scheduling/timeline
+- **GaugeChart** — semicircular gauge with needle indicator
+- **FunnelChart** — centered decreasing-width conversion bars
+- **FunnelArea** — trapezoidal proportional-area funnel
+
+#### Hierarchical & Relational
+- **TreemapChart** — area-proportional hierarchical rectangles
+- **SunburstChart** — hierarchical nested ring charts
+- **IcicleChart** — rectangular hierarchy with orientation options
+- **SankeyDiagram** — flow diagrams with node-to-node bands
+- **DendrogramPlot** — hierarchical clustering trees
+- **ClusterMap** — heatmap with row/column dendrograms
+- **NetworkGraph** — force-directed or manual-layout graph visualization
+- **ParallelCoords** — parallel coordinates for multivariate data
+- **ParallelCategories** — categorical flow ribbons between dimensions
+
+#### Polar & Specialized
+- **RadialPlot** — polar coordinates: line, scatter, bar, fill-between (also aliased as RadarPlot)
+- **TernaryPlot** — ternary/triangle diagrams with percentage labels
+
+#### 3D Visualization
+- **Surface3D** — colored surface with filled/wireframe/both render modes
 - **Scatter3D** — 3D point cloud with axis lines
+- **Line3D** — 3D parametric lines/trajectories with depth-cued brightness
+- **Mesh3D** — arbitrary triangle mesh with painter's algorithm
 - **Bar3D** — 3D bar chart with depth sorting
 - **Contour3D** — filled contour surfaces in 3D
 - **Quiver3D** — 3D vector field arrows
+- **Voxels** — 3D colored cube grid
+- **Isosurface** — marching cubes on 3D scalar field
+- **Volume3D** — volumetric rendering via ray compositing
+- **Streamtube** — thick depth-cued 3D streamlines
 
 All 3D widgets support interactive camera control via `Camera3DState` (arrow keys to rotate, +/- to zoom).
 
-#### Specialized Plots
-- **RadialPlot** — polar coordinates: line, scatter, bar, fill-between
-- **TernaryPlot** — ternary/triangle diagrams with percentage labels
-- **NetworkGraph** — force-directed or manual-layout graph visualization
-- **ParallelCoords** — parallel coordinates for multivariate data
-- **SankeyDiagram** — flow diagrams with node-to-node bands
-- **SunburstChart** — hierarchical nested ring charts
-- **TreemapChart** — area-proportional hierarchical rectangles
-- **DendrogramPlot** — hierarchical clustering trees
-- **StreamPlot** — vector field streamlines via Runge-Kutta integration
+#### Triangulation
+- **TriPlot** — triangulated mesh display
+- **TriContour** — contours on unstructured triangulated data
+- **TriColor** — color-filled triangulation
 
 #### Layout
-- **MultiPanel** — GridSpec-like subplot grid with `width_ratios` / `height_ratios`, mosaic syntax, shared axes
-- **FacetGrid** — seaborn-style automatic small multiples from grouped data
+- **MultiPanel** — GridSpec-like subplot grid with `width_ratios` / `height_ratios`, mosaic syntax
+- **FacetGrid** — automatic small multiples with free scales, column wrap, margin titles
 - **TwinAxes** — dual y-axis overlay with independent scales
 - **InsetPlot** — zoomed inset panels with highlighted source regions
+- **JointPlot** — scatter with marginal histograms/KDE/rug distributions
+- **PairPlot** — N x N scatter matrix with KDE/histogram diagonals
 
 #### Interactivity
 - **Crosshair** — cursor overlay with coordinate readout
@@ -171,6 +214,7 @@ All 3D widgets support interactive camera control via `Camera3DState` (arrow key
 - **InteractiveLegend** — click-to-toggle series visibility with `SharedLegendState`
 - **SpanSelector** — horizontal/vertical range selection overlay
 - **RectangleSelector** — 2D rectangular selection overlay
+- **LassoSelector** — freehand polygon selection
 - **LinkedView** — synchronized pan/zoom bounds across multiple panels with `SharedView`
 
 </details>

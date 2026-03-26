@@ -1,6 +1,6 @@
 [package]
 name = "ratatui-plt"
-version = "0.0.2"
+version = "0.0.3"
 edition = "2024"
 description = "Scientific visualization widgets for ratatui — matplotlib for the terminal"
 authors = ["Albin <albin@sjoegren.se>"]
