@@ -11,7 +11,7 @@ use crate::annotation::Annotation;
 use crate::axis::{AspectRatio, Axis};
 use crate::colormap::{Colorbar, Colormap, Viridis};
 use crate::frame::{DataBounds, PlotFrame, ReferenceLine};
-use crate::norm::{LinearNorm, Normalize};
+use crate::norm::{LinearNorm, Normalize, TwoSlopeNorm};
 use crate::plot_buffer::{PlotBuffer, Z_ANNOTATION, Z_DATA};
 use crate::series::GridData;
 use crate::spines::Spines;
@@ -42,6 +42,14 @@ pub struct Heatmap {
     show_colorbar: bool,
     aspect_ratio: AspectRatio,
     show_values: bool,
+    /// Format string for cell values (e.g. ".2" for 2 decimal places).
+    value_format: Option<String>,
+    /// Center value for diverging colormaps. When set, automatically uses
+    /// `TwoSlopeNorm` centered on this value.
+    center: Option<f64>,
+    /// When true, compute vmin/vmax from 2nd and 98th percentiles instead of
+    /// absolute min/max, making the colormap resistant to outliers.
+    robust: bool,
     /// Color used for NaN/invalid cells.
     bad_color: Color,
     /// Optional boolean mask. When set, cells where `mask[row][col]` is `true`
@@ -67,6 +75,9 @@ impl Heatmap {
             show_colorbar: true,
             aspect_ratio: AspectRatio::Auto,
             show_values: false,
+            value_format: None,
+            center: None,
+            robust: false,
             bad_color: Theme::get_default().bad_data_color,
             mask: None,
             theme: Theme::get_default(),
@@ -124,6 +135,27 @@ impl Heatmap {
         self
     }
 
+    /// Set the format string for cell values (e.g. ".2" for 2 decimal places,
+    /// ".0" for integers). Only takes effect when `show_values` is enabled.
+    pub fn value_format(mut self, fmt: impl Into<String>) -> Self {
+        self.value_format = Some(fmt.into());
+        self
+    }
+
+    /// Set the center value for diverging colormaps. When set, automatically
+    /// uses `TwoSlopeNorm` centered on this value, overriding any custom norm.
+    pub fn center(mut self, center: f64) -> Self {
+        self.center = Some(center);
+        self
+    }
+
+    /// Enable robust percentile scaling. When true, vmin/vmax are computed
+    /// from the 2nd and 98th percentiles instead of absolute min/max.
+    pub fn robust(mut self, robust: bool) -> Self {
+        self.robust = robust;
+        self
+    }
+
     /// Set the color used for NaN/invalid cells.
     pub fn bad_color(mut self, color: Color) -> Self {
         self.bad_color = color;
@@ -170,6 +202,39 @@ impl Heatmap {
     }
 }
 
+/// Format a value with an optional precision string.
+fn format_value(val: f64, fmt: &Option<String>) -> String {
+    match fmt {
+        Some(f) if f.starts_with('.') => {
+            if let Ok(prec) = f[1..].parse::<usize>() {
+                format!("{val:.prec$}")
+            } else {
+                format!("{val:.1}")
+            }
+        }
+        Some(f) => {
+            if let Ok(prec) = f.parse::<usize>() {
+                format!("{val:.prec$}")
+            } else {
+                format!("{val:.1}")
+            }
+        }
+        None => format!("{val:.1}"),
+    }
+}
+
+/// Compute percentile from a sorted slice. `p` is in [0, 1].
+fn percentile(sorted: &[f64], p: f64) -> f64 {
+    if sorted.is_empty() {
+        return 0.0;
+    }
+    let idx = p * (sorted.len() - 1) as f64;
+    let lo = idx.floor() as usize;
+    let hi = idx.ceil().min((sorted.len() - 1) as f64) as usize;
+    let frac = idx - lo as f64;
+    sorted[lo] * (1.0 - frac) + sorted[hi] * frac
+}
+
 impl Widget for &Heatmap {
     fn render(self, area: Rect, buf: &mut Buffer) {
         let nrows = self.data.nrows();
@@ -183,6 +248,49 @@ impl Widget for &Heatmap {
         let x_hi = *self.data.x.last().unwrap_or(&1.0);
         let y_lo = *self.data.y.first().unwrap_or(&0.0);
         let y_hi = *self.data.y.last().unwrap_or(&1.0);
+
+        // Compute effective normalization based on robust/center settings.
+        // Center takes priority over robust if both are set.
+        let effective_norm: Box<dyn Normalize> = if let Some(vcenter) = self.center {
+            let (mut vmin, mut vmax) = self.data.value_bounds();
+            if self.robust {
+                let mut vals: Vec<f64> = self
+                    .data
+                    .values
+                    .iter()
+                    .flatten()
+                    .copied()
+                    .filter(|v| v.is_finite())
+                    .collect();
+                vals.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
+                if !vals.is_empty() {
+                    vmin = percentile(&vals, 0.02);
+                    vmax = percentile(&vals, 0.98);
+                }
+            }
+            // Clamp center between bounds to satisfy TwoSlopeNorm invariant
+            let clamped = vcenter.clamp(vmin, vmax);
+            Box::new(TwoSlopeNorm::new(clamped, vmin, vmax))
+        } else if self.robust {
+            let mut vals: Vec<f64> = self
+                .data
+                .values
+                .iter()
+                .flatten()
+                .copied()
+                .filter(|v| v.is_finite())
+                .collect();
+            vals.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
+            if vals.is_empty() {
+                self.norm.box_clone()
+            } else {
+                let vmin = percentile(&vals, 0.02);
+                let vmax = percentile(&vals, 0.98);
+                Box::new(LinearNorm::new(vmin, vmax))
+            }
+        } else {
+            self.norm.box_clone()
+        };
 
         let colorbar_width: u16 = if self.show_colorbar { 10 } else { 0 };
 
@@ -243,7 +351,7 @@ impl Widget for &Heatmap {
                 let top_color = if top_masked || !top_val.is_finite() {
                     self.bad_color
                 } else {
-                    let top_t = self.norm.normalize(top_val);
+                    let top_t = effective_norm.normalize(top_val);
                     self.colormap.color_at(top_t)
                 };
 
@@ -261,7 +369,7 @@ impl Widget for &Heatmap {
                 let bot_color = if bot_masked || !bot_val.is_finite() {
                     self.bad_color
                 } else {
-                    let bot_t = self.norm.normalize(bot_val);
+                    let bot_t = effective_norm.normalize(bot_val);
                     self.colormap.color_at(bot_t)
                 };
 
@@ -298,7 +406,7 @@ impl Widget for &Heatmap {
                             continue;
                         }
 
-                        let label = format!("{:.1}", val);
+                        let label = format_value(val, &self.value_format);
 
                         // Compute center screen position for this cell
                         // Row 0 is at the top of data but bottom of screen (y inverted)
@@ -309,7 +417,7 @@ impl Widget for &Heatmap {
                         let yi = center_y.round() as u16;
 
                         // Determine contrasting text color based on cell luminance
-                        let t = self.norm.normalize(val);
+                        let t = effective_norm.normalize(val);
                         let fg_color = match self.colormap.color_at(t) {
                             Color::Rgb(r, g, b) => {
                                 let luminance =

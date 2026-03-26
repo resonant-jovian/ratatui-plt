@@ -120,12 +120,12 @@ pub use crate::transform::{Camera3D, Camera3DState, aspect_area, square_area};
 
 // ── Core Visualization Widgets ───────────────────────────────────────────────
 pub use crate::widgets::area_chart::{AreaChart, AreaMode};
-pub use crate::widgets::bar_chart::BarChart;
+pub use crate::widgets::bar_chart::{BarChart, BarMode};
 pub use crate::widgets::histogram::Histogram;
 pub use crate::widgets::image_plot::{
     ImageData, ImageOrigin, ImagePlot, Interpolation, matshow, spy,
 };
-pub use crate::widgets::line_plot::LinePlot;
+pub use crate::widgets::line_plot::{InterpolationMode, LinePlot};
 pub use crate::widgets::pie_chart::{PieChart, PieSlice};
 pub use crate::widgets::scatter_plot::ScatterPlot;
 #[cfg(feature = "statistics")]
@@ -140,7 +140,7 @@ pub use crate::widgets::error_bar::ErrorBarPlot;
 pub use crate::widgets::rug::{RugDataset, RugPlot, RugSide};
 pub use crate::widgets::strip::{StripGroup, StripPlot};
 pub use crate::widgets::swarm::SwarmPlot;
-pub use crate::widgets::violin_plot::{ViolinInner, ViolinPlot};
+pub use crate::widgets::violin_plot::{DensityNorm, ViolinInner, ViolinPlot};
 
 // ── Scientific Widgets ──────────────────────────────────────────────────────
 pub use crate::widgets::contour::ContourPlot;
@@ -187,7 +187,7 @@ pub use crate::widgets::tricontour::TriContour;
 pub use crate::widgets::triplot::TriPlot;
 
 // ── Layout Widgets ──────────────────────────────────────────────────────────
-pub use crate::widgets::facet_grid::{FacetData, FacetGrid, FacetRecord};
+pub use crate::widgets::facet_grid::{FacetData, FacetGrid, FacetRecord, FacetScales};
 pub use crate::widgets::inset::InsetAxes;
 pub use crate::widgets::joint_plot::{JointPlot, MarginalType};
 pub use crate::widgets::multi_panel::{MosaicPanel, MultiPanel};

@@ -22,6 +22,10 @@ pub enum HistNorm {
     Density,
     /// Probability (bar heights sum to 1).
     Probability,
+    /// Probability as a percentage (bar heights sum to 100).
+    Percent,
+    /// Frequency: count divided by bin width.
+    Frequency,
 }
 
 /// Multi-histogram display mode.
@@ -121,6 +125,7 @@ pub struct Histogram {
     rwidth: f64,
     show_legend: bool,
     legend_position: LegendPosition,
+    show_kde: bool,
 }
 
 impl Histogram {
@@ -147,6 +152,7 @@ impl Histogram {
             rwidth: 1.0,
             show_legend: true,
             legend_position: LegendPosition::TopRight,
+            show_kde: false,
         }
     }
 
@@ -268,6 +274,15 @@ impl Histogram {
         self
     }
 
+    /// Enable or disable KDE (kernel density estimation) overlay.
+    ///
+    /// When enabled and the `statistics` feature is active, a smooth density
+    /// curve is drawn on top of the histogram bars using Braille characters.
+    pub fn show_kde(mut self, show: bool) -> Self {
+        self.show_kde = show;
+        self
+    }
+
     /// Resolve the number of bins from data, considering bin_method and explicit bins setting.
     fn resolve_bin_count(&self, data: &[f64]) -> usize {
         if let Some(ref method) = self.bin_method {
@@ -311,6 +326,8 @@ impl Histogram {
             HistNorm::Count => counts,
             HistNorm::Density => counts.iter().map(|&c| c / (n_total * bin_width)).collect(),
             HistNorm::Probability => counts.iter().map(|&c| c / n_total).collect(),
+            HistNorm::Percent => counts.iter().map(|&c| c / n_total * 100.0).collect(),
+            HistNorm::Frequency => counts.iter().map(|&c| c / bin_width).collect(),
         };
 
         (edges, heights)
@@ -539,6 +556,12 @@ impl Histogram {
             },
         );
 
+        // Draw KDE overlay if enabled
+        #[cfg(feature = "statistics")]
+        if self.show_kde {
+            self.draw_kde_overlay(&self.data, &pa, pb, resolved_color, y_lo, y_hi);
+        }
+
         // Draw annotations
         PlotFrame::draw_annotations_pb(&pa, &self.annotations, pb);
 
@@ -716,6 +739,14 @@ impl Histogram {
             }
         }
 
+        // Draw KDE overlay for each dataset if enabled
+        #[cfg(feature = "statistics")]
+        if self.show_kde {
+            for ds in &self.datasets {
+                self.draw_kde_overlay(&ds.data, &pa, pb, ds.color, y_lo, y_hi);
+            }
+        }
+
         // Draw annotations
         PlotFrame::draw_annotations_pb(&pa, &self.annotations, pb);
 
@@ -874,6 +905,76 @@ impl Histogram {
                     }
                 }
             }
+        }
+    }
+
+    /// Draw a KDE (kernel density estimation) curve as a Braille line overlay.
+    ///
+    /// The KDE density values are scaled to match the histogram's current
+    /// normalization mode so the curve visually aligns with the bars.
+    #[cfg(feature = "statistics")]
+    fn draw_kde_overlay(
+        &self,
+        data: &[f64],
+        pa: &crate::frame::PlotArea,
+        pb: &mut PlotBuffer,
+        color: Color,
+        _y_lo: f64,
+        _y_hi: f64,
+    ) {
+        use crate::drawing::draw_braille_line_pb;
+        use crate::statistics::Kde;
+
+        let clean: Vec<f64> = data.iter().copied().filter(|v| v.is_finite()).collect();
+        if clean.len() < 2 {
+            return;
+        }
+
+        let kde = Kde::new();
+        let (kde_x, kde_density) = kde.fit(&clean);
+        if kde_x.is_empty() {
+            return;
+        }
+
+        // Scale the raw KDE density (which integrates to 1) to match the
+        // histogram's current normalization mode.
+        let n_total = clean.len() as f64;
+        let n_bins = self.resolve_bin_count(&clean);
+        let (lo, hi) = self.compute_range_for_data(&clean);
+        let bin_width = if n_bins > 0 {
+            (hi - lo) / n_bins as f64
+        } else {
+            1.0
+        };
+
+        let kde_y: Vec<f64> = match self.norm_mode {
+            // Count: density * n_total * bin_width
+            HistNorm::Count => kde_density
+                .iter()
+                .map(|&d| d * n_total * bin_width)
+                .collect(),
+            // Density: raw KDE density is already a probability density
+            HistNorm::Density => kde_density.clone(),
+            // Probability: density * bin_width
+            HistNorm::Probability => kde_density.iter().map(|&d| d * bin_width).collect(),
+            // Percent: density * bin_width * 100
+            HistNorm::Percent => kde_density
+                .iter()
+                .map(|&d| d * bin_width * 100.0)
+                .collect(),
+            // Frequency: density * n_total
+            HistNorm::Frequency => kde_density.iter().map(|&d| d * n_total).collect(),
+        };
+
+        // Draw the KDE curve as connected Braille line segments
+        let z = Z_DATA + 1;
+        for i in 1..kde_x.len() {
+            let sx0 = pa.screen_x(kde_x[i - 1]);
+            let sy0 = pa.screen_y(kde_y[i - 1]);
+            let sx1 = pa.screen_x(kde_x[i]);
+            let sy1 = pa.screen_y(kde_y[i]);
+
+            draw_braille_line_pb(pb, sx0, sy0, sx1, sy1, color, pa, z);
         }
     }
 }
