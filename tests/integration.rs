@@ -463,7 +463,7 @@ fn test_radial_plot_renders() {
 }
 
 #[test]
-fn test_stacked_area_renders() {
+fn test_area_chart_renders() {
     let s1 = Series::new("A")
         .data(
             (0..10)
@@ -481,7 +481,7 @@ fn test_stacked_area_renders() {
     let s3 = Series::new("C")
         .data((0..10).map(|i| (i as f64, 0.5)).collect())
         .color(Color::Magenta);
-    let plot = StackedArea::new()
+    let plot = AreaChart::new()
         .series(s1)
         .series(s2)
         .series(s3)
@@ -531,9 +531,11 @@ fn test_scatter3d_renders() {
 }
 
 #[test]
-fn test_wireframe3d_renders() {
+fn test_surface3d_wireframe_mode_renders() {
     let data = GridData::from_fn((-1.0, 1.0), (-1.0, 1.0), 5, 5, |x, y| x * x + y * y);
-    let plot = Wireframe3D::new(data).title("Wireframe");
+    let plot = Surface3D::new(data)
+        .render_mode(SurfaceRenderMode::Wireframe)
+        .title("Wireframe");
 
     let area = Rect::new(0, 0, 40, 20);
     let mut buf = Buffer::empty(area);
@@ -920,9 +922,11 @@ fn test_scatter3d_stateful_renders() {
 }
 
 #[test]
-fn test_wireframe3d_stateful_renders() {
+fn test_surface3d_wireframe_stateful_renders() {
     let data = GridData::from_fn((-1.0, 1.0), (-1.0, 1.0), 5, 5, |x, y| x * x + y * y);
-    let plot = Wireframe3D::new(data).title("Wireframe Stateful");
+    let plot = Surface3D::new(data)
+        .render_mode(SurfaceRenderMode::Wireframe)
+        .title("Wireframe Stateful");
 
     let area = Rect::new(0, 0, 40, 20);
     let mut buf = Buffer::empty(area);

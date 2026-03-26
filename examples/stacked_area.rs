@@ -72,7 +72,7 @@ fn main() -> color_eyre::Result<()> {
         .data((0..n).map(|i| (i as f64, 25.0)).collect())
         .color(cycle.next_color());
 
-    let plot = StackedArea::new()
+    let plot = AreaChart::new()
         .series(solar)
         .series(wind)
         .series(hydro)

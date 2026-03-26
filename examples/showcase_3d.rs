@@ -55,15 +55,16 @@ fn main() -> color_eyre::Result<()> {
         .camera(Camera3D::new().azimuth(-60.0).elevation(30.0))
         .title("Surface3D: sinc(r)");
 
-    // ── 2. Wireframe3D: same surface as wireframe ───────────────────────
+    // ── 2. Wireframe mode: same surface as wireframe ───────────────────
     let wire_data = GridData::from_fn((-6.0, 6.0), (-6.0, 6.0), 30, 30, |x, y| {
         let r = (x * x + y * y).sqrt().max(0.001);
         r.sin() / r
     });
-    let wireframe = Wireframe3D::new(wire_data)
-        .color(theme.primary)
+    let wireframe = Surface3D::new(wire_data)
+        .render_mode(SurfaceRenderMode::Wireframe)
+        .wireframe_color(theme.primary)
         .camera(Camera3D::new().azimuth(-60.0).elevation(30.0))
-        .title("Wireframe3D: sinc(r)");
+        .title("Wireframe: sinc(r)");
 
     // ── 3. Scatter3D: random 3D point cloud ─────────────────────────────
     let mut seed = 77_u64;

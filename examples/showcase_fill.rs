@@ -1,7 +1,7 @@
 //! Showcase: Fill plots replicating matplotlib reference gallery.
 //!
 //! 2 plots stacked vertically in a 2x1 MultiPanel:
-//! Top) BandPlot (fill_between), Bottom) StackedArea (stackplot).
+//! Top) BandPlot (fill_between), Bottom) AreaChart (stackplot).
 
 use std::io;
 
@@ -61,7 +61,7 @@ fn main() -> color_eyre::Result<()> {
         .show_legend(true)
         .legend_position(LegendPosition::TopRight);
 
-    // ---- Panel B: StackedArea (3 series) ----
+    // ---- Panel B: AreaChart (3 series, stacked) ----
     let n_stack = 200;
 
     let series_a = Series::new("Research")
@@ -97,7 +97,7 @@ fn main() -> color_eyre::Result<()> {
         )
         .color(blue_light);
 
-    let stacked = StackedArea::new()
+    let stacked = AreaChart::new()
         .series(series_a)
         .series(series_b)
         .series(series_c)

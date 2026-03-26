@@ -39,8 +39,9 @@ fn main() -> color_eyre::Result<()> {
     });
 
     let theme = Theme::get_default();
-    let wireframe = Wireframe3D::new(data)
-        .color(theme.primary)
+    let wireframe = Surface3D::new(data)
+        .render_mode(SurfaceRenderMode::Wireframe)
+        .wireframe_color(theme.primary)
         .title("Gaussian Bump - Arrow keys: rotate, +/-: zoom, q: quit");
 
     let mut camera_state = Camera3DState::default();

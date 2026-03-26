@@ -13,9 +13,22 @@ use crate::series::GridData;
 use crate::theme::Theme;
 use crate::transform::{Camera3D, Camera3DState, data_to_screen};
 
+/// How the 3D surface is rendered.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub enum SurfaceRenderMode {
+    /// Filled surface with half-block shading (default behavior when wireframe overlay is shown).
+    #[default]
+    Both,
+    /// Filled surface only, no wireframe grid lines.
+    Filled,
+    /// Wireframe only — depth-cued Braille lines with no filled faces.
+    Wireframe,
+}
+
 /// A 3D surface plot widget.
 ///
 /// Renders z = f(x, y) as a colored surface using isometric or perspective projection.
+/// Supports filled surface, wireframe, or both combined via [`SurfaceRenderMode`].
 /// Supports both static (`Widget`) and interactive (`StatefulWidget`) usage.
 ///
 /// # Example
@@ -36,7 +49,9 @@ pub struct Surface3D {
     colormap: Box<dyn Colormap>,
     norm: Box<dyn Normalize>,
     title: Option<String>,
-    show_wireframe: bool,
+    render_mode: SurfaceRenderMode,
+    /// Base color for wireframe-only mode (overrides colormap-derived axis color).
+    wireframe_color: Option<Color>,
     theme: Theme,
 }
 
@@ -49,7 +64,8 @@ impl Surface3D {
             colormap: Box::new(Viridis),
             norm: Box::new(LinearNorm::new(vmin, vmax)),
             title: None,
-            show_wireframe: true,
+            render_mode: SurfaceRenderMode::default(),
+            wireframe_color: None,
             theme: Theme::get_default(),
         }
     }
@@ -74,8 +90,26 @@ impl Surface3D {
         self
     }
 
+    /// Set the render mode (Filled, Wireframe, or Both).
+    pub fn render_mode(mut self, mode: SurfaceRenderMode) -> Self {
+        self.render_mode = mode;
+        self
+    }
+
+    /// Set the base color for wireframe-only mode.
+    /// In `Both` mode, wireframe uses the theme's axis color instead.
+    pub fn wireframe_color(mut self, c: Color) -> Self {
+        self.wireframe_color = Some(c);
+        self
+    }
+
+    /// Legacy method — use `render_mode()` instead.
     pub fn show_wireframe(mut self, show: bool) -> Self {
-        self.show_wireframe = show;
+        self.render_mode = if show {
+            SurfaceRenderMode::Both
+        } else {
+            SurfaceRenderMode::Filled
+        };
         self
     }
 
@@ -210,6 +244,38 @@ impl Surface3D {
             y_hi: 0.0,
             area: Rect::new(px, py, pw, ph),
         };
+
+        // In wireframe-only mode, render depth-cued lines instead of filled faces
+        if self.render_mode == SurfaceRenderMode::Wireframe {
+            render_wireframe_only(
+                &projected,
+                nrows,
+                ncols,
+                &ScreenBounds {
+                    sx_min,
+                    sx_max,
+                    sy_min,
+                    sy_max,
+                },
+                &pa,
+                self.wireframe_color.unwrap_or(self.theme.primary),
+                buf,
+            );
+
+            draw_axis_lines(
+                camera,
+                buf,
+                &pa,
+                &ScreenBounds {
+                    sx_min,
+                    sx_max,
+                    sy_min,
+                    sy_max,
+                },
+                &self.theme,
+            );
+            return;
+        }
 
         // Draw faces with scanline rasterization using half-block shading
         for &(j, i, _) in &faces {
@@ -355,7 +421,7 @@ impl Surface3D {
             }
 
             // Draw wireframe edges using Braille lines for higher resolution
-            if self.show_wireframe {
+            if self.render_mode == SurfaceRenderMode::Both {
                 let wire_color = self.theme.axis_color;
                 let edges = [(0, 1), (1, 2), (2, 3), (3, 0)];
                 for &(a, b) in &edges {
@@ -437,6 +503,113 @@ struct ScreenBounds {
     sx_max: f64,
     sy_min: f64,
     sy_max: f64,
+}
+
+/// Render wireframe-only mode with depth-cued brightness.
+///
+/// Draws grid lines as Braille characters where brightness varies with depth —
+/// nearer lines are brighter, farther lines are dimmer.
+fn render_wireframe_only(
+    projected: &[(f64, f64, f64, f64)],
+    nrows: usize,
+    ncols: usize,
+    sb: &ScreenBounds,
+    pa: &PlotArea,
+    base_color: Color,
+    buf: &mut Buffer,
+) {
+    let (px, pw, py, ph) = (pa.x, pa.width, pa.y, pa.height);
+
+    let map_x =
+        |sx: f64| data_to_screen(sx, sb.sx_min, sb.sx_max, px as f64, (px + pw - 1) as f64);
+    let map_y =
+        |sy: f64| data_to_screen(sy, sb.sy_min, sb.sy_max, py as f64, (py + ph - 1) as f64);
+
+    // Find depth range for brightness mapping
+    let depth_min = projected
+        .iter()
+        .map(|p| p.2)
+        .fold(f64::INFINITY, f64::min);
+    let depth_max = projected
+        .iter()
+        .map(|p| p.2)
+        .fold(f64::NEG_INFINITY, f64::max);
+    let depth_range = if depth_max == depth_min {
+        1.0
+    } else {
+        depth_max - depth_min
+    };
+
+    // Collect line segments with depth
+    struct Segment {
+        sx0: f64,
+        sy0: f64,
+        sx1: f64,
+        sy1: f64,
+        depth: f64,
+    }
+
+    let mut segments: Vec<Segment> = Vec::new();
+
+    // Row lines
+    for j in 0..nrows {
+        for i in 0..ncols - 1 {
+            let idx0 = j * ncols + i;
+            let idx1 = j * ncols + i + 1;
+            segments.push(Segment {
+                sx0: map_x(projected[idx0].0),
+                sy0: map_y(projected[idx0].1),
+                sx1: map_x(projected[idx1].0),
+                sy1: map_y(projected[idx1].1),
+                depth: (projected[idx0].2 + projected[idx1].2) / 2.0,
+            });
+        }
+    }
+    // Column lines
+    for j in 0..nrows - 1 {
+        for i in 0..ncols {
+            let idx0 = j * ncols + i;
+            let idx1 = (j + 1) * ncols + i;
+            segments.push(Segment {
+                sx0: map_x(projected[idx0].0),
+                sy0: map_y(projected[idx0].1),
+                sx1: map_x(projected[idx1].0),
+                sy1: map_y(projected[idx1].1),
+                depth: (projected[idx0].2 + projected[idx1].2) / 2.0,
+            });
+        }
+    }
+
+    // Sort back-to-front (farthest first)
+    segments.sort_by(|a, b| {
+        a.depth
+            .partial_cmp(&b.depth)
+            .unwrap_or(std::cmp::Ordering::Equal)
+    });
+
+    // Resolve base color to RGB components
+    let (r, g, b) = match base_color {
+        Color::Rgb(r, g, b) => (r, g, b),
+        Color::Cyan => (0, 255, 255),
+        Color::Green => (0, 255, 0),
+        Color::Yellow => (255, 255, 0),
+        Color::Red => (255, 0, 0),
+        Color::Blue => (0, 0, 255),
+        Color::Magenta => (255, 0, 255),
+        _ => (255, 255, 255),
+    };
+
+    // Draw segments with depth-cued brightness
+    for seg in &segments {
+        let brightness =
+            ((seg.depth - depth_min) / depth_range * 200.0 + 55.0).clamp(55.0, 255.0) as u8;
+        let color = Color::Rgb(
+            (r as f64 * brightness as f64 / 255.0) as u8,
+            (g as f64 * brightness as f64 / 255.0) as u8,
+            (b as f64 * brightness as f64 / 255.0) as u8,
+        );
+        draw_braille_line(buf, seg.sx0, seg.sy0, seg.sx1, seg.sy1, color, pa);
+    }
 }
 
 /// Draw 3D axis lines (X, Y, Z) at the edges of the data bounding box.

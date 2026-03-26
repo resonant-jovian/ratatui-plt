@@ -64,9 +64,19 @@ impl Candle {
     }
 }
 
+/// Visual style for displaying OHLC data.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub enum CandleDisplayMode {
+    /// Traditional candlestick: filled body (open→close) with thin wicks (high/low).
+    #[default]
+    Candlestick,
+    /// OHLC bar: vertical line (high→low) with left tick (open) and right tick (close).
+    Ohlc,
+}
+
 /// A candlestick (OHLC) chart widget.
 ///
-/// Draws vertical wicks from low to high and filled bodies from open to close.
+/// Draws OHLC financial data as either traditional candlesticks or OHLC bars.
 /// Bullish candles (close > open) are drawn with `bull_color`, bearish candles
 /// with `bear_color`.
 #[derive(Clone)]
@@ -75,6 +85,7 @@ pub struct CandlestickChart {
     x_axis: Axis,
     y_axis: Axis,
     title: Option<String>,
+    display_mode: CandleDisplayMode,
     bull_color: Color,
     bear_color: Color,
     theme: Theme,
@@ -90,6 +101,7 @@ impl Default for CandlestickChart {
             x_axis: Axis::new(),
             y_axis: Axis::new(),
             title: None,
+            display_mode: CandleDisplayMode::default(),
             bull_color: Theme::get_default().positive_color,
             bear_color: Theme::get_default().negative_color,
             theme: Theme::get_default(),
@@ -115,6 +127,12 @@ impl CandlestickChart {
     /// Set all candles at once.
     pub fn candles(mut self, candles: Vec<Candle>) -> Self {
         self.candles = candles;
+        self
+    }
+
+    /// Set the display mode (Candlestick or Ohlc).
+    pub fn display_mode(mut self, mode: CandleDisplayMode) -> Self {
+        self.display_mode = mode;
         self
     }
 
@@ -251,58 +269,127 @@ impl Widget for &CandlestickChart {
 
             let sy_open = pa.screen_y(candle.open).round() as u16;
             let sy_close = pa.screen_y(candle.close).round() as u16;
-            let body_top = sy_open.min(sy_close);
-            let body_bot = sy_open.max(sy_close).max(body_top);
 
-            // Body width is dynamic based on number of candles
-            let body_left = sx.saturating_sub(half_body).max(pa.x);
-            let body_right = (sx + half_body).min(pa.x + pa.width - 1);
+            match self.display_mode {
+                CandleDisplayMode::Candlestick => {
+                    let body_top = sy_open.min(sy_close);
+                    let body_bot = sy_open.max(sy_close).max(body_top);
 
-            // 1. Clear the full candle area with a reset background
-            for y in wick_top..=wick_bot {
-                for x in body_left..=body_right {
-                    if pa.contains(x, y) {
-                        pb.set_bg(x, y, Color::Reset, Z_FILL);
+                    // Body width is dynamic based on number of candles
+                    let body_left = sx.saturating_sub(half_body).max(pa.x);
+                    let body_right = (sx + half_body).min(pa.x + pa.width - 1);
+
+                    // 1. Clear the full candle area with a reset background
+                    for y in wick_top..=wick_bot {
+                        for x in body_left..=body_right {
+                            if pa.contains(x, y) {
+                                pb.set_bg(x, y, Color::Reset, Z_FILL);
+                            }
+                        }
                     }
-                }
-            }
 
-            // 2. Draw body (solid filled block, 3 columns wide)
-            for y in body_top..=body_bot {
-                for x in body_left..=body_right {
-                    if pa.contains(x, y) {
-                        pb.set_char(x, y, self.theme.chars.fill.solid, color, Z_DATA);
+                    // 2. Draw body (solid filled block)
+                    for y in body_top..=body_bot {
+                        for x in body_left..=body_right {
+                            if pa.contains(x, y) {
+                                pb.set_char(x, y, self.theme.chars.fill.solid, color, Z_DATA);
+                            }
+                        }
                     }
-                }
-            }
 
-            // 3. Draw wicks on center column at Z_MARKER (on top of body fill)
-            if wick_top < body_top {
-                if pa.contains(sx, wick_top) {
-                    pb.set_char(sx, wick_top, self.theme.chars.tick.cap_top, color, Z_MARKER);
-                }
-                for y in (wick_top + 1)..body_top {
-                    if pa.contains(sx, y) {
-                        pb.set_char(sx, y, self.theme.chars.border.vertical, color, Z_MARKER);
+                    // 3. Draw wicks on center column at Z_MARKER (on top of body fill)
+                    if wick_top < body_top {
+                        if pa.contains(sx, wick_top) {
+                            pb.set_char(
+                                sx,
+                                wick_top,
+                                self.theme.chars.tick.cap_top,
+                                color,
+                                Z_MARKER,
+                            );
+                        }
+                        for y in (wick_top + 1)..body_top {
+                            if pa.contains(sx, y) {
+                                pb.set_char(
+                                    sx,
+                                    y,
+                                    self.theme.chars.border.vertical,
+                                    color,
+                                    Z_MARKER,
+                                );
+                            }
+                        }
                     }
-                }
-            }
-            if wick_bot > body_bot {
-                if wick_bot > body_bot + 1 {
-                    for y in (body_bot + 1)..wick_bot {
-                        if pa.contains(sx, y) {
-                            pb.set_char(sx, y, self.theme.chars.border.vertical, color, Z_MARKER);
+                    if wick_bot > body_bot {
+                        if wick_bot > body_bot + 1 {
+                            for y in (body_bot + 1)..wick_bot {
+                                if pa.contains(sx, y) {
+                                    pb.set_char(
+                                        sx,
+                                        y,
+                                        self.theme.chars.border.vertical,
+                                        color,
+                                        Z_MARKER,
+                                    );
+                                }
+                            }
+                        }
+                        if pa.contains(sx, wick_bot) {
+                            pb.set_char(
+                                sx,
+                                wick_bot,
+                                self.theme.chars.tick.cap_bottom,
+                                color,
+                                Z_MARKER,
+                            );
                         }
                     }
                 }
-                if pa.contains(sx, wick_bot) {
-                    pb.set_char(
-                        sx,
-                        wick_bot,
-                        self.theme.chars.tick.cap_bottom,
-                        color,
-                        Z_MARKER,
-                    );
+                CandleDisplayMode::Ohlc => {
+                    // OHLC bar: vertical line (high→low), left tick (open), right tick (close)
+                    // Draw vertical line from high to low
+                    for y in wick_top..=wick_bot {
+                        if pa.contains(sx, y) {
+                            pb.set_char(
+                                sx,
+                                y,
+                                self.theme.chars.border.vertical,
+                                color,
+                                Z_DATA,
+                            );
+                        }
+                    }
+
+                    // Open tick: horizontal line extending LEFT from center
+                    let tick_len = half_body.max(1);
+                    let open_y = sy_open.clamp(pa.y, pa.y + pa.height - 1);
+                    for dx in 1..=tick_len {
+                        let tick_x = sx.saturating_sub(dx);
+                        if pa.contains(tick_x, open_y) {
+                            pb.set_char(
+                                tick_x,
+                                open_y,
+                                self.theme.chars.border.horizontal,
+                                color,
+                                Z_DATA,
+                            );
+                        }
+                    }
+
+                    // Close tick: horizontal line extending RIGHT from center
+                    let close_y = sy_close.clamp(pa.y, pa.y + pa.height - 1);
+                    for dx in 1..=tick_len {
+                        let tick_x = sx + dx;
+                        if pa.contains(tick_x, close_y) {
+                            pb.set_char(
+                                tick_x,
+                                close_y,
+                                self.theme.chars.border.horizontal,
+                                color,
+                                Z_DATA,
+                            );
+                        }
+                    }
                 }
             }
         }

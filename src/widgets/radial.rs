@@ -36,7 +36,16 @@ pub enum PolarPlotType {
 /// A radial (polar coordinate) plot widget.
 ///
 /// Displays data in polar coordinates with circular grid lines and angular tick marks.
-/// Useful for radial density profiles, angular distributions, etc.
+/// Supports multiple visualization modes via [`PolarPlotType`]:
+///
+/// - **Radar/spider chart:** Use `PolarPlotType::Line` (or `FillBetween` for filled).
+///   Supply data as equally-spaced angles with the polygon closed by appending the first
+///   point.
+/// - **Rose/polar bar chart:** Use `PolarPlotType::Bar` for filled wedge sectors from
+///   the origin. Each data point defines a wedge at angle theta with height r.
+/// - **Polar scatter:** Use `PolarPlotType::Scatter` for point markers only.
+///
+/// The type alias [`RadarPlot`] is provided for convenience when building radar/spider charts.
 ///
 /// # Example
 ///
@@ -476,3 +485,27 @@ fn draw_braille_line_clipped_pb(
         }
     }
 }
+
+/// Type alias for [`RadialPlot`] when used for radar/spider charts.
+///
+/// # Example
+///
+/// ```
+/// use ratatui_plt::prelude::*;
+/// use std::f64::consts::TAU;
+///
+/// // 5-axis radar chart
+/// let n = 5;
+/// let mut data: Vec<(f64, f64)> = (0..n)
+///     .map(|i| (i as f64 * TAU / n as f64, (i as f64 + 1.0) * 0.2))
+///     .collect();
+/// // Close the polygon by appending the first point
+/// data.push(data[0]);
+///
+/// let radar = RadarPlot::new()
+///     .series(Series::new("Scores").data(data).color(Color::Cyan))
+///     .plot_type(PolarPlotType::FillBetween)
+///     .n_spokes(n)
+///     .title("Radar Chart");
+/// ```
+pub type RadarPlot = RadialPlot;

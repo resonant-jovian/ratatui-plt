@@ -50,8 +50,8 @@ require_cmd() {
 
 # ── Example Groups ───────────────────────────────────────────────────────────
 
-GROUP_2D=(line_plot scatter_plot heatmap histogram bar_chart contour image_plot pcolormesh collections pie_chart stacked_area stairs stem_plot event_plot hexbin hist2d band rug)
-GROUP_3D=(surface3d wireframe3d scatter3d bar3d contour3d quiver3d vector_field)
+GROUP_2D=(line_plot scatter_plot heatmap histogram bar_chart contour image_plot pcolormesh collections pie_chart stacked_area area_chart stairs stem_plot event_plot hexbin hist2d band rug)
+GROUP_3D=(surface3d scatter3d bar3d contour3d quiver3d vector_field wireframe3d)
 GROUP_STATISTICAL=(box_plot boxen violin_plot ecdf error_bar joint_plot swarm strip statistics trendline)
 GROUP_SHOWCASE=(showcase_basic_2d showcase_3d showcase_fill showcase_grid showcase_statistical showcase_tri showcase_unicode showcase_features)
 GROUP_SPECIALIZED=(radial ternary network parallel_coords sankey sunburst treemap dendrogram streamplot tricolor triplot scientific_dashboard theme_config)

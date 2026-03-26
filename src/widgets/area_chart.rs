@@ -1,8 +1,8 @@
-//! Stacked area chart widget (matplotlib's stackplot equivalent).
+//! Area chart widget (matplotlib's stackplot / fill_between equivalent).
 //!
-//! Renders multiple series as stacked filled areas, with each series
-//! cumulatively added on top of the previous. Uses half-block fill
-//! characters for visual distinction between layers.
+//! Renders series as filled areas with multiple modes: plain (individual
+//! fills), stacked (cumulative), normalized (100% stacked), and streamgraph
+//! (symmetric baseline). Uses half-block fill characters for visual distinction.
 
 use ratatui::buffer::Buffer;
 use ratatui::layout::Rect;
@@ -24,25 +24,44 @@ fn fill_chars(theme: &Theme) -> [char; 4] {
     [f.light, f.medium, f.dense, f.solid]
 }
 
-/// A stacked area chart widget.
+/// How areas are combined when multiple series are present.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub enum AreaMode {
+    /// Each series is filled independently from its line down to the baseline.
+    /// Overlapping regions use painter's algorithm (later series on top).
+    Plain,
+    /// Series are cumulatively stacked on top of each other (default).
+    /// Each series' area starts where the previous one ends.
+    #[default]
+    Stacked,
+    /// Like Stacked, but normalized so the total always fills to 100%.
+    Normalized,
+    /// Symmetric baseline (streamgraph / ThemeRiver). The stack is centered
+    /// around zero with a wiggle-minimizing baseline.
+    StreamGraph,
+}
+
+/// An area chart widget.
 ///
 /// # Example
 ///
 /// ```
-/// use ratatui_plt::widgets::stacked_area::StackedArea;
+/// use ratatui_plt::widgets::area_chart::{AreaChart, AreaMode};
 /// use ratatui_plt::series::Series;
 /// use ratatui::style::Color;
 ///
-/// let chart = StackedArea::new()
+/// let chart = AreaChart::new()
 ///     .series(Series::new("A").data(vec![(0.0, 1.0), (1.0, 2.0), (2.0, 1.5)]).color(Color::Cyan))
 ///     .series(Series::new("B").data(vec![(0.0, 2.0), (1.0, 1.0), (2.0, 2.5)]).color(Color::Yellow))
-///     .title("Stacked Areas");
+///     .mode(AreaMode::Stacked)
+///     .title("Areas");
 /// ```
-pub struct StackedArea {
+pub struct AreaChart {
     series: Vec<Series>,
     x_axis: Axis,
     y_axis: Axis,
     title: Option<String>,
+    mode: AreaMode,
     theme: Theme,
     spines: Spines,
     reference_lines: Vec<ReferenceLine>,
@@ -51,13 +70,14 @@ pub struct StackedArea {
     legend_position: LegendPosition,
 }
 
-impl Default for StackedArea {
+impl Default for AreaChart {
     fn default() -> Self {
         Self {
             series: Vec::new(),
             x_axis: Axis::new(),
             y_axis: Axis::new(),
             title: None,
+            mode: AreaMode::default(),
             theme: Theme::get_default(),
             spines: Spines::default(),
             reference_lines: Vec::new(),
@@ -68,13 +88,19 @@ impl Default for StackedArea {
     }
 }
 
-impl StackedArea {
+impl AreaChart {
     pub fn new() -> Self {
         Self::default()
     }
 
     pub fn series(mut self, s: Series) -> Self {
         self.series.push(s);
+        self
+    }
+
+    /// Set the area mode (Plain, Stacked, Normalized, StreamGraph).
+    pub fn mode(mut self, mode: AreaMode) -> Self {
+        self.mode = mode;
         self
     }
 
@@ -135,7 +161,7 @@ impl StackedArea {
     }
 }
 
-impl Widget for &StackedArea {
+impl Widget for &AreaChart {
     fn render(self, area: Rect, buf: &mut Buffer) {
         if area.width < 4 || area.height < 4 || self.series.is_empty() {
             return;
@@ -169,26 +195,19 @@ impl Widget for &StackedArea {
             }
         }
 
-        // Compute cumulative sums: cumulative[si][xi] = sum of y_values[0..=si][xi]
-        let mut cumulative: Vec<Vec<f64>> = vec![vec![0.0; n_x]; n_series];
-        for xi in 0..n_x {
-            let mut running = 0.0;
-            for si in 0..n_series {
-                running += y_values[si][xi].max(0.0);
-                cumulative[si][xi] = running;
-            }
-        }
+        // Compute upper and lower boundaries per series based on mode
+        let (upper, lower, y_lo_data, y_hi_data) = match self.mode {
+            AreaMode::Plain => compute_plain(&y_values, n_x, n_series),
+            AreaMode::Stacked => compute_stacked(&y_values, n_x, n_series),
+            AreaMode::Normalized => compute_normalized(&y_values, n_x, n_series),
+            AreaMode::StreamGraph => compute_streamgraph(&y_values, n_x, n_series),
+        };
 
         // Determine axis bounds
         let x_lo_data = all_x[0];
         let x_hi_data = *all_x.last().unwrap_or(&0.0);
         let (x_lo, x_hi) = self.x_axis.resolve_bounds(x_lo_data, x_hi_data);
-
-        let y_max_data = cumulative
-            .last()
-            .map(|row| row.iter().cloned().fold(0.0f64, f64::max))
-            .unwrap_or(1.0);
-        let (y_lo, y_hi) = self.y_axis.resolve_bounds(0.0, y_max_data);
+        let (y_lo, y_hi) = self.y_axis.resolve_bounds(y_lo_data, y_hi_data);
 
         let mut pb = PlotBuffer::new(area);
 
@@ -221,20 +240,18 @@ impl Widget for &StackedArea {
             // Map screen column to data x
             let data_x = x_lo + (col_offset as f64 / (pa.width - 1).max(1) as f64) * (x_hi - x_lo);
 
-            // Interpolate cumulative values at this x for each series
-            let mut cum_at_x: Vec<f64> = Vec::with_capacity(n_series);
-            for cum_row in cumulative.iter().take(n_series) {
-                let interp = interpolate_from_arrays(&all_x, cum_row, data_x);
-                cum_at_x.push(interp);
+            // Interpolate upper/lower at this x for each series
+            let mut upper_at_x: Vec<f64> = Vec::with_capacity(n_series);
+            let mut lower_at_x: Vec<f64> = Vec::with_capacity(n_series);
+            for si in 0..n_series {
+                upper_at_x.push(interpolate_from_arrays(&all_x, &upper[si], data_x));
+                lower_at_x.push(interpolate_from_arrays(&all_x, &lower[si], data_x));
             }
 
             // For each series (drawn back to front), fill between lower and upper boundary
             for si in (0..n_series).rev() {
-                let upper = cum_at_x[si];
-                let lower = if si > 0 { cum_at_x[si - 1] } else { 0.0 };
-
                 let sy_upper = data_to_screen(
-                    upper,
+                    upper_at_x[si],
                     y_lo,
                     y_hi,
                     (pa.y + pa.height - 1) as f64,
@@ -242,7 +259,7 @@ impl Widget for &StackedArea {
                 )
                 .round() as u16;
                 let sy_lower = data_to_screen(
-                    lower,
+                    lower_at_x[si],
                     y_lo,
                     y_hi,
                     (pa.y + pa.height - 1) as f64,
@@ -294,6 +311,108 @@ impl Widget for &StackedArea {
             (&legend).render(legend_area, buf);
         }
     }
+}
+
+/// Plain mode: each series filled independently from baseline (y=0).
+fn compute_plain(
+    y_values: &[Vec<f64>],
+    n_x: usize,
+    n_series: usize,
+) -> (Vec<Vec<f64>>, Vec<Vec<f64>>, f64, f64) {
+    let mut upper = vec![vec![0.0; n_x]; n_series];
+    let mut lower = vec![vec![0.0; n_x]; n_series];
+    let mut y_max = 0.0f64;
+    for si in 0..n_series {
+        for xi in 0..n_x {
+            let val = y_values[si][xi].max(0.0);
+            upper[si][xi] = val;
+            lower[si][xi] = 0.0;
+            y_max = y_max.max(val);
+        }
+    }
+
+    (upper, lower, 0.0, y_max)
+}
+
+/// Stacked mode: cumulative stacking.
+fn compute_stacked(
+    y_values: &[Vec<f64>],
+    n_x: usize,
+    n_series: usize,
+) -> (Vec<Vec<f64>>, Vec<Vec<f64>>, f64, f64) {
+    let mut upper = vec![vec![0.0; n_x]; n_series];
+    let mut lower = vec![vec![0.0; n_x]; n_series];
+
+    for xi in 0..n_x {
+        let mut running = 0.0;
+        for si in 0..n_series {
+            lower[si][xi] = running;
+            running += y_values[si][xi].max(0.0);
+            upper[si][xi] = running;
+        }
+    }
+
+    let y_max = upper
+        .last()
+        .map(|row| row.iter().cloned().fold(0.0f64, f64::max))
+        .unwrap_or(1.0);
+
+    (upper, lower, 0.0, y_max)
+}
+
+/// Normalized mode: stacked to 100%.
+fn compute_normalized(
+    y_values: &[Vec<f64>],
+    n_x: usize,
+    n_series: usize,
+) -> (Vec<Vec<f64>>, Vec<Vec<f64>>, f64, f64) {
+    let mut upper = vec![vec![0.0; n_x]; n_series];
+    let mut lower = vec![vec![0.0; n_x]; n_series];
+
+    for xi in 0..n_x {
+        let total: f64 = (0..n_series).map(|si| y_values[si][xi].max(0.0)).sum();
+        if total <= 0.0 {
+            continue;
+        }
+        let mut running = 0.0;
+        for si in 0..n_series {
+            lower[si][xi] = running;
+            running += y_values[si][xi].max(0.0) / total;
+            upper[si][xi] = running;
+        }
+    }
+
+    (upper, lower, 0.0, 1.0)
+}
+
+/// Streamgraph mode: symmetric baseline centered on zero.
+///
+/// Uses a simple symmetric baseline: offset = -total/2 at each x.
+/// The wiggle-minimizing baseline (ThemeRiver algorithm) is planned for Phase 7.
+fn compute_streamgraph(
+    y_values: &[Vec<f64>],
+    n_x: usize,
+    n_series: usize,
+) -> (Vec<Vec<f64>>, Vec<Vec<f64>>, f64, f64) {
+    let mut upper = vec![vec![0.0; n_x]; n_series];
+    let mut lower = vec![vec![0.0; n_x]; n_series];
+    let mut y_min = 0.0f64;
+    let mut y_max = 0.0f64;
+
+    for xi in 0..n_x {
+        let total: f64 = (0..n_series).map(|si| y_values[si][xi].max(0.0)).sum();
+        let offset = -total / 2.0;
+        let mut running = offset;
+        for si in 0..n_series {
+            lower[si][xi] = running;
+            running += y_values[si][xi].max(0.0);
+            upper[si][xi] = running;
+        }
+        y_min = y_min.min(offset);
+        y_max = y_max.max(running);
+    }
+
+    (upper, lower, y_min, y_max)
 }
 
 /// Linearly interpolate y at a given x from sorted (x, y) data points.
