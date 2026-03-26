@@ -19,6 +19,7 @@
 // ── Core ────────────────────────────────────────────────────────────────────
 pub mod area_chart;
 pub mod bar_chart;
+pub mod data_table;
 pub mod heatmap;
 pub mod histogram;
 pub mod image_plot;
@@ -40,6 +41,7 @@ pub mod qq_plot;
 pub mod regression_plot;
 #[cfg(feature = "statistics")]
 pub mod ridgeline;
+pub mod dot_plot;
 pub mod rug;
 pub mod strip;
 pub mod swarm;
@@ -49,6 +51,7 @@ pub mod violin_plot;
 pub mod contour;
 pub mod event_plot;
 pub mod hexbin;
+pub mod horizon;
 pub mod hist2d;
 pub mod pcolormesh;
 pub mod stairs;
@@ -63,9 +66,12 @@ pub mod gauge;
 pub mod waterfall;
 
 // ── Hierarchical & Relational ───────────────────────────────────────────────
+pub mod clustermap;
 pub mod dendrogram;
 pub mod funnel;
+pub mod icicle;
 pub mod network;
+pub mod parallel_categories;
 pub mod parallel_coords;
 pub mod sankey;
 pub mod sunburst;
@@ -78,6 +84,8 @@ pub mod ternary;
 // ── 3D ──────────────────────────────────────────────────────────────────────
 pub mod bar3d;
 pub mod contour3d;
+pub mod line3d;
+pub mod mesh3d;
 pub mod quiver3d;
 pub mod scatter3d;
 pub mod surface3d;
@@ -92,6 +100,8 @@ pub mod facet_grid;
 pub mod inset;
 pub mod joint_plot;
 pub mod multi_panel;
+#[cfg(feature = "statistics")]
+pub mod pair_plot;
 pub mod twin_axes;
 
 // ── Interaction ─────────────────────────────────────────────────────────────

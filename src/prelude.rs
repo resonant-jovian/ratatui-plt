@@ -121,6 +121,7 @@ pub use crate::transform::{Camera3D, Camera3DState, aspect_area, square_area};
 // ── Core Visualization Widgets ───────────────────────────────────────────────
 pub use crate::widgets::area_chart::{AreaChart, AreaMode};
 pub use crate::widgets::bar_chart::{BarChart, BarMode};
+pub use crate::widgets::data_table::DataTable;
 pub use crate::widgets::histogram::Histogram;
 pub use crate::widgets::image_plot::{
     ImageData, ImageOrigin, ImagePlot, Interpolation, matshow, spy,
@@ -145,6 +146,7 @@ pub use crate::widgets::qq_plot::QQPlot;
 pub use crate::widgets::regression_plot::RegressionPlot;
 #[cfg(feature = "statistics")]
 pub use crate::widgets::ridgeline::{RidgelineGroup, RidgelinePlot};
+pub use crate::widgets::dot_plot::{DotDataset, DotPlot};
 pub use crate::widgets::rug::{RugDataset, RugPlot, RugSide};
 pub use crate::widgets::strip::{StripGroup, StripPlot};
 pub use crate::widgets::swarm::SwarmPlot;
@@ -155,6 +157,7 @@ pub use crate::widgets::contour::ContourPlot;
 pub use crate::widgets::event_plot::{EventGroup, EventPlot};
 pub use crate::widgets::heatmap::Heatmap;
 pub use crate::widgets::hexbin::HexbinPlot;
+pub use crate::widgets::horizon::HorizonGraph;
 pub use crate::widgets::hist2d::Hist2D;
 pub use crate::widgets::pcolormesh::Pcolormesh;
 pub use crate::widgets::stairs::{StairsDataset, StairsPlot};
@@ -169,11 +172,14 @@ pub use crate::widgets::gauge::{GaugeChart, GaugeSector};
 pub use crate::widgets::waterfall::{WaterfallChart, WaterfallEntry};
 
 // ── Hierarchical & Relational Widgets ───────────────────────────────────────
+pub use crate::widgets::clustermap::ClusterMap;
 pub use crate::widgets::dendrogram::{DendroLink, DendroOrientation, Dendrogram};
 pub use crate::widgets::funnel::{FunnelChart, FunnelEntry};
 pub use crate::widgets::network::{GraphEdge, GraphLayout, GraphNode, NetworkPlot};
+pub use crate::widgets::parallel_categories::{CategoricalDimension, CategoricalRecord, ParallelCategories};
 pub use crate::widgets::parallel_coords::{ParallelAxis, ParallelCoords, ParallelRecord};
 pub use crate::widgets::sankey::{SankeyDiagram, SankeyFlow, SankeyNode};
+pub use crate::widgets::icicle::{IcicleChart, IcicleOrientation};
 pub use crate::widgets::sunburst::{Sunburst, SunburstNode};
 pub use crate::widgets::treemap::{Treemap, TreemapNode};
 
@@ -184,6 +190,8 @@ pub use crate::widgets::ternary::{TernaryData, TernaryPlot};
 // ── 3D Widgets ──────────────────────────────────────────────────────────────
 pub use crate::widgets::bar3d::Bar3D;
 pub use crate::widgets::contour3d::Contour3D;
+pub use crate::widgets::line3d::Line3D;
+pub use crate::widgets::mesh3d::Mesh3D;
 pub use crate::widgets::quiver3d::{Arrow3D, Quiver3D};
 pub use crate::widgets::scatter3d::Scatter3D;
 pub use crate::widgets::surface3d::{Surface3D, SurfaceRenderMode};
@@ -199,6 +207,8 @@ pub use crate::widgets::facet_grid::{FacetData, FacetGrid, FacetRecord, FacetSca
 pub use crate::widgets::inset::InsetAxes;
 pub use crate::widgets::joint_plot::{JointPlot, MarginalType};
 pub use crate::widgets::multi_panel::{MosaicPanel, MultiPanel};
+#[cfg(feature = "statistics")]
+pub use crate::widgets::pair_plot::{DiagType, PairPlot, PairPlotColumn};
 pub use crate::widgets::twin_axes::TwinAxes;
 
 // ── Interaction Widgets ─────────────────────────────────────────────────────
