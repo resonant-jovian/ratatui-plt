@@ -329,7 +329,7 @@ impl Widget for &SmithChart {
             let xi = sx.round() as u16;
             let yi = sy.round() as u16;
             let color = pt.color.unwrap_or(default_color);
-            if pa.contains(xi, yi) {
+            if geom.pa.contains(xi, yi) {
                 pb.set_char(xi, yi, self.marker.char(), color, Z_MARKER);
             }
 

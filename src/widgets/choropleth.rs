@@ -89,18 +89,15 @@ impl MapCell {
 
 /// The type of map layout to use.
 #[derive(Clone, Debug)]
+#[derive(Default)]
 pub enum MapType {
     /// Simple world regions (continents) using a predefined ASCII layout.
+    #[default]
     World,
     /// Custom region layout defined by user-specified cells.
     Custom(Vec<MapCell>),
 }
 
-impl Default for MapType {
-    fn default() -> Self {
-        Self::World
-    }
-}
 
 /// A choropleth map widget for data-driven geographic coloring.
 ///
@@ -397,8 +394,8 @@ impl Widget for &ChoroplethMap {
             }
 
             // If we have data, show the value below the label
-            if has_data && sh >= 3 {
-                if let Some(v) = value {
+            if has_data && sh >= 3
+                && let Some(v) = value {
                     let val_str = format_value(v);
                     let val_display: String = if val_str.len() > max_label_len {
                         val_str.chars().take(max_label_len).collect()
@@ -415,7 +412,6 @@ impl Widget for &ChoroplethMap {
                         }
                     }
                 }
-            }
         }
 
         pb.composite(buf);

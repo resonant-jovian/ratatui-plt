@@ -90,11 +90,15 @@ pub mod smith_chart;
 // ── 3D ──────────────────────────────────────────────────────────────────────
 pub mod bar3d;
 pub mod contour3d;
+pub mod isosurface;
 pub mod line3d;
 pub mod mesh3d;
 pub mod quiver3d;
 pub mod scatter3d;
+pub mod streamtube;
 pub mod surface3d;
+pub mod volume3d;
+pub mod voxels;
 
 // ── Triangulation ───────────────────────────────────────────────────────────
 pub mod tricolor;

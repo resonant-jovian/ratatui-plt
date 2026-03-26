@@ -200,7 +200,11 @@ pub use crate::widgets::line3d::Line3D;
 pub use crate::widgets::mesh3d::Mesh3D;
 pub use crate::widgets::quiver3d::{Arrow3D, Quiver3D};
 pub use crate::widgets::scatter3d::Scatter3D;
+pub use crate::widgets::isosurface::Isosurface;
+pub use crate::widgets::streamtube::Streamtube;
 pub use crate::widgets::surface3d::{Surface3D, SurfaceRenderMode};
+pub use crate::widgets::volume3d::Volume3D;
+pub use crate::widgets::voxels::Voxels;
 
 // ── Triangulation Widgets ───────────────────────────────────────────────────
 pub use crate::triangulation::Triangulation;

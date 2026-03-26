@@ -402,8 +402,8 @@ impl Widget for &CarpetPlot {
         frame.draw_end_labels(buf, area, &pa);
 
         // Draw colorbar
-        if self.show_colorbar {
-            if let Some(ref vals) = self.values {
+        if self.show_colorbar
+            && let Some(ref vals) = self.values {
                 let (vmin, vmax) = value_bounds_2d(vals);
                 let cb = Colorbar::new(self.colormap.as_ref(), vmin, vmax)
                     .label_color(self.theme.foreground);
@@ -421,7 +421,6 @@ impl Widget for &CarpetPlot {
                     (&cb).render(cb_area, buf);
                 }
             }
-        }
     }
 }
 
