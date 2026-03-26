@@ -6,7 +6,7 @@
 use ratatui::buffer::Buffer;
 use ratatui::style::Color;
 
-use crate::drawing::{draw_braille_line, draw_braille_line_pb};
+use crate::drawing::draw_braille_line;
 use crate::frame::PlotArea;
 use crate::plot_buffer::{PlotBuffer, Z_DATA};
 use crate::style::LineStyle;
@@ -85,7 +85,7 @@ impl LineCollection {
             let sy0 = pa.screen_y(y0);
             let sx1 = pa.screen_x(x1);
             let sy1 = pa.screen_y(y1);
-            draw_braille_line_pb(pb, sx0, sy0, sx1, sy1, color, pa, Z_DATA);
+            pb.draw_line(sx0, sy0, sx1, sy1, color, pa, Z_DATA);
         }
     }
 }
@@ -165,7 +165,7 @@ impl PathCollection {
                 let sy0 = pa.screen_y(y0);
                 let sx1 = pa.screen_x(x1);
                 let sy1 = pa.screen_y(y1);
-                draw_braille_line_pb(pb, sx0, sy0, sx1, sy1, *color, pa, Z_DATA);
+                pb.draw_line(sx0, sy0, sx1, sy1, *color, pa, Z_DATA);
             }
             if *closed && vertices.len() > 2 {
                 let (x0, y0) = vertices[vertices.len() - 1];
@@ -174,7 +174,7 @@ impl PathCollection {
                 let sy0 = pa.screen_y(y0);
                 let sx1 = pa.screen_x(x1);
                 let sy1 = pa.screen_y(y1);
-                draw_braille_line_pb(pb, sx0, sy0, sx1, sy1, *color, pa, Z_DATA);
+                pb.draw_line(sx0, sy0, sx1, sy1, *color, pa, Z_DATA);
             }
         }
     }

@@ -29,7 +29,6 @@ use ratatui::widgets::Widget;
 
 use crate::axis::Axis;
 use crate::colormap::{Colorbar, Colormap, Viridis};
-use crate::drawing::draw_braille_line_pb;
 use crate::frame::{DataBounds, PlotFrame, ReferenceLine};
 use crate::norm::{LinearNorm, Normalize};
 use crate::plot_buffer::{PlotBuffer, Z_DATA, Z_GRID};
@@ -381,7 +380,7 @@ impl Widget for &CarpetPlot {
                     let sy0 = pa.screen_y(self.y[bi][ai]);
                     let sx1 = pa.screen_x(self.x[bi + 1][ai]);
                     let sy1 = pa.screen_y(self.y[bi + 1][ai]);
-                    draw_braille_line_pb(&mut pb, sx0, sy0, sx1, sy1, grid_color, &pa, z);
+                    pb.draw_line(sx0, sy0, sx1, sy1, grid_color, &pa, z);
                 }
             }
 
@@ -392,7 +391,7 @@ impl Widget for &CarpetPlot {
                     let sy0 = pa.screen_y(self.y[bi][ai]);
                     let sx1 = pa.screen_x(self.x[bi][ai + 1]);
                     let sy1 = pa.screen_y(self.y[bi][ai + 1]);
-                    draw_braille_line_pb(&mut pb, sx0, sy0, sx1, sy1, grid_color, &pa, z);
+                    pb.draw_line(sx0, sy0, sx1, sy1, grid_color, &pa, z);
                 }
             }
         }

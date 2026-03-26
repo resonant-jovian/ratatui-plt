@@ -27,7 +27,6 @@ use ratatui::widgets::Widget;
 
 use crate::annotation::Annotation;
 use crate::axis::Axis;
-use crate::drawing::draw_braille_line_pb;
 use crate::frame::{DataBounds, PlotFrame, ReferenceLine};
 use crate::plot_buffer::{PlotBuffer, Z_DATA, Z_FILL, Z_MARKER};
 use crate::series::Series;
@@ -279,7 +278,7 @@ impl Widget for &RegressionPlot {
             let sy0 = pa.screen_y(predicted[i]);
             let sx1 = pa.screen_x(eval_xs[i + 1]);
             let sy1 = pa.screen_y(predicted[i + 1]);
-            draw_braille_line_pb(&mut pb, sx0, sy0, sx1, sy1, line_color, &pa, Z_DATA);
+            pb.draw_line(sx0, sy0, sx1, sy1, line_color, &pa, Z_DATA);
         }
 
         // ── 7. Draw confidence band ─────────────────────────────────────

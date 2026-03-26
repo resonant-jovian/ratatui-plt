@@ -922,7 +922,6 @@ impl Histogram {
         _y_lo: f64,
         _y_hi: f64,
     ) {
-        use crate::drawing::draw_braille_line_pb;
         use crate::statistics::Kde;
 
         let clean: Vec<f64> = data.iter().copied().filter(|v| v.is_finite()).collect();
@@ -974,7 +973,7 @@ impl Histogram {
             let sx1 = pa.screen_x(kde_x[i]);
             let sy1 = pa.screen_y(kde_y[i]);
 
-            draw_braille_line_pb(pb, sx0, sy0, sx1, sy1, color, pa, z);
+            pb.draw_line(sx0, sy0, sx1, sy1, color, pa, z);
         }
     }
 }

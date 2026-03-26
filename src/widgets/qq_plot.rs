@@ -26,7 +26,6 @@ use ratatui::widgets::Widget;
 
 use crate::annotation::Annotation;
 use crate::axis::Axis;
-use crate::drawing::draw_braille_line_pb;
 use crate::frame::{DataBounds, PlotFrame, ReferenceLine};
 use crate::plot_buffer::{PlotBuffer, Z_DATA, Z_MARKER};
 use crate::spines::Spines;
@@ -284,7 +283,7 @@ impl Widget for &QQPlot {
                     let sx1 = pa.screen_x(rx1);
                     let sy1 = pa.screen_y(ry1);
 
-                    draw_braille_line_pb(&mut pb, sx0, sy0, sx1, sy1, ref_color, &pa, Z_DATA);
+                    pb.draw_line(sx0, sy0, sx1, sy1, ref_color, &pa, Z_DATA);
                 }
             }
         }

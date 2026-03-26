@@ -252,8 +252,7 @@ impl Widget for &BandPlot {
                             // Zero-width band: draw as a braille line segment
                             // connecting this column to the next for a smooth curve.
                             if let Some(prev_y) = prev_zero_y_draw {
-                                crate::drawing::draw_braille_line_pb(
-                                    &mut pb,
+                                pb.draw_line(
                                     (screen_x - 1) as f64,
                                     prev_y,
                                     screen_x as f64,

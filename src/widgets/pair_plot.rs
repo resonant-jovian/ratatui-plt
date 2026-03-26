@@ -25,7 +25,6 @@ use ratatui::layout::Rect;
 use ratatui::style::Color;
 use ratatui::widgets::Widget;
 
-use crate::drawing::draw_braille_line_pb;
 use crate::frame::PlotArea;
 use crate::plot_buffer::{PlotBuffer, Z_DATA, Z_MARKER};
 use crate::statistics::Kde;
@@ -502,7 +501,7 @@ fn render_kde(
         let sy0 = pa.screen_y(densities[i]);
         let sx1 = pa.screen_x(eval_xs[i + 1]);
         let sy1 = pa.screen_y(densities[i + 1]);
-        draw_braille_line_pb(&mut pb, sx0, sy0, sx1, sy1, color, &pa, Z_DATA);
+        pb.draw_line(sx0, sy0, sx1, sy1, color, &pa, Z_DATA);
     }
 
     pb.composite(buf);

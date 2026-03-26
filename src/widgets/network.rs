@@ -26,7 +26,6 @@ use ratatui::style::Color;
 use ratatui::widgets::Widget;
 
 use crate::axis::{AspectRatio, Axis};
-use crate::drawing::draw_braille_line_pb;
 use crate::frame::{DataBounds, PlotFrame, ReferenceLine};
 use crate::plot_buffer::{PlotBuffer, Z_ANNOTATION, Z_DATA, Z_MARKER};
 use crate::spines::Spines;
@@ -450,7 +449,7 @@ impl Widget for &NetworkPlot {
 
             let edge_color = edge.color.unwrap_or(self.theme.grid_color);
 
-            draw_braille_line_pb(&mut pb, sx0, sy0, sx1, sy1, edge_color, &pa, Z_DATA);
+            pb.draw_line(sx0, sy0, sx1, sy1, edge_color, &pa, Z_DATA);
         }
 
         // Draw nodes on top of edges

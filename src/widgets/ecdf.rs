@@ -19,7 +19,6 @@ use ratatui::widgets::Widget;
 
 use crate::annotation::Annotation;
 use crate::axis::Axis;
-use crate::drawing::draw_braille_line_pb;
 use crate::frame::{DataBounds, PlotFrame, ReferenceLine};
 use crate::legend::{Legend, LegendEntry, LegendPosition};
 use crate::plot_buffer::{PlotBuffer, Z_DATA};
@@ -273,8 +272,7 @@ impl Widget for &EcdfPlot {
                 let sy1 = pa.screen_y(y1);
 
                 // Horizontal segment at y0 from x0 to x1
-                draw_braille_line_pb(
-                    &mut pb,
+                pb.draw_line(
                     sx0,
                     sy0,
                     sx1,
@@ -285,8 +283,7 @@ impl Widget for &EcdfPlot {
                 );
 
                 // Vertical segment at x1 from y0 to y1
-                draw_braille_line_pb(
-                    &mut pb,
+                pb.draw_line(
                     sx1,
                     sy0,
                     sx1,
@@ -303,8 +300,7 @@ impl Widget for &EcdfPlot {
                 let sx_end = pa.screen_x(x_hi);
                 let sy = pa.screen_y(last_y);
 
-                draw_braille_line_pb(
-                    &mut pb,
+                pb.draw_line(
                     sx_last,
                     sy,
                     sx_end,

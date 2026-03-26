@@ -27,7 +27,6 @@ use ratatui::style::Color;
 use ratatui::widgets::Widget;
 
 use crate::annotation::Annotation;
-use crate::drawing::draw_braille_line_pb;
 use crate::frame::PlotArea;
 use crate::legend::{Legend, LegendEntry, LegendPosition};
 use crate::plot_buffer::{PlotBuffer, Z_ANNOTATION, Z_CHROME, Z_DATA, Z_MARKER};
@@ -294,7 +293,7 @@ impl Widget for &ParallelCoords {
             }
         }
 
-        // Build a PlotArea covering the plot region so draw_braille_line_pb can clip.
+        // Build a PlotArea covering the plot region so draw_line can clip.
         let pa = PlotArea {
             x: area.x,
             y: plot_top,
@@ -331,8 +330,7 @@ impl Widget for &ParallelCoords {
                 let sx1 = axis_positions[i + 1] as f64;
                 let sy1 = data_to_screen(v1, ax1.min, ax1.max, plot_bottom as f64, plot_top as f64);
 
-                draw_braille_line_pb(
-                    &mut pb,
+                pb.draw_line(
                     sx0,
                     sy0,
                     sx1,

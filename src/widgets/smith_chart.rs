@@ -23,7 +23,6 @@ use ratatui::layout::Rect;
 use ratatui::style::Color;
 use ratatui::widgets::Widget;
 
-use crate::drawing::draw_braille_line_pb;
 use crate::frame::PlotArea;
 use crate::plot_buffer::{PlotBuffer, Z_CHROME, Z_DATA, Z_GRID, Z_MARKER};
 use crate::style::MarkerShape;
@@ -265,7 +264,7 @@ impl Widget for &SmithChart {
         {
             let (sx0, sy0) = geom.gamma_to_screen(-1.0, 0.0);
             let (sx1, sy1) = geom.gamma_to_screen(1.0, 0.0);
-            draw_braille_line_pb(&mut pb, sx0, sy0, sx1, sy1, self.theme.grid_color, &geom.pa, Z_GRID);
+            pb.draw_line(sx0, sy0, sx1, sy1, self.theme.grid_color, &geom.pa, Z_GRID);
         }
 
         // Draw constant-resistance circles
@@ -314,7 +313,7 @@ impl Widget for &SmithChart {
                 let (sx0, sy0) = geom.gamma_to_screen(gr0, gi0);
                 let (sx1, sy1) = geom.gamma_to_screen(gr1, gi1);
                 let color = self.points[i].color.unwrap_or(default_color);
-                draw_braille_line_pb(&mut pb, sx0, sy0, sx1, sy1, color, &geom.pa, Z_DATA);
+                pb.draw_line(sx0, sy0, sx1, sy1, color, &geom.pa, Z_DATA);
             }
         }
 
@@ -409,7 +408,7 @@ fn draw_circle_braille(
 
         let (sx, sy) = geom.gamma_to_screen(gr, gi);
         if let Some((px, py)) = prev {
-            draw_braille_line_pb(pb, px, py, sx, sy, color, &geom.pa, z);
+            pb.draw_line(px, py, sx, sy, color, &geom.pa, z);
         }
         prev = Some((sx, sy));
     }
@@ -440,7 +439,7 @@ fn draw_arc_clipped(
 
         let (sx, sy) = geom.gamma_to_screen(gr, gi);
         if let Some((px, py)) = prev {
-            draw_braille_line_pb(pb, px, py, sx, sy, color, &geom.pa, z);
+            pb.draw_line(px, py, sx, sy, color, &geom.pa, z);
         }
         prev = Some((sx, sy));
     }

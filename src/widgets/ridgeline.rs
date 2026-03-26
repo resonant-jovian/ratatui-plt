@@ -25,7 +25,6 @@ use ratatui::style::Color;
 use ratatui::widgets::Widget;
 
 use crate::axis::Axis;
-use crate::drawing::draw_braille_line_pb;
 use crate::frame::{DataBounds, PlotFrame, ReferenceLine};
 use crate::plot_buffer::{PlotBuffer, Z_CHROME, Z_DATA, Z_FILL};
 use crate::spines::Spines;
@@ -403,8 +402,7 @@ impl Widget for &RidgelinePlot {
                 let sy0 = band_baseline_screen - curve_h0;
                 let sy1 = band_baseline_screen - curve_h1;
 
-                draw_braille_line_pb(
-                    &mut pb,
+                pb.draw_line(
                     sx0,
                     sy0,
                     sx1,

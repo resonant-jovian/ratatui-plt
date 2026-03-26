@@ -105,7 +105,8 @@ pub use crate::norm::{
 };
 pub use crate::picking::{PickResult, pick_nearest};
 pub use crate::plot_buffer::{
-    PlotBuffer, Z_ANNOTATION, Z_BACKGROUND, Z_CHROME, Z_DATA, Z_FILL, Z_GRID, Z_MARKER,
+    PlotBackend, PlotBuffer, Z_ANNOTATION, Z_BACKGROUND, Z_CHROME, Z_DATA, Z_FILL, Z_GRID,
+    Z_MARKER,
 };
 pub use crate::series::{GridData, Series, Series3D, VectorFieldData, split_at_nan};
 pub use crate::spines::Spines;

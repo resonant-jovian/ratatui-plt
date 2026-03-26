@@ -8,7 +8,6 @@ use ratatui::widgets::Widget;
 use crate::annotation::Annotation;
 use crate::axis::{AspectRatio, Axis};
 use crate::colormap::{Colormap, Viridis};
-use crate::drawing::draw_braille_line_pb;
 use crate::frame::{DataBounds, PlotFrame, ReferenceLine};
 use crate::norm::{LinearNorm, Normalize};
 use crate::plot_buffer::{PlotBuffer, Z_ANNOTATION, Z_DATA};
@@ -330,8 +329,7 @@ impl Widget for &ContourPlot {
                             let sx1 = pa.screen_x(dx1);
                             let sy1 = pa.screen_y(dy1);
 
-                            draw_braille_line_pb(
-                                &mut pb,
+                            pb.draw_line(
                                 sx0,
                                 sy0,
                                 sx1,

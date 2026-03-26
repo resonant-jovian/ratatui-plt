@@ -23,7 +23,6 @@ use ratatui::widgets::Widget;
 
 use crate::annotation::Annotation;
 use crate::axis::Axis;
-use crate::drawing::draw_braille_line_pb;
 use crate::frame::{DataBounds, PlotFrame, ReferenceLine};
 use crate::legend::{Legend, LegendEntry, LegendPosition};
 use crate::plot_buffer::{PlotBuffer, Z_DATA, Z_FILL};
@@ -292,8 +291,7 @@ impl Widget for &StairsPlot {
                     let sy = pa.screen_y(ds.values[i]);
 
                     // Horizontal segment at current value
-                    draw_braille_line_pb(
-                        &mut pb,
+                    pb.draw_line(
                         sx_left,
                         sy,
                         sx_right,
@@ -306,8 +304,7 @@ impl Widget for &StairsPlot {
                     // Vertical segment at the right edge connecting to next value
                     if i + 1 < n {
                         let sy_next = pa.screen_y(ds.values[i + 1]);
-                        draw_braille_line_pb(
-                            &mut pb,
+                        pb.draw_line(
                             sx_right,
                             sy,
                             sx_right,

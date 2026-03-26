@@ -29,7 +29,6 @@ use ratatui::style::Color;
 use ratatui::widgets::StatefulWidget;
 
 use crate::axis::Axis;
-use crate::drawing::draw_braille_line_pb;
 use crate::frame::{DataBounds, PlotFrame};
 use crate::plot_buffer::{PlotBuffer, Z_DATA, Z_FILL, Z_MARKER};
 use crate::spines::Spines;
@@ -294,7 +293,7 @@ impl StatefulWidget for &LassoSelector {
                     let sx1 = pa.screen_x(x1);
                     let sy1 = pa.screen_y(y1);
 
-                    draw_braille_line_pb(&mut pb, sx0, sy0, sx1, sy1, line_color, &pa, Z_DATA);
+                    pb.draw_line(sx0, sy0, sx1, sy1, line_color, &pa, Z_DATA);
                 }
             }
 
@@ -309,7 +308,7 @@ impl StatefulWidget for &LassoSelector {
                     let sx1 = pa.screen_x(x1);
                     let sy1 = pa.screen_y(y1);
 
-                    draw_braille_line_pb(&mut pb, sx0, sy0, sx1, sy1, line_color, &pa, Z_DATA);
+                    pb.draw_line(sx0, sy0, sx1, sy1, line_color, &pa, Z_DATA);
                 }
             }
         }

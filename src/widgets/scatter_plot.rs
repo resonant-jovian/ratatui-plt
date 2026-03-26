@@ -9,8 +9,6 @@ use ratatui::widgets::Widget;
 use crate::annotation::Annotation;
 use crate::axis::{AspectRatio, Axis};
 use crate::colormap::{Colormap, Viridis};
-#[cfg(feature = "statistics")]
-use crate::drawing::draw_braille_line_pb;
 use crate::frame::{DataBounds, PlotFrame, ReferenceLine};
 use crate::legend::{Legend, LegendPosition};
 use crate::linked_view::SharedView;
@@ -442,7 +440,7 @@ impl Widget for &ScatterPlot {
                     let sy0 = pa.screen_y(ys[i]);
                     let sx1 = pa.screen_x(eval_xs[i + 1]);
                     let sy1 = pa.screen_y(ys[i + 1]);
-                    draw_braille_line_pb(&mut pb, sx0, sy0, sx1, sy1, trend_color, &pa, Z_DATA);
+                    pb.draw_line(sx0, sy0, sx1, sy1, trend_color, &pa, Z_DATA);
                 }
             }
         }
