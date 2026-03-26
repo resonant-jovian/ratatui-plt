@@ -137,6 +137,14 @@ pub use crate::widgets::box_plot::BoxPlot;
 pub use crate::widgets::boxen::BoxenPlot;
 pub use crate::widgets::ecdf::{EcdfDataset, EcdfPlot};
 pub use crate::widgets::error_bar::ErrorBarPlot;
+#[cfg(feature = "statistics")]
+pub use crate::widgets::kde_plot::{KDEPlot, KdeDataset};
+#[cfg(feature = "statistics")]
+pub use crate::widgets::qq_plot::QQPlot;
+#[cfg(feature = "statistics")]
+pub use crate::widgets::regression_plot::RegressionPlot;
+#[cfg(feature = "statistics")]
+pub use crate::widgets::ridgeline::{RidgelineGroup, RidgelinePlot};
 pub use crate::widgets::rug::{RugDataset, RugPlot, RugSide};
 pub use crate::widgets::strip::{StripGroup, StripPlot};
 pub use crate::widgets::swarm::SwarmPlot;
@@ -211,9 +219,10 @@ pub use crate::widgets::spectrogram::Spectrogram;
 // ── Statistics (behind statistics feature) ──────────────────────────────────
 #[cfg(feature = "statistics")]
 pub use crate::statistics::{
-    BandwidthMethod, BootstrapCI, EstimatorFn, HistNormExt, Kde, Kernel, LinearFitResult,
-    LowessResult, PolyFitResult, bootstrap_ci, iqr, linear_regression, lowess, mean,
-    mean_estimator, median, median_estimator, percentile, poly_fit, std_dev, variance,
+    BandwidthMethod, BootstrapCI, EstimatorFn, HistNormExt, Kde, Kde2D, Kernel, LinearFitResult,
+    LowessResult, PolyFitResult, QQDistribution, bootstrap_ci, iqr, linear_regression, lowess,
+    mean, mean_estimator, median, median_estimator, percentile, poly_fit, qq_points, std_dev,
+    variance,
 };
 
 // ── TOML Themes ─────────────────────────────────────────────────────────────

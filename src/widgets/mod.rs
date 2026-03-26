@@ -32,6 +32,14 @@ pub mod box_plot;
 pub mod boxen;
 pub mod ecdf;
 pub mod error_bar;
+#[cfg(feature = "statistics")]
+pub mod kde_plot;
+#[cfg(feature = "statistics")]
+pub mod qq_plot;
+#[cfg(feature = "statistics")]
+pub mod regression_plot;
+#[cfg(feature = "statistics")]
+pub mod ridgeline;
 pub mod rug;
 pub mod strip;
 pub mod swarm;
