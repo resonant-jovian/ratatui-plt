@@ -136,6 +136,8 @@ pub use crate::widgets::scatter_plot::TrendlineType;
 pub use crate::widgets::band::{Band, BandPlot};
 pub use crate::widgets::box_plot::BoxPlot;
 pub use crate::widgets::boxen::BoxenPlot;
+#[cfg(feature = "statistics")]
+pub use crate::widgets::confidence_ellipse::ConfidenceEllipse;
 pub use crate::widgets::ecdf::{EcdfDataset, EcdfPlot};
 pub use crate::widgets::error_bar::ErrorBarPlot;
 #[cfg(feature = "statistics")]
@@ -153,6 +155,8 @@ pub use crate::widgets::swarm::SwarmPlot;
 pub use crate::widgets::violin_plot::{DensityNorm, ViolinInner, ViolinPlot};
 
 // ── Scientific Widgets ──────────────────────────────────────────────────────
+pub use crate::widgets::carpet::CarpetPlot;
+pub use crate::widgets::choropleth::{ChoroplethMap, ChoroplethRegion, MapCell, MapType};
 pub use crate::widgets::contour::ContourPlot;
 pub use crate::widgets::event_plot::{EventGroup, EventPlot};
 pub use crate::widgets::heatmap::Heatmap;
@@ -167,6 +171,7 @@ pub use crate::widgets::vector_field::{ArrowCharSet, VectorField};
 
 // ── Financial Widgets ───────────────────────────────────────────────────────
 pub use crate::widgets::candlestick::{Candle, CandleDisplayMode, CandlestickChart};
+pub use crate::widgets::funnel_area::{FunnelArea, FunnelAreaEntry};
 pub use crate::widgets::gantt::{GanttChart, GanttTask};
 pub use crate::widgets::gauge::{GaugeChart, GaugeSector};
 pub use crate::widgets::waterfall::{WaterfallChart, WaterfallEntry};
@@ -186,6 +191,7 @@ pub use crate::widgets::treemap::{Treemap, TreemapNode};
 // ── Polar & Specialized Coordinate Widgets ──────────────────────────────────
 pub use crate::widgets::radial::{PolarPlotType, RadarPlot, RadialPlot, ThetaDirection};
 pub use crate::widgets::ternary::{TernaryData, TernaryPlot};
+pub use crate::widgets::smith_chart::{SmithChart, SmithChartPoint};
 
 // ── 3D Widgets ──────────────────────────────────────────────────────────────
 pub use crate::widgets::bar3d::Bar3D;
@@ -213,6 +219,7 @@ pub use crate::widgets::twin_axes::TwinAxes;
 
 // ── Interaction Widgets ─────────────────────────────────────────────────────
 pub use crate::widgets::crosshair::Crosshair;
+pub use crate::widgets::lasso_selector::{LassoSelector, LassoSelectorState};
 pub use crate::widgets::rect_selector::RectangleSelector;
 pub use crate::widgets::span_selector::{
     SharedSpanState, SpanDirection, SpanSelector, SpanSelectorState, shared_span_state,

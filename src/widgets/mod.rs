@@ -31,6 +31,8 @@ pub mod scatter_plot;
 pub mod band;
 pub mod box_plot;
 pub mod boxen;
+#[cfg(feature = "statistics")]
+pub mod confidence_ellipse;
 pub mod ecdf;
 pub mod error_bar;
 #[cfg(feature = "statistics")]
@@ -48,6 +50,8 @@ pub mod swarm;
 pub mod violin_plot;
 
 // ── Scientific ──────────────────────────────────────────────────────────────
+pub mod carpet;
+pub mod choropleth;
 pub mod contour;
 pub mod event_plot;
 pub mod hexbin;
@@ -61,6 +65,7 @@ pub mod vector_field;
 
 // ── Financial ───────────────────────────────────────────────────────────────
 pub mod candlestick;
+pub mod funnel_area;
 pub mod gantt;
 pub mod gauge;
 pub mod waterfall;
@@ -80,6 +85,7 @@ pub mod treemap;
 // ── Polar & Specialized ─────────────────────────────────────────────────────
 pub mod radial;
 pub mod ternary;
+pub mod smith_chart;
 
 // ── 3D ──────────────────────────────────────────────────────────────────────
 pub mod bar3d;
@@ -106,6 +112,7 @@ pub mod twin_axes;
 
 // ── Interaction ─────────────────────────────────────────────────────────────
 pub mod crosshair;
+pub mod lasso_selector;
 pub mod rect_selector;
 pub mod span_selector;
 
