@@ -115,7 +115,7 @@ impl DataTable {
     /// Set numeric values for colormap-based cell coloring.
     ///
     /// The outer vec corresponds to rows, the inner to columns.
-    /// Values are normalized to [0,1] using the global min/max across
+    /// Values are normalized to \[0,1\] using the global min/max across
     /// all provided values.
     pub fn cell_values(mut self, values: Vec<Vec<f64>>) -> Self {
         self.cell_values = Some(values);

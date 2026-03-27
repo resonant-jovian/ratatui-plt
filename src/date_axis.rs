@@ -19,7 +19,7 @@ use chrono::{DateTime, Utc};
 use crate::series::Series;
 use crate::ticker::{TickFormatter, TickLocator};
 
-/// A time series that stores DateTime<Utc> timestamps internally as f64
+/// A time series that stores `DateTime<Utc>` timestamps internally as f64
 /// (seconds since Unix epoch) for compatibility with the Series type.
 #[derive(Clone, Debug)]
 pub struct TimeSeries {

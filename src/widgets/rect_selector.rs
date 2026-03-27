@@ -16,7 +16,7 @@ use crate::theme::Theme;
 /// Given a shared brush state containing a selection rectangle, draws a filled
 /// region with an optional border. This is designed to be rendered *on top of*
 /// an existing plot by calling [`RectangleSelector::render_on`] with a
-/// [`PlotArea`] reference obtained from [`PlotFrame::render`].
+/// [`PlotArea`] reference obtained from [`PlotFrame::render`](crate::frame::PlotFrame::render).
 ///
 /// # Example
 ///

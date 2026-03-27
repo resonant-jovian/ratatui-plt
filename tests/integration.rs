@@ -351,6 +351,25 @@ fn test_bar_chart_stacked_renders() {
 }
 
 #[test]
+fn test_bar_chart_pattern_fill_renders() {
+    let cats = vec!["A", "B", "C"];
+    let ds1 =
+        BarDataset::new("G1", vec![10.0, 20.0, 15.0], Color::Cyan).pattern(FillPattern::CrossHatch);
+    let ds2 = BarDataset::new("G2", vec![12.0, 18.0, 22.0], Color::Yellow)
+        .pattern(FillPattern::DiagonalRight);
+    let chart = BarChart::new()
+        .categories(cats)
+        .dataset(ds1)
+        .dataset(ds2)
+        .mode(BarMode::Grouped)
+        .title("Patterned");
+
+    let area = Rect::new(0, 0, 40, 20);
+    let mut buf = Buffer::empty(area);
+    (&chart).render(area, &mut buf);
+}
+
+#[test]
 fn test_box_plot_renders() {
     let g1 = BoxData::new(
         "A",
@@ -444,6 +463,28 @@ fn test_pie_chart_renders() {
     let area = Rect::new(0, 0, 40, 20);
     let mut buf = Buffer::empty(area);
     (&plot).render(area, &mut buf);
+}
+
+#[test]
+fn test_pie_chart_multi_ring_renders() {
+    let chart = PieChart::new()
+        .slice(PieSlice::new("Inner A", 40.0).color(Color::Cyan))
+        .slice(PieSlice::new("Inner B", 35.0).color(Color::Yellow))
+        .slice(PieSlice::new("Inner C", 25.0).color(Color::Red))
+        .ring(PieRing::new(vec![
+            PieSlice::new("Outer 1", 20.0).color(Color::Blue),
+            PieSlice::new("Outer 2", 30.0).color(Color::Green),
+            PieSlice::new("Outer 3", 25.0).color(Color::Magenta),
+            PieSlice::new("Outer 4", 25.0).color(Color::White),
+        ]))
+        .donut_ratio(0.2)
+        .show_labels(true)
+        .show_percentages(true)
+        .title("Multi-Ring Pie");
+
+    let area = Rect::new(0, 0, 60, 30);
+    let mut buf = Buffer::empty(area);
+    (&chart).render(area, &mut buf);
 }
 
 #[test]
@@ -3637,4 +3678,247 @@ fn test_enclosed_numbers() {
     assert_eq!(enclosed_number(10), "⑩");
     assert_eq!(enclosed_number(20), "⑳");
     assert_eq!(enclosed_number(21), "21"); // falls back to string
+}
+
+#[test]
+fn test_area_chart_streamgraph_renders() {
+    let s1 = Series::new("A")
+        .data(
+            (0..10)
+                .map(|i| (i as f64, (i as f64 * 0.3).sin().abs()))
+                .collect(),
+        )
+        .color(Color::Cyan);
+    let s2 = Series::new("B")
+        .data(
+            (0..10)
+                .map(|i| (i as f64, (i as f64 * 0.2).cos().abs()))
+                .collect(),
+        )
+        .color(Color::Yellow);
+    let s3 = Series::new("C")
+        .data((0..10).map(|i| (i as f64, 0.5)).collect())
+        .color(Color::Magenta);
+    let plot = AreaChart::new()
+        .series(s1)
+        .series(s2)
+        .series(s3)
+        .mode(AreaMode::StreamGraph)
+        .title("StreamGraph Wiggle");
+
+    let area = Rect::new(0, 0, 40, 20);
+    let mut buf = Buffer::empty(area);
+    (&plot).render(area, &mut buf);
+}
+
+#[test]
+fn test_sankey_vertical_orientation_renders() {
+    let d = SankeyDiagram::new()
+        .node(SankeyNode {
+            label: "A".into(),
+            color: Some(Color::Red),
+        })
+        .node(SankeyNode {
+            label: "B".into(),
+            color: Some(Color::Blue),
+        })
+        .node(SankeyNode {
+            label: "C".into(),
+            color: Some(Color::Green),
+        })
+        .node(SankeyNode {
+            label: "D".into(),
+            color: Some(Color::Yellow),
+        })
+        .flow(SankeyFlow {
+            source: 0,
+            target: 2,
+            value: 5.0,
+            color: None,
+        })
+        .flow(SankeyFlow {
+            source: 0,
+            target: 3,
+            value: 2.0,
+            color: None,
+        })
+        .flow(SankeyFlow {
+            source: 1,
+            target: 3,
+            value: 3.0,
+            color: None,
+        })
+        .orientation(SankeyOrientation::Vertical)
+        .title("Vertical Sankey");
+    let area = Rect::new(0, 0, 60, 20);
+    let mut buf = Buffer::empty(area);
+    (&d).render(area, &mut buf);
+}
+
+#[cfg(feature = "statistics")]
+#[test]
+fn test_lineplot_ci_mean_band() {
+    use ratatui_plt::widgets::line_plot::EstimatorType;
+
+    // 3 y-values at each of 5 x positions
+    let data: Vec<(f64, f64)> = vec![
+        (1.0, 2.0),
+        (1.0, 2.5),
+        (1.0, 3.0),
+        (2.0, 4.0),
+        (2.0, 4.5),
+        (2.0, 5.0),
+        (3.0, 1.0),
+        (3.0, 1.5),
+        (3.0, 2.0),
+        (4.0, 3.0),
+        (4.0, 3.5),
+        (4.0, 4.0),
+        (5.0, 5.0),
+        (5.0, 5.5),
+        (5.0, 6.0),
+    ];
+    let s = Series::new("noisy").data(data).color(Color::Cyan);
+    let plot = LinePlot::new()
+        .series(s)
+        .estimator(EstimatorType::Mean)
+        .title("CI Band");
+    let area = Rect::new(0, 0, 60, 20);
+    let mut buf = Buffer::empty(area);
+    (&plot).render(area, &mut buf);
+}
+
+#[cfg(feature = "statistics")]
+#[test]
+fn test_lineplot_ci_median_bars() {
+    use ratatui_plt::widgets::line_plot::{ErrorStyle, EstimatorType};
+
+    let data: Vec<(f64, f64)> = vec![
+        (1.0, 10.0),
+        (1.0, 12.0),
+        (1.0, 11.0),
+        (2.0, 20.0),
+        (2.0, 22.0),
+        (2.0, 21.0),
+        (3.0, 15.0),
+        (3.0, 17.0),
+        (3.0, 16.0),
+    ];
+    let s = Series::new("err").data(data).color(Color::Red);
+    let plot = LinePlot::new()
+        .series(s)
+        .estimator(EstimatorType::Median)
+        .error_style(ErrorStyle::Bars)
+        .ci_level(0.90)
+        .n_bootstrap(500)
+        .title("CI Bars");
+    let area = Rect::new(0, 0, 60, 20);
+    let mut buf = Buffer::empty(area);
+    (&plot).render(area, &mut buf);
+}
+
+// ===== ScatterPlot marginal distribution tests =====
+
+#[test]
+fn test_scatter_plot_histogram_marginals() {
+    use ratatui_plt::widgets::joint_plot::MarginalType;
+
+    let s = Series::new("pts")
+        .data(vec![
+            (0.0, 0.0),
+            (1.0, 2.0),
+            (2.0, 1.0),
+            (3.0, 3.0),
+            (4.0, 2.5),
+        ])
+        .color(Color::Cyan)
+        .marker(MarkerShape::FilledCircle);
+    let plot = ScatterPlot::new()
+        .series(s)
+        .marginal_x(MarginalType::Histogram)
+        .marginal_y(MarginalType::Histogram)
+        .title("Scatter + Marginals");
+
+    let area = Rect::new(0, 0, 60, 30);
+    let mut buf = Buffer::empty(area);
+    (&plot).render(area, &mut buf);
+}
+
+#[test]
+fn test_scatter_plot_kde_marginals() {
+    use ratatui_plt::widgets::joint_plot::MarginalType;
+
+    let s = Series::new("pts")
+        .data(vec![
+            (0.0, 0.0),
+            (1.0, 1.5),
+            (2.0, 1.0),
+            (3.0, 2.5),
+            (4.0, 3.0),
+            (5.0, 4.0),
+        ])
+        .color(Color::Green)
+        .marker(MarkerShape::Circle);
+    let plot = ScatterPlot::new()
+        .series(s)
+        .marginal_x(MarginalType::Kde)
+        .marginal_y(MarginalType::Kde)
+        .title("Scatter KDE Marginals");
+
+    let area = Rect::new(0, 0, 60, 30);
+    let mut buf = Buffer::empty(area);
+    (&plot).render(area, &mut buf);
+}
+
+#[test]
+fn test_scatter_plot_rug_marginals() {
+    use ratatui_plt::widgets::joint_plot::MarginalType;
+
+    let s = Series::new("pts")
+        .data(vec![(1.0, 2.0), (2.0, 3.0), (3.0, 1.0), (4.0, 4.0)])
+        .color(Color::Yellow)
+        .marker(MarkerShape::Dot);
+    let plot = ScatterPlot::new()
+        .series(s)
+        .marginal_x(MarginalType::Rug)
+        .marginal_y(MarginalType::Rug)
+        .title("Scatter Rug Marginals");
+
+    let area = Rect::new(0, 0, 60, 30);
+    let mut buf = Buffer::empty(area);
+    (&plot).render(area, &mut buf);
+}
+
+#[test]
+fn test_scatter_plot_mixed_marginals() {
+    use ratatui_plt::widgets::joint_plot::MarginalType;
+
+    let s = Series::new("pts")
+        .data(vec![(0.0, 1.0), (1.0, 3.0), (2.0, 2.0), (3.0, 4.0)])
+        .color(Color::Magenta)
+        .marker(MarkerShape::Cross);
+    let plot = ScatterPlot::new()
+        .series(s)
+        .marginal_x(MarginalType::Histogram)
+        .marginal_y(MarginalType::Kde)
+        .marginal_ratio(0.25)
+        .marginal_bins(10)
+        .title("Scatter Mixed Marginals");
+
+    let area = Rect::new(0, 0, 60, 30);
+    let mut buf = Buffer::empty(area);
+    (&plot).render(area, &mut buf);
+}
+
+#[test]
+fn test_scatter_plot_no_marginals_unchanged() {
+    let s = Series::new("pts")
+        .data(vec![(0.0, 0.0), (1.0, 1.0), (2.0, 2.0)])
+        .color(Color::Red)
+        .marker(MarkerShape::Cross);
+    let plot = ScatterPlot::new().series(s).title("No Marginals");
+
+    let area = Rect::new(0, 0, 40, 20);
+    let mut buf = Buffer::empty(area);
+    (&plot).render(area, &mut buf);
 }

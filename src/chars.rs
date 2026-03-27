@@ -38,6 +38,8 @@ pub struct CharSet {
     pub marker: MarkerChars,
     /// Depth-shading characters for 3D bar rendering.
     pub depth: DepthChars,
+    /// Pattern/hatch fill characters for bar charts.
+    pub pattern: PatternChars,
 }
 
 /// Half-block and fill characters for area rendering.
@@ -291,6 +293,36 @@ impl Default for MarkerChars {
             legend_line: '━',
             gauge_hub: '●',
             whisker_dash: '┆',
+        }
+    }
+}
+
+/// Characters used for pattern/hatch fills in bar charts.
+#[derive(Clone, Debug)]
+pub struct PatternChars {
+    /// Diagonal right slash: `╱`
+    pub diagonal_right: char,
+    /// Diagonal left slash: `╲`
+    pub diagonal_left: char,
+    /// Cross hatch: `╳`
+    pub cross_hatch: char,
+    /// Horizontal line: `─`
+    pub horizontal: char,
+    /// Vertical line: `│`
+    pub vertical: char,
+    /// Dot: `·`
+    pub dot: char,
+}
+
+impl Default for PatternChars {
+    fn default() -> Self {
+        Self {
+            diagonal_right: '╱',
+            diagonal_left: '╲',
+            cross_hatch: '╳',
+            horizontal: '─',
+            vertical: '│',
+            dot: '·',
         }
     }
 }

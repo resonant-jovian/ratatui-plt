@@ -45,7 +45,7 @@ pub fn shared_span_state() -> SharedSpanState {
 /// Given a shared state containing start and end data values, draws a filled
 /// rectangular region across the plot area. This is designed to be rendered
 /// *on top of* an existing plot by calling [`SpanSelector::render_on`]
-/// with a [`PlotArea`] reference obtained from [`PlotFrame::render`].
+/// with a [`PlotArea`] reference obtained from [`PlotFrame::render`](crate::frame::PlotFrame::render).
 ///
 /// # Example
 ///

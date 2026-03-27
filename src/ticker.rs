@@ -425,7 +425,7 @@ impl TickFormatter for NullFormatter {
 /// Formatter that displays values as percentages.
 #[derive(Clone, Debug)]
 pub struct PercentFormatter {
-    /// Multiplier applied before formatting (e.g., 100.0 for [0,1] data).
+    /// Multiplier applied before formatting (e.g., 100.0 for \[0,1\] data).
     pub scale: f64,
     /// Number of decimal places.
     pub decimals: usize,
@@ -433,7 +433,7 @@ pub struct PercentFormatter {
 
 impl PercentFormatter {
     /// Create a percent formatter. `scale` is multiplied by the value
-    /// before appending '%'. Use `scale=100.0` for data already in [0,1].
+    /// before appending '%'. Use `scale=100.0` for data already in \[0,1\].
     pub fn new(scale: f64) -> Self {
         Self { scale, decimals: 0 }
     }

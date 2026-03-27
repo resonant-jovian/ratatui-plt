@@ -1116,7 +1116,7 @@ impl<'a> PlotFrame<'a> {
         }
     }
 
-    /// Render all plot chrome into a [`PlotBuffer`] and return the inner drawing area.
+    /// Render all plot chrome into a [`PlotBuffer`](crate::plot_buffer::PlotBuffer) and return the inner drawing area.
     ///
     /// This is the Z-buffered counterpart of [`PlotFrame::render`]. Every visual
     /// element is written with an explicit Z-level so that compositing produces

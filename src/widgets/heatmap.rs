@@ -163,7 +163,7 @@ impl Heatmap {
     }
 
     /// Set a boolean mask. Cells where `mask[row][col]` is `true` are
-    /// rendered as [`bad_color`] instead of the data value. This is useful
+    /// rendered as [`bad_color`](Self::bad_color) instead of the data value. This is useful
     /// for triangular correlation matrices where the upper or lower triangle
     /// should be hidden.
     pub fn mask(mut self, mask: Vec<Vec<bool>>) -> Self {

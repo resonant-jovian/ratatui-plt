@@ -64,7 +64,7 @@ ratatui-plt = "0.1.0"
 ratatui = "0.30"
 
 # Optional features:
-# ratatui-plt = { version = "0.0.3", features = ["statistics", "export"] }
+# ratatui-plt = { version = "0.1.0", features = ["statistics", "export"] }
 ```
 
 ### Quick start
