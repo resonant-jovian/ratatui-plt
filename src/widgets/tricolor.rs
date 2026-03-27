@@ -13,7 +13,7 @@ use crate::axis::Axis;
 use crate::colormap::{Colormap, Viridis};
 use crate::frame::{DataBounds, PlotArea, PlotFrame, ReferenceLine};
 use crate::norm::{LinearNorm, Normalize};
-use crate::plot_buffer::{PlotBuffer, Z_DATA};
+use crate::plot_buffer::{PlotBackend, create_backend, Z_DATA};
 use crate::spines::Spines;
 use crate::theme::Theme;
 use crate::triangulation::Triangulation;
@@ -158,7 +158,7 @@ impl Widget for &TriColor {
         let (x_lo, x_hi) = self.x_axis.resolve_bounds(x_min, x_max);
         let (y_lo, y_hi) = self.y_axis.resolve_bounds(y_min, y_max);
 
-        let mut pb = PlotBuffer::new(area);
+        let mut pb = create_backend(area);
 
         let frame = PlotFrame::new(&self.x_axis, &self.y_axis, &self.theme)
             .title(self.title.as_deref())
@@ -213,7 +213,7 @@ impl Widget for &TriColor {
 
 /// Fill a triangle using scanline algorithm.
 fn scanline_fill_triangle(
-    pb: &mut PlotBuffer,
+    pb: &mut dyn PlotBackend,
     vertices: [(f64, f64); 3],
     color: Color,
     pa: &PlotArea,

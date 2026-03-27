@@ -11,7 +11,7 @@ use ratatui::style::Color;
 
 use crate::annotation::Annotation;
 use crate::axis::{AspectRatio, Axis};
-use crate::plot_buffer::{PlotBuffer, Z_ANNOTATION, Z_CHROME, Z_FILL, Z_GRID};
+use crate::plot_buffer::{PlotBackend, Z_ANNOTATION, Z_CHROME, Z_FILL, Z_GRID};
 use crate::spines::Spines;
 use crate::theme::Theme;
 use crate::transform::{apply_aspect_ratio, data_to_screen};
@@ -1126,7 +1126,7 @@ impl<'a> PlotFrame<'a> {
     /// resolution). Returns `None` if the area is too small.
     pub fn render_to_pb(
         &self,
-        pb: &mut PlotBuffer,
+        pb: &mut dyn PlotBackend,
         area: Rect,
         bounds: DataBounds,
     ) -> Option<PlotArea> {
@@ -1498,7 +1498,7 @@ impl<'a> PlotFrame<'a> {
     /// Draw the x-axis label to PlotBuffer.
     fn draw_x_label_pb(
         &self,
-        _pb: &mut PlotBuffer,
+        _pb: &mut dyn PlotBackend,
         _area: Rect,
         _px: u16,
         _py: u16,
@@ -1614,11 +1614,11 @@ impl<'a> PlotFrame<'a> {
         }
     }
 
-    fn draw_y_label_pb(&self, _pb: &mut PlotBuffer, _area: Rect, _py: u16, _ah: u16) {
+    fn draw_y_label_pb(&self, _pb: &mut dyn PlotBackend, _area: Rect, _py: u16, _ah: u16) {
         // All y-axis labels are rendered after composite via draw_end_labels()
     }
 
-    pub fn draw_annotations_pb(pa: &PlotArea, annotations: &[Annotation], pb: &mut PlotBuffer) {
+    pub fn draw_annotations_pb(pa: &PlotArea, annotations: &[Annotation], pb: &mut dyn PlotBackend) {
         let default_color = Theme::get_default().annotation_color;
         for ann in annotations {
             let color = ann.color.unwrap_or(default_color);
@@ -1655,7 +1655,7 @@ impl<'a> PlotFrame<'a> {
     /// Draw reference lines and spans into a [`PlotBuffer`].
     ///
     /// Reference lines use [`Z_GRID`], reference spans/fills use [`Z_FILL`].
-    fn draw_reference_lines_pb(&self, pb: &mut PlotBuffer, pa: &PlotArea) {
+    fn draw_reference_lines_pb(&self, pb: &mut dyn PlotBackend, pa: &PlotArea) {
         let (px, py, aw, ah) = (pa.x, pa.y, pa.width, pa.height);
         let (x_lo, x_hi, y_lo, y_hi) = (pa.x_lo, pa.x_hi, pa.y_lo, pa.y_hi);
         for refline in self.reference_lines {

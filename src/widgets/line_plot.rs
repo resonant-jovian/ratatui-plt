@@ -24,11 +24,24 @@ use crate::axis::{AspectRatio, Axis};
 use crate::frame::{DataBounds, PlotArea, PlotFrame, ReferenceLine};
 use crate::legend::{Legend, LegendPosition};
 use crate::linked_view::SharedView;
-use crate::plot_buffer::{PlotBuffer, Z_DATA, Z_FILL, Z_MARKER};
+use crate::plot_buffer::{PlotBackend, create_backend, Z_DATA, Z_FILL, Z_MARKER};
 use crate::series::{Series, is_valid_point};
 use crate::spines::Spines;
 use crate::style::DashPattern;
 use crate::theme::Theme;
+
+/// Interpolation mode for line rendering.
+///
+/// Controls how data points are connected when drawing line segments.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub enum InterpolationMode {
+    /// Connect points with straight line segments (default).
+    #[default]
+    Linear,
+    /// Use natural cubic spline interpolation to produce a smooth curve.
+    /// Evaluates at 4x the data point count for visual smoothness.
+    CubicSpline,
+}
 
 /// Line plot step mode.
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -54,6 +67,7 @@ pub struct LinePlot {
     show_legend: bool,
     legend_position: LegendPosition,
     step_mode: StepMode,
+    interpolation: InterpolationMode,
     annotations: Vec<Annotation>,
     theme: Theme,
     spines: Spines,
@@ -72,6 +86,7 @@ impl Default for LinePlot {
             show_legend: true,
             legend_position: LegendPosition::TopRight,
             step_mode: StepMode::None,
+            interpolation: InterpolationMode::default(),
             annotations: Vec::new(),
             theme: Theme::get_default(),
             spines: Spines::default(),
@@ -141,6 +156,16 @@ impl LinePlot {
         self
     }
 
+    /// Set the interpolation mode.
+    ///
+    /// When set to [`InterpolationMode::CubicSpline`], each series is
+    /// smoothed with a natural cubic spline before rendering. The original
+    /// rendering pipeline is unchanged — it simply receives more points.
+    pub fn interpolation(mut self, mode: InterpolationMode) -> Self {
+        self.interpolation = mode;
+        self
+    }
+
     /// Add an annotation.
     pub fn annotation(mut self, ann: Annotation) -> Self {
         self.annotations.push(ann);
@@ -199,7 +224,7 @@ impl Widget for &LinePlot {
             }
         }
 
-        let mut pb = PlotBuffer::new(area);
+        let mut pb = create_backend(area);
 
         // Create and render the plot frame (title, axes, grid, ticks, labels, spines, ref lines)
         let frame = PlotFrame::new(&self.x_axis, &self.y_axis, &self.theme)
@@ -235,7 +260,32 @@ impl Widget for &LinePlot {
             })
             .collect();
 
-        // Draw fill regions
+        // Apply cubic spline interpolation when requested.
+        // This produces denser point arrays for smooth curves while leaving
+        // the downstream rendering code unchanged.
+        let interpolated: Vec<Vec<(f64, f64)>> =
+            if self.interpolation == InterpolationMode::CubicSpline {
+                self.series
+                    .iter()
+                    .map(|s| {
+                        let valid: Vec<(f64, f64)> = s
+                            .data
+                            .iter()
+                            .copied()
+                            .filter(|&(x, y)| is_valid_point(x, y))
+                            .collect();
+                        if valid.len() < 3 {
+                            valid
+                        } else {
+                            cubic_spline_interpolate(&valid)
+                        }
+                    })
+                    .collect()
+            } else {
+                self.series.iter().map(|s| s.data.clone()).collect()
+            };
+
+        // Draw fill regions (using interpolated data for smoother fill)
         for (si, s) in self.series.iter().enumerate() {
             if let Some(ref fill_to) = s.fill_to {
                 let baseline = match fill_to {
@@ -244,18 +294,31 @@ impl Widget for &LinePlot {
                 };
                 let baseline_screen = pa.screen_y(baseline);
 
-                for point in &s.data {
-                    let sx = pa.screen_x(point.0);
-                    let sy = pa.screen_y(point.1);
-                    let xi = sx.round() as u16;
+                let data = &interpolated[si];
+                // Fill column-by-column between adjacent interpolated points.
+                // For each screen column inside the plot area, linearly interpolate
+                // the series y-value from the (possibly spline-densified) data and
+                // fill between that y and the baseline.
+                for col_offset in 0..pa.width {
+                    let screen_x = pa.x + col_offset;
+                    // Map screen column back to data x
+                    let data_x = x_lo
+                        + (col_offset as f64 / (pa.width.saturating_sub(1)).max(1) as f64)
+                            * (x_hi - x_lo);
+
+                    // Linearly interpolate y at data_x from the interpolated points
+                    let data_y = interp_y_at(data, data_x);
+                    if !data_y.is_finite() {
+                        continue;
+                    }
+
+                    let sy = pa.screen_y(data_y);
                     let y_top = sy.round().min(baseline_screen.round()) as u16;
                     let y_bot = sy.round().max(baseline_screen.round()) as u16;
 
-                    if xi >= pa.x && xi < pa.x + pa.width {
-                        for y in y_top..=y_bot {
-                            if pa.contains(xi, y) {
-                                pb.set_bg(xi, y, resolved_colors[si], Z_FILL);
-                            }
+                    for y in y_top..=y_bot {
+                        if pa.contains(screen_x, y) {
+                            pb.set_bg(screen_x, y, resolved_colors[si], Z_FILL);
                         }
                     }
                 }
@@ -298,10 +361,11 @@ impl Widget for &LinePlot {
             }
         }
 
-        // Draw line series
+        // Draw line series (using interpolated data for line segments)
         for (si, s) in self.series.iter().enumerate() {
             let color = resolved_colors[si];
-            if s.data.len() < 2 {
+            let line_data = &interpolated[si];
+            if line_data.len() < 2 {
                 // Just draw markers for single-point series
                 for &(x, y) in &s.data {
                     let sx = pa.screen_x(x);
@@ -319,9 +383,9 @@ impl Widget for &LinePlot {
             }
 
             // Draw lines between consecutive points, breaking at NaN
-            for i in 0..s.data.len() - 1 {
-                let (x0, y0) = s.data[i];
-                let (x1, y1) = s.data[i + 1];
+            for i in 0..line_data.len() - 1 {
+                let (x0, y0) = line_data[i];
+                let (x1, y1) = line_data[i + 1];
 
                 // Skip line segments where either endpoint is NaN/infinite
                 if !is_valid_point(x0, y0) || !is_valid_point(x1, y1) {
@@ -581,7 +645,7 @@ struct LineSegment {
 /// Draw a line between two screen points using Bresenham's at braille sub-pixel resolution,
 /// writing into a [`PlotBuffer`] at the given Z-level.
 fn draw_line_pb(
-    pb: &mut PlotBuffer,
+    pb: &mut dyn PlotBackend,
     seg: &LineSegment,
     color: Color,
     pattern: &DashPattern,
@@ -666,4 +730,141 @@ fn draw_line_pb(
         }
         step += 1;
     }
+}
+
+/// Linearly interpolate a y value from sorted (x, y) data at a given x.
+///
+/// Returns `f64::NAN` when `data` is empty. Clamps to endpoint values
+/// when `x` falls outside the data range.
+fn interp_y_at(data: &[(f64, f64)], x: f64) -> f64 {
+    if data.is_empty() {
+        return f64::NAN;
+    }
+    if data.len() == 1 {
+        return data[0].1;
+    }
+    if x <= data[0].0 {
+        return data[0].1;
+    }
+    let last = data.len() - 1;
+    if x >= data[last].0 {
+        return data[last].1;
+    }
+    for i in 0..last {
+        let (x0, y0) = data[i];
+        let (x1, y1) = data[i + 1];
+        if x >= x0 && x <= x1 {
+            let dx = x1 - x0;
+            if dx.abs() < 1e-15 {
+                return y0;
+            }
+            let t = (x - x0) / dx;
+            return y0 + t * (y1 - y0);
+        }
+    }
+    data[last].1
+}
+
+/// Compute a natural cubic spline through `pts` and evaluate at 4x density.
+///
+/// `pts` must be sorted by x, contain no NaN values, and have at least 3
+/// elements. Returns evenly-spaced evaluated points from x_min to x_max.
+///
+/// Algorithm:
+/// 1. Build the tridiagonal system for natural spline second derivatives.
+/// 2. Solve via the Thomas algorithm (forward elimination + back substitution).
+/// 3. Compute cubic polynomial coefficients per interval.
+/// 4. Evaluate at `4 * n` evenly-spaced x values.
+fn cubic_spline_interpolate(pts: &[(f64, f64)]) -> Vec<(f64, f64)> {
+    let n = pts.len();
+    if n < 3 {
+        return pts.to_vec();
+    }
+
+    // h[i] = x[i+1] - x[i]
+    let h: Vec<f64> = (0..n - 1).map(|i| pts[i + 1].0 - pts[i].0).collect();
+
+    // Check for degenerate intervals — if any h is too small, fall back
+    if h.iter().any(|&hi| hi.abs() < 1e-15) {
+        return pts.to_vec();
+    }
+
+    // Set up tridiagonal system for second derivatives (natural spline: M[0] = M[n-1] = 0)
+    // Interior equations: h[i-1]*M[i-1] + 2*(h[i-1]+h[i])*M[i] + h[i]*M[i+1] = 6*d[i]
+    // where d[i] = (y[i+1]-y[i])/h[i] - (y[i]-y[i-1])/h[i-1]
+    let m = n - 2; // number of interior unknowns
+    let mut diag = vec![0.0; m]; // main diagonal
+    let mut upper = vec![0.0; m]; // upper diagonal
+    let mut rhs = vec![0.0; m]; // right-hand side
+
+    for i in 0..m {
+        let idx = i + 1; // maps to global index
+        diag[i] = 2.0 * (h[idx - 1] + h[idx]);
+        if i + 1 < m {
+            upper[i] = h[idx];
+        }
+        let slope_right = (pts[idx + 1].1 - pts[idx].1) / h[idx];
+        let slope_left = (pts[idx].1 - pts[idx - 1].1) / h[idx - 1];
+        rhs[i] = 6.0 * (slope_right - slope_left);
+    }
+
+    // Thomas algorithm — forward sweep
+    // lower[i] = h[i] (the sub-diagonal), but we consume it during elimination
+    for i in 1..m {
+        let lower_i = h[i]; // h[global_idx - 1] where global_idx = i + 1
+        if diag[i - 1].abs() < 1e-30 {
+            // Degenerate pivot; fall back to linear
+            return pts.to_vec();
+        }
+        let factor = lower_i / diag[i - 1];
+        diag[i] -= factor * upper[i - 1];
+        rhs[i] -= factor * rhs[i - 1];
+    }
+
+    // Back substitution
+    let mut moments = vec![0.0; n]; // M[0] = M[n-1] = 0 (natural spline)
+    if diag[m - 1].abs() < 1e-30 {
+        return pts.to_vec();
+    }
+    moments[m] = rhs[m - 1] / diag[m - 1]; // M[n-2]
+    for i in (0..m - 1).rev() {
+        if diag[i].abs() < 1e-30 {
+            return pts.to_vec();
+        }
+        moments[i + 1] = (rhs[i] - upper[i] * moments[i + 2]) / diag[i];
+    }
+
+    // Evaluate spline at 4x density
+    let out_count = 4 * n;
+    let x_min = pts[0].0;
+    let x_max = pts[n - 1].0;
+    let x_span = x_max - x_min;
+    if x_span.abs() < 1e-15 {
+        return pts.to_vec();
+    }
+
+    let mut result = Vec::with_capacity(out_count);
+    let mut seg = 0usize; // current spline segment index
+
+    for k in 0..out_count {
+        let x = x_min + x_span * (k as f64) / (out_count - 1).max(1) as f64;
+
+        // Advance segment index so that pts[seg].0 <= x <= pts[seg+1].0
+        while seg + 2 < n && x > pts[seg + 1].0 {
+            seg += 1;
+        }
+
+        let hi = h[seg];
+        let a = (pts[seg + 1].0 - x) / hi;
+        let b = (x - pts[seg].0) / hi;
+
+        let y = a * pts[seg].1
+            + b * pts[seg + 1].1
+            + (a * a * a - a) * (hi * hi / 6.0) * moments[seg]
+            + (b * b * b - b) * (hi * hi / 6.0) * moments[seg + 1];
+
+        result.push((x, y));
+    }
+
+    result
 }

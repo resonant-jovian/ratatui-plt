@@ -23,7 +23,7 @@ use ratatui::style::Color;
 use ratatui::widgets::Widget;
 
 use crate::color_cycle::ColorCycle;
-use crate::plot_buffer::{PlotBuffer, Z_CHROME, Z_DATA};
+use crate::plot_buffer::{PlotBackend, create_backend, Z_CHROME, Z_DATA};
 use crate::theme::Theme;
 
 /// A node in the treemap hierarchy.
@@ -337,7 +337,7 @@ impl Widget for &Treemap {
             return;
         }
 
-        let mut pb = PlotBuffer::new(area);
+        let mut pb = create_backend(area);
 
         // Draw title
         if let Some(ref title) = self.title {

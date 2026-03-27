@@ -8,7 +8,7 @@ use ratatui::widgets::Widget;
 use crate::annotation::Annotation;
 use crate::axis::Axis;
 use crate::frame::{DataBounds, PlotFrame, ReferenceLine};
-use crate::plot_buffer::{PlotBuffer, Z_CHROME, Z_DATA, Z_MARKER};
+use crate::plot_buffer::{PlotBackend, create_backend, Z_CHROME, Z_DATA, Z_MARKER};
 use crate::spines::Spines;
 use crate::theme::Theme;
 use crate::ticker::NullLocator;
@@ -131,6 +131,8 @@ pub struct BoxPlot {
     bootstrap_ci: bool,
     /// Number of bootstrap resamples (default: 1000).
     bootstrap_n: usize,
+    /// Show individual data points alongside each box.
+    show_points: bool,
     theme: Theme,
     spines: Spines,
     reference_lines: Vec<ReferenceLine>,
@@ -150,6 +152,7 @@ impl Default for BoxPlot {
             notch: false,
             bootstrap_ci: false,
             bootstrap_n: 1000,
+            show_points: false,
             theme: Theme::get_default(),
             spines: Spines::default(),
             reference_lines: Vec::new(),
@@ -203,6 +206,15 @@ impl BoxPlot {
     /// groups suggest no significant difference in medians.
     pub fn notch(mut self, notch: bool) -> Self {
         self.notch = notch;
+        self
+    }
+
+    /// Show individual data points alongside each box.
+    ///
+    /// When enabled, raw data values are rendered as scatter markers next to
+    /// the box with a small deterministic horizontal jitter for visibility.
+    pub fn show_points(mut self, show: bool) -> Self {
+        self.show_points = show;
         self
     }
 
@@ -325,7 +337,7 @@ impl Widget for &BoxPlot {
         let x_lo = 0.0;
         let x_hi = n as f64;
 
-        let mut pb = PlotBuffer::new(area);
+        let mut pb = create_backend(area);
 
         // Create and render the plot frame
         let frame = PlotFrame::new(&x_axis, &self.y_axis, &self.theme)
@@ -396,7 +408,7 @@ impl Widget for &BoxPlot {
             .round() as u16;
 
             // Notch calculation: bootstrap CI or 1.57*IQR/sqrt(n)
-            let (_notch_lo_y, _notch_hi_y, _notch_left, _notch_right) =
+            let (notch_lo_y, notch_hi_y, notch_left, notch_right) =
                 if (self.notch || self.bootstrap_ci) && d.values.len() > 1 {
                     let (notch_lo, notch_hi) = if self.bootstrap_ci {
                         let (ci_lo, ci_hi) = bootstrap_median_ci(&d.values, self.bootstrap_n);
@@ -439,10 +451,20 @@ impl Widget for &BoxPlot {
                 d.color
             };
 
+            let is_notched = (self.notch || self.bootstrap_ci) && d.values.len() > 1;
+
             if self.fill_boxes {
                 // Filled mode: solid color rectangle, NO outline. Fill IS the box.
+                // When notched, narrow the box in the notch region to create a
+                // visible pinch around the median.
                 for y in sy_q3..=sy_q1 {
-                    for x in box_left..box_right {
+                    let (row_left, row_right) = if is_notched && y >= notch_hi_y && y <= notch_lo_y
+                    {
+                        (notch_left, notch_right)
+                    } else {
+                        (box_left, box_right)
+                    };
+                    for x in row_left..row_right {
                         if pa.contains(x, y) {
                             pb.set_cell(x, y, ' ', d.color, d.color, Z_DATA);
                         }
@@ -510,21 +532,27 @@ impl Widget for &BoxPlot {
                         Z_DATA,
                     );
                 }
-                // Side walls — always straight (no notch indentation in outline mode)
+                // Side walls — indented in the notch region when notched
                 {
                     for y in (sy_q3 + 1)..sy_q1 {
-                        if pa.contains(box_left, y) {
+                        let (wall_left, wall_right) =
+                            if is_notched && y >= notch_hi_y && y <= notch_lo_y {
+                                (notch_left, notch_right)
+                            } else {
+                                (box_left, box_right)
+                            };
+                        if pa.contains(wall_left, y) {
                             pb.set_char(
-                                box_left,
+                                wall_left,
                                 y,
                                 self.theme.chars.border.vertical,
                                 border_fg,
                                 Z_DATA,
                             );
                         }
-                        if box_right > 0 && pa.contains(box_right - 1, y) {
+                        if wall_right > 0 && pa.contains(wall_right - 1, y) {
                             pb.set_char(
-                                box_right - 1,
+                                wall_right - 1,
                                 y,
                                 self.theme.chars.border.vertical,
                                 border_fg,
@@ -535,8 +563,13 @@ impl Widget for &BoxPlot {
                 }
             }
 
-            // Median line — thin horizontal, full box width
-            for x in box_left..box_right {
+            // Median line — narrower when notched to match the pinch
+            let (median_left, median_right) = if is_notched {
+                (notch_left, notch_right)
+            } else {
+                (box_left, box_right)
+            };
+            for x in median_left..median_right {
                 if pa.contains(x, sy_median) {
                     pb.set_char(
                         x,
@@ -631,6 +664,36 @@ impl Widget for &BoxPlot {
                         marker_fg,
                         Z_MARKER,
                     );
+                }
+            }
+
+            // Individual data points with deterministic horizontal jitter
+            if self.show_points {
+                // Seed the RNG deterministically from the dataset index
+                let mut rng = SimpleRng::new(i as u64 ^ 0xCAFEBABE);
+                let jitter_range = (box_width / 3).max(1) as i16;
+                for &v in &d.values {
+                    let sy =
+                        data_to_screen(v, y_lo, y_hi, (pa.y + pa.height - 1) as f64, pa.y as f64)
+                            .round() as u16;
+                    // Deterministic jitter: map RNG output to [-jitter_range, jitter_range]
+                    let jitter =
+                        (rng.next_u64() % (2 * jitter_range as u64 + 1)) as i16 - jitter_range;
+                    let sx = (center_x as i16 + jitter).max(pa.x as i16) as u16;
+                    if pa.contains(sx, sy) {
+                        let marker_fg = if self.fill_boxes {
+                            crate::drawing::contrasting_color(d.color)
+                        } else {
+                            self.theme.foreground
+                        };
+                        pb.set_char(
+                            sx,
+                            sy,
+                            self.theme.chars.marker.default_point,
+                            marker_fg,
+                            Z_MARKER,
+                        );
+                    }
                 }
             }
 

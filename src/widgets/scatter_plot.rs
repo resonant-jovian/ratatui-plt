@@ -9,15 +9,13 @@ use ratatui::widgets::Widget;
 use crate::annotation::Annotation;
 use crate::axis::{AspectRatio, Axis};
 use crate::colormap::{Colormap, Viridis};
-#[cfg(feature = "statistics")]
-use crate::drawing::draw_braille_line_pb;
 use crate::frame::{DataBounds, PlotFrame, ReferenceLine};
 use crate::legend::{Legend, LegendPosition};
 use crate::linked_view::SharedView;
 use crate::norm::{LinearNorm, Normalize};
 #[cfg(feature = "statistics")]
 use crate::plot_buffer::Z_DATA;
-use crate::plot_buffer::{PlotBuffer, Z_MARKER};
+use crate::plot_buffer::{PlotBackend, create_backend, Z_MARKER};
 use crate::series::Series;
 use crate::spines::Spines;
 use crate::style::MarkerShape;
@@ -61,6 +59,10 @@ pub struct ScatterPlot {
     colormap: Box<dyn Colormap>,
     /// Normalizer for color values.
     color_norm: Box<dyn Normalize>,
+    /// Optional per-point size values for bubble mode.
+    size_values: Option<Vec<f64>>,
+    /// Min and max marker size in characters for bubble mode.
+    size_range: (f64, f64),
     theme: Theme,
     spines: Spines,
     reference_lines: Vec<ReferenceLine>,
@@ -90,6 +92,8 @@ impl Default for ScatterPlot {
             color_values: None,
             colormap: Box::new(Viridis),
             color_norm: Box::new(LinearNorm::new(0.0, 1.0)),
+            size_values: None,
+            size_range: (1.0, 5.0),
             theme: Theme::get_default(),
             spines: Spines::default(),
             reference_lines: Vec::new(),
@@ -163,6 +167,21 @@ impl ScatterPlot {
     /// Set the normalization for color values.
     pub fn color_norm(mut self, norm: impl Normalize + 'static) -> Self {
         self.color_norm = Box::new(norm);
+        self
+    }
+
+    /// Set per-point size values for bubble mode.
+    ///
+    /// Each value maps to a marker radius between `size_range.0` and `size_range.1`.
+    /// In the terminal, larger sizes fill adjacent cells around the marker position.
+    pub fn size_values(mut self, values: Vec<f64>) -> Self {
+        self.size_values = Some(values);
+        self
+    }
+
+    /// Set the min/max marker size in characters for bubble mode (default: 1.0–5.0).
+    pub fn size_range(mut self, min: f64, max: f64) -> Self {
+        self.size_range = (min, max);
         self
     }
 
@@ -263,7 +282,7 @@ impl Widget for &ScatterPlot {
             }
         }
 
-        let mut pb = PlotBuffer::new(area);
+        let mut pb = create_backend(area);
 
         // Create and render the plot frame (title, axes, grid, ticks, labels, spines, ref lines)
         let frame = PlotFrame::new(&self.x_axis, &self.y_axis, &self.theme)
@@ -309,7 +328,58 @@ impl Widget for &ScatterPlot {
                     } else {
                         fallback
                     };
-                    pb.set_char(xi, yi, marker.char(), color, Z_MARKER);
+
+                    // Bubble mode: draw filled circle of variable radius
+                    if let Some(ref sv) = self.size_values {
+                        if global_point_idx < sv.len() {
+                            let sv_min = sv
+                                .iter()
+                                .cloned()
+                                .filter(|v| v.is_finite())
+                                .fold(f64::INFINITY, f64::min);
+                            let sv_max = sv
+                                .iter()
+                                .cloned()
+                                .filter(|v| v.is_finite())
+                                .fold(f64::NEG_INFINITY, f64::max);
+                            let sv_range = sv_max - sv_min;
+                            let t = if sv_range > 0.0 {
+                                (sv[global_point_idx] - sv_min) / sv_range
+                            } else {
+                                0.5
+                            };
+                            let radius = (self.size_range.0
+                                + t * (self.size_range.1 - self.size_range.0))
+                                .max(0.5);
+                            let r_int = radius.round() as i16;
+                            // Fill a circle of the computed radius
+                            for dy in -r_int..=r_int {
+                                for dx in -r_int..=r_int {
+                                    if dx * dx + dy * dy <= r_int * r_int {
+                                        let bx = xi as i16 + dx;
+                                        let by = yi as i16 + dy;
+                                        if bx >= 0 && by >= 0 {
+                                            let bxu = bx as u16;
+                                            let byu = by as u16;
+                                            if pa.contains(bxu, byu) {
+                                                pb.set_char(
+                                                    bxu,
+                                                    byu,
+                                                    self.theme.chars.fill.solid,
+                                                    color,
+                                                    Z_MARKER,
+                                                );
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        } else {
+                            pb.set_char(xi, yi, marker.char(), color, Z_MARKER);
+                        }
+                    } else {
+                        pb.set_char(xi, yi, marker.char(), color, Z_MARKER);
+                    }
                 }
                 global_point_idx += 1;
             }
@@ -370,7 +440,7 @@ impl Widget for &ScatterPlot {
                     let sy0 = pa.screen_y(ys[i]);
                     let sx1 = pa.screen_x(eval_xs[i + 1]);
                     let sy1 = pa.screen_y(ys[i + 1]);
-                    draw_braille_line_pb(&mut pb, sx0, sy0, sx1, sy1, trend_color, &pa, Z_DATA);
+                    pb.draw_line(sx0, sy0, sx1, sy1, trend_color, &pa, Z_DATA);
                 }
             }
         }

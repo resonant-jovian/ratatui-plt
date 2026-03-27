@@ -8,7 +8,7 @@ use ratatui::widgets::Widget;
 use crate::annotation::Annotation;
 use crate::axis::Axis;
 use crate::frame::{DataBounds, PlotFrame, ReferenceLine};
-use crate::plot_buffer::{PlotBuffer, Z_CHROME, Z_DATA};
+use crate::plot_buffer::{PlotBackend, create_backend, Z_CHROME, Z_DATA};
 use crate::spines::Spines;
 use crate::theme::Theme;
 
@@ -254,7 +254,7 @@ impl Widget for &Dendrogram {
         let x_axis = Axis::new();
         let y_axis = Axis::new();
 
-        let mut pb = PlotBuffer::new(area);
+        let mut pb = create_backend(area);
 
         let frame = PlotFrame::new(&x_axis, &y_axis, &self.theme)
             .title(self.title.as_deref())
@@ -466,7 +466,7 @@ use crate::frame::PlotArea;
 
 /// Draw a vertical line segment (for Bottom/Top orientation) into a PlotBuffer.
 fn draw_vertical_segment_pb(
-    pb: &mut PlotBuffer,
+    pb: &mut dyn PlotBackend,
     pa: &PlotArea,
     cat: f64,
     h0: f64,
@@ -491,7 +491,7 @@ fn draw_vertical_segment_pb(
 
 /// Draw a horizontal line segment (for Bottom/Top orientation) into a PlotBuffer.
 fn draw_horizontal_segment_pb(
-    pb: &mut PlotBuffer,
+    pb: &mut dyn PlotBackend,
     pa: &PlotArea,
     cat0: f64,
     cat1: f64,
@@ -525,7 +525,7 @@ fn draw_horizontal_segment_pb(
 
 /// Draw a horizontal segment in Left/Right orientation into a PlotBuffer.
 fn draw_horizontal_segment_h_pb(
-    pb: &mut PlotBuffer,
+    pb: &mut dyn PlotBackend,
     pa: &PlotArea,
     cat: f64,
     h0: f64,
@@ -550,7 +550,7 @@ fn draw_horizontal_segment_h_pb(
 
 /// Draw a vertical segment in Left/Right orientation into a PlotBuffer.
 fn draw_vertical_segment_h_pb(
-    pb: &mut PlotBuffer,
+    pb: &mut dyn PlotBackend,
     pa: &PlotArea,
     cat0: f64,
     cat1: f64,

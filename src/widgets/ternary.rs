@@ -26,7 +26,7 @@ use ratatui::layout::Rect;
 use ratatui::style::Color;
 use ratatui::widgets::Widget;
 
-use crate::plot_buffer::{PlotBuffer, Z_CHROME, Z_GRID, Z_MARKER};
+use crate::plot_buffer::{PlotBackend, create_backend, Z_CHROME, Z_GRID, Z_MARKER};
 use crate::style::MarkerShape;
 use crate::theme::Theme;
 
@@ -197,7 +197,7 @@ impl Widget for &TernaryPlot {
             return;
         }
 
-        let mut pb = PlotBuffer::new(area);
+        let mut pb = create_backend(area);
 
         // Draw title
         if let Some(ref title) = self.title {
@@ -472,7 +472,7 @@ struct TernaryClip {
 /// Draw a line between two screen coordinates using character-level Bresenham, writing into a [`PlotBuffer`].
 #[allow(clippy::too_many_arguments)]
 fn draw_screen_line_pb(
-    pb: &mut PlotBuffer,
+    pb: &mut dyn PlotBackend,
     x0: f64,
     y0: f64,
     x1: f64,

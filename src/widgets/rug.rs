@@ -20,7 +20,7 @@ use ratatui::widgets::Widget;
 use crate::annotation::Annotation;
 use crate::axis::Axis;
 use crate::frame::{DataBounds, PlotFrame, ReferenceLine};
-use crate::plot_buffer::{PlotBuffer, Z_DATA};
+use crate::plot_buffer::{PlotBackend, create_backend, Z_DATA};
 use crate::spines::Spines;
 use crate::theme::Theme;
 
@@ -215,7 +215,7 @@ impl Widget for &RugPlot {
             (xl, xh, yl, yh)
         };
 
-        let mut pb = PlotBuffer::new(area);
+        let mut pb = create_backend(area);
 
         // Create and render the plot frame
         let frame = PlotFrame::new(&self.x_axis, &self.y_axis, &self.theme)

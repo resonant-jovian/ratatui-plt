@@ -23,10 +23,9 @@ use ratatui::widgets::Widget;
 
 use crate::annotation::Annotation;
 use crate::axis::Axis;
-use crate::drawing::draw_braille_line_pb;
 use crate::frame::{DataBounds, PlotFrame, ReferenceLine};
 use crate::legend::{Legend, LegendEntry, LegendPosition};
-use crate::plot_buffer::{PlotBuffer, Z_DATA, Z_FILL};
+use crate::plot_buffer::{PlotBackend, create_backend, Z_DATA, Z_FILL};
 use crate::spines::Spines;
 use crate::theme::Theme;
 
@@ -234,7 +233,7 @@ impl Widget for &StairsPlot {
         let (x_lo, x_hi) = self.x_axis.resolve_bounds(x_min, x_max);
         let (y_lo, y_hi) = self.y_axis.resolve_bounds(y_min, y_max);
 
-        let mut pb = PlotBuffer::new(area);
+        let mut pb = create_backend(area);
 
         // Create and render the plot frame
         let frame = PlotFrame::new(&self.x_axis, &self.y_axis, &self.theme)
@@ -292,22 +291,12 @@ impl Widget for &StairsPlot {
                     let sy = pa.screen_y(ds.values[i]);
 
                     // Horizontal segment at current value
-                    draw_braille_line_pb(
-                        &mut pb,
-                        sx_left,
-                        sy,
-                        sx_right,
-                        sy,
-                        ds.color,
-                        &pa,
-                        Z_DATA + si as u8,
-                    );
+                    pb.draw_line(sx_left, sy, sx_right, sy, ds.color, &pa, Z_DATA + si as u8);
 
                     // Vertical segment at the right edge connecting to next value
                     if i + 1 < n {
                         let sy_next = pa.screen_y(ds.values[i + 1]);
-                        draw_braille_line_pb(
-                            &mut pb,
+                        pb.draw_line(
                             sx_right,
                             sy,
                             sx_right,

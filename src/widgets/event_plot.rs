@@ -24,7 +24,7 @@ use ratatui::widgets::Widget;
 use crate::annotation::Annotation;
 use crate::axis::Axis;
 use crate::frame::{DataBounds, PlotFrame, ReferenceLine};
-use crate::plot_buffer::{PlotBuffer, Z_CHROME, Z_DATA, Z_GRID};
+use crate::plot_buffer::{PlotBackend, create_backend, Z_CHROME, Z_DATA, Z_GRID};
 use crate::spines::Spines;
 use crate::theme::Theme;
 use crate::ticker::NullLocator;
@@ -212,7 +212,7 @@ impl Widget for &EventPlot {
 impl EventPlot {
     /// Render in horizontal orientation: groups as horizontal lines, events as vertical ticks.
     fn render_horizontal(&self, area: Rect, buf: &mut Buffer) {
-        let mut pb = PlotBuffer::new(area);
+        let mut pb = create_backend(area);
         // Compute data bounds from all event positions
         let mut d_min = f64::INFINITY;
         let mut d_max = f64::NEG_INFINITY;
@@ -340,7 +340,7 @@ impl EventPlot {
 
     /// Render in vertical orientation: groups as vertical lines, events as horizontal ticks.
     fn render_vertical(&self, area: Rect, buf: &mut Buffer) {
-        let mut pb = PlotBuffer::new(area);
+        let mut pb = create_backend(area);
 
         // Compute data bounds from all event positions
         let mut d_min = f64::INFINITY;

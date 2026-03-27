@@ -50,40 +50,37 @@ require_cmd() {
 
 # ── Example Groups ───────────────────────────────────────────────────────────
 
-GROUP_2D=(line_plot scatter_plot heatmap histogram bar_chart contour image_plot pcolormesh collections pie_chart stacked_area stairs stem_plot event_plot hexbin hist2d band rug)
-GROUP_3D=(surface3d wireframe3d scatter3d bar3d contour3d quiver3d vector_field)
-GROUP_STATISTICAL=(box_plot boxen violin_plot ecdf error_bar joint_plot swarm strip statistics trendline)
-GROUP_SHOWCASE=(showcase_basic_2d showcase_3d showcase_fill showcase_grid showcase_statistical showcase_tri showcase_unicode showcase_features)
-GROUP_SPECIALIZED=(radial ternary network parallel_coords sankey sunburst treemap dendrogram streamplot tricolor triplot scientific_dashboard theme_config)
-GROUP_LAYOUT=(multi_panel facet_grid twin_axes inset)
-GROUP_INTERACTIVE=(crosshair picking interactive_legend span_selector)
-GROUP_FINANCE=(candlestick waterfall funnel gauge gantt)
-GROUP_EXPORT=(kitty_export sixel_export toml_theme)
+GROUP_SHOWCASE=(showcase_basic_2d showcase_statistical showcase_grid showcase_fill showcase_tri showcase_3d showcase_hierarchical showcase_financial showcase_polar showcase_network showcase_scientific showcase_features showcase_unicode)
+GROUP_CORE=(line_plot scatter_plot bar_chart histogram heatmap image_plot pie_chart)
+GROUP_3D=(surface3d scatter3d line3d mesh3d bar3d voxels isosurface volume3d streamtube contour3d quiver3d)
+GROUP_INTERACTIVE=(crosshair picking interactive_legend span_selector rect_selector lasso_selector)
+GROUP_LAYOUT=(multi_panel facet_grid twin_axes inset joint_plot pair_plot)
+GROUP_COMPOSITE=(scientific_dashboard collections regression_plot ridgeline)
+GROUP_EXPORT=(kitty_export sixel_export toml_theme theme_config)
 
-ALL_GROUPS=(2d 3d statistical showcase specialized layout interactive finance export)
+ALL_GROUPS=(showcase core 3d interactive layout composite export)
 
 # Feature flags for examples that require them
 declare -A EXAMPLE_FEATURES=(
-    [statistics]="statistics"
-    [trendline]="statistics"
+    [regression_plot]="statistics"
+    [ridgeline]="statistics"
+    [pair_plot]="statistics"
+    [showcase_features]="statistics"
     [kitty_export]="kitty"
     [sixel_export]="sixel"
     [toml_theme]="toml-themes"
     [showcase_unicode]="unicode-extended"
-    [showcase_features]="statistics"
 )
 
 get_group_examples() {
     local group="$1"
     case "$group" in
-        2d)           echo "${GROUP_2D[@]}" ;;
-        3d)           echo "${GROUP_3D[@]}" ;;
-        statistical)  echo "${GROUP_STATISTICAL[@]}" ;;
         showcase)     echo "${GROUP_SHOWCASE[@]}" ;;
-        specialized)  echo "${GROUP_SPECIALIZED[@]}" ;;
-        layout)       echo "${GROUP_LAYOUT[@]}" ;;
+        core)         echo "${GROUP_CORE[@]}" ;;
+        3d)           echo "${GROUP_3D[@]}" ;;
         interactive)  echo "${GROUP_INTERACTIVE[@]}" ;;
-        finance)      echo "${GROUP_FINANCE[@]}" ;;
+        layout)       echo "${GROUP_LAYOUT[@]}" ;;
+        composite)    echo "${GROUP_COMPOSITE[@]}" ;;
         export)       echo "${GROUP_EXPORT[@]}" ;;
         *)            err "unknown group: $group"; return 1 ;;
     esac

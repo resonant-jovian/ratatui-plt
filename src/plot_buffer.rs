@@ -20,7 +20,122 @@ use ratatui::buffer::Buffer;
 use ratatui::layout::Rect;
 use ratatui::style::Color;
 
-use crate::drawing::{BRAILLE_BASE, colors_match, contrasting_color};
+use crate::drawing::{BRAILLE_BASE, BRAILLE_BITS, colors_match, contrasting_color};
+use crate::frame::PlotArea;
+
+/// Trait defining the rendering backend abstraction.
+///
+/// All plot widgets render through this interface. The default implementation
+/// is [`PlotBuffer`] (Braille/half-block Unicode rendering). Alternative
+/// backends can implement this trait to provide pixel-level rendering via
+/// Kitty graphics protocol, Sixel, or other terminal image protocols.
+///
+/// # Backend Implementations
+///
+/// - [`PlotBuffer`] — Default. Uses Braille sub-pixel dots for lines and
+///   half-block characters for fills. Works in all terminals.
+/// - *(Future)* `KittyBackend` — Renders to a pixel buffer via tiny-skia,
+///   outputs via Kitty Unicode placeholders for pixel-perfect plots.
+/// - *(Future)* `SixelBackend` — Renders to pixels, encodes as Sixel protocol.
+pub trait PlotBackend {
+    /// Set the background color at cell (x, y) at the given Z-level.
+    fn set_bg(&mut self, x: u16, y: u16, color: Color, z: u8);
+
+    /// Set a foreground character at cell (x, y) at the given Z-level.
+    fn set_char(&mut self, x: u16, y: u16, ch: char, fg: Color, z: u8);
+
+    /// Set both foreground character and background color at the given Z-level.
+    fn set_cell(&mut self, x: u16, y: u16, ch: char, fg: Color, bg: Color, z: u8);
+
+    /// Draw a line from (x0, y0) to (x1, y1), clipped to the plot area.
+    ///
+    /// Coordinates are in terminal cell space (floating point).
+    /// The backend decides the rendering technique:
+    /// - Braille sub-pixel dots for Unicode backends
+    /// - Anti-aliased pixels for graphics protocol backends
+    #[allow(clippy::too_many_arguments)]
+    fn draw_line(&mut self, x0: f64, y0: f64, x1: f64, y1: f64, color: Color, pa: &PlotArea, z: u8);
+
+    /// Set braille dots at cell (x, y) at the given Z-level.
+    ///
+    /// For Unicode backends, braille bits are OR'd together at the same Z-level.
+    /// For pixel backends, this translates to setting small sub-cell regions.
+    fn set_braille(&mut self, x: u16, y: u16, bits: u8, fg: Color, z: u8);
+
+    /// Check if cell (x, y) is within this backend's renderable area.
+    fn contains(&self, x: u16, y: u16) -> bool;
+
+    /// Get the renderable area covered by this backend.
+    fn area(&self) -> Rect;
+
+    /// Composite the backend's internal state into a ratatui Buffer.
+    fn composite(&self, buf: &mut Buffer);
+}
+
+/// Blanket implementation so `Box<dyn PlotBackend>` can be passed where
+/// `&mut dyn PlotBackend` is expected.
+impl PlotBackend for Box<dyn PlotBackend> {
+    fn set_bg(&mut self, x: u16, y: u16, color: Color, z: u8) {
+        (**self).set_bg(x, y, color, z);
+    }
+    fn set_char(&mut self, x: u16, y: u16, ch: char, fg: Color, z: u8) {
+        (**self).set_char(x, y, ch, fg, z);
+    }
+    fn set_cell(&mut self, x: u16, y: u16, ch: char, fg: Color, bg: Color, z: u8) {
+        (**self).set_cell(x, y, ch, fg, bg, z);
+    }
+    fn set_braille(&mut self, x: u16, y: u16, bits: u8, fg: Color, z: u8) {
+        (**self).set_braille(x, y, bits, fg, z);
+    }
+    #[allow(clippy::too_many_arguments)]
+    fn draw_line(&mut self, x0: f64, y0: f64, x1: f64, y1: f64, color: Color, pa: &PlotArea, z: u8) {
+        (**self).draw_line(x0, y0, x1, y1, color, pa, z);
+    }
+    fn contains(&self, x: u16, y: u16) -> bool {
+        (**self).contains(x, y)
+    }
+    fn area(&self) -> Rect {
+        (**self).area()
+    }
+    fn composite(&self, buf: &mut Buffer) {
+        (**self).composite(buf);
+    }
+}
+
+/// Create a rendering backend for the given area, using the configured backend
+/// from [`PlotConfig`](crate::config::PlotConfig).
+///
+/// Returns `PlotBuffer` (Unicode) by default. When the `kitty` or `sixel`
+/// features are enabled and the corresponding backend is selected, returns
+/// a pixel-level backend instead.
+pub fn create_backend(area: Rect) -> Box<dyn PlotBackend> {
+    use crate::config::{PlotConfig, RenderBackend};
+
+    let cfg = PlotConfig::get_default();
+    match cfg.render_backend {
+        RenderBackend::Unicode => Box::new(PlotBuffer::new(area)),
+        #[cfg(feature = "kitty")]
+        RenderBackend::Kitty => Box::new(crate::kitty_backend::KittyBackend::new(area)),
+        #[cfg(feature = "sixel")]
+        RenderBackend::Sixel => Box::new(crate::sixel_backend::SixelBackend::new(area)),
+        RenderBackend::Auto => {
+            #[cfg(feature = "kitty")]
+            if crate::config::detect_kitty() {
+                return Box::new(crate::kitty_backend::KittyBackend::new(area));
+            }
+            #[cfg(feature = "sixel")]
+            if crate::config::detect_sixel() {
+                return Box::new(crate::sixel_backend::SixelBackend::new(area));
+            }
+            Box::new(PlotBuffer::new(area))
+        }
+        // If feature not enabled but backend was requested, fall back to Unicode
+        #[cfg(not(feature = "kitty"))]
+        RenderBackend::Kitty => Box::new(PlotBuffer::new(area)),
+        #[cfg(not(feature = "sixel"))]
+        RenderBackend::Sixel => Box::new(PlotBuffer::new(area)),
+    }
+}
 
 /// Plot area background.
 pub const Z_BACKGROUND: u8 = 0;
@@ -166,6 +281,69 @@ impl PlotBuffer {
         self.set_char(x, y, ch, fg, z);
     }
 
+    /// Draw a line from `(x0, y0)` to `(x1, y1)` using Braille sub-pixel dots.
+    #[allow(clippy::too_many_arguments)]
+    ///
+    /// Coordinates are in terminal cell space (floating point). The line is
+    /// clipped to the given plot area bounds. Uses Bresenham's algorithm at
+    /// 2× horizontal and 4× vertical resolution for sub-cell precision.
+    ///
+    /// This is the primary line-drawing method for the PlotBackend abstraction.
+    /// Alternative backends (e.g., Kitty/Sixel) would implement this differently
+    /// to produce pixel-level anti-aliased lines.
+    pub fn draw_line(
+        &mut self,
+        x0: f64,
+        y0: f64,
+        x1: f64,
+        y1: f64,
+        color: Color,
+        pa: &PlotArea,
+        z: u8,
+    ) {
+        // Scale to braille sub-pixel coordinates (2x horizontal, 4x vertical)
+        let mut ix0 = (x0 * 2.0).round() as i32;
+        let mut iy0 = (y0 * 4.0).round() as i32;
+        let ix1 = (x1 * 2.0).round() as i32;
+        let iy1 = (y1 * 4.0).round() as i32;
+
+        let dx = (ix1 - ix0).abs();
+        let dy = -(iy1 - iy0).abs();
+        let sx = if ix0 < ix1 { 1 } else { -1 };
+        let sy = if iy0 < iy1 { 1 } else { -1 };
+        let mut err = dx + dy;
+
+        loop {
+            if ix0 >= 0 && iy0 >= 0 {
+                let cell_x = (ix0 / 2) as u16;
+                let cell_y = (iy0 / 4) as u16;
+                if cell_x >= pa.x
+                    && cell_x < pa.x + pa.width
+                    && cell_y >= pa.y
+                    && cell_y < pa.y + pa.height
+                {
+                    let dot_col = (ix0 % 2) as usize;
+                    let dot_row = (iy0 % 4) as usize;
+                    let bit = BRAILLE_BITS[dot_col][dot_row];
+                    self.set_braille(cell_x, cell_y, bit, color, z);
+                }
+            }
+
+            if ix0 == ix1 && iy0 == iy1 {
+                break;
+            }
+            let e2 = 2 * err;
+            if e2 >= dy {
+                err += dy;
+                ix0 += sx;
+            }
+            if e2 <= dx {
+                err += dx;
+                iy0 += sy;
+            }
+        }
+    }
+
     /// Composite all Z-layers into the target ratatui buffer.
     ///
     /// For each cell:
@@ -241,6 +419,53 @@ impl PlotBuffer {
         };
 
         (ch, fg)
+    }
+}
+
+/// PlotBuffer implements the PlotBackend trait, delegating to its inherent methods.
+///
+/// This is the default (Braille/Unicode) backend used by all widgets.
+impl PlotBackend for PlotBuffer {
+    fn set_bg(&mut self, x: u16, y: u16, color: Color, z: u8) {
+        PlotBuffer::set_bg(self, x, y, color, z);
+    }
+
+    fn set_char(&mut self, x: u16, y: u16, ch: char, fg: Color, z: u8) {
+        PlotBuffer::set_char(self, x, y, ch, fg, z);
+    }
+
+    fn set_cell(&mut self, x: u16, y: u16, ch: char, fg: Color, bg: Color, z: u8) {
+        PlotBuffer::set_cell(self, x, y, ch, fg, bg, z);
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    fn draw_line(
+        &mut self,
+        x0: f64,
+        y0: f64,
+        x1: f64,
+        y1: f64,
+        color: Color,
+        pa: &PlotArea,
+        z: u8,
+    ) {
+        PlotBuffer::draw_line(self, x0, y0, x1, y1, color, pa, z);
+    }
+
+    fn set_braille(&mut self, x: u16, y: u16, bits: u8, fg: Color, z: u8) {
+        PlotBuffer::set_braille(self, x, y, bits, fg, z);
+    }
+
+    fn contains(&self, x: u16, y: u16) -> bool {
+        PlotBuffer::contains(self, x, y)
+    }
+
+    fn area(&self) -> Rect {
+        self.area
+    }
+
+    fn composite(&self, buf: &mut Buffer) {
+        PlotBuffer::composite(self, buf);
     }
 }
 

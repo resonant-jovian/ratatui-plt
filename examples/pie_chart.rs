@@ -1,3 +1,11 @@
+//! Pie chart gallery: standard pie, exploded pie, and donut chart.
+//!
+//! Three panels in a 2-row layout:
+//! - Top row (2 side-by-side): Standard pie with percentages | Donut chart
+//! - Bottom row (full width): Exploded pie highlighting the top three slices
+//!
+//! All panels share the same programming language market-share dataset.
+
 use std::io;
 
 use crossterm::{
@@ -25,29 +33,109 @@ fn parse_theme() -> Theme {
     }
 }
 
+/// Build pie slices from parallel label/value/color arrays.
+fn make_slices(
+    labels: &[&str],
+    values: &[f64],
+    colors: &[Color],
+    explode: &[f64],
+) -> Vec<PieSlice> {
+    labels
+        .iter()
+        .zip(values.iter())
+        .zip(colors.iter())
+        .zip(explode.iter())
+        .map(|(((&label, &val), &color), &expl)| {
+            let mut s = PieSlice::new(label, val).color(color);
+            if expl > 0.0 {
+                s = s.explode(expl);
+            }
+            s
+        })
+        .collect()
+}
+
 fn main() -> color_eyre::Result<()> {
     color_eyre::install()?;
     Theme::set_default(parse_theme());
-    let theme = Theme::get_default();
-    let mut cycle = theme.color_cycle.clone();
     io::stdout().execute(EnterAlternateScreen)?;
     enable_raw_mode()?;
     let mut terminal = Terminal::new(CrosstermBackend::new(io::stdout()))?;
 
-    let chart = PieChart::new()
-        .slice(PieSlice::new("Python", 28.1).color(cycle.next_color()))
-        .slice(PieSlice::new("JS", 17.4).color(cycle.next_color()))
-        .slice(PieSlice::new("Java", 15.8).color(cycle.next_color()))
-        .slice(PieSlice::new("C/C++", 12.3).color(cycle.next_color()))
-        .slice(PieSlice::new("C#", 7.5).color(cycle.next_color()))
-        .slice(PieSlice::new("Other", 18.9).color(theme.muted))
-        .donut_ratio(0.35)
-        .show_labels(true)
-        .title("Programming Language Market Share (q to quit)");
+    let theme = Theme::get_default();
 
+    // Shared data: programming language market share (6 slices)
+    let labels = ["Python", "JavaScript", "Java", "C/C++", "Rust", "Other"];
+    let values = [28.1, 17.4, 15.8, 12.3, 8.5, 17.9];
+
+    // Primary color palette from theme cycle
+    let primary_colors = [
+        theme.color_cycle.at(0),
+        theme.color_cycle.at(1),
+        theme.color_cycle.at(2),
+        theme.color_cycle.at(3),
+        theme.color_cycle.at(4),
+        theme.muted,
+    ];
+
+    // Reversed palette for the donut chart (visual contrast)
+    let donut_colors = [
+        theme.color_cycle.at(5),
+        theme.color_cycle.at(4),
+        theme.color_cycle.at(3),
+        theme.color_cycle.at(2),
+        theme.color_cycle.at(1),
+        theme.muted,
+    ];
+
+    let no_explode = [0.0; 6];
+
+    // ── Top-left panel: Standard pie with labels and percentages ───────
+    let standard_slices = make_slices(&labels, &values, &primary_colors, &no_explode);
+    let standard_pie = PieChart::new()
+        .slices(standard_slices)
+        .show_labels(true)
+        .show_percentages(true)
+        .title("Standard Pie (labels + percentages)");
+
+    // ── Top-right panel: Donut chart ───────────────────────────────────
+    let donut_slices = make_slices(&labels, &values, &donut_colors, &no_explode);
+    let donut_pie = PieChart::new()
+        .slices(donut_slices)
+        .donut_ratio(0.4)
+        .show_labels(true)
+        .show_percentages(true)
+        .title("Donut Chart (ratio 0.4)");
+
+    // ── Bottom panel: Exploded pie highlighting the top 3 slices ───────
+    let explode_offsets = [0.10, 0.06, 0.06, 0.0, 0.0, 0.0];
+    let exploded_slices = make_slices(&labels, &values, &primary_colors, &explode_offsets);
+    let exploded_pie = PieChart::new()
+        .slices(exploded_slices)
+        .show_labels(true)
+        .show_percentages(true)
+        .title("Exploded: Top 3 Languages Highlighted");
+
+    // ── Event loop ─────────────────────────────────────────────────────
     loop {
         terminal.draw(|frame| {
-            frame.render_widget(&chart, square_area(frame.area()));
+            let area = square_area(frame.area());
+
+            // Split into two rows: top (55%) and bottom (45%)
+            let rows = Layout::default()
+                .direction(Direction::Vertical)
+                .constraints([Constraint::Percentage(55), Constraint::Percentage(45)])
+                .split(area);
+
+            // Split top row into two equal columns
+            let top_cols = Layout::default()
+                .direction(Direction::Horizontal)
+                .constraints([Constraint::Ratio(1, 2), Constraint::Ratio(1, 2)])
+                .split(rows[0]);
+
+            frame.render_widget(&standard_pie, top_cols[0]);
+            frame.render_widget(&donut_pie, top_cols[1]);
+            frame.render_widget(&exploded_pie, rows[1]);
         })?;
 
         if let Event::Key(key) = event::read()?

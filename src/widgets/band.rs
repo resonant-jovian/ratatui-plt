@@ -29,7 +29,7 @@ use crate::annotation::Annotation;
 use crate::axis::Axis;
 use crate::frame::{DataBounds, PlotFrame, ReferenceLine};
 use crate::legend::{Legend, LegendEntry, LegendPosition};
-use crate::plot_buffer::{PlotBuffer, Z_DATA, Z_FILL};
+use crate::plot_buffer::{PlotBackend, create_backend, Z_DATA, Z_FILL};
 use crate::spines::Spines;
 use crate::theme::Theme;
 
@@ -198,7 +198,7 @@ impl Widget for &BandPlot {
         let (x_lo, x_hi) = self.x_axis.resolve_bounds(data_x_min, data_x_max);
         let (y_lo, y_hi) = self.y_axis.resolve_bounds(data_y_min, data_y_max);
 
-        let mut pb = PlotBuffer::new(area);
+        let mut pb = create_backend(area);
 
         // Create and render the plot frame
         let frame = PlotFrame::new(&self.x_axis, &self.y_axis, &self.theme)
@@ -252,8 +252,7 @@ impl Widget for &BandPlot {
                             // Zero-width band: draw as a braille line segment
                             // connecting this column to the next for a smooth curve.
                             if let Some(prev_y) = prev_zero_y_draw {
-                                crate::drawing::draw_braille_line_pb(
-                                    &mut pb,
+                                pb.draw_line(
                                     (screen_x - 1) as f64,
                                     prev_y,
                                     screen_x as f64,

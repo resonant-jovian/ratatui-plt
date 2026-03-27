@@ -25,7 +25,7 @@ use ratatui::layout::Rect;
 use ratatui::style::Color;
 use ratatui::widgets::Widget;
 
-use crate::plot_buffer::{PlotBuffer, Z_CHROME, Z_DATA};
+use crate::plot_buffer::{PlotBackend, create_backend, Z_CHROME, Z_DATA};
 use crate::theme::Theme;
 
 /// A sector (colored segment) of the gauge arc.
@@ -156,7 +156,7 @@ impl Widget for &GaugeChart {
         // Reserve space for value label below arc
         let label_height: u16 = 1;
 
-        let mut pb = PlotBuffer::new(area);
+        let mut pb = create_backend(area);
 
         // Draw title
         if let Some(ref title) = self.title {

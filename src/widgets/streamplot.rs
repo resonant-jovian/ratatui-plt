@@ -30,7 +30,7 @@ use crate::colormap::{Colormap, Viridis};
 use crate::drawing::BRAILLE_BITS;
 use crate::frame::{DataBounds, PlotFrame, ReferenceLine};
 use crate::norm::{LinearNorm, Normalize};
-use crate::plot_buffer::{PlotBuffer, Z_DATA, Z_MARKER};
+use crate::plot_buffer::{PlotBackend, create_backend, Z_DATA, Z_MARKER};
 use crate::series::VectorFieldData;
 use crate::spines::Spines;
 use crate::theme::Theme;
@@ -234,7 +234,7 @@ fn trace_streamline(
 /// Draw a braille line into a PlotBuffer, clipped to the plot area.
 #[allow(clippy::too_many_arguments)]
 fn draw_braille_line_stream(
-    pb: &mut PlotBuffer,
+    pb: &mut dyn PlotBackend,
     x0: f64,
     y0: f64,
     x1: f64,
@@ -329,7 +329,7 @@ impl Widget for &StreamPlot {
         let max_mag = self.field.max_magnitude();
         let norm = LinearNorm::new(0.0, if max_mag == 0.0 { 1.0 } else { max_mag });
 
-        let mut pb = PlotBuffer::new(area);
+        let mut pb = create_backend(area);
 
         // Create and render the plot frame (title, axes, grid, ticks, labels, spines, ref lines)
         let frame = PlotFrame::new(&self.x_axis, &self.y_axis, &self.theme)

@@ -1,5 +1,12 @@
-//! Histogram example: multi-dataset stacked histogram with two overlapping
-//! distributions demonstrating the HistMode::Stacked display.
+//! Histogram gallery: overlapping, stacked, cumulative, and side-by-side modes.
+//!
+//! Four panels in a 2x2 grid showing the same pair of distributions:
+//! - Top-left: Layered mode (overlapping) with KDE overlay
+//! - Top-right: Stacked mode showing combined totals
+//! - Bottom-left: Cumulative distribution view
+//! - Bottom-right: Side-by-side bars for direct bin comparison
+//!
+//! The data uses a deterministic pseudo-normal generator for reproducibility.
 
 use std::io;
 
@@ -60,39 +67,95 @@ fn main() -> color_eyre::Result<()> {
 
     let theme = Theme::get_default();
     let mut cycle = theme.color_cycle.clone();
+    let c1 = cycle.next_color();
+    let c2 = cycle.next_color();
 
-    // Distribution A: centred at 0, moderate spread
+    // Generate two overlapping distributions with different shapes
     let dist_a = pseudo_normal(3000, 0.0, 3.0, 0.0);
-    // Distribution B: centred at 2, narrower spread
-    let dist_b = pseudo_normal(2000, 2.0, 2.0, 100.0);
+    let dist_b = pseudo_normal(2000, 2.5, 2.0, 100.0);
 
-    let hist = Histogram::new(vec![])
-        .dataset(HistDataset::new(
-            "Population A (n=3000)",
-            dist_a,
-            cycle.next_color(),
-        ))
-        .dataset(HistDataset::new(
-            "Population B (n=2000)",
-            dist_b,
-            cycle.next_color(),
-        ))
-        .bins(35)
+    let bins = 30;
+
+    // ── Top-left: Layered mode with KDE overlay ────────────────────────
+    let layered = Histogram::new(vec![])
+        .dataset(HistDataset::new("Pop A (n=3k)", dist_a.clone(), c1))
+        .dataset(HistDataset::new("Pop B (n=2k)", dist_b.clone(), c2))
+        .bins(bins)
+        .hist_mode(HistMode::Layered)
+        .show_kde(true)
+        .title("Layered + KDE")
+        .x_axis(Axis::new().label("Value").grid(true))
+        .y_axis(Axis::new().label("Count").grid(true))
+        .show_legend(true)
+        .legend_position(LegendPosition::TopRight);
+
+    // ── Top-right: Stacked mode ────────────────────────────────────────
+    let stacked = Histogram::new(vec![])
+        .dataset(HistDataset::new("Pop A (n=3k)", dist_a.clone(), c1))
+        .dataset(HistDataset::new("Pop B (n=2k)", dist_b.clone(), c2))
+        .bins(bins)
         .hist_mode(HistMode::Stacked)
-        .title("Stacked Histogram: Two Overlapping Distributions (q to quit)")
-        .x_axis(Axis::new().label("value").grid(true))
+        .title("Stacked")
+        .x_axis(Axis::new().label("Value").grid(true))
+        .y_axis(Axis::new().label("Count").grid(true))
+        .show_legend(true)
+        .legend_position(LegendPosition::TopRight);
+
+    // ── Bottom-left: Cumulative distribution ───────────────────────────
+    let cumulative = Histogram::new(vec![])
+        .dataset(HistDataset::new("Pop A (n=3k)", dist_a.clone(), c1))
+        .dataset(HistDataset::new("Pop B (n=2k)", dist_b.clone(), c2))
+        .bins(bins)
+        .hist_mode(HistMode::Layered)
+        .cumulative(true)
+        .title("Cumulative Layered")
+        .x_axis(Axis::new().label("Value").grid(true))
         .y_axis(
             Axis::new()
-                .label("count")
+                .label("Cumulative")
                 .label_position(LabelPosition::End)
                 .grid(true),
         )
         .show_legend(true)
+        .legend_position(LegendPosition::TopLeft);
+
+    // ── Bottom-right: Side-by-side bars ────────────────────────────────
+    let side_by_side = Histogram::new(vec![])
+        .dataset(HistDataset::new("Pop A (n=3k)", dist_a, c1))
+        .dataset(HistDataset::new("Pop B (n=2k)", dist_b, c2))
+        .bins(bins)
+        .hist_mode(HistMode::SideBySide)
+        .title("Side-by-Side")
+        .x_axis(Axis::new().label("Value").grid(true))
+        .y_axis(Axis::new().label("Count").grid(true))
+        .show_legend(true)
         .legend_position(LegendPosition::TopRight);
 
+    // ── Event loop ─────────────────────────────────────────────────────
     loop {
         terminal.draw(|frame| {
-            frame.render_widget(&hist, square_area(frame.area()));
+            let area = square_area(frame.area());
+
+            // 2x2 grid layout
+            let rows = Layout::default()
+                .direction(Direction::Vertical)
+                .constraints([Constraint::Ratio(1, 2), Constraint::Ratio(1, 2)])
+                .split(area);
+
+            let top_cols = Layout::default()
+                .direction(Direction::Horizontal)
+                .constraints([Constraint::Ratio(1, 2), Constraint::Ratio(1, 2)])
+                .split(rows[0]);
+
+            let bot_cols = Layout::default()
+                .direction(Direction::Horizontal)
+                .constraints([Constraint::Ratio(1, 2), Constraint::Ratio(1, 2)])
+                .split(rows[1]);
+
+            frame.render_widget(&layered, top_cols[0]);
+            frame.render_widget(&stacked, top_cols[1]);
+            frame.render_widget(&cumulative, bot_cols[0]);
+            frame.render_widget(&side_by_side, bot_cols[1]);
         })?;
 
         if let Event::Key(key) = event::read()?

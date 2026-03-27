@@ -8,11 +8,23 @@ use ratatui::widgets::Widget;
 use crate::annotation::Annotation;
 use crate::axis::Axis;
 use crate::frame::{DataBounds, PlotFrame, ReferenceLine};
-use crate::plot_buffer::{PlotBuffer, Z_CHROME, Z_DATA, Z_MARKER};
+use crate::plot_buffer::{PlotBackend, create_backend, Z_CHROME, Z_DATA, Z_MARKER};
 use crate::spines::Spines;
 use crate::theme::Theme;
 use crate::ticker::NullLocator;
 use crate::transform::data_to_screen;
+
+/// Controls how violin widths are normalized across groups.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub enum DensityNorm {
+    /// All violins have the same area (default behavior).
+    #[default]
+    Area,
+    /// Violin area is proportional to the number of observations.
+    Count,
+    /// All violins have the same maximum width.
+    Width,
+}
 
 /// Controls what is rendered inside each violin body.
 #[derive(Clone, Debug, Default)]
@@ -171,6 +183,8 @@ pub struct ViolinPlot {
     /// When true with exactly 2 datasets, draw left-half for the first and
     /// right-half for the second at each position (split violin).
     split: bool,
+    /// How violin widths are normalized across groups.
+    density_norm: DensityNorm,
     /// Visual theme.
     theme: Theme,
     spines: Spines,
@@ -188,6 +202,7 @@ impl Default for ViolinPlot {
             show_box: true,
             show_inner: ViolinInner::default(),
             split: false,
+            density_norm: DensityNorm::default(),
             theme: Theme::get_default(),
             spines: Spines::default(),
             reference_lines: Vec::new(),
@@ -239,6 +254,16 @@ impl ViolinPlot {
     /// position, enabling direct side-by-side comparison.
     pub fn split(mut self, split: bool) -> Self {
         self.split = split;
+        self
+    }
+
+    /// Set how violin widths are normalized across groups.
+    ///
+    /// - `Area` (default): all violins have the same total area.
+    /// - `Count`: violin area is proportional to the number of observations.
+    /// - `Width`: all violins have the same maximum width.
+    pub fn density_norm(mut self, norm: DensityNorm) -> Self {
+        self.density_norm = norm;
         self
     }
 
@@ -312,7 +337,7 @@ impl Widget for &ViolinPlot {
         let x_lo = 0.0;
         let x_hi = n_slots as f64;
 
-        let mut pb = PlotBuffer::new(area);
+        let mut pb = create_backend(area);
 
         // Create and render the plot frame
         let frame = PlotFrame::new(&x_axis, &self.y_axis, &self.theme)
@@ -349,25 +374,113 @@ impl Widget for &ViolinPlot {
                 .collect()
         };
 
+        // Build evaluation grid spanning the y range (shared across all violins)
+        let eval_points: Vec<f64> = (0..n_eval)
+            .map(|j| y_lo + (y_hi - y_lo) * j as f64 / (n_eval - 1).max(1) as f64)
+            .collect();
+
+        // Pre-compute KDE values and sorted data for each dataset
+        let mut precomputed: Vec<(Vec<f64>, Vec<f64>)> = Vec::with_capacity(self.datasets.len());
+        for d in &self.datasets {
+            let sorted = d.finite_sorted();
+            let kde_values = if sorted.is_empty() {
+                vec![0.0; n_eval]
+            } else {
+                gaussian_kde(&sorted, &eval_points)
+            };
+            precomputed.push((sorted, kde_values));
+        }
+
+        // Compute per-dataset normalization divisor based on DensityNorm.
+        //
+        // The divisor transforms raw KDE values so that:
+        //   normalized_width = raw_kde / divisor * max_half_width
+        //
+        // - Width: divisor = per-violin kde_max  (current default behavior)
+        // - Area:  divisor = per-violin kde_sum, scaled so largest sum maps to same
+        //          width as Width mode (all violins get the same visual area)
+        // - Count: divisor = global kde_max, then scale by (n_i / n_max) so wider
+        //          violins represent larger groups
+        let norm_divisors: Vec<f64> = match self.density_norm {
+            DensityNorm::Width => {
+                // Each violin independently normalized to the same max width
+                precomputed
+                    .iter()
+                    .map(|(_, kde)| kde.iter().cloned().fold(0.0f64, f64::max))
+                    .collect()
+            }
+            DensityNorm::Area => {
+                // Normalize by total area (sum of KDE values) so all violins
+                // have the same visual area.  We scale so that the violin with
+                // the largest area sum still fills the available width.
+                let sums: Vec<f64> = precomputed
+                    .iter()
+                    .map(|(_, kde)| kde.iter().sum::<f64>())
+                    .collect();
+                let max_sum = sums.iter().cloned().fold(0.0f64, f64::max);
+                if max_sum <= 0.0 {
+                    vec![1.0; precomputed.len()]
+                } else {
+                    // For each violin: divisor = kde_max * (sum / max_sum)
+                    // This means a violin with half the area will be twice as wide
+                    // per-density-unit, keeping total visual area constant.
+                    precomputed
+                        .iter()
+                        .zip(sums.iter())
+                        .map(|((_, kde), &sum)| {
+                            let kde_max = kde.iter().cloned().fold(0.0f64, f64::max);
+                            if sum > 0.0 {
+                                kde_max * (sum / max_sum)
+                            } else {
+                                1.0
+                            }
+                        })
+                        .collect()
+                }
+            }
+            DensityNorm::Count => {
+                // Scale width proportionally to observation count.
+                // All violins share a global KDE max, then each is scaled by n_i/n_max.
+                let global_kde_max = precomputed
+                    .iter()
+                    .flat_map(|(_, kde)| kde.iter().cloned())
+                    .fold(0.0f64, f64::max);
+                let max_n = precomputed
+                    .iter()
+                    .map(|(sorted, _)| sorted.len())
+                    .max()
+                    .unwrap_or(1)
+                    .max(1) as f64;
+                if global_kde_max <= 0.0 {
+                    vec![1.0; precomputed.len()]
+                } else {
+                    precomputed
+                        .iter()
+                        .map(|(sorted, _)| {
+                            let count_scale = sorted.len() as f64 / max_n;
+                            if count_scale > 0.0 {
+                                global_kde_max / count_scale
+                            } else {
+                                1.0
+                            }
+                        })
+                        .collect()
+                }
+            }
+        };
+
         for &(di, slot, side) in &jobs {
             let d = &self.datasets[di];
-            let sorted = d.finite_sorted();
+            let (ref sorted, ref kde_values) = precomputed[di];
             if sorted.is_empty() {
                 continue;
             }
 
             let center_x = pa.x + (slot as u16 * slot_width) + slot_width / 2;
 
-            // Build evaluation grid spanning the y range
-            let eval_points: Vec<f64> = (0..n_eval)
-                .map(|j| y_lo + (y_hi - y_lo) * j as f64 / (n_eval - 1).max(1) as f64)
-                .collect();
-
-            let kde_values = gaussian_kde(&sorted, &eval_points);
-
-            // Find max KDE value for scaling the width
-            let kde_max = kde_values.iter().cloned().fold(0.0f64, f64::max);
-            if kde_max <= 0.0 {
+            // Normalization divisor for this violin
+            let kde_divisor = norm_divisors[di];
+            if kde_divisor <= 0.0 {
                 continue;
             }
 
@@ -390,8 +503,8 @@ impl Widget for &ViolinPlot {
                     * (n_eval - 1) as f64;
                 let bot_idx = (bot_eval_idx_f.round() as usize).min(n_eval - 1);
 
-                let top_width = (kde_values[top_idx] / kde_max * max_half_width).round() as u16;
-                let bot_width = (kde_values[bot_idx] / kde_max * max_half_width).round() as u16;
+                let top_width = (kde_values[top_idx] / kde_divisor * max_half_width).round() as u16;
+                let bot_width = (kde_values[bot_idx] / kde_divisor * max_half_width).round() as u16;
 
                 let max_w = top_width.max(bot_width);
                 for dx in 0..=max_w {
@@ -448,7 +561,7 @@ impl Widget for &ViolinPlot {
             // Draw inner decoration based on show_inner (respecting show_box for compat)
             let draw_inner = self.show_box;
             if draw_inner {
-                let (q1, median, q3) = ViolinData::quartiles(&sorted);
+                let (q1, median, q3) = ViolinData::quartiles(sorted);
                 let sy_q1 =
                     data_to_screen(q1, y_lo, y_hi, (pa.y + pa.height - 1) as f64, pa.y as f64)
                         .round() as u16;
@@ -520,7 +633,7 @@ impl Widget for &ViolinPlot {
                         }
                     }
                     ViolinInner::Point => {
-                        for &v in &sorted {
+                        for &v in sorted {
                             let sy = data_to_screen(
                                 v,
                                 y_lo,
@@ -541,7 +654,7 @@ impl Widget for &ViolinPlot {
                         }
                     }
                     ViolinInner::Stick => {
-                        for &v in &sorted {
+                        for &v in sorted {
                             let sy = data_to_screen(
                                 v,
                                 y_lo,

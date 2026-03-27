@@ -1,6 +1,6 @@
 [package]
 name = "ratatui-plt"
-version = "0.0.2"
+version = "0.0.3"
 edition = "2024"
 description = "Scientific visualization widgets for ratatui — matplotlib for the terminal"
 authors = ["Albin <albin@sjoegren.se>"]
@@ -26,7 +26,7 @@ unicode-extended = []
 [dependencies]
 ratatui = "0.30.0"
 palette = "0.7.6"
-ordered-float = "5.1.0"
+ordered-float = "5.2.0"
 crossterm = { version = "0.29.0", optional = true }
 
 [dependencies.tokio]
@@ -68,14 +68,6 @@ version = "0.13.0"
 optional = true
 
 [[example]]
-name = "statistics"
-required-features = ["statistics"]
-
-[[example]]
-name = "trendline"
-required-features = ["statistics"]
-
-[[example]]
 name = "kitty_export"
 required-features = ["kitty"]
 
@@ -93,6 +85,21 @@ required-features = ["unicode-extended"]
 
 [[example]]
 name = "showcase_features"
+required-features = ["statistics"]
+
+[[example]]
+name = "showcase_scientific"
+
+[[example]]
+name = "regression_plot"
+required-features = ["statistics"]
+
+[[example]]
+name = "ridgeline"
+required-features = ["statistics"]
+
+[[example]]
+name = "pair_plot"
 required-features = ["statistics"]
 
 [dependencies.image]

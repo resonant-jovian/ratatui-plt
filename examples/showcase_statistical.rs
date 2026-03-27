@@ -1,8 +1,8 @@
 //! Showcase: Statistical plots replicating matplotlib reference gallery.
 //!
-//! 5 plots in a 2x3 mosaic grid (ABC / DE.):
+//! 6 plots in a 2x3 mosaic grid (ABC / DEF):
 //! A) BoxPlot, B) ViolinPlot, C) ErrorBarPlot,
-//! D) EcdfPlot, E) EventPlot.
+//! D) EcdfPlot, E) EventPlot (horizontal), F) EventPlot (vertical spikes).
 
 use std::io;
 
@@ -173,8 +173,32 @@ fn main() -> color_eyre::Result<()> {
         .title("Event Plot")
         .x_axis(Axis::new().label("Time").grid(true));
 
-    // ---- MultiPanel mosaic layout: ABC / DE. ----
-    let panel = MultiPanel::from_mosaic("ABC\nDE.")
+    // ---- Panel F: EventPlot (5 spike channels, vertical orientation) ----
+    let spike_colors = [
+        blue_dark,
+        blue_mid,
+        blue_light,
+        blue_steel,
+        theme.color_cycle.at(4),
+    ];
+
+    let spike_groups: Vec<EventGroup> = (0..5)
+        .map(|i| {
+            let mut seed_sp = 2000u64 + i * 53;
+            let n_spikes = 12 + (i as usize) * 3;
+            let mut spikes: Vec<f64> = (0..n_spikes).map(|_| lcg(&mut seed_sp) * 100.0).collect();
+            spikes.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
+            EventGroup::new(format!("Spike {}", i + 1), spikes).color(spike_colors[i as usize])
+        })
+        .collect();
+
+    let spike_plot = EventPlot::new()
+        .groups(spike_groups)
+        .title("Spike Raster")
+        .x_axis(Axis::new().label("Time (ms)").grid(true));
+
+    // ---- MultiPanel mosaic layout: ABC / DEF ----
+    let panel = MultiPanel::from_mosaic("ABC\nDEF")
         .gap(1)
         .suptitle("Statistical Plots Showcase (q to quit)")
         .mosaic_panel('A', move |area: Rect, buf: &mut Buffer| {
@@ -191,6 +215,9 @@ fn main() -> color_eyre::Result<()> {
         })
         .mosaic_panel('E', move |area: Rect, buf: &mut Buffer| {
             (&event_plot).render(area, buf);
+        })
+        .mosaic_panel('F', move |area: Rect, buf: &mut Buffer| {
+            (&spike_plot).render(area, buf);
         });
 
     loop {

@@ -755,3 +755,185 @@ pub enum HistNormExt {
     /// Count divided by (total * bin_width), forming a proper PDF.
     Density,
 }
+
+// ── 2D KDE ──────────────────────────────────────────────────────────────────
+
+/// 2D kernel density estimation using a product (separable) Gaussian kernel.
+///
+/// Computes independent 1D KDEs on x and y, then multiplies them on a grid.
+/// Returns a [`crate::series::GridData`] suitable for heatmap/contour rendering.
+///
+/// # Example
+///
+/// ```
+/// use ratatui_plt::statistics::Kde2D;
+///
+/// let x = vec![0.0, 1.0, 2.0, 1.5, 0.5];
+/// let y = vec![0.0, 1.0, 0.5, 1.5, 0.8];
+/// let grid = Kde2D::new().fit(&x, &y);
+/// assert!(grid.nrows() > 0);
+/// assert!(grid.ncols() > 0);
+/// ```
+pub struct Kde2D {
+    bandwidth: BandwidthMethod,
+    n_points: usize,
+}
+
+impl Default for Kde2D {
+    fn default() -> Self {
+        Self {
+            bandwidth: BandwidthMethod::default(),
+            n_points: 50,
+        }
+    }
+}
+
+impl Kde2D {
+    /// Create a new 2D KDE with default settings (Silverman bandwidth, 50×50 grid).
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Set the bandwidth selection method (applied independently to x and y).
+    pub fn bandwidth(mut self, bw: BandwidthMethod) -> Self {
+        self.bandwidth = bw;
+        self
+    }
+
+    /// Set the number of grid points per axis (default: 50).
+    pub fn n_points(mut self, n: usize) -> Self {
+        self.n_points = n;
+        self
+    }
+
+    /// Compute the 2D KDE and return a [`crate::series::GridData`].
+    ///
+    /// Uses a product kernel: f(x, y) ≈ kde_x(x) × kde_y(y) × N, where N is the
+    /// number of data points. This is an approximation that works well when x and y
+    /// are roughly independent.
+    pub fn fit(&self, x: &[f64], y: &[f64]) -> crate::series::GridData {
+        let n = x.len().min(y.len());
+        if n == 0 {
+            return crate::series::GridData {
+                x: vec![0.0],
+                y: vec![0.0],
+                values: vec![vec![0.0]],
+            };
+        }
+
+        let kde = Kde::new()
+            .bandwidth(self.bandwidth.clone())
+            .n_points(self.n_points);
+
+        // Filter to finite pairs
+        let (xf, yf): (Vec<f64>, Vec<f64>) = x
+            .iter()
+            .zip(y.iter())
+            .filter(|(a, b)| a.is_finite() && b.is_finite())
+            .map(|(&a, &b)| (a, b))
+            .unzip();
+
+        if xf.is_empty() {
+            return crate::series::GridData {
+                x: vec![0.0],
+                y: vec![0.0],
+                values: vec![vec![0.0]],
+            };
+        }
+
+        let (x_pts, x_dens) = kde.fit(&xf);
+        let (y_pts, y_dens) = kde.fit(&yf);
+
+        let n_data = xf.len() as f64;
+
+        // Compute 2D density as product of marginal densities, scaled by N
+        let mut values = Vec::with_capacity(y_pts.len());
+        for y_d in &y_dens {
+            let row: Vec<f64> = x_dens.iter().map(|x_d| x_d * y_d * n_data).collect();
+            values.push(row);
+        }
+
+        crate::series::GridData {
+            x: x_pts,
+            y: y_pts,
+            values,
+        }
+    }
+}
+
+// ── Q-Q Plot Points ─────────────────────────────────────────────────────────
+
+/// Theoretical distribution for Q-Q plot comparison.
+#[derive(Clone, Debug, Default)]
+pub enum QQDistribution {
+    /// Standard normal distribution (default).
+    #[default]
+    Normal,
+}
+
+/// Compute quantile-quantile points for comparing data against a theoretical distribution.
+///
+/// Returns pairs of (theoretical_quantile, sample_quantile) suitable for scatter plotting.
+/// Points falling on the diagonal y=x indicate the data matches the distribution.
+///
+/// # Example
+///
+/// ```
+/// use ratatui_plt::statistics::{QQDistribution, qq_points};
+///
+/// let data = vec![1.0, 2.0, 3.0, 4.0, 5.0];
+/// let points = qq_points(&data, &QQDistribution::Normal);
+/// assert_eq!(points.len(), 5);
+/// ```
+pub fn qq_points(data: &[f64], distribution: &QQDistribution) -> Vec<(f64, f64)> {
+    if data.is_empty() {
+        return Vec::new();
+    }
+
+    let mut sorted: Vec<f64> = data.iter().copied().filter(|v| v.is_finite()).collect();
+    sorted.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
+
+    let n = sorted.len();
+    if n == 0 {
+        return Vec::new();
+    }
+
+    sorted
+        .iter()
+        .enumerate()
+        .map(|(i, &sample_q)| {
+            // Probability plotting position (Hazen formula): (i + 0.5) / n
+            let p = (i as f64 + 0.5) / n as f64;
+            let theoretical_q = match distribution {
+                QQDistribution::Normal => normal_ppf(p),
+            };
+            (theoretical_q, sample_q)
+        })
+        .collect()
+}
+
+/// Approximate inverse normal CDF (probit function) using rational approximation.
+///
+/// Abramowitz & Stegun approximation 26.2.23, accurate to ~4.5×10⁻⁴.
+fn normal_ppf(p: f64) -> f64 {
+    let p = p.clamp(1e-10, 1.0 - 1e-10);
+
+    if p < 0.5 {
+        -rational_approx((-2.0 * p.ln()).sqrt())
+    } else {
+        rational_approx((-2.0 * (1.0 - p).ln()).sqrt())
+    }
+}
+
+/// Rational approximation helper for normal_ppf.
+fn rational_approx(t: f64) -> f64 {
+    // Coefficients from Peter Acklam's approximation
+    const C0: f64 = 2.515_517;
+    const C1: f64 = 0.802_853;
+    const C2: f64 = 0.010_328;
+    const D1: f64 = 1.432_788;
+    const D2: f64 = 0.189_269;
+    const D3: f64 = 0.001_308;
+
+    t - (C0 + C1 * t + C2 * t * t) / (1.0 + D1 * t + D2 * t * t + D3 * t * t * t)
+}

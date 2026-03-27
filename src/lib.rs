@@ -69,6 +69,11 @@ pub mod widgets;
 
 pub mod linked_view;
 
+#[cfg(feature = "kitty")]
+pub mod kitty_backend;
+#[cfg(feature = "sixel")]
+pub mod sixel_backend;
+
 #[cfg(feature = "statistics")]
 pub mod statistics;
 
