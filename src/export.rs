@@ -231,6 +231,147 @@ pub fn save_svg<W: Widget>(
 }
 
 // ---------------------------------------------------------------------------
+// Headless export (env-var driven)
+// ---------------------------------------------------------------------------
+
+/// Perform headless export if `RATATUI_PLT_EXPORT` env var is set.
+///
+/// When set, renders one frame via the provided closure and exports to SVG
+/// (and optionally PNG). Returns `Ok(true)` if export was performed (caller
+/// should exit), `Ok(false)` if the env var is not set (continue normally).
+///
+/// # Environment variables
+///
+/// | Variable | Default | Description |
+/// |----------|---------|-------------|
+/// | `RATATUI_PLT_EXPORT` | (unset) | Any value enables headless export |
+/// | `RATATUI_PLT_EXPORT_OUTPUT` | `output.svg` | Output file path |
+/// | `RATATUI_PLT_EXPORT_WIDTH` | `120` | Buffer width in columns |
+/// | `RATATUI_PLT_EXPORT_HEIGHT` | `40` | Buffer height in rows |
+/// | `RATATUI_PLT_EXPORT_FORMAT` | `svg` | `svg`, `png`, or `both` |
+///
+/// # Format notes
+///
+/// - `svg` is always available (no extra features needed).
+/// - `png` and `both` require the `export` cargo feature.
+/// - For `both`, writes `<path>.svg` and `<path>.png` (extension replaced).
+///
+/// # Example
+///
+/// ```no_run
+/// use ratatui::widgets::Widget;
+/// use ratatui_plt::prelude::*;
+///
+/// fn main() -> std::io::Result<()> {
+///     let plot = LinePlot::new()
+///         .series(Series::new("s").data(vec![(0.0, 0.0), (1.0, 1.0)]));
+///
+///     if headless_export(|area, buf| (&plot).render(area, buf))? {
+///         return Ok(());
+///     }
+///     // ... normal event loop ...
+///     Ok(())
+/// }
+/// ```
+pub fn headless_export<F>(render_fn: F) -> std::io::Result<bool>
+where
+    F: FnOnce(Rect, &mut Buffer),
+{
+    if std::env::var("RATATUI_PLT_EXPORT").is_err() {
+        return Ok(false);
+    }
+
+    // Override theme if RATATUI_PLT_THEME is set.
+    if let Ok(theme_name) = std::env::var("RATATUI_PLT_THEME") {
+        let theme = match theme_name.as_str() {
+            "dark" => crate::theme::Theme::dark(),
+            "light" => crate::theme::Theme::light(),
+            "minimal" => crate::theme::Theme::minimal(),
+            "publication" => crate::theme::Theme::publication(),
+            "solarized" => crate::theme::Theme::solarized(),
+            "gruvbox" => crate::theme::Theme::gruvbox(),
+            _ => {
+                eprintln!("Warning: unknown RATATUI_PLT_THEME '{theme_name}', using default");
+                crate::theme::Theme::dark()
+            }
+        };
+        crate::theme::Theme::set_default(theme);
+    }
+
+    let output =
+        std::env::var("RATATUI_PLT_EXPORT_OUTPUT").unwrap_or_else(|_| "output.svg".to_string());
+    let width: u16 = std::env::var("RATATUI_PLT_EXPORT_WIDTH")
+        .ok()
+        .and_then(|s| match s.parse() {
+            Ok(v) => Some(v),
+            Err(_) => {
+                eprintln!("Warning: invalid RATATUI_PLT_EXPORT_WIDTH '{s}', using default 120");
+                None
+            }
+        })
+        .unwrap_or(120);
+    let height: u16 = std::env::var("RATATUI_PLT_EXPORT_HEIGHT")
+        .ok()
+        .and_then(|s| match s.parse() {
+            Ok(v) => Some(v),
+            Err(_) => {
+                eprintln!("Warning: invalid RATATUI_PLT_EXPORT_HEIGHT '{s}', using default 40");
+                None
+            }
+        })
+        .unwrap_or(40);
+    let format = std::env::var("RATATUI_PLT_EXPORT_FORMAT").unwrap_or_else(|_| "svg".to_string());
+
+    let area = Rect::new(0, 0, width, height);
+    let mut buf = Buffer::empty(area);
+    render_fn(area, &mut buf);
+
+    let output_path = std::path::Path::new(&output);
+
+    match format.as_str() {
+        "svg" => {
+            let svg = buffer_to_svg(&buf, 14.0);
+            std::fs::write(output_path, svg)?;
+        }
+        "png" => {
+            headless_write_png(&buf, output_path)?;
+        }
+        "both" => {
+            let svg = buffer_to_svg(&buf, 14.0);
+            let svg_path = output_path.with_extension("svg");
+            std::fs::write(&svg_path, svg)?;
+            let png_path = output_path.with_extension("png");
+            headless_write_png(&buf, &png_path)?;
+        }
+        other => {
+            return Err(std::io::Error::new(
+                std::io::ErrorKind::InvalidInput,
+                format!(
+                    "Unknown RATATUI_PLT_EXPORT_FORMAT '{other}'. Expected 'svg', 'png', or 'both'."
+                ),
+            ));
+        }
+    }
+
+    Ok(true)
+}
+
+#[cfg(feature = "export")]
+fn headless_write_png(buf: &Buffer, path: &std::path::Path) -> std::io::Result<()> {
+    let png_bytes = buffer_to_png(buf, &ExportOptions::default())
+        .map_err(|e| std::io::Error::other(e.to_string()))?;
+    std::fs::write(path, png_bytes)
+}
+
+#[cfg(not(feature = "export"))]
+fn headless_write_png(_buf: &Buffer, _path: &std::path::Path) -> std::io::Result<()> {
+    Err(std::io::Error::new(
+        std::io::ErrorKind::Unsupported,
+        "PNG export requires the 'export' cargo feature. Use --features export or set RATATUI_PLT_EXPORT_FORMAT=svg",
+    ))
+}
+
+// ---------------------------------------------------------------------------
 // Internal helpers
 // ---------------------------------------------------------------------------
 

@@ -28,10 +28,6 @@ fn parse_theme() -> Theme {
 fn main() -> color_eyre::Result<()> {
     color_eyre::install()?;
     Theme::set_default(parse_theme());
-    io::stdout().execute(EnterAlternateScreen)?;
-    enable_raw_mode()?;
-    io::stdout().execute(crossterm::event::EnableMouseCapture)?;
-    let mut terminal = Terminal::new(CrosstermBackend::new(io::stdout()))?;
 
     // Generate sin(sqrt(x^2 + y^2)) surface data
     let data = GridData::from_fn((-6.0, 6.0), (-6.0, 6.0), 120, 120, |x, y| {
@@ -43,6 +39,17 @@ fn main() -> color_eyre::Result<()> {
         .colormap(Plasma)
         .show_wireframe(false)
         .title("sin(sqrt(x^2 + y^2)) - Arrow keys: rotate, +/-: zoom, q: quit");
+
+    if headless_export(|area, buf| {
+        StatefulWidget::render(&surface, area, buf, &mut Camera3DState::default());
+    })? {
+        return Ok(());
+    }
+
+    io::stdout().execute(EnterAlternateScreen)?;
+    enable_raw_mode()?;
+    io::stdout().execute(crossterm::event::EnableMouseCapture)?;
+    let mut terminal = Terminal::new(CrosstermBackend::new(io::stdout()))?;
 
     let mut camera_state = Camera3DState::default();
 

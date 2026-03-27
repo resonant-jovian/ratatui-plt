@@ -53,10 +53,6 @@ fn main() -> color_eyre::Result<()> {
     color_eyre::install()?;
     Theme::set_default(parse_theme());
     let theme = Theme::get_default();
-    io::stdout().execute(EnterAlternateScreen)?;
-    enable_raw_mode()?;
-    let mut terminal = Terminal::new(CrosstermBackend::new(io::stdout()))?;
-
     let blue_dark = theme.primary;
 
     // ---- Panel A: ScatterPlot with polynomial(2) trendline ----
@@ -169,6 +165,14 @@ fn main() -> color_eyre::Result<()> {
         .panel(1, 1, move |area: Rect, buf: &mut Buffer| {
             (&conf_ellipse).render(area, buf);
         });
+
+    if headless_export(|area, buf| (&panel).render(area, buf))? {
+        return Ok(());
+    }
+
+    io::stdout().execute(EnterAlternateScreen)?;
+    enable_raw_mode()?;
+    let mut terminal = Terminal::new(CrosstermBackend::new(io::stdout()))?;
 
     loop {
         terminal.draw(|frame| {

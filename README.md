@@ -10,6 +10,22 @@
 [![Rust](https://github.com/resonant-jovian/ratatui-plt/actions/workflows/test.yml/badge.svg)](https://github.com/resonant-jovian/ratatui-plt/actions/workflows/test.yml)
 [![rust-clippy analyze](https://github.com/resonant-jovian/ratatui-plt/actions/workflows/clippy.yml/badge.svg)](https://github.com/resonant-jovian/ratatui-plt/actions/workflows/clippy.yml)
 
+### Gallery
+
+<p align="center">
+  <img src="assets/screenshots/showcase_basic_2d_dark.svg" alt="Basic 2D plots: line, scatter, bar, histogram, pie, stairs, stem, image, table" width="100%">
+</p>
+<p align="center">
+  <img src="assets/screenshots/showcase_3d_dark.svg" alt="3D plots: surface, wireframe, scatter, bar, quiver, line, contour" width="49%">
+  <img src="assets/screenshots/showcase_statistical_dark.svg" alt="Statistical plots: box, violin, errorbar, ECDF, event" width="49%">
+</p>
+<p align="center">
+  <img src="assets/screenshots/showcase_hierarchical_dark.svg" alt="Hierarchical plots: treemap, sunburst, icicle, sankey, dendrogram, clustermap" width="49%">
+  <img src="assets/screenshots/showcase_scientific_dark.svg" alt="Scientific plots: horizon, carpet, smith chart, choropleth, PSD, spectrogram" width="49%">
+</p>
+
+Generate screenshots locally: `./dev.sh screenshots --theme dark`
+
 ### Highlights
 
 - **80 plot widgets** — 2D, 3D, statistical, financial, hierarchical, scientific, and layout
@@ -307,6 +323,32 @@ All 3D widgets support interactive camera control via `Camera3DState` (arrow key
 >
 > GNOME Terminal, Alacritty, and most VTE-based terminals do **not** support Sixel or Kitty graphics. PNG export works everywhere (saves to file). Text/ANSI/SVG export requires no feature flags and works in any terminal.
 
+### Rendering Backends
+
+ratatui-plt auto-detects the best rendering backend for your terminal:
+
+1. **Kitty** — detected via `KITTY_WINDOW_ID`, `TERM_PROGRAM=kitty/WezTerm/Ghostty`, or escape-sequence probe
+2. **Sixel** — detected via `SIXEL_SUPPORT` or `TERM_PROGRAM=foot/contour/mlterm`
+3. **Unicode** (default fallback) — Braille characters + half-block fills, works everywhere
+
+Override the auto-detected backend with an environment variable:
+
+```bash
+# Force a specific backend
+RATATUI_PLT_BACKEND=kitty cargo run --features kitty --example line_plot
+RATATUI_PLT_BACKEND=unicode cargo run --example line_plot
+```
+
+Or programmatically in code:
+
+```rust
+use ratatui_plt::prelude::*;
+
+PlotConfig::global()
+    .backend(RenderBackend::Kitty)
+    .apply();
+```
+
 ### Optional Features
 
 | Feature | Dependencies | Description |
@@ -348,6 +390,8 @@ Run examples with `dev.sh`:
 ./dev.sh examples --group 3d            # all 3D examples
 ./dev.sh examples --all --theme dark    # all examples, dark theme
 ./dev.sh examples --list                # list groups
+./dev.sh screenshots                    # generate SVG screenshots
+./dev.sh screenshots --theme light      # light theme screenshots
 ```
 
 #### Showcases (13 multi-panel matplotlib-style galleries)

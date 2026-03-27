@@ -35,9 +35,6 @@ fn main() -> color_eyre::Result<()> {
     color_eyre::install()?;
     Theme::set_default(parse_theme());
     let theme = Theme::get_default();
-    io::stdout().execute(EnterAlternateScreen)?;
-    enable_raw_mode()?;
-    let mut terminal = Terminal::new(CrosstermBackend::new(io::stdout()))?;
 
     let n = 80;
     let s1 = Series::new("sin(x)")
@@ -65,6 +62,32 @@ fn main() -> color_eyre::Result<()> {
         .marker(MarkerShape::FilledCircle);
 
     let all_series = vec![s1.clone(), s2.clone()];
+
+    let headless_plot = LinePlot::new()
+        .series(s1.clone())
+        .series(s2.clone())
+        .title("Data Picking")
+        .x_axis(
+            Axis::new()
+                .label("x")
+                .grid(true)
+                .bounds(Bounds::Manual(-0.4, 8.4)),
+        )
+        .y_axis(
+            Axis::new()
+                .label("y")
+                .grid(true)
+                .bounds(Bounds::Manual(-1.1, 1.1)),
+        )
+        .show_legend(true);
+
+    if headless_export(|area, buf| (&headless_plot).render(area, buf))? {
+        return Ok(());
+    }
+
+    io::stdout().execute(EnterAlternateScreen)?;
+    enable_raw_mode()?;
+    let mut terminal = Terminal::new(CrosstermBackend::new(io::stdout()))?;
 
     // Cursor position in data coordinates
     let mut cursor_x: f64 = 4.0;

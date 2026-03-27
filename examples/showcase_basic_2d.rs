@@ -34,9 +34,6 @@ fn main() -> color_eyre::Result<()> {
     color_eyre::install()?;
     Theme::set_default(Theme::light());
     let theme = Theme::get_default();
-    io::stdout().execute(EnterAlternateScreen)?;
-    enable_raw_mode()?;
-    let mut terminal = Terminal::new(CrosstermBackend::new(io::stdout()))?;
 
     // Series colors from theme color cycle
     let blue_dark = theme.color_cycle.at(0);
@@ -248,6 +245,14 @@ fn main() -> color_eyre::Result<()> {
         .mosaic_panel('I', move |area: Rect, buf: &mut Buffer| {
             (&data_table).render(area, buf);
         });
+
+    if headless_export(|area, buf| (&panel).render(area, buf))? {
+        return Ok(());
+    }
+
+    io::stdout().execute(EnterAlternateScreen)?;
+    enable_raw_mode()?;
+    let mut terminal = Terminal::new(CrosstermBackend::new(io::stdout()))?;
 
     loop {
         terminal.draw(|frame| {

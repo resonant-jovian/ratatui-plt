@@ -40,11 +40,6 @@ fn main() -> color_eyre::Result<()> {
     color_eyre::install()?;
     Theme::set_default(Theme::light());
     let theme = Theme::get_default();
-    io::stdout().execute(EnterAlternateScreen)?;
-    enable_raw_mode()?;
-    io::stdout().execute(crossterm::event::EnableMouseCapture)?;
-    let mut terminal = Terminal::new(CrosstermBackend::new(io::stdout()))?;
-
     // ── 1. Surface3D: Mexican hat / sinc surface ────────────────────────
     let surface_data = GridData::from_fn((-6.0, 6.0), (-6.0, 6.0), 60, 60, |x, y| {
         let r = (x * x + y * y).sqrt().max(0.001);
@@ -185,6 +180,56 @@ fn main() -> color_eyre::Result<()> {
     let mut cam_quiver = Camera3DState::default();
     let mut cam_line = Camera3DState::default();
     let mut cam_contour = Camera3DState::default();
+
+    if headless_export(|area, buf| {
+        let rows = Layout::default()
+            .direction(Direction::Vertical)
+            .constraints([
+                Constraint::Length(1),
+                Constraint::Ratio(1, 3),
+                Constraint::Ratio(1, 3),
+                Constraint::Ratio(1, 3),
+            ])
+            .split(area);
+        let top = Layout::default()
+            .direction(Direction::Horizontal)
+            .constraints([
+                Constraint::Ratio(1, 3),
+                Constraint::Ratio(1, 3),
+                Constraint::Ratio(1, 3),
+            ])
+            .split(rows[1]);
+        let mid = Layout::default()
+            .direction(Direction::Horizontal)
+            .constraints([
+                Constraint::Ratio(1, 3),
+                Constraint::Ratio(1, 3),
+                Constraint::Ratio(1, 3),
+            ])
+            .split(rows[2]);
+        let bot = Layout::default()
+            .direction(Direction::Horizontal)
+            .constraints([
+                Constraint::Ratio(1, 3),
+                Constraint::Ratio(1, 3),
+                Constraint::Ratio(1, 3),
+            ])
+            .split(rows[3]);
+        StatefulWidget::render(&surface, top[0], buf, &mut Camera3DState::default());
+        StatefulWidget::render(&wireframe, top[1], buf, &mut Camera3DState::default());
+        StatefulWidget::render(&scatter, top[2], buf, &mut Camera3DState::default());
+        StatefulWidget::render(&bar3d, mid[0], buf, &mut Camera3DState::default());
+        StatefulWidget::render(&quiver3d, mid[1], buf, &mut Camera3DState::default());
+        StatefulWidget::render(&line3d, mid[2], buf, &mut Camera3DState::default());
+        StatefulWidget::render(&contour3d, bot[0], buf, &mut Camera3DState::default());
+    })? {
+        return Ok(());
+    }
+
+    io::stdout().execute(EnterAlternateScreen)?;
+    enable_raw_mode()?;
+    io::stdout().execute(crossterm::event::EnableMouseCapture)?;
+    let mut terminal = Terminal::new(CrosstermBackend::new(io::stdout()))?;
 
     loop {
         terminal.draw(|frame| {

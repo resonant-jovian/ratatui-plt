@@ -28,10 +28,6 @@ fn parse_theme() -> Theme {
 fn main() -> color_eyre::Result<()> {
     color_eyre::install()?;
     Theme::set_default(parse_theme());
-    io::stdout().execute(EnterAlternateScreen)?;
-    enable_raw_mode()?;
-    let mut terminal = Terminal::new(CrosstermBackend::new(io::stdout()))?;
-
     let theme = Theme::get_default();
     let mut cycle = theme.color_cycle.clone();
 
@@ -75,6 +71,14 @@ fn main() -> color_eyre::Result<()> {
                 .label_position(LabelPosition::End),
         )
         .title("24h Weather: Temperature & Humidity (q to quit)");
+
+    if headless_export(|area, buf| (&plot).render(area, buf))? {
+        return Ok(());
+    }
+
+    io::stdout().execute(EnterAlternateScreen)?;
+    enable_raw_mode()?;
+    let mut terminal = Terminal::new(CrosstermBackend::new(io::stdout()))?;
 
     loop {
         terminal.draw(|frame| {

@@ -67,10 +67,6 @@ fn parse_theme() -> Theme {
 fn main() -> color_eyre::Result<()> {
     color_eyre::install()?;
     Theme::set_default(parse_theme());
-    io::stdout().execute(EnterAlternateScreen)?;
-    enable_raw_mode()?;
-    let mut terminal = Terminal::new(CrosstermBackend::new(io::stdout()))?;
-
     let theme = Theme::get_default();
 
     // ── Left panel: Linear regression on y = 2x + 3 + noise ───────────
@@ -125,6 +121,22 @@ fn main() -> color_eyre::Result<()> {
         .title("Cubic: 0.02x\u{00b3} - 0.3x\u{00b2} + x + 2")
         .x_axis(Axis::new().label("x").grid(true))
         .y_axis(Axis::new().label("y").grid(true));
+
+    // ── Headless export ────────────────────────────────────────────────
+    if headless_export(|area, buf| {
+        let cols = Layout::default()
+            .direction(Direction::Horizontal)
+            .constraints([Constraint::Ratio(1, 2), Constraint::Ratio(1, 2)])
+            .split(area);
+        (&linear_plot).render(cols[0], buf);
+        (&poly_plot).render(cols[1], buf);
+    })? {
+        return Ok(());
+    }
+
+    io::stdout().execute(EnterAlternateScreen)?;
+    enable_raw_mode()?;
+    let mut terminal = Terminal::new(CrosstermBackend::new(io::stdout()))?;
 
     // ── Event loop ─────────────────────────────────────────────────────
     loop {

@@ -31,10 +31,6 @@ fn parse_theme() -> Theme {
 fn main() -> color_eyre::Result<()> {
     color_eyre::install()?;
     Theme::set_default(parse_theme());
-    io::stdout().execute(EnterAlternateScreen)?;
-    enable_raw_mode()?;
-    let mut terminal = Terminal::new(CrosstermBackend::new(io::stdout()))?;
-
     // Auto-detect terminal cell aspect ratio for accurate equal aspect plots
     if let Ok(size) = crossterm::terminal::window_size()
         && size.width > 0
@@ -104,6 +100,21 @@ fn main() -> color_eyre::Result<()> {
         .show_colorbar(true)
         .show_values(true)
         .mask(mask);
+
+    if headless_export(|area, buf| {
+        let cols = Layout::default()
+            .direction(Direction::Horizontal)
+            .constraints([Constraint::Percentage(55), Constraint::Percentage(45)])
+            .split(area);
+        (&heatmap).render(cols[0], buf);
+        (&corr_heatmap).render(cols[1], buf);
+    })? {
+        return Ok(());
+    }
+
+    io::stdout().execute(EnterAlternateScreen)?;
+    enable_raw_mode()?;
+    let mut terminal = Terminal::new(CrosstermBackend::new(io::stdout()))?;
 
     loop {
         terminal.draw(|frame| {

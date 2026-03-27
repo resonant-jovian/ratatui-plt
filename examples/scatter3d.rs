@@ -29,10 +29,6 @@ fn main() -> color_eyre::Result<()> {
     color_eyre::install()?;
     Theme::set_default(parse_theme());
     let theme = Theme::get_default();
-    io::stdout().execute(EnterAlternateScreen)?;
-    enable_raw_mode()?;
-    io::stdout().execute(crossterm::event::EnableMouseCapture)?;
-    let mut terminal = Terminal::new(CrosstermBackend::new(io::stdout()))?;
 
     // Generate helix: (cos(t), sin(t), t/10)
     let n = 200;
@@ -54,6 +50,17 @@ fn main() -> color_eyre::Result<()> {
         .colormap(Viridis)
         .marker(MarkerShape::FilledCircle)
         .title("3D Helix - Arrow keys: rotate, +/-: zoom, q: quit");
+
+    if headless_export(|area, buf| {
+        StatefulWidget::render(&scatter, area, buf, &mut Camera3DState::default());
+    })? {
+        return Ok(());
+    }
+
+    io::stdout().execute(EnterAlternateScreen)?;
+    enable_raw_mode()?;
+    io::stdout().execute(crossterm::event::EnableMouseCapture)?;
+    let mut terminal = Terminal::new(CrosstermBackend::new(io::stdout()))?;
 
     let mut camera_state = Camera3DState::default();
 

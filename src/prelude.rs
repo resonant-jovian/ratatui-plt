@@ -84,13 +84,12 @@ pub use crate::colormap::{
     colormap_names,
     get_colormap,
 };
-pub use crate::config::{
-    ConfigGuard, PlotConfig, RenderBackend, detect_backend,
-};
+pub use crate::config::{ConfigGuard, PlotConfig, RenderBackend, detect_backend};
 #[cfg(feature = "export")]
 pub use crate::export::{ExportError, ExportOptions, buffer_to_png};
 pub use crate::export::{
-    buffer_to_ansi, buffer_to_svg, buffer_to_text, render_to_buffer, save_ansi, save_svg, save_text,
+    buffer_to_ansi, buffer_to_svg, buffer_to_text, headless_export, render_to_buffer, save_ansi,
+    save_svg, save_text,
 };
 #[cfg(feature = "kitty")]
 pub use crate::export::{buffer_to_kitty, print_kitty};

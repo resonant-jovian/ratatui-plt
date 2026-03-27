@@ -32,10 +32,6 @@ fn parse_theme() -> Theme {
 fn main() -> color_eyre::Result<()> {
     color_eyre::install()?;
     Theme::set_default(parse_theme());
-    io::stdout().execute(EnterAlternateScreen)?;
-    enable_raw_mode()?;
-    let mut terminal = Terminal::new(CrosstermBackend::new(io::stdout()))?;
-
     // Panel 1: Confusion matrix via matshow()
     let confusion = vec![
         vec![50.0, 2.0, 1.0, 0.0],
@@ -92,6 +88,14 @@ fn main() -> color_eyre::Result<()> {
         .panel(0, 2, move |area: Rect, buf: &mut Buffer| {
             (&spy_plot).render(area, buf);
         });
+
+    if headless_export(|area, buf| (&panel).render(area, buf))? {
+        return Ok(());
+    }
+
+    io::stdout().execute(EnterAlternateScreen)?;
+    enable_raw_mode()?;
+    let mut terminal = Terminal::new(CrosstermBackend::new(io::stdout()))?;
 
     loop {
         terminal.draw(|frame| {

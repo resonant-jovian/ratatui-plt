@@ -43,6 +43,17 @@ First stable API release.
 - Optional feature flags: `async`, `chrono`, `serde`, `fft`,
   `triangulation`, `export`, `kitty`, `sixel`, `toml-themes`,
   `statistics`, `unicode-extended`
+- Smart backend auto-detection: probes Kitty/Sixel support via
+  environment variables and escape sequences, with OnceLock
+  caching and `RATATUI_PLT_BACKEND` env var override
+- Headless export via `headless_export()`: set
+  `RATATUI_PLT_EXPORT=1` to render showcases to SVG/PNG
+  without a terminal
+- `dev.sh screenshots` command for batch screenshot generation
+  of all 13 showcases with configurable theme/format/size
+- Expanded edge-case test coverage: NaN handling, empty data,
+  single-point data, extreme values, Unicode labels, backend
+  detection subprocess tests, tiny/huge rendering areas
 
 ### Changed
 

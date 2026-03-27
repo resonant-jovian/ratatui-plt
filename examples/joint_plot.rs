@@ -31,10 +31,6 @@ fn parse_theme() -> Theme {
 fn main() -> color_eyre::Result<()> {
     color_eyre::install()?;
     Theme::set_default(parse_theme());
-    io::stdout().execute(EnterAlternateScreen)?;
-    enable_raw_mode()?;
-    let mut terminal = Terminal::new(CrosstermBackend::new(io::stdout()))?;
-
     // Generate correlated random data
     let mut rng = rand::rng();
     let n = 500;
@@ -62,6 +58,14 @@ fn main() -> color_eyre::Result<()> {
         .x_axis(Axis::new().label("x"))
         .y_axis(Axis::new().label("y"))
         .show_legend(false);
+
+    if headless_export(|area, buf| (&plot).render(area, buf))? {
+        return Ok(());
+    }
+
+    io::stdout().execute(EnterAlternateScreen)?;
+    enable_raw_mode()?;
+    let mut terminal = Terminal::new(CrosstermBackend::new(io::stdout()))?;
 
     loop {
         terminal.draw(|frame| {

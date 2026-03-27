@@ -33,10 +33,6 @@ fn parse_theme() -> Theme {
 fn main() -> color_eyre::Result<()> {
     color_eyre::install()?;
     Theme::set_default(parse_theme());
-    io::stdout().execute(EnterAlternateScreen)?;
-    enable_raw_mode()?;
-    let mut terminal = Terminal::new(CrosstermBackend::new(io::stdout()))?;
-
     let theme = Theme::get_default();
     let mut cycle = theme.color_cycle.clone();
 
@@ -76,6 +72,23 @@ fn main() -> color_eyre::Result<()> {
 
     let all_series = vec![s1, s2, s3];
     let legend_state = shared_legend_state(all_series.len());
+
+    let headless_plot = LinePlot::new()
+        .series(all_series[0].clone())
+        .series(all_series[1].clone())
+        .series(all_series[2].clone())
+        .title("Interactive Legend")
+        .x_axis(Axis::new().label("x").grid(true))
+        .y_axis(Axis::new().label("y").grid(true))
+        .show_legend(true);
+
+    if headless_export(|area, buf| (&headless_plot).render(area, buf))? {
+        return Ok(());
+    }
+
+    io::stdout().execute(EnterAlternateScreen)?;
+    enable_raw_mode()?;
+    let mut terminal = Terminal::new(CrosstermBackend::new(io::stdout()))?;
 
     loop {
         terminal.draw(|frame| {

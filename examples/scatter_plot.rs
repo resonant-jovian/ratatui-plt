@@ -52,10 +52,6 @@ fn pseudo_normal(seed: f64) -> f64 {
 fn main() -> color_eyre::Result<()> {
     color_eyre::install()?;
     Theme::set_default(parse_theme());
-    io::stdout().execute(EnterAlternateScreen)?;
-    enable_raw_mode()?;
-    let mut terminal = Terminal::new(CrosstermBackend::new(io::stdout()))?;
-
     let theme = Theme::get_default();
     let mut cycle = theme.color_cycle.clone();
 
@@ -147,6 +143,21 @@ fn main() -> color_eyre::Result<()> {
         .legend_position(LegendPosition::TopLeft);
 
     // ── Event loop ─────────────────────────────────────────────────────
+    if headless_export(|area, buf| {
+        let cols = Layout::default()
+            .direction(Direction::Horizontal)
+            .constraints([Constraint::Ratio(1, 2), Constraint::Ratio(1, 2)])
+            .split(area);
+        (&left_plot).render(cols[0], buf);
+        (&right_plot).render(cols[1], buf);
+    })? {
+        return Ok(());
+    }
+
+    io::stdout().execute(EnterAlternateScreen)?;
+    enable_raw_mode()?;
+    let mut terminal = Terminal::new(CrosstermBackend::new(io::stdout()))?;
+
     loop {
         terminal.draw(|frame| {
             let area = square_area(frame.area());

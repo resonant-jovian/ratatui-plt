@@ -5,6 +5,7 @@
 //! Run with: `cargo run --example sixel_export --features sixel`
 //! (requires a Sixel-compatible terminal)
 
+use ratatui::prelude::*;
 use ratatui_plt::export::{ExportOptions, buffer_to_sixel, render_to_buffer};
 use ratatui_plt::prelude::*;
 
@@ -30,6 +31,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 .label("cos(x)")
                 .label_position(LabelPosition::End),
         );
+
+    if headless_export(|area, buf| (&plot).render(area, buf))? {
+        return Ok(());
+    }
 
     let buf = render_to_buffer(&plot, 80, 24);
     let options = ExportOptions::default();

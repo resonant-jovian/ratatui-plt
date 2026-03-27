@@ -130,30 +130,16 @@ pub fn create_backend(area: Rect) -> Box<dyn PlotBackend> {
     };
 
     match backend {
-        RenderBackend::Unicode | RenderBackend::Auto => {
-            Box::new(PlotBuffer::new(area))
-        }
+        RenderBackend::Unicode | RenderBackend::Auto => Box::new(PlotBuffer::new(area)),
         #[cfg(feature = "kitty")]
-        RenderBackend::Kitty => {
-            Box::new(
-                crate::kitty_backend::KittyBackend::new(area),
-            )
-        }
+        RenderBackend::Kitty => Box::new(crate::kitty_backend::KittyBackend::new(area)),
         #[cfg(feature = "sixel")]
-        RenderBackend::Sixel => {
-            Box::new(
-                crate::sixel_backend::SixelBackend::new(area),
-            )
-        }
+        RenderBackend::Sixel => Box::new(crate::sixel_backend::SixelBackend::new(area)),
         // Feature not enabled — fall back to Unicode
         #[cfg(not(feature = "kitty"))]
-        RenderBackend::Kitty => {
-            Box::new(PlotBuffer::new(area))
-        }
+        RenderBackend::Kitty => Box::new(PlotBuffer::new(area)),
         #[cfg(not(feature = "sixel"))]
-        RenderBackend::Sixel => {
-            Box::new(PlotBuffer::new(area))
-        }
+        RenderBackend::Sixel => Box::new(PlotBuffer::new(area)),
     }
 }
 

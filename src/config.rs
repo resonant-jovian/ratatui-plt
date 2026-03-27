@@ -219,9 +219,7 @@ fn probe_kitty_graphics() -> bool {
     if !std::io::stdout().is_terminal() {
         return false;
     }
-    if crossterm::terminal::is_raw_mode_enabled()
-        .unwrap_or(true)
-    {
+    if crossterm::terminal::is_raw_mode_enabled().unwrap_or(true) {
         return false;
     }
 
@@ -233,19 +231,15 @@ fn probe_kitty_graphics() -> bool {
     // Send Kitty graphics query (ask terminal if it supports
     // graphics). The query uses action=query (a=q) with a
     // minimal 1x1 pixel payload.
-    let query =
-        b"\x1b_Gi=31,s=1,v=1,a=q,t=d,f=24;AAAA\x1b\\";
-    let sent = std::io::stdout().write_all(query).is_ok()
-        && std::io::stdout().flush().is_ok();
+    let query = b"\x1b_Gi=31,s=1,v=1,a=q,t=d,f=24;AAAA\x1b\\";
+    let sent = std::io::stdout().write_all(query).is_ok() && std::io::stdout().flush().is_ok();
 
     let mut detected = false;
     if sent {
         // If the terminal supports Kitty graphics, it responds
         // with an APC sequence. Non-Kitty terminals silently
         // ignore APC, so poll() will time out.
-        if let Ok(true) = crossterm::event::poll(
-            Duration::from_millis(200),
-        ) {
+        if let Ok(true) = crossterm::event::poll(Duration::from_millis(200)) {
             detected = true;
             // Drain the response event to avoid leaving stale
             // data in the event queue.

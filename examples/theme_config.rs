@@ -57,10 +57,6 @@ fn make_plot(theme: &Theme, title: &str) -> LinePlot {
 
 fn main() -> color_eyre::Result<()> {
     color_eyre::install()?;
-    io::stdout().execute(EnterAlternateScreen)?;
-    enable_raw_mode()?;
-    let mut terminal = Terminal::new(CrosstermBackend::new(io::stdout()))?;
-
     let themes = [
         (Theme::dark(), "Dark"),
         (Theme::light(), "Light"),
@@ -73,6 +69,40 @@ fn main() -> color_eyre::Result<()> {
         .iter()
         .map(|(t, name)| make_plot(t, &format!("Theme: {name}")))
         .collect();
+
+    if headless_export(|area, buf| {
+        let outer = Layout::default()
+            .direction(Direction::Vertical)
+            .constraints([
+                Constraint::Length(1),
+                Constraint::Percentage(50),
+                Constraint::Percentage(50),
+            ])
+            .split(area);
+        let top = Layout::default()
+            .direction(Direction::Horizontal)
+            .constraints([
+                Constraint::Ratio(1, 3),
+                Constraint::Ratio(1, 3),
+                Constraint::Ratio(1, 3),
+            ])
+            .split(outer[1]);
+        let bot = Layout::default()
+            .direction(Direction::Horizontal)
+            .constraints([Constraint::Ratio(1, 2), Constraint::Ratio(1, 2)])
+            .split(outer[2]);
+        (&plots[0]).render(top[0], buf);
+        (&plots[1]).render(top[1], buf);
+        (&plots[2]).render(top[2], buf);
+        (&plots[3]).render(bot[0], buf);
+        (&plots[4]).render(bot[1], buf);
+    })? {
+        return Ok(());
+    }
+
+    io::stdout().execute(EnterAlternateScreen)?;
+    enable_raw_mode()?;
+    let mut terminal = Terminal::new(CrosstermBackend::new(io::stdout()))?;
 
     loop {
         terminal.draw(|frame| {
