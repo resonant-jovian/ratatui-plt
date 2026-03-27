@@ -111,38 +111,49 @@ impl PlotBackend for Box<dyn PlotBackend> {
     }
 }
 
-/// Create a rendering backend for the given area, using the configured backend
-/// from [`PlotConfig`](crate::config::PlotConfig).
+/// Create a rendering backend for the given area, using the
+/// configured backend from
+/// [`PlotConfig`](crate::config::PlotConfig).
 ///
-/// Returns `PlotBuffer` (Unicode) by default. When the `kitty` or `sixel`
-/// features are enabled and the corresponding backend is selected, returns
-/// a pixel-level backend instead.
+/// With the default [`RenderBackend::Auto`], this auto-detects
+/// the best available graphics protocol (Kitty > Sixel >
+/// Unicode). Detection results are cached per-process.
 pub fn create_backend(area: Rect) -> Box<dyn PlotBackend> {
-    use crate::config::{PlotConfig, RenderBackend};
+    use crate::config::{PlotConfig, RenderBackend, detect_backend};
 
     let cfg = PlotConfig::get_default();
-    match cfg.render_backend {
-        RenderBackend::Unicode => Box::new(PlotBuffer::new(area)),
-        #[cfg(feature = "kitty")]
-        RenderBackend::Kitty => Box::new(crate::kitty_backend::KittyBackend::new(area)),
-        #[cfg(feature = "sixel")]
-        RenderBackend::Sixel => Box::new(crate::sixel_backend::SixelBackend::new(area)),
-        RenderBackend::Auto => {
-            #[cfg(feature = "kitty")]
-            if crate::config::detect_kitty() {
-                return Box::new(crate::kitty_backend::KittyBackend::new(area));
-            }
-            #[cfg(feature = "sixel")]
-            if crate::config::detect_sixel() {
-                return Box::new(crate::sixel_backend::SixelBackend::new(area));
-            }
+
+    // Resolve Auto to a concrete backend via cached detection
+    let backend = match cfg.render_backend {
+        RenderBackend::Auto => detect_backend(),
+        other => other,
+    };
+
+    match backend {
+        RenderBackend::Unicode | RenderBackend::Auto => {
             Box::new(PlotBuffer::new(area))
         }
-        // If feature not enabled but backend was requested, fall back to Unicode
+        #[cfg(feature = "kitty")]
+        RenderBackend::Kitty => {
+            Box::new(
+                crate::kitty_backend::KittyBackend::new(area),
+            )
+        }
+        #[cfg(feature = "sixel")]
+        RenderBackend::Sixel => {
+            Box::new(
+                crate::sixel_backend::SixelBackend::new(area),
+            )
+        }
+        // Feature not enabled — fall back to Unicode
         #[cfg(not(feature = "kitty"))]
-        RenderBackend::Kitty => Box::new(PlotBuffer::new(area)),
+        RenderBackend::Kitty => {
+            Box::new(PlotBuffer::new(area))
+        }
         #[cfg(not(feature = "sixel"))]
-        RenderBackend::Sixel => Box::new(PlotBuffer::new(area)),
+        RenderBackend::Sixel => {
+            Box::new(PlotBuffer::new(area))
+        }
     }
 }
 

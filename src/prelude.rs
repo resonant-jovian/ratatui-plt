@@ -84,7 +84,9 @@ pub use crate::colormap::{
     colormap_names,
     get_colormap,
 };
-pub use crate::config::{ConfigGuard, PlotConfig, RenderBackend};
+pub use crate::config::{
+    ConfigGuard, PlotConfig, RenderBackend, detect_backend,
+};
 #[cfg(feature = "export")]
 pub use crate::export::{ExportError, ExportOptions, buffer_to_png};
 pub use crate::export::{
