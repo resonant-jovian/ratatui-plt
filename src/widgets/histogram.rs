@@ -957,10 +957,7 @@ impl Histogram {
             // Probability: density * bin_width
             HistNorm::Probability => kde_density.iter().map(|&d| d * bin_width).collect(),
             // Percent: density * bin_width * 100
-            HistNorm::Percent => kde_density
-                .iter()
-                .map(|&d| d * bin_width * 100.0)
-                .collect(),
+            HistNorm::Percent => kde_density.iter().map(|&d| d * bin_width * 100.0).collect(),
             // Frequency: density * n_total
             HistNorm::Frequency => kde_density.iter().map(|&d| d * n_total).collect(),
         };

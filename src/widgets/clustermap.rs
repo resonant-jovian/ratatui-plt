@@ -159,7 +159,11 @@ impl ClusterMap {
 }
 
 /// Reorder grid data by the given row and column permutations.
-fn reorder_grid(data: &GridData, row_order: Option<&[usize]>, col_order: Option<&[usize]>) -> GridData {
+fn reorder_grid(
+    data: &GridData,
+    row_order: Option<&[usize]>,
+    col_order: Option<&[usize]>,
+) -> GridData {
     let nrows = data.nrows();
     let ncols = data.ncols();
 
@@ -242,10 +246,7 @@ fn compute_heights(links: &[DendroLink], n_leaves: usize) -> Vec<f64> {
 
 /// Find the maximum merge distance in a set of links.
 fn max_distance(links: &[DendroLink]) -> f64 {
-    links
-        .iter()
-        .map(|l| l.distance)
-        .fold(0.0_f64, f64::max)
+    links.iter().map(|l| l.distance).fold(0.0_f64, f64::max)
 }
 
 /// Render the heatmap region using half-block characters.
@@ -278,8 +279,7 @@ fn render_heatmap(
 
             // Top half-pixel
             let top_row_f = (cy as usize * 2) as f64 / effective_height as f64;
-            let top_data_row =
-                ((1.0 - top_row_f) * nrows as f64).min((nrows - 1) as f64) as usize;
+            let top_data_row = ((1.0 - top_row_f) * nrows as f64).min((nrows - 1) as f64) as usize;
             let top_data_col =
                 (cx as f64 / aw as f64 * ncols as f64).min((ncols - 1) as f64) as usize;
             let top_val = data
@@ -295,8 +295,7 @@ fn render_heatmap(
 
             // Bottom half-pixel
             let bot_row_f = (cy as usize * 2 + 1) as f64 / effective_height as f64;
-            let bot_data_row =
-                ((1.0 - bot_row_f) * nrows as f64).min((nrows - 1) as f64) as usize;
+            let bot_data_row = ((1.0 - bot_row_f) * nrows as f64).min((nrows - 1) as f64) as usize;
             let bot_val = data
                 .values
                 .get(bot_data_row)
@@ -333,10 +332,8 @@ fn render_heatmap(
                     }
 
                     let label = format!("{val:.1}");
-                    let center_x =
-                        area.x as f64 + (col as f64 + 0.5) * cell_width;
-                    let center_y =
-                        area.y as f64 + ((nrows - 1 - row) as f64 + 0.5) * cell_height;
+                    let center_x = area.x as f64 + (col as f64 + 0.5) * cell_width;
+                    let center_y = area.y as f64 + ((nrows - 1 - row) as f64 + 0.5) * cell_height;
 
                     let xi = center_x.round() as u16;
                     let yi = center_y.round() as u16;
@@ -422,10 +419,12 @@ fn render_row_dendrogram(
         let x_start = merge_x.min(left_x);
         let x_end = merge_x.max(left_x);
         for x in x_start..=x_end {
-            if x >= area.x && x < area.x + area.width && left_y >= area.y && left_y < area.y + area.height {
-                buf[(x, left_y)]
-                    .set_char(border.horizontal)
-                    .set_fg(color);
+            if x >= area.x
+                && x < area.x + area.width
+                && left_y >= area.y
+                && left_y < area.y + area.height
+            {
+                buf[(x, left_y)].set_char(border.horizontal).set_fg(color);
             }
         }
 
@@ -433,10 +432,12 @@ fn render_row_dendrogram(
         let x_start = merge_x.min(right_x);
         let x_end = merge_x.max(right_x);
         for x in x_start..=x_end {
-            if x >= area.x && x < area.x + area.width && right_y >= area.y && right_y < area.y + area.height {
-                buf[(x, right_y)]
-                    .set_char(border.horizontal)
-                    .set_fg(color);
+            if x >= area.x
+                && x < area.x + area.width
+                && right_y >= area.y
+                && right_y < area.y + area.height
+            {
+                buf[(x, right_y)].set_char(border.horizontal).set_fg(color);
             }
         }
 
@@ -444,10 +445,12 @@ fn render_row_dendrogram(
         let y_top = left_y.min(right_y);
         let y_bot = left_y.max(right_y);
         for y in y_top..=y_bot {
-            if merge_x >= area.x && merge_x < area.x + area.width && y >= area.y && y < area.y + area.height {
-                buf[(merge_x, y)]
-                    .set_char(border.vertical)
-                    .set_fg(color);
+            if merge_x >= area.x
+                && merge_x < area.x + area.width
+                && y >= area.y
+                && y < area.y + area.height
+            {
+                buf[(merge_x, y)].set_char(border.vertical).set_fg(color);
             }
         }
 
@@ -520,10 +523,12 @@ fn render_col_dendrogram(
         let y_start = merge_y.min(left_y);
         let y_end = merge_y.max(left_y);
         for y in y_start..=y_end {
-            if left_x >= area.x && left_x < area.x + area.width && y >= area.y && y < area.y + area.height {
-                buf[(left_x, y)]
-                    .set_char(border.vertical)
-                    .set_fg(color);
+            if left_x >= area.x
+                && left_x < area.x + area.width
+                && y >= area.y
+                && y < area.y + area.height
+            {
+                buf[(left_x, y)].set_char(border.vertical).set_fg(color);
             }
         }
 
@@ -531,10 +536,12 @@ fn render_col_dendrogram(
         let y_start = merge_y.min(right_y);
         let y_end = merge_y.max(right_y);
         for y in y_start..=y_end {
-            if right_x >= area.x && right_x < area.x + area.width && y >= area.y && y < area.y + area.height {
-                buf[(right_x, y)]
-                    .set_char(border.vertical)
-                    .set_fg(color);
+            if right_x >= area.x
+                && right_x < area.x + area.width
+                && y >= area.y
+                && y < area.y + area.height
+            {
+                buf[(right_x, y)].set_char(border.vertical).set_fg(color);
             }
         }
 
@@ -542,10 +549,12 @@ fn render_col_dendrogram(
         let x_left = left_x.min(right_x);
         let x_right = left_x.max(right_x);
         for x in x_left..=x_right {
-            if x >= area.x && x < area.x + area.width && merge_y >= area.y && merge_y < area.y + area.height {
-                buf[(x, merge_y)]
-                    .set_char(border.horizontal)
-                    .set_fg(color);
+            if x >= area.x
+                && x < area.x + area.width
+                && merge_y >= area.y
+                && merge_y < area.y + area.height
+            {
+                buf[(x, merge_y)].set_char(border.horizontal).set_fg(color);
             }
         }
 
@@ -650,9 +659,7 @@ impl Widget for &ClusterMap {
         // Compute heatmap area
         let heatmap_x = area.x + row_dendro_width;
         let heatmap_y = remaining_y + col_dendro_height;
-        let heatmap_width = area
-            .width
-            .saturating_sub(row_dendro_width + colorbar_width);
+        let heatmap_width = area.width.saturating_sub(row_dendro_width + colorbar_width);
         let heatmap_height = remaining_height.saturating_sub(col_dendro_height);
 
         if heatmap_width < 3 || heatmap_height < 2 {
@@ -682,20 +689,31 @@ impl Widget for &ClusterMap {
                 .col_order
                 .as_ref()
                 .map_or(ncols, |o| o.iter().filter(|&&i| i < ncols).count());
-            render_col_dendrogram(buf, col_dendro_area, col_links, effective_ncols, &self.theme);
+            render_col_dendrogram(
+                buf,
+                col_dendro_area,
+                col_links,
+                effective_ncols,
+                &self.theme,
+            );
         }
 
         // Render row dendrogram (left region)
         if let Some(ref row_links) = self.row_links
             && !row_links.is_empty()
         {
-            let row_dendro_area =
-                Rect::new(area.x, heatmap_y, row_dendro_width, heatmap_height);
+            let row_dendro_area = Rect::new(area.x, heatmap_y, row_dendro_width, heatmap_height);
             let effective_nrows = self
                 .row_order
                 .as_ref()
                 .map_or(nrows, |o| o.iter().filter(|&&i| i < nrows).count());
-            render_row_dendrogram(buf, row_dendro_area, row_links, effective_nrows, &self.theme);
+            render_row_dendrogram(
+                buf,
+                row_dendro_area,
+                row_links,
+                effective_nrows,
+                &self.theme,
+            );
         }
 
         // Render the heatmap

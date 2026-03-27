@@ -300,9 +300,7 @@ impl Widget for &RidgelinePlot {
         // visually overlay lower groups.
         for gi in (0..n_groups).rev() {
             let group = &self.groups[gi];
-            let group_color = group
-                .color
-                .unwrap_or_else(|| self.theme.color_cycle.at(gi));
+            let group_color = group.color.unwrap_or_else(|| self.theme.color_cycle.at(gi));
 
             let (ref x_vals, ref densities) = kde_results[gi];
 
@@ -338,13 +336,8 @@ impl Widget for &RidgelinePlot {
                     if !xv.is_finite() {
                         continue;
                     }
-                    let sx = data_to_screen(
-                        xv,
-                        x_lo,
-                        x_hi,
-                        pa.x as f64,
-                        (pa.x + pa.width - 1) as f64,
-                    );
+                    let sx =
+                        data_to_screen(xv, x_lo, x_hi, pa.x as f64, (pa.x + pa.width - 1) as f64);
                     let xi = sx.round() as u16;
                     if xi < pa.x || xi >= pa.x + pa.width {
                         continue;
@@ -360,7 +353,9 @@ impl Widget for &RidgelinePlot {
                     let curve_top_screen = band_baseline_screen - curve_height;
 
                     let y_top = curve_top_screen.round().max(pa.y as f64) as u16;
-                    let y_bot = band_baseline_screen.round().min((pa.y + pa.height - 1) as f64) as u16;
+                    let y_bot = band_baseline_screen
+                        .round()
+                        .min((pa.y + pa.height - 1) as f64) as u16;
 
                     for y in y_top..=y_bot {
                         if pa.contains(xi, y) {
@@ -381,20 +376,10 @@ impl Widget for &RidgelinePlot {
                     continue;
                 }
 
-                let sx0 = data_to_screen(
-                    xv0,
-                    x_lo,
-                    x_hi,
-                    pa.x as f64,
-                    (pa.x + pa.width - 1) as f64,
-                );
-                let sx1 = data_to_screen(
-                    xv1,
-                    x_lo,
-                    x_hi,
-                    pa.x as f64,
-                    (pa.x + pa.width - 1) as f64,
-                );
+                let sx0 =
+                    data_to_screen(xv0, x_lo, x_hi, pa.x as f64, (pa.x + pa.width - 1) as f64);
+                let sx1 =
+                    data_to_screen(xv1, x_lo, x_hi, pa.x as f64, (pa.x + pa.width - 1) as f64);
 
                 let curve_h0 = (d0 / global_density_max) * effective_band_height;
                 let curve_h1 = (d1 / global_density_max) * effective_band_height;

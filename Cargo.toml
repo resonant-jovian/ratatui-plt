@@ -95,6 +95,38 @@ required-features = ["unicode-extended"]
 name = "showcase_features"
 required-features = ["statistics"]
 
+[[example]]
+name = "kde_plot"
+required-features = ["statistics"]
+
+[[example]]
+name = "regression_plot"
+required-features = ["statistics"]
+
+[[example]]
+name = "ridgeline"
+required-features = ["statistics"]
+
+[[example]]
+name = "qq_plot"
+required-features = ["statistics"]
+
+[[example]]
+name = "pair_plot"
+required-features = ["statistics"]
+
+[[example]]
+name = "confidence_ellipse"
+required-features = ["statistics"]
+
+[[example]]
+name = "psd"
+required-features = ["fft"]
+
+[[example]]
+name = "tricontour"
+required-features = ["triangulation"]
+
 [dependencies.image]
 version = "0.25.10"
 optional = true

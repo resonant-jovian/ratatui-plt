@@ -262,10 +262,7 @@ impl Widget for &QQPlot {
                 let ref_y_at_xlo = slope * x_lo + intercept;
                 let ref_y_at_xhi = slope * x_hi + intercept;
 
-                let ref_color = self
-                    .color
-                    .map(dim_color)
-                    .unwrap_or(self.theme.grid_color);
+                let ref_color = self.color.map(dim_color).unwrap_or(self.theme.grid_color);
 
                 // Draw the reference line across the full x range
                 let n_segs: usize = 100;

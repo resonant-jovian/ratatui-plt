@@ -201,7 +201,13 @@ impl Widget for &FunnelArea {
         if self.spines.top {
             let border = &self.theme.chars.border;
             for x in area.x..area.x + area.width {
-                pb.set_char(x, draw_y, border.horizontal, self.theme.axis_color, Z_CHROME);
+                pb.set_char(
+                    x,
+                    draw_y,
+                    border.horizontal,
+                    self.theme.axis_color,
+                    Z_CHROME,
+                );
             }
         }
 
@@ -257,10 +263,22 @@ impl Widget for &FunnelArea {
 
                 // Draw angled edges with theme border chars
                 if left > area.x {
-                    pb.set_char(left, y, self.theme.chars.border.vertical, self.theme.axis_color, Z_CHROME);
+                    pb.set_char(
+                        left,
+                        y,
+                        self.theme.chars.border.vertical,
+                        self.theme.axis_color,
+                        Z_CHROME,
+                    );
                 }
                 if right > 0 && right - 1 < area.x + area.width {
-                    pb.set_char(right.saturating_sub(1), y, self.theme.chars.border.vertical, self.theme.axis_color, Z_CHROME);
+                    pb.set_char(
+                        right.saturating_sub(1),
+                        y,
+                        self.theme.chars.border.vertical,
+                        self.theme.axis_color,
+                        Z_CHROME,
+                    );
                 }
             }
 
@@ -289,7 +307,8 @@ impl Widget for &FunnelArea {
                 } else {
                     0.0
                 };
-                let hw_at_label = (top_hw as f64 * (1.0 - t_label) + bottom_hw as f64 * t_label).round() as u16;
+                let hw_at_label =
+                    (top_hw as f64 * (1.0 - t_label) + bottom_hw as f64 * t_label).round() as u16;
                 let available = hw_at_label * 2;
 
                 if label_len <= available {

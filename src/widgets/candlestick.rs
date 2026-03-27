@@ -350,13 +350,7 @@ impl Widget for &CandlestickChart {
                     // Draw vertical line from high to low
                     for y in wick_top..=wick_bot {
                         if pa.contains(sx, y) {
-                            pb.set_char(
-                                sx,
-                                y,
-                                self.theme.chars.border.vertical,
-                                color,
-                                Z_DATA,
-                            );
+                            pb.set_char(sx, y, self.theme.chars.border.vertical, color, Z_DATA);
                         }
                     }
 

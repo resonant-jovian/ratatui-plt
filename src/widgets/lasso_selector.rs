@@ -213,8 +213,8 @@ impl StatefulWidget for &LassoSelector {
 
         let mut pb = PlotBuffer::new(area);
 
-        let frame = PlotFrame::new(&self.x_axis, &self.y_axis, &self.theme)
-            .spines(self.spines.clone());
+        let frame =
+            PlotFrame::new(&self.x_axis, &self.y_axis, &self.theme).spines(self.spines.clone());
 
         let bounds = DataBounds {
             x_lo,
@@ -258,7 +258,8 @@ impl StatefulWidget for &LassoSelector {
                     j = i;
                 }
 
-                x_intersections.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
+                x_intersections
+                    .sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
 
                 // Fill between pairs of intersections
                 let mut k = 0;

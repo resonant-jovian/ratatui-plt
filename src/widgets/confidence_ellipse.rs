@@ -151,7 +151,10 @@ impl ConfidenceEllipse {
 
 /// Compute mean of a slice of finite values.
 fn mean(data: &[f64]) -> f64 {
-    let (sum, count) = data.iter().filter(|v| v.is_finite()).fold((0.0, 0usize), |(s, c), &v| (s + v, c + 1));
+    let (sum, count) = data
+        .iter()
+        .filter(|v| v.is_finite())
+        .fold((0.0, 0usize), |(s, c), &v| (s + v, c + 1));
     if count == 0 { 0.0 } else { sum / count as f64 }
 }
 
@@ -205,7 +208,11 @@ fn eigen_2x2(a: f64, b: f64, c: f64) -> (f64, f64, f64) {
 
     // Rotation angle from eigenvector of the larger eigenvalue
     let theta = if b.abs() < 1e-15 {
-        if a >= c { 0.0 } else { std::f64::consts::FRAC_PI_2 }
+        if a >= c {
+            0.0
+        } else {
+            std::f64::consts::FRAC_PI_2
+        }
     } else {
         (lambda1 - a).atan2(b)
     };

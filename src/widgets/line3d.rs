@@ -207,7 +207,10 @@ impl Line3D {
         }
 
         // Depth range for brightness cuing
-        let depth_min = projected.iter().map(|p| p.depth).fold(f64::INFINITY, f64::min);
+        let depth_min = projected
+            .iter()
+            .map(|p| p.depth)
+            .fold(f64::INFINITY, f64::min);
         let depth_max = projected
             .iter()
             .map(|p| p.depth)
@@ -231,10 +234,8 @@ impl Line3D {
             area: Rect::new(px, py, pw, ph),
         };
 
-        let map_x =
-            |v: f64| data_to_screen(v, sx_min, sx_max, px as f64, (px + pw - 1) as f64);
-        let map_y =
-            |v: f64| data_to_screen(v, sy_min, sy_max, py as f64, (py + ph - 1) as f64);
+        let map_x = |v: f64| data_to_screen(v, sx_min, sx_max, px as f64, (px + pw - 1) as f64);
+        let map_y = |v: f64| data_to_screen(v, sy_min, sy_max, py as f64, (py + ph - 1) as f64);
 
         // ── collect line segments with depth for sorting ────────────────
         struct Segment {
@@ -275,8 +276,7 @@ impl Line3D {
 
         // Draw segments with depth-cued brightness
         for seg in &segments {
-            let brightness =
-                ((seg.depth - depth_min) / depth_range * 0.7 + 0.3).clamp(0.3, 1.0);
+            let brightness = ((seg.depth - depth_min) / depth_range * 0.7 + 0.3).clamp(0.3, 1.0);
             let color = dim_color(seg.color, brightness);
             draw_braille_line(buf, seg.x0, seg.y0, seg.x1, seg.y1, color, &pa);
         }
@@ -306,7 +306,12 @@ impl Line3D {
         }
 
         // ── 3D axis lines and labels ────────────────────────────────────
-        let sb = ScreenBounds { sx_min, sx_max, sy_min, sy_max };
+        let sb = ScreenBounds {
+            sx_min,
+            sx_max,
+            sy_min,
+            sy_max,
+        };
         draw_axis_lines(camera, buf, &pa, &sb, &self.theme);
     }
 }

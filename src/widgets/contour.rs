@@ -329,15 +329,7 @@ impl Widget for &ContourPlot {
                             let sx1 = pa.screen_x(dx1);
                             let sy1 = pa.screen_y(dy1);
 
-                            pb.draw_line(
-                                sx0,
-                                sy0,
-                                sx1,
-                                sy1,
-                                color,
-                                &pa,
-                                Z_DATA + level_idx as u8,
-                            );
+                            pb.draw_line(sx0, sy0, sx1, sy1, color, &pa, Z_DATA + level_idx as u8);
                         }
                     }
                 }

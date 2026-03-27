@@ -228,11 +228,7 @@ fn write_str_clipped(
 
 /// Write a single character into the buffer with a style.
 fn write_char(buf: &mut Buffer, x: u16, y: u16, ch: char, style: Style, area: Rect) {
-    if x >= area.x
-        && x < area.x + area.width
-        && y >= area.y
-        && y < area.y + area.height
-    {
+    if x >= area.x && x < area.x + area.width && y >= area.y && y < area.y + area.height {
         let cell = &mut buf[(x, y)];
         cell.set_char(ch);
         cell.set_style(style);
@@ -259,8 +255,8 @@ impl Widget for &DataTable {
         let fg_style = Style::default().fg(fg_color);
 
         // Compute total table width (sum of columns + separators + outer borders)
-        let total_content_width: u16 = col_widths.iter().sum::<u16>()
-            + (ncols as u16).saturating_sub(1); // separators between columns
+        let total_content_width: u16 =
+            col_widths.iter().sum::<u16>() + (ncols as u16).saturating_sub(1); // separators between columns
         let table_width = (total_content_width + 2).min(area.width); // +2 for outer borders
 
         let mut cur_y = area.y;
@@ -268,9 +264,7 @@ impl Widget for &DataTable {
         // ── Title ─────────────────────────────────────────────────────────
         if let Some(ref title) = self.title {
             let title_style = if self.theme.bold_title {
-                Style::default()
-                    .fg(fg_color)
-                    .add_modifier(Modifier::BOLD)
+                Style::default().fg(fg_color).add_modifier(Modifier::BOLD)
             } else {
                 fg_style
             };
@@ -333,9 +327,7 @@ impl Widget for &DataTable {
 
         // ── Header row ────────────────────────────────────────────────────
         if !self.headers.is_empty() {
-            let header_style = Style::default()
-                .fg(header_fg)
-                .add_modifier(Modifier::BOLD);
+            let header_style = Style::default().fg(header_fg).add_modifier(Modifier::BOLD);
 
             write_char(buf, table_x, cur_y, border_char_v, chrome_style, area);
             let mut cx = table_x + 1;
@@ -462,8 +454,7 @@ impl Widget for &DataTable {
                         // Choose contrasting foreground
                         let cell_fg = match bg {
                             Color::Rgb(r, g, b) => {
-                                let lum =
-                                    (r as u32 * 299 + g as u32 * 587 + b as u32 * 114) / 1000;
+                                let lum = (r as u32 * 299 + g as u32 * 587 + b as u32 * 114) / 1000;
                                 if lum > 128 {
                                     Color::Black
                                 } else {

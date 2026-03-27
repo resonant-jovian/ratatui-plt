@@ -33,6 +33,7 @@ pub mod box_plot;
 pub mod boxen;
 #[cfg(feature = "statistics")]
 pub mod confidence_ellipse;
+pub mod dot_plot;
 pub mod ecdf;
 pub mod error_bar;
 #[cfg(feature = "statistics")]
@@ -43,7 +44,6 @@ pub mod qq_plot;
 pub mod regression_plot;
 #[cfg(feature = "statistics")]
 pub mod ridgeline;
-pub mod dot_plot;
 pub mod rug;
 pub mod strip;
 pub mod swarm;
@@ -55,8 +55,8 @@ pub mod choropleth;
 pub mod contour;
 pub mod event_plot;
 pub mod hexbin;
-pub mod horizon;
 pub mod hist2d;
+pub mod horizon;
 pub mod pcolormesh;
 pub mod stairs;
 pub mod stem_plot;
@@ -84,8 +84,8 @@ pub mod treemap;
 
 // ── Polar & Specialized ─────────────────────────────────────────────────────
 pub mod radial;
-pub mod ternary;
 pub mod smith_chart;
+pub mod ternary;
 
 // ── 3D ──────────────────────────────────────────────────────────────────────
 pub mod bar3d;

@@ -88,8 +88,7 @@ impl MapCell {
 }
 
 /// The type of map layout to use.
-#[derive(Clone, Debug)]
-#[derive(Default)]
+#[derive(Clone, Debug, Default)]
 pub enum MapType {
     /// Simple world regions (continents) using a predefined ASCII layout.
     #[default]
@@ -97,7 +96,6 @@ pub enum MapType {
     /// Custom region layout defined by user-specified cells.
     Custom(Vec<MapCell>),
 }
-
 
 /// A choropleth map widget for data-driven geographic coloring.
 ///
@@ -248,16 +246,8 @@ impl Widget for &ChoroplethMap {
         }
 
         // Compute the grid bounds from the cells
-        let grid_cols = cells
-            .iter()
-            .map(|c| c.col + c.width)
-            .max()
-            .unwrap_or(1);
-        let grid_rows = cells
-            .iter()
-            .map(|c| c.row + c.height)
-            .max()
-            .unwrap_or(1);
+        let grid_cols = cells.iter().map(|c| c.col + c.width).max().unwrap_or(1);
+        let grid_rows = cells.iter().map(|c| c.row + c.height).max().unwrap_or(1);
 
         if grid_cols == 0 || grid_rows == 0 {
             return;
@@ -293,11 +283,7 @@ impl Widget for &ChoroplethMap {
 
             // Determine color
             let (fill_color, has_data) = if let Some(v) = value {
-                let t = if vmin < vmax {
-                    norm.normalize(v)
-                } else {
-                    0.5
-                };
+                let t = if vmin < vmax { norm.normalize(v) } else { 0.5 };
                 (self.colormap.color_at(t), true)
             } else {
                 (self.theme.muted, false)
@@ -394,24 +380,26 @@ impl Widget for &ChoroplethMap {
             }
 
             // If we have data, show the value below the label
-            if has_data && sh >= 3
-                && let Some(v) = value {
-                    let val_str = format_value(v);
-                    let val_display: String = if val_str.len() > max_label_len {
-                        val_str.chars().take(max_label_len).collect()
-                    } else {
-                        val_str
-                    };
-                    let val_y = sy + sh / 2 + 1;
-                    let val_x = sx + (sw.saturating_sub(val_display.len() as u16)) / 2;
-                    let text_color = contrasting_color(fill_color);
-                    for (j, ch) in val_display.chars().enumerate() {
-                        let x = val_x + j as u16;
-                        if x < area.x + area.width && val_y < area.y + area.height {
-                            pb.set_char(x, val_y, ch, text_color, Z_CHROME);
-                        }
+            if has_data
+                && sh >= 3
+                && let Some(v) = value
+            {
+                let val_str = format_value(v);
+                let val_display: String = if val_str.len() > max_label_len {
+                    val_str.chars().take(max_label_len).collect()
+                } else {
+                    val_str
+                };
+                let val_y = sy + sh / 2 + 1;
+                let val_x = sx + (sw.saturating_sub(val_display.len() as u16)) / 2;
+                let text_color = contrasting_color(fill_color);
+                for (j, ch) in val_display.chars().enumerate() {
+                    let x = val_x + j as u16;
+                    if x < area.x + area.width && val_y < area.y + area.height {
+                        pb.set_char(x, val_y, ch, text_color, Z_CHROME);
                     }
                 }
+            }
         }
 
         pb.composite(buf);
@@ -421,11 +409,7 @@ impl Widget for &ChoroplethMap {
             let cb = Colorbar::new(self.colormap.as_ref(), vmin, vmax)
                 .label_color(self.theme.foreground);
             let cb_x = px + pw + 2;
-            let cb_w = colorbar_width.min(
-                area.x
-                    .saturating_add(area.width)
-                    .saturating_sub(cb_x),
-            );
+            let cb_w = colorbar_width.min(area.x.saturating_add(area.width).saturating_sub(cb_x));
             let cb_area = Rect::new(cb_x, py, cb_w, ph);
             if cb_area.x + cb_area.width <= area.x + area.width {
                 (&cb).render(cb_area, buf);

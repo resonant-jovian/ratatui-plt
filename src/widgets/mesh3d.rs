@@ -177,9 +177,10 @@ impl Mesh3D {
                 let ny = 2.0 * (y - yn) / y_range - 1.0;
                 let nz = (2.0 * (z - zn) / z_range - 1.0) * 0.8;
                 let (sx, sy, depth) = camera.project(nx, ny, nz);
-                let val = self.values.as_ref().map_or(z, |v| {
-                    if i < v.len() { v[i] } else { z }
-                });
+                let val = self
+                    .values
+                    .as_ref()
+                    .map_or(z, |v| if i < v.len() { v[i] } else { z });
                 (sx, sy, depth, val)
             })
             .collect();
@@ -224,10 +225,7 @@ impl Mesh3D {
             })
             .collect();
 
-        sorted_faces.sort_by(|a, b| {
-            b.1.partial_cmp(&a.1)
-                .unwrap_or(std::cmp::Ordering::Equal)
-        });
+        sorted_faces.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
 
         // PlotArea for Braille clipping
         let pa = PlotArea {
@@ -242,10 +240,8 @@ impl Mesh3D {
             area: Rect::new(px, py, pw, ph),
         };
 
-        let map_x =
-            |v: f64| data_to_screen(v, sx_min, sx_max, px as f64, (px + pw - 1) as f64);
-        let map_y =
-            |v: f64| data_to_screen(v, sy_min, sy_max, py as f64, (py + ph - 1) as f64);
+        let map_x = |v: f64| data_to_screen(v, sx_min, sx_max, px as f64, (px + pw - 1) as f64);
+        let map_y = |v: f64| data_to_screen(v, sy_min, sy_max, py as f64, (py + ph - 1) as f64);
 
         // ── render faces ────────────────────────────────────────────────
         for &(fi, _) in &sorted_faces {
@@ -258,9 +254,18 @@ impl Mesh3D {
 
             // Screen-space triangle corners
             let tri = [
-                (map_x(projected[a].0).round() as i32, map_y(projected[a].1).round() as i32),
-                (map_x(projected[b].0).round() as i32, map_y(projected[b].1).round() as i32),
-                (map_x(projected[c].0).round() as i32, map_y(projected[c].1).round() as i32),
+                (
+                    map_x(projected[a].0).round() as i32,
+                    map_y(projected[a].1).round() as i32,
+                ),
+                (
+                    map_x(projected[b].0).round() as i32,
+                    map_y(projected[b].1).round() as i32,
+                ),
+                (
+                    map_x(projected[c].0).round() as i32,
+                    map_y(projected[c].1).round() as i32,
+                ),
             ];
 
             // ── bounding-box rasterisation ──────────────────────────────
@@ -343,7 +348,12 @@ impl Mesh3D {
         }
 
         // ── 3D axis lines ───────────────────────────────────────────────
-        let sb = ScreenBounds { sx_min, sx_max, sy_min, sy_max };
+        let sb = ScreenBounds {
+            sx_min,
+            sx_max,
+            sy_min,
+            sy_max,
+        };
         draw_axis_lines(camera, buf, &pa, &sb, &self.theme);
     }
 }
@@ -357,8 +367,7 @@ fn point_in_triangle(px: i32, py: i32, tri: &[(i32, i32); 3]) -> bool {
     for i in 0..3 {
         let (x0, y0) = tri[i];
         let (x1, y1) = tri[(i + 1) % 3];
-        let cross =
-            (x1 - x0) as i64 * (py - y0) as i64 - (y1 - y0) as i64 * (px - x0) as i64;
+        let cross = (x1 - x0) as i64 * (py - y0) as i64 - (y1 - y0) as i64 * (px - x0) as i64;
         if cross != 0 {
             let s = if cross > 0 { 1 } else { -1 };
             if sign == 0 {
@@ -392,10 +401,7 @@ fn shade_color(color: Color, factor: f64) -> Color {
     }
 }
 
-fn vertex_value_bounds(
-    verts: &[(f64, f64, f64)],
-    vals: Option<&[f64]>,
-) -> (f64, f64) {
+fn vertex_value_bounds(verts: &[(f64, f64, f64)], vals: Option<&[f64]>) -> (f64, f64) {
     let mut min = f64::INFINITY;
     let mut max = f64::NEG_INFINITY;
     match vals {

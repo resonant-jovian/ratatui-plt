@@ -54,16 +54,7 @@ pub trait PlotBackend {
     /// - Braille sub-pixel dots for Unicode backends
     /// - Anti-aliased pixels for graphics protocol backends
     #[allow(clippy::too_many_arguments)]
-    fn draw_line(
-        &mut self,
-        x0: f64,
-        y0: f64,
-        x1: f64,
-        y1: f64,
-        color: Color,
-        pa: &PlotArea,
-        z: u8,
-    );
+    fn draw_line(&mut self, x0: f64, y0: f64, x1: f64, y1: f64, color: Color, pa: &PlotArea, z: u8);
 
     /// Check if cell (x, y) is within this backend's renderable area.
     fn contains(&self, x: u16, y: u16) -> bool;

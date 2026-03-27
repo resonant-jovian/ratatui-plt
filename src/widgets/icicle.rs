@@ -118,12 +118,7 @@ fn tree_max_depth(node: &TreemapNode) -> usize {
     if node.children.is_empty() {
         1
     } else {
-        1 + node
-            .children
-            .iter()
-            .map(tree_max_depth)
-            .max()
-            .unwrap_or(0)
+        1 + node.children.iter().map(tree_max_depth).max().unwrap_or(0)
     }
 }
 
@@ -280,12 +275,9 @@ impl Widget for &IcicleChart {
                 // Primary axis = width, depth axis = height
                 let level_size = plot_h as f64 / effective_depth as f64;
                 let level_pos = match self.orientation {
-                    IcicleOrientation::TopDown => {
-                        plot_y as f64 + r.level as f64 * level_size
-                    }
+                    IcicleOrientation::TopDown => plot_y as f64 + r.level as f64 * level_size,
                     IcicleOrientation::BottomUp => {
-                        plot_y as f64
-                            + (effective_depth - 1 - r.level) as f64 * level_size
+                        plot_y as f64 + (effective_depth - 1 - r.level) as f64 * level_size
                     }
                     _ => plot_y as f64,
                 };
@@ -303,12 +295,9 @@ impl Widget for &IcicleChart {
                 // Primary axis = height, depth axis = width
                 let level_size = area.width as f64 / effective_depth as f64;
                 let level_pos = match self.orientation {
-                    IcicleOrientation::LeftRight => {
-                        area.x as f64 + r.level as f64 * level_size
-                    }
+                    IcicleOrientation::LeftRight => area.x as f64 + r.level as f64 * level_size,
                     IcicleOrientation::RightLeft => {
-                        area.x as f64
-                            + (effective_depth - 1 - r.level) as f64 * level_size
+                        area.x as f64 + (effective_depth - 1 - r.level) as f64 * level_size
                     }
                     _ => area.x as f64,
                 };
@@ -338,8 +327,7 @@ impl Widget for &IcicleChart {
                         continue;
                     }
 
-                    let is_border =
-                        dx == 0 || dx == rw - 1 || dy == 0 || dy == rh - 1;
+                    let is_border = dx == 0 || dx == rw - 1 || dy == 0 || dy == rh - 1;
 
                     if is_border {
                         let bc = &self.theme.chars.border;
@@ -358,14 +346,7 @@ impl Widget for &IcicleChart {
                         };
                         pb.set_char(x, y, ch, self.theme.axis_color, Z_CHROME);
                     } else {
-                        pb.set_cell(
-                            x,
-                            y,
-                            self.theme.chars.fill.solid,
-                            r.color,
-                            r.color,
-                            Z_DATA,
-                        );
+                        pb.set_cell(x, y, self.theme.chars.fill.solid, r.color, r.color, Z_DATA);
                     }
                 }
             }
@@ -374,8 +355,7 @@ impl Widget for &IcicleChart {
             if self.show_labels && rw >= 3 && rh >= 2 {
                 let max_label_len = (rw as usize).saturating_sub(2);
                 if max_label_len > 0 {
-                    let truncated: String =
-                        r.label.chars().take(max_label_len).collect();
+                    let truncated: String = r.label.chars().take(max_label_len).collect();
                     let label_x =
                         rx + 1 + (max_label_len.saturating_sub(truncated.len()) as u16) / 2;
                     let label_y = ry + rh / 2;
@@ -384,13 +364,7 @@ impl Widget for &IcicleChart {
                         for (j, ch) in truncated.chars().enumerate() {
                             let x = label_x + j as u16;
                             if x < rx + rw && x < area.x + area.width {
-                                pb.set_char(
-                                    x,
-                                    label_y,
-                                    ch,
-                                    self.theme.foreground,
-                                    Z_CHROME,
-                                );
+                                pb.set_char(x, label_y, ch, self.theme.foreground, Z_CHROME);
                             }
                         }
                     }

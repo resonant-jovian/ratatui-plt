@@ -330,15 +330,7 @@ impl Widget for &ParallelCoords {
                 let sx1 = axis_positions[i + 1] as f64;
                 let sy1 = data_to_screen(v1, ax1.min, ax1.max, plot_bottom as f64, plot_top as f64);
 
-                pb.draw_line(
-                    sx0,
-                    sy0,
-                    sx1,
-                    sy1,
-                    rec.color,
-                    &pa,
-                    Z_DATA + si as u8,
-                );
+                pb.draw_line(sx0, sy0, sx1, sy1, rec.color, &pa, Z_DATA + si as u8);
             }
 
             // Draw value markers on each axis

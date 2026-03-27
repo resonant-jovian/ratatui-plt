@@ -258,7 +258,15 @@ impl Widget for &SmithChart {
         };
 
         // Draw the unit circle boundary
-        draw_circle_braille(&mut pb, &geom, 0.0, 0.0, 1.0, self.theme.axis_color, Z_CHROME);
+        draw_circle_braille(
+            &mut pb,
+            &geom,
+            0.0,
+            0.0,
+            1.0,
+            self.theme.axis_color,
+            Z_CHROME,
+        );
 
         // Draw horizontal center line (real axis)
         {

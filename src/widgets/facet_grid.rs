@@ -247,7 +247,8 @@ impl FacetGrid {
         let theme = self.theme.clone();
 
         self.render_fn = Some(Box::new(move |data, row, col, cycle, area, buf| {
-            let (x_bounds, y_bounds) = resolve_cell_bounds(data, row, col, share_x, share_y, &scales);
+            let (x_bounds, y_bounds) =
+                resolve_cell_bounds(data, row, col, share_x, share_y, &scales);
             let cfg = CellConfig {
                 data,
                 row,
@@ -272,7 +273,8 @@ impl FacetGrid {
         let theme = self.theme.clone();
 
         self.render_fn = Some(Box::new(move |data, row, col, cycle, area, buf| {
-            let (x_bounds, y_bounds) = resolve_cell_bounds(data, row, col, share_x, share_y, &scales);
+            let (x_bounds, y_bounds) =
+                resolve_cell_bounds(data, row, col, share_x, share_y, &scales);
             let cfg = CellConfig {
                 data,
                 row,
@@ -403,18 +405,19 @@ impl Widget for &FacetGrid {
             for rk in &row_keys {
                 for ck in &col_keys {
                     // Only include cells that have data.
-                    if self.data.records.iter().any(|r| r.row_key == *rk && r.col_key == *ck) {
+                    if self
+                        .data
+                        .records
+                        .iter()
+                        .any(|r| r.row_key == *rk && r.col_key == *ck)
+                    {
                         cells.push((rk.clone(), ck.clone()));
                     }
                 }
             }
             let total = cells.len();
             let cols = wrap.min(total).max(1);
-            let rows = if total == 0 {
-                0
-            } else {
-                total.div_ceil(cols)
-            };
+            let rows = if total == 0 { 0 } else { total.div_ceil(cols) };
             (cells, rows, cols)
         } else {
             // Standard grid: every row x col combination.
@@ -480,8 +483,12 @@ impl Widget for &FacetGrid {
         }
 
         // Compute cell sizes
-        let total_h_gap = self.gap.saturating_mul(n_grid_rows.saturating_sub(1) as u16);
-        let total_w_gap = self.gap.saturating_mul(n_grid_cols.saturating_sub(1) as u16);
+        let total_h_gap = self
+            .gap
+            .saturating_mul(n_grid_rows.saturating_sub(1) as u16);
+        let total_w_gap = self
+            .gap
+            .saturating_mul(n_grid_cols.saturating_sub(1) as u16);
         let cell_height = grid_height.saturating_sub(total_h_gap) / n_grid_rows as u16;
         let cell_width = grid_width.saturating_sub(total_w_gap) / n_grid_cols as u16;
 
@@ -500,12 +507,7 @@ impl Widget for &FacetGrid {
                 let labels: Vec<&str> = if self.col_wrap.is_some() {
                     // Use the first n_grid_cols col_keys (they repeat).
                     (0..n_grid_cols)
-                        .map(|c| {
-                            grid_cells
-                                .get(c)
-                                .map(|(_, ck)| ck.as_str())
-                                .unwrap_or("")
-                        })
+                        .map(|c| grid_cells.get(c).map(|(_, ck)| ck.as_str()).unwrap_or(""))
                         .collect()
                 } else {
                     col_keys.iter().map(|s| s.as_str()).collect()
@@ -549,10 +551,7 @@ impl Widget for &FacetGrid {
                     (0..n_grid_rows)
                         .map(|r| {
                             let idx = r * n_grid_cols;
-                            grid_cells
-                                .get(idx)
-                                .map(|(rk, _)| rk.as_str())
-                                .unwrap_or("")
+                            grid_cells.get(idx).map(|(rk, _)| rk.as_str()).unwrap_or("")
                         })
                         .collect()
                 } else {
@@ -592,12 +591,8 @@ impl Widget for &FacetGrid {
                 let cell_y = grid_y + (grid_row as u16) * (cell_height + self.gap);
 
                 // Clamp so cell does not extend beyond the grid area.
-                let clamped_w = cell_width.min(
-                    (area.x + grid_width).saturating_sub(cell_x),
-                );
-                let clamped_h = cell_height.min(
-                    (area.y + area.height).saturating_sub(cell_y),
-                );
+                let clamped_w = cell_width.min((area.x + grid_width).saturating_sub(cell_x));
+                let clamped_h = cell_height.min((area.y + area.height).saturating_sub(cell_y));
 
                 if clamped_w < 2 || clamped_h < 2 {
                     continue;

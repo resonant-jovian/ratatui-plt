@@ -520,16 +520,11 @@ fn render_wireframe_only(
 ) {
     let (px, pw, py, ph) = (pa.x, pa.width, pa.y, pa.height);
 
-    let map_x =
-        |sx: f64| data_to_screen(sx, sb.sx_min, sb.sx_max, px as f64, (px + pw - 1) as f64);
-    let map_y =
-        |sy: f64| data_to_screen(sy, sb.sy_min, sb.sy_max, py as f64, (py + ph - 1) as f64);
+    let map_x = |sx: f64| data_to_screen(sx, sb.sx_min, sb.sx_max, px as f64, (px + pw - 1) as f64);
+    let map_y = |sy: f64| data_to_screen(sy, sb.sy_min, sb.sy_max, py as f64, (py + ph - 1) as f64);
 
     // Find depth range for brightness mapping
-    let depth_min = projected
-        .iter()
-        .map(|p| p.2)
-        .fold(f64::INFINITY, f64::min);
+    let depth_min = projected.iter().map(|p| p.2).fold(f64::INFINITY, f64::min);
     let depth_max = projected
         .iter()
         .map(|p| p.2)

@@ -340,8 +340,7 @@ impl Widget for &HorizonGraph {
                 let frac_in_band = band_idx_f - band_idx as f64;
 
                 // Compute fill height in half-rows within this lane
-                let fill_half_rows =
-                    (frac_in_band * rows_per_series as f64).round() as usize;
+                let fill_half_rows = (frac_in_band * rows_per_series as f64).round() as usize;
 
                 // Color intensity increases with band index
                 let alpha = (band_idx as f64 + 1.0) / n_bands as f64;

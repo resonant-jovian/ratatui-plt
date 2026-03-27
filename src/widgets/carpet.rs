@@ -301,10 +301,7 @@ impl Widget for &CarpetPlot {
 
                     // Get the four corners in screen space
                     let corners = [
-                        (
-                            pa.screen_x(self.x[bi][ai]),
-                            pa.screen_y(self.y[bi][ai]),
-                        ),
+                        (pa.screen_x(self.x[bi][ai]), pa.screen_y(self.y[bi][ai])),
                         (
                             pa.screen_x(self.x[bi][ai + 1]),
                             pa.screen_y(self.y[bi][ai + 1]),
@@ -346,9 +343,7 @@ impl Widget for &CarpetPlot {
                         for sx in bb_min_x..=bb_max_x {
                             let ux = sx as u16;
                             let uy = sy as u16;
-                            if pa.contains(ux, uy)
-                                && point_in_quad(sx as f64, sy as f64, &quad)
-                            {
+                            if pa.contains(ux, uy) && point_in_quad(sx as f64, sy as f64, &quad) {
                                 pb.set_cell(
                                     ux,
                                     uy,
@@ -402,24 +397,25 @@ impl Widget for &CarpetPlot {
 
         // Draw colorbar
         if self.show_colorbar
-            && let Some(ref vals) = self.values {
-                let (vmin, vmax) = value_bounds_2d(vals);
-                let cb = Colorbar::new(self.colormap.as_ref(), vmin, vmax)
-                    .label_color(self.theme.foreground);
-                let cb_area = Rect::new(
-                    pa.x + pa.width + 2,
-                    pa.y,
-                    colorbar_width.min(
-                        area.x
-                            .saturating_add(area.width)
-                            .saturating_sub(pa.x + pa.width + 2),
-                    ),
-                    pa.height,
-                );
-                if cb_area.x + cb_area.width <= area.x + area.width {
-                    (&cb).render(cb_area, buf);
-                }
+            && let Some(ref vals) = self.values
+        {
+            let (vmin, vmax) = value_bounds_2d(vals);
+            let cb = Colorbar::new(self.colormap.as_ref(), vmin, vmax)
+                .label_color(self.theme.foreground);
+            let cb_area = Rect::new(
+                pa.x + pa.width + 2,
+                pa.y,
+                colorbar_width.min(
+                    area.x
+                        .saturating_add(area.width)
+                        .saturating_sub(pa.x + pa.width + 2),
+                ),
+                pa.height,
+            );
+            if cb_area.x + cb_area.width <= area.x + area.width {
+                (&cb).render(cb_area, buf);
             }
+        }
     }
 }
 

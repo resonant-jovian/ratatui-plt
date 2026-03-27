@@ -458,9 +458,7 @@ impl Widget for &BoxPlot {
                 // When notched, narrow the box in the notch region to create a
                 // visible pinch around the median.
                 for y in sy_q3..=sy_q1 {
-                    let (row_left, row_right) = if is_notched
-                        && y >= notch_hi_y
-                        && y <= notch_lo_y
+                    let (row_left, row_right) = if is_notched && y >= notch_hi_y && y <= notch_lo_y
                     {
                         (notch_left, notch_right)
                     } else {
@@ -537,14 +535,12 @@ impl Widget for &BoxPlot {
                 // Side walls — indented in the notch region when notched
                 {
                     for y in (sy_q3 + 1)..sy_q1 {
-                        let (wall_left, wall_right) = if is_notched
-                            && y >= notch_hi_y
-                            && y <= notch_lo_y
-                        {
-                            (notch_left, notch_right)
-                        } else {
-                            (box_left, box_right)
-                        };
+                        let (wall_left, wall_right) =
+                            if is_notched && y >= notch_hi_y && y <= notch_lo_y {
+                                (notch_left, notch_right)
+                            } else {
+                                (box_left, box_right)
+                            };
                         if pa.contains(wall_left, y) {
                             pb.set_char(
                                 wall_left,
@@ -677,14 +673,9 @@ impl Widget for &BoxPlot {
                 let mut rng = SimpleRng::new(i as u64 ^ 0xCAFEBABE);
                 let jitter_range = (box_width / 3).max(1) as i16;
                 for &v in &d.values {
-                    let sy = data_to_screen(
-                        v,
-                        y_lo,
-                        y_hi,
-                        (pa.y + pa.height - 1) as f64,
-                        pa.y as f64,
-                    )
-                    .round() as u16;
+                    let sy =
+                        data_to_screen(v, y_lo, y_hi, (pa.y + pa.height - 1) as f64, pa.y as f64)
+                            .round() as u16;
                     // Deterministic jitter: map RNG output to [-jitter_range, jitter_range]
                     let jitter =
                         (rng.next_u64() % (2 * jitter_range as u64 + 1)) as i16 - jitter_range;

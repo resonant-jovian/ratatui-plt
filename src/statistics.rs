@@ -821,7 +821,9 @@ impl Kde2D {
             };
         }
 
-        let kde = Kde::new().bandwidth(self.bandwidth.clone()).n_points(self.n_points);
+        let kde = Kde::new()
+            .bandwidth(self.bandwidth.clone())
+            .n_points(self.n_points);
 
         // Filter to finite pairs
         let (xf, yf): (Vec<f64>, Vec<f64>) = x
@@ -917,9 +919,9 @@ fn normal_ppf(p: f64) -> f64 {
     let p = p.clamp(1e-10, 1.0 - 1e-10);
 
     if p < 0.5 {
-        -rational_approx((- 2.0 * p.ln()).sqrt())
+        -rational_approx((-2.0 * p.ln()).sqrt())
     } else {
-        rational_approx((- 2.0 * (1.0 - p).ln()).sqrt())
+        rational_approx((-2.0 * (1.0 - p).ln()).sqrt())
     }
 }
 

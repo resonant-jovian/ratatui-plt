@@ -434,8 +434,7 @@ fn render_histogram(
         if count == 0 {
             continue;
         }
-        let bar_height =
-            ((count as f64 / max_count as f64) * area.height as f64).round() as u16;
+        let bar_height = ((count as f64 / max_count as f64) * area.height as f64).round() as u16;
 
         let bar_x_start = area.x + (i as f64 * bin_w_screen).round() as u16;
         let bar_x_end = area.x + (((i + 1) as f64) * bin_w_screen).round() as u16;
@@ -444,9 +443,7 @@ fn render_histogram(
             for dy in 0..bar_height.min(area.height) {
                 let y = area.y + area.height - 1 - dy;
                 if y >= area.y {
-                    buf[(x, y)]
-                        .set_char(theme.chars.fill.solid)
-                        .set_fg(color);
+                    buf[(x, y)].set_char(theme.chars.fill.solid).set_fg(color);
                 }
             }
         }
@@ -604,14 +601,10 @@ fn draw_cell_border(buf: &mut Buffer, area: Rect, color: Color, theme: &Theme) {
 
     // Corners
     if in_buf(buf, x0, y0) {
-        buf[(x0, y0)]
-            .set_char(chars.border.top_left)
-            .set_fg(color);
+        buf[(x0, y0)].set_char(chars.border.top_left).set_fg(color);
     }
     if in_buf(buf, x1, y0) {
-        buf[(x1, y0)]
-            .set_char(chars.border.top_right)
-            .set_fg(color);
+        buf[(x1, y0)].set_char(chars.border.top_right).set_fg(color);
     }
     if in_buf(buf, x0, y1) {
         buf[(x0, y1)]
@@ -627,28 +620,20 @@ fn draw_cell_border(buf: &mut Buffer, area: Rect, color: Color, theme: &Theme) {
     // Top and bottom edges
     for x in (x0 + 1)..x1 {
         if in_buf(buf, x, y0) {
-            buf[(x, y0)]
-                .set_char(chars.border.horizontal)
-                .set_fg(color);
+            buf[(x, y0)].set_char(chars.border.horizontal).set_fg(color);
         }
         if in_buf(buf, x, y1) {
-            buf[(x, y1)]
-                .set_char(chars.border.horizontal)
-                .set_fg(color);
+            buf[(x, y1)].set_char(chars.border.horizontal).set_fg(color);
         }
     }
 
     // Left and right edges
     for y in (y0 + 1)..y1 {
         if in_buf(buf, x0, y) {
-            buf[(x0, y)]
-                .set_char(chars.border.vertical)
-                .set_fg(color);
+            buf[(x0, y)].set_char(chars.border.vertical).set_fg(color);
         }
         if in_buf(buf, x1, y) {
-            buf[(x1, y)]
-                .set_char(chars.border.vertical)
-                .set_fg(color);
+            buf[(x1, y)].set_char(chars.border.vertical).set_fg(color);
         }
     }
 }

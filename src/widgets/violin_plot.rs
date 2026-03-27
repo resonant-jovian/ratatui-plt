@@ -503,10 +503,8 @@ impl Widget for &ViolinPlot {
                     * (n_eval - 1) as f64;
                 let bot_idx = (bot_eval_idx_f.round() as usize).min(n_eval - 1);
 
-                let top_width =
-                    (kde_values[top_idx] / kde_divisor * max_half_width).round() as u16;
-                let bot_width =
-                    (kde_values[bot_idx] / kde_divisor * max_half_width).round() as u16;
+                let top_width = (kde_values[top_idx] / kde_divisor * max_half_width).round() as u16;
+                let bot_width = (kde_values[bot_idx] / kde_divisor * max_half_width).round() as u16;
 
                 let max_w = top_width.max(bot_width);
                 for dx in 0..=max_w {

@@ -369,9 +369,8 @@ impl Widget for &BarChart {
                     for (ds_i, ds) in self.datasets.iter().enumerate() {
                         let val = ds.values.get(cat_i).copied().unwrap_or(0.0);
                         let bar_x = group_x + self.bar_gap + ds_i as u16 * bar_width;
-                        let bar_top =
-                            data_to_screen(val, y_lo, y_hi, screen_bottom, screen_top).round()
-                                as u16;
+                        let bar_top = data_to_screen(val, y_lo, y_hi, screen_bottom, screen_top)
+                            .round() as u16;
 
                         let effective_width = bar_width.max(1);
                         for x in bar_x..bar_x + effective_width {
@@ -409,11 +408,11 @@ impl Widget for &BarChart {
 
                     for ds in &self.datasets {
                         let val = ds.values.get(cat_i).copied().unwrap_or(0.0);
-                        let y_bot =
-                            data_to_screen(bottom, y_lo, y_hi, screen_bottom, screen_top).round()
-                                as u16;
-                        let y_top = data_to_screen(bottom + val, y_lo, y_hi, screen_bottom, screen_top)
+                        let y_bot = data_to_screen(bottom, y_lo, y_hi, screen_bottom, screen_top)
                             .round() as u16;
+                        let y_top =
+                            data_to_screen(bottom + val, y_lo, y_hi, screen_bottom, screen_top)
+                                .round() as u16;
 
                         for x in bar_x..bar_x + bar_width {
                             for y in y_top..y_bot {
@@ -455,12 +454,15 @@ impl Widget for &BarChart {
                         let val = ds.values.get(cat_i).copied().unwrap_or(0.0);
                         if val >= 0.0 {
                             // Stack upward from zero
-                            let seg_bot = data_to_screen(
-                                pos_bottom, y_lo, y_hi, screen_bottom, screen_top,
-                            )
-                            .round() as u16;
+                            let seg_bot =
+                                data_to_screen(pos_bottom, y_lo, y_hi, screen_bottom, screen_top)
+                                    .round() as u16;
                             let seg_top = data_to_screen(
-                                pos_bottom + val, y_lo, y_hi, screen_bottom, screen_top,
+                                pos_bottom + val,
+                                y_lo,
+                                y_hi,
+                                screen_bottom,
+                                screen_top,
                             )
                             .round() as u16;
 
@@ -476,13 +478,16 @@ impl Widget for &BarChart {
                         } else {
                             // Stack downward from zero
                             let seg_top = data_to_screen(
-                                neg_top + val, y_lo, y_hi, screen_bottom, screen_top,
+                                neg_top + val,
+                                y_lo,
+                                y_hi,
+                                screen_bottom,
+                                screen_top,
                             )
                             .round() as u16;
-                            let seg_bot = data_to_screen(
-                                neg_top, y_lo, y_hi, screen_bottom, screen_top,
-                            )
-                            .round() as u16;
+                            let seg_bot =
+                                data_to_screen(neg_top, y_lo, y_hi, screen_bottom, screen_top)
+                                    .round() as u16;
 
                             for x in bar_x..bar_x + bar_width {
                                 for y in seg_top..seg_bot {
@@ -499,10 +504,9 @@ impl Widget for &BarChart {
                     // Value labels for diverging: show positive total above, negative below
                     if self.show_values {
                         if pos_bottom > 0.0 {
-                            let top_screen = data_to_screen(
-                                pos_bottom, y_lo, y_hi, screen_bottom, screen_top,
-                            )
-                            .round() as u16;
+                            let top_screen =
+                                data_to_screen(pos_bottom, y_lo, y_hi, screen_bottom, screen_top)
+                                    .round() as u16;
                             draw_value_label(
                                 &mut pb,
                                 &self.orientation,
@@ -518,10 +522,9 @@ impl Widget for &BarChart {
                             );
                         }
                         if neg_top < 0.0 {
-                            let bot_screen = data_to_screen(
-                                neg_top, y_lo, y_hi, screen_bottom, screen_top,
-                            )
-                            .round() as u16;
+                            let bot_screen =
+                                data_to_screen(neg_top, y_lo, y_hi, screen_bottom, screen_top)
+                                    .round() as u16;
                             // Place below the negative stack: 1 row below bottom
                             let label = format!("{:.1}", neg_top);
                             let center_x = bar_x + bar_width / 2;
@@ -534,7 +537,13 @@ impl Widget for &BarChart {
                                     && label_y >= area.y
                                     && label_y < area.y + area.height
                                 {
-                                    pb.set_char(lx, label_y, ch, self.theme.foreground, Z_ANNOTATION);
+                                    pb.set_char(
+                                        lx,
+                                        label_y,
+                                        ch,
+                                        self.theme.foreground,
+                                        Z_ANNOTATION,
+                                    );
                                 }
                             }
                         }

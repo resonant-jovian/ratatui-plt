@@ -50,14 +50,14 @@ require_cmd() {
 
 # ── Example Groups ───────────────────────────────────────────────────────────
 
-GROUP_2D=(line_plot scatter_plot heatmap histogram bar_chart contour image_plot pcolormesh collections pie_chart stacked_area area_chart stairs stem_plot event_plot hexbin hist2d band rug)
-GROUP_3D=(surface3d scatter3d bar3d contour3d quiver3d vector_field wireframe3d)
-GROUP_STATISTICAL=(box_plot boxen violin_plot ecdf error_bar joint_plot swarm strip statistics trendline)
+GROUP_2D=(line_plot scatter_plot heatmap histogram bar_chart contour image_plot pcolormesh collections pie_chart area_chart stairs stem_plot event_plot hexbin hist2d band rug)
+GROUP_3D=(surface3d scatter3d bar3d contour3d quiver3d vector_field line3d mesh3d voxels isosurface volume3d streamtube)
+GROUP_STATISTICAL=(box_plot boxen violin_plot ecdf error_bar joint_plot swarm strip statistics trendline kde_plot regression_plot ridgeline qq_plot dot_plot confidence_ellipse pair_plot)
 GROUP_SHOWCASE=(showcase_basic_2d showcase_3d showcase_fill showcase_grid showcase_statistical showcase_tri showcase_unicode showcase_features)
-GROUP_SPECIALIZED=(radial ternary network parallel_coords sankey sunburst treemap dendrogram streamplot tricolor triplot scientific_dashboard theme_config)
+GROUP_SPECIALIZED=(radial ternary network parallel_coords sankey sunburst treemap dendrogram streamplot tricolor triplot tricontour scientific_dashboard theme_config horizon data_table carpet smith_chart choropleth icicle parallel_categories clustermap psd)
 GROUP_LAYOUT=(multi_panel facet_grid twin_axes inset)
-GROUP_INTERACTIVE=(crosshair picking interactive_legend span_selector)
-GROUP_FINANCE=(candlestick waterfall funnel gauge gantt)
+GROUP_INTERACTIVE=(crosshair picking interactive_legend span_selector rect_selector lasso_selector)
+GROUP_FINANCE=(candlestick waterfall funnel gauge gantt funnel_area)
 GROUP_EXPORT=(kitty_export sixel_export toml_theme)
 
 ALL_GROUPS=(2d 3d statistical showcase specialized layout interactive finance export)
@@ -66,6 +66,14 @@ ALL_GROUPS=(2d 3d statistical showcase specialized layout interactive finance ex
 declare -A EXAMPLE_FEATURES=(
     [statistics]="statistics"
     [trendline]="statistics"
+    [kde_plot]="statistics"
+    [regression_plot]="statistics"
+    [ridgeline]="statistics"
+    [qq_plot]="statistics"
+    [pair_plot]="statistics"
+    [confidence_ellipse]="statistics"
+    [psd]="fft"
+    [tricontour]="triangulation"
     [kitty_export]="kitty"
     [sixel_export]="sixel"
     [toml_theme]="toml-themes"

@@ -17,7 +17,7 @@
 - **7 axis scales** — linear, log, symlog, power, logit, asinh, function
 - **6 export formats** — text, ANSI, SVG, PNG, Sixel, Kitty
 - **PlotBackend trait** — extensible rendering backend for Unicode, Kitty, Sixel
-- **72 runnable examples** — including 6 matplotlib showcase replicas
+- **98 runnable examples** — including 6 matplotlib showcase replicas
 
 > [!IMPORTANT]
 > **Status (0.0.3):** Rapidly evolving. 80 widgets covering the full matplotlib/seaborn/plotly chart taxonomy. Breaking API changes from 0.0.2: `StackedArea` renamed to `AreaChart`, `Wireframe3D` merged into `Surface3D` (use `SurfaceRenderMode::Wireframe`). Expect further breaking changes before 0.1.0.
@@ -64,7 +64,7 @@ ratatui-plt = "0.0.3"
 ratatui = "0.30"
 
 # Optional features:
-# ratatui-plt = { version = "0.0.2", features = ["statistics", "export"] }
+# ratatui-plt = { version = "0.0.3", features = ["statistics", "export"] }
 ```
 
 ### Quick start
@@ -259,7 +259,7 @@ All 3D widgets support interactive camera control via `Camera3DState` (arrow key
 
 ### Themes
 
-- 5 presets: `dark`, `light`, `minimal`, `publication`, `solarized`
+- 6 presets: `dark`, `light`, `minimal`, `publication`, `solarized`, `gruvbox`
 - Global default via `Theme::set_default()` with RAII guard via `Theme::activate()`
 - TOML file loading (with `toml-themes` feature)
 - All interactive examples accept a theme CLI argument
@@ -321,10 +321,11 @@ All 3D widgets support interactive camera control via `Camera3DState` (arrow key
 | `serde` | `serde` | Serialization for data types |
 | `fft` | `rustfft` | Power spectral density and spectrogram plots |
 | `triangulation` | `delaunator` | Delaunay triangulation for unstructured data |
+| `unicode-extended` | (none) | Extended Unicode characters for pie chart arcs |
 
 ### Examples
 
-70+ examples are included. Run any interactive example with:
+98 examples are included. Run any interactive example with:
 ```bash
 cargo run --example <name>
 # Pass a theme:
@@ -351,19 +352,21 @@ Run examples with `dev.sh`:
 
 #### Showcase Examples (matplotlib reference replicas)
 
-Six showcase examples replicate matplotlib's reference plot gallery using `MultiPanel` grids:
+Eight showcase examples replicate matplotlib's reference plot gallery using `MultiPanel` grids:
 
 | Example | Plots |
 |---------|-------|
 | `showcase_basic_2d` | LinePlot, ScatterPlot, BarChart, Histogram, PieChart, StairsPlot, StemPlot |
 | `showcase_statistical` | BoxPlot, ViolinPlot, ErrorBarPlot, EcdfPlot, EventPlot |
 | `showcase_grid` | ContourPlot (unfilled + filled), Heatmap, Pcolormesh, HexbinPlot, Hist2D, VectorField, StreamPlot |
-| `showcase_fill` | BandPlot (fill_between), StackedArea |
+| `showcase_fill` | BandPlot (fill_between), AreaChart |
 | `showcase_tri` | TriPlot, TriContour (unfilled + filled), TriColor |
-| `showcase_3d` | Surface3D, Wireframe3D, Scatter3D, Bar3D, Quiver3D |
+| `showcase_3d` | Surface3D (filled + wireframe), Scatter3D, Bar3D, Quiver3D |
+| `showcase_features` | Feature demonstration (statistics, trendlines, KDE) |
+| `showcase_unicode` | Extended Unicode character rendering (pie chart arcs) |
 
 <details>
-<summary><strong>All 72 examples</strong></summary>
+<summary><strong>All 98 examples</strong></summary>
 
 | Example | Description |
 |---------|-------------|
@@ -374,7 +377,7 @@ Six showcase examples replicate matplotlib's reference plot gallery using `Multi
 | `histogram` | Stacked distributions |
 | `contour` | Filled 2D potential field |
 | `surface3d` | Interactive 3D surface with camera |
-| `wireframe3d` | Depth-cued 3D wireframe |
+| `wireframe3d` | Depth-cued 3D wireframe (Surface3D wireframe mode) |
 | `scatter3d` | 3D point cloud |
 | `bar3d` | 3D bar chart with axis lines |
 | `box_plot` | Standard, notched, and bootstrap CI |
@@ -388,7 +391,7 @@ Six showcase examples replicate matplotlib's reference plot gallery using `Multi
 | `strip` | Gene expression by cell type |
 | `stem_plot` | Discrete impulse events |
 | `error_bar` | Symmetric/asymmetric error bars |
-| `stacked_area` | Cumulative filled areas |
+| `area_chart` | Plain, stacked, normalized, streamgraph area charts |
 | `bar_chart` | Grouped/stacked bars |
 | `pie_chart` | Pie/donut chart |
 | `hexbin` | Hexagonal binning |
@@ -431,6 +434,34 @@ Six showcase examples replicate matplotlib's reference plot gallery using `Multi
 | `kitty_export` | Inline Kitty image output (requires `kitty`) |
 | `sixel_export` | Inline Sixel image output (requires `sixel`) |
 | `toml_theme` | Load theme from TOML string (requires `toml-themes`) |
+| `kde_plot` | Smooth kernel density estimation curves (requires `statistics`) |
+| `regression_plot` | Scatter + OLS/polynomial fit + CI band (requires `statistics`) |
+| `ridgeline` | Overlapping KDE curves by category (requires `statistics`) |
+| `qq_plot` | Quantile-quantile diagnostic plot (requires `statistics`) |
+| `pair_plot` | N×N scatter matrix with KDE diagonals (requires `statistics`) |
+| `confidence_ellipse` | 2D covariance ellipse overlay (requires `statistics`) |
+| `clustermap` | Heatmap with row/column dendrograms |
+| `horizon` | Compact multi-band time-series |
+| `data_table` | Styled data table with colormap cells |
+| `dot_plot` | Wilkinson stacked dot distribution |
+| `icicle` | Rectangular hierarchy chart |
+| `parallel_categories` | Categorical flow ribbons between dimensions |
+| `tricontour` | Contours on triangulated data (requires `triangulation`) |
+| `psd` | Power spectral density plot (requires `fft`) |
+| `smith_chart` | RF impedance Smith chart |
+| `line3d` | 3D helix trajectory with camera control |
+| `mesh3d` | 3D triangle mesh with camera control |
+| `voxels` | 3D colored cube grid |
+| `isosurface` | Marching cubes 3D iso-extraction |
+| `volume3d` | 3D volumetric rendering |
+| `streamtube` | 3D depth-cued streamlines |
+| `rect_selector` | 2D rectangular brush selection |
+| `lasso_selector` | Freehand polygon selection |
+| `carpet` | Parametric curvilinear grid with coloring |
+| `choropleth` | Tile-based geographic region coloring |
+| `funnel_area` | Trapezoidal proportional-area funnel |
+| `showcase_features` | Feature demonstration showcase (requires `statistics`) |
+| `showcase_unicode` | Extended Unicode character rendering (requires `unicode-extended`) |
 
 </details>
 
@@ -454,7 +485,7 @@ The crate follows a layered design:
 
 1. **Data containers** (`series.rs`) — `Series`, `Series3D`, `GridData`, `VectorFieldData`. All plot widgets consume these.
 2. **Configuration** (`axis.rs`, `norm.rs`, `colormap.rs`, `ticker.rs`, `theme.rs`) — scales, normalization, colormaps, tick generation, themes.
-3. **Widgets** (`widgets/`) — 58 plot widgets, each implementing ratatui's `Widget` or `StatefulWidget` trait via builder pattern.
+3. **Widgets** (`widgets/`) — 80 plot widgets, each implementing ratatui's `Widget` or `StatefulWidget` trait via builder pattern.
 4. **Rendering helpers** (`drawing.rs`, `plot_buffer.rs`, `transform.rs`) — Braille/half-block drawing, Z-buffered rendering, 3D camera transforms.
 5. **Export** (`export.rs`) — text, ANSI, SVG, PNG, Sixel, Kitty output.
 

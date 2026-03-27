@@ -291,15 +291,7 @@ impl Widget for &StairsPlot {
                     let sy = pa.screen_y(ds.values[i]);
 
                     // Horizontal segment at current value
-                    pb.draw_line(
-                        sx_left,
-                        sy,
-                        sx_right,
-                        sy,
-                        ds.color,
-                        &pa,
-                        Z_DATA + si as u8,
-                    );
+                    pb.draw_line(sx_left, sy, sx_right, sy, ds.color, &pa, Z_DATA + si as u8);
 
                     // Vertical segment at the right edge connecting to next value
                     if i + 1 < n {

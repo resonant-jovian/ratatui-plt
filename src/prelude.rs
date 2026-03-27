@@ -105,8 +105,7 @@ pub use crate::norm::{
 };
 pub use crate::picking::{PickResult, pick_nearest};
 pub use crate::plot_buffer::{
-    PlotBackend, PlotBuffer, Z_ANNOTATION, Z_BACKGROUND, Z_CHROME, Z_DATA, Z_FILL, Z_GRID,
-    Z_MARKER,
+    PlotBackend, PlotBuffer, Z_ANNOTATION, Z_BACKGROUND, Z_CHROME, Z_DATA, Z_FILL, Z_GRID, Z_MARKER,
 };
 pub use crate::series::{GridData, Series, Series3D, VectorFieldData, split_at_nan};
 pub use crate::spines::Spines;
@@ -139,6 +138,7 @@ pub use crate::widgets::box_plot::BoxPlot;
 pub use crate::widgets::boxen::BoxenPlot;
 #[cfg(feature = "statistics")]
 pub use crate::widgets::confidence_ellipse::ConfidenceEllipse;
+pub use crate::widgets::dot_plot::{DotDataset, DotPlot};
 pub use crate::widgets::ecdf::{EcdfDataset, EcdfPlot};
 pub use crate::widgets::error_bar::ErrorBarPlot;
 #[cfg(feature = "statistics")]
@@ -149,7 +149,6 @@ pub use crate::widgets::qq_plot::QQPlot;
 pub use crate::widgets::regression_plot::RegressionPlot;
 #[cfg(feature = "statistics")]
 pub use crate::widgets::ridgeline::{RidgelineGroup, RidgelinePlot};
-pub use crate::widgets::dot_plot::{DotDataset, DotPlot};
 pub use crate::widgets::rug::{RugDataset, RugPlot, RugSide};
 pub use crate::widgets::strip::{StripGroup, StripPlot};
 pub use crate::widgets::swarm::SwarmPlot;
@@ -162,8 +161,8 @@ pub use crate::widgets::contour::ContourPlot;
 pub use crate::widgets::event_plot::{EventGroup, EventPlot};
 pub use crate::widgets::heatmap::Heatmap;
 pub use crate::widgets::hexbin::HexbinPlot;
-pub use crate::widgets::horizon::HorizonGraph;
 pub use crate::widgets::hist2d::Hist2D;
+pub use crate::widgets::horizon::HorizonGraph;
 pub use crate::widgets::pcolormesh::Pcolormesh;
 pub use crate::widgets::stairs::{StairsDataset, StairsPlot};
 pub use crate::widgets::stem_plot::StemPlot;
@@ -181,27 +180,29 @@ pub use crate::widgets::waterfall::{WaterfallChart, WaterfallEntry};
 pub use crate::widgets::clustermap::ClusterMap;
 pub use crate::widgets::dendrogram::{DendroLink, DendroOrientation, Dendrogram};
 pub use crate::widgets::funnel::{FunnelChart, FunnelEntry};
+pub use crate::widgets::icicle::{IcicleChart, IcicleOrientation};
 pub use crate::widgets::network::{GraphEdge, GraphLayout, GraphNode, NetworkPlot};
-pub use crate::widgets::parallel_categories::{CategoricalDimension, CategoricalRecord, ParallelCategories};
+pub use crate::widgets::parallel_categories::{
+    CategoricalDimension, CategoricalRecord, ParallelCategories,
+};
 pub use crate::widgets::parallel_coords::{ParallelAxis, ParallelCoords, ParallelRecord};
 pub use crate::widgets::sankey::{SankeyDiagram, SankeyFlow, SankeyNode};
-pub use crate::widgets::icicle::{IcicleChart, IcicleOrientation};
 pub use crate::widgets::sunburst::{Sunburst, SunburstNode};
 pub use crate::widgets::treemap::{Treemap, TreemapNode};
 
 // ── Polar & Specialized Coordinate Widgets ──────────────────────────────────
 pub use crate::widgets::radial::{PolarPlotType, RadarPlot, RadialPlot, ThetaDirection};
-pub use crate::widgets::ternary::{TernaryData, TernaryPlot};
 pub use crate::widgets::smith_chart::{SmithChart, SmithChartPoint};
+pub use crate::widgets::ternary::{TernaryData, TernaryPlot};
 
 // ── 3D Widgets ──────────────────────────────────────────────────────────────
 pub use crate::widgets::bar3d::Bar3D;
 pub use crate::widgets::contour3d::Contour3D;
+pub use crate::widgets::isosurface::Isosurface;
 pub use crate::widgets::line3d::Line3D;
 pub use crate::widgets::mesh3d::Mesh3D;
 pub use crate::widgets::quiver3d::{Arrow3D, Quiver3D};
 pub use crate::widgets::scatter3d::Scatter3D;
-pub use crate::widgets::isosurface::Isosurface;
 pub use crate::widgets::streamtube::Streamtube;
 pub use crate::widgets::surface3d::{Surface3D, SurfaceRenderMode};
 pub use crate::widgets::volume3d::Volume3D;

@@ -348,9 +348,9 @@ impl Widget for &ScatterPlot {
                             } else {
                                 0.5
                             };
-                            let radius =
-                                (self.size_range.0 + t * (self.size_range.1 - self.size_range.0))
-                                    .max(0.5);
+                            let radius = (self.size_range.0
+                                + t * (self.size_range.1 - self.size_range.0))
+                                .max(0.5);
                             let r_int = radius.round() as i16;
                             // Fill a circle of the computed radius
                             for dy in -r_int..=r_int {

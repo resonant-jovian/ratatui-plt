@@ -120,12 +120,18 @@ impl Streamtube {
             for (i, ch) in t.chars().enumerate() {
                 let x = tx + i as u16;
                 if x < area.x + area.width
-                    && let Some(cell) = buf.cell_mut((x, area.y)) {
-                        cell.set_char(ch);
-                        cell.set_fg(self.theme.foreground);
-                    }
+                    && let Some(cell) = buf.cell_mut((x, area.y))
+                {
+                    cell.set_char(ch);
+                    cell.set_fg(self.theme.foreground);
+                }
             }
-            Rect::new(area.x, area.y + 1, area.width, area.height.saturating_sub(1))
+            Rect::new(
+                area.x,
+                area.y + 1,
+                area.width,
+                area.height.saturating_sub(1),
+            )
         } else {
             area
         };
@@ -146,7 +152,12 @@ impl Streamtube {
             .collect();
 
         let (sx_min, sx_max, sy_min, sy_max) = projected.iter().fold(
-            (f64::INFINITY, f64::NEG_INFINITY, f64::INFINITY, f64::NEG_INFINITY),
+            (
+                f64::INFINITY,
+                f64::NEG_INFINITY,
+                f64::INFINITY,
+                f64::NEG_INFINITY,
+            ),
             |(sxn, sxx, syn, syx), &(sx, sy, _)| {
                 (sxn.min(sx), sxx.max(sx), syn.min(sy), syx.max(sy))
             },
@@ -215,10 +226,22 @@ impl Streamtube {
                 };
 
                 let map_x = |sx: f64| {
-                    data_to_screen(sx, sx_min, sx_max, pa.x as f64, (pa.x + pa.width - 1) as f64)
+                    data_to_screen(
+                        sx,
+                        sx_min,
+                        sx_max,
+                        pa.x as f64,
+                        (pa.x + pa.width - 1) as f64,
+                    )
                 };
                 let map_y = |sy: f64| {
-                    data_to_screen(sy, sy_min, sy_max, pa.y as f64, (pa.y + pa.height - 1) as f64)
+                    data_to_screen(
+                        sy,
+                        sy_min,
+                        sy_max,
+                        pa.y as f64,
+                        (pa.y + pa.height - 1) as f64,
+                    )
                 };
 
                 segments.push(Seg {
@@ -242,8 +265,8 @@ impl Streamtube {
 
         // Draw segments with depth-cued brightness and tube offset
         for seg in &segments {
-            let brightness = ((seg.depth - depth_min) / depth_range * 200.0 + 55.0)
-                .clamp(55.0, 255.0) as u8;
+            let brightness =
+                ((seg.depth - depth_min) / depth_range * 200.0 + 55.0).clamp(55.0, 255.0) as u8;
             let (r, g, b_val) = match seg.color {
                 Color::Rgb(r, g, b) => (r, g, b),
                 _ => (200, 200, 200),

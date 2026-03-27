@@ -330,15 +330,7 @@ impl Widget for &KDEPlot {
                     let sx1 = pa.screen_x(x1);
                     let sy1 = pa.screen_y(y1);
 
-                    pb.draw_line(
-                        sx0,
-                        sy0,
-                        sx1,
-                        sy1,
-                        r.color,
-                        &pa,
-                        Z_DATA + si as u8,
-                    );
+                    pb.draw_line(sx0, sy0, sx1, sy1, r.color, &pa, Z_DATA + si as u8);
                 }
             }
         }

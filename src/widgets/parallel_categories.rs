@@ -102,7 +102,9 @@ impl Default for ParallelCategories {
 
 impl ParallelCategories {
     /// Create an empty parallel categories plot.
-    pub fn new() -> Self { Self::default() }
+    pub fn new() -> Self {
+        Self::default()
+    }
 
     /// Add a single dimension.
     pub fn dimension(mut self, dim: CategoricalDimension) -> Self {
@@ -158,7 +160,11 @@ struct Flow {
 }
 
 /// Compute per-category totals for a single dimension.
-fn category_totals(dim_idx: usize, dim: &CategoricalDimension, records: &[CategoricalRecord]) -> Vec<usize> {
+fn category_totals(
+    dim_idx: usize,
+    dim: &CategoricalDimension,
+    records: &[CategoricalRecord],
+) -> Vec<usize> {
     let n = dim.categories.len();
     let mut totals = vec![0usize; n];
     for rec in records {
@@ -173,7 +179,10 @@ fn category_totals(dim_idx: usize, dim: &CategoricalDimension, records: &[Catego
 
 /// Aggregate flows between two adjacent dimensions, assigning colours via `get_color`.
 fn compute_flows(
-    left: usize, right: usize, ln: usize, rn: usize,
+    left: usize,
+    right: usize,
+    ln: usize,
+    rn: usize,
     records: &[CategoricalRecord],
     get_color: &dyn Fn(&CategoricalRecord) -> Color,
 ) -> Vec<Flow> {
@@ -183,7 +192,8 @@ fn compute_flows(
         let src = rec.indices.get(left).copied();
         let dst = rec.indices.get(right).copied();
         if let (Some(s), Some(d)) = (src, dst)
-            && s < ln && d < rn
+            && s < ln
+            && d < rn
         {
             grid[s][d] += rec.count;
             if colors[s][d].is_none() {
@@ -196,7 +206,9 @@ fn compute_flows(
         for d in 0..rn {
             if grid[s][d] > 0 {
                 out.push(Flow {
-                    src_cat: s, dst_cat: d, total: grid[s][d],
+                    src_cat: s,
+                    dst_cat: d,
+                    total: grid[s][d],
                     color: colors[s][d].unwrap_or(Color::White),
                 });
             }
@@ -237,7 +249,9 @@ impl Widget for &ParallelCategories {
         let label_row = area.y + title_h;
         let plot_top = label_row + 1;
         let plot_bottom = (area.y + area.height - 1).saturating_sub(1);
-        if plot_bottom <= plot_top { return; }
+        if plot_bottom <= plot_top {
+            return;
+        }
         let plot_h = plot_bottom - plot_top + 1;
 
         // Title
@@ -255,7 +269,9 @@ impl Widget for &ParallelCategories {
         let margin: u16 = 4;
         let bw: u16 = 3; // block width
         let usable = area.width.saturating_sub(margin * 2);
-        if usable < (n_dims as u16) * bw { return; }
+        if usable < (n_dims as u16) * bw {
+            return;
+        }
 
         let dim_x: Vec<u16> = (0..n_dims)
             .map(|i| {
@@ -266,7 +282,10 @@ impl Widget for &ParallelCategories {
 
         // Vertical layouts per dimension
         let pad = 1.0;
-        let layouts: Vec<Vec<(f64, f64)>> = self.dimensions.iter().enumerate()
+        let layouts: Vec<Vec<(f64, f64)>> = self
+            .dimensions
+            .iter()
+            .enumerate()
             .map(|(i, dim)| {
                 let totals = category_totals(i, dim, &self.records);
                 layout_categories(&totals, plot_top, plot_h, pad)
@@ -291,7 +310,9 @@ impl Widget for &ParallelCategories {
 
             for flow in &flows {
                 let (s, d) = (flow.src_cat, flow.dst_cat);
-                if s >= layouts[di].len() || d >= layouts[di + 1].len() { continue; }
+                if s >= layouts[di].len() || d >= layouts[di + 1].len() {
+                    continue;
+                }
 
                 let (sy0, sh) = layouts[di][s];
                 let (dy0, dh) = layouts[di + 1][d];
@@ -307,7 +328,9 @@ impl Widget for &ParallelCategories {
 
                 let sx = dim_x[di] + bw;
                 let tx = dim_x[di + 1];
-                if tx <= sx { continue; }
+                if tx <= sx {
+                    continue;
+                }
                 let bw_px = tx - sx;
 
                 for dx in 0..bw_px {
@@ -320,21 +343,56 @@ impl Widget for &ParallelCategories {
                     let y1 = bot.ceil().max(top.floor() + 1.0) as u16;
 
                     for y in y0..y1 {
-                        if x >= area.x + area.width || y < plot_top || y > plot_bottom { continue; }
+                        if x >= area.x + area.width || y < plot_top || y > plot_bottom {
+                            continue;
+                        }
                         if y == y0 {
                             if top - (y as f64) > 0.5 {
-                                pb.set_char(x, y, self.theme.chars.fill.half_lower, flow.color, Z_DATA);
+                                pb.set_char(
+                                    x,
+                                    y,
+                                    self.theme.chars.fill.half_lower,
+                                    flow.color,
+                                    Z_DATA,
+                                );
                             } else {
-                                pb.set_cell(x, y, self.theme.chars.fill.solid, flow.color, flow.color, Z_DATA);
+                                pb.set_cell(
+                                    x,
+                                    y,
+                                    self.theme.chars.fill.solid,
+                                    flow.color,
+                                    flow.color,
+                                    Z_DATA,
+                                );
                             }
                         } else if y + 1 >= y1 {
                             if bot - (y as f64) < 0.5 {
-                                pb.set_char(x, y, self.theme.chars.fill.half_upper, flow.color, Z_DATA);
+                                pb.set_char(
+                                    x,
+                                    y,
+                                    self.theme.chars.fill.half_upper,
+                                    flow.color,
+                                    Z_DATA,
+                                );
                             } else {
-                                pb.set_cell(x, y, self.theme.chars.fill.solid, flow.color, flow.color, Z_DATA);
+                                pb.set_cell(
+                                    x,
+                                    y,
+                                    self.theme.chars.fill.solid,
+                                    flow.color,
+                                    flow.color,
+                                    Z_DATA,
+                                );
                             }
                         } else {
-                            pb.set_cell(x, y, self.theme.chars.fill.solid, flow.color, flow.color, Z_DATA);
+                            pb.set_cell(
+                                x,
+                                y,
+                                self.theme.chars.fill.solid,
+                                flow.color,
+                                flow.color,
+                                Z_DATA,
+                            );
                         }
                     }
                 }
@@ -356,7 +414,9 @@ impl Widget for &ParallelCategories {
             }
 
             for (ci, label) in dim.categories.iter().enumerate() {
-                if ci >= layouts[di].len() { continue; }
+                if ci >= layouts[di].len() {
+                    continue;
+                }
                 let (cy, ch) = layouts[di][ci];
                 let cy16 = cy.round() as u16;
                 let ch16 = ch.round().max(1.0) as u16;
@@ -379,7 +439,13 @@ impl Widget for &ParallelCategories {
                     for dy in 0..ch16 {
                         let y = cy16 + dy;
                         if ex < area.x + area.width && y >= plot_top && y <= plot_bottom {
-                            pb.set_char(ex, y, self.theme.chars.border.vertical, self.theme.axis_color, Z_CHROME);
+                            pb.set_char(
+                                ex,
+                                y,
+                                self.theme.chars.border.vertical,
+                                self.theme.axis_color,
+                                Z_CHROME,
+                            );
                         }
                     }
                 }

@@ -162,12 +162,18 @@ impl Volume3D {
             for (i, ch) in t.chars().enumerate() {
                 let x = tx + i as u16;
                 if x < area.x + area.width
-                    && let Some(cell) = buf.cell_mut((x, area.y)) {
-                        cell.set_char(ch);
-                        cell.set_fg(self.theme.foreground);
-                    }
+                    && let Some(cell) = buf.cell_mut((x, area.y))
+                {
+                    cell.set_char(ch);
+                    cell.set_fg(self.theme.foreground);
+                }
             }
-            Rect::new(area.x, area.y + 1, area.width, area.height.saturating_sub(1))
+            Rect::new(
+                area.x,
+                area.y + 1,
+                area.width,
+                area.height.saturating_sub(1),
+            )
         } else {
             area
         };
@@ -189,7 +195,12 @@ impl Volume3D {
             .collect();
 
         let (sx_min, sx_max, sy_min, sy_max) = projected.iter().fold(
-            (f64::INFINITY, f64::NEG_INFINITY, f64::INFINITY, f64::NEG_INFINITY),
+            (
+                f64::INFINITY,
+                f64::NEG_INFINITY,
+                f64::INFINITY,
+                f64::NEG_INFINITY,
+            ),
             |(sxn, sxx, syn, syx), &(sx, sy, _)| {
                 (sxn.min(sx), sxx.max(sx), syn.min(sy), syx.max(sy))
             },
