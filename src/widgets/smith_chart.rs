@@ -24,7 +24,7 @@ use ratatui::style::Color;
 use ratatui::widgets::Widget;
 
 use crate::frame::PlotArea;
-use crate::plot_buffer::{PlotBackend, create_backend, Z_CHROME, Z_DATA, Z_GRID, Z_MARKER};
+use crate::plot_buffer::{PlotBackend, Z_CHROME, Z_DATA, Z_GRID, Z_MARKER, create_backend};
 use crate::style::MarkerShape;
 use crate::theme::Theme;
 

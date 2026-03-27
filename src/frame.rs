@@ -1618,7 +1618,11 @@ impl<'a> PlotFrame<'a> {
         // All y-axis labels are rendered after composite via draw_end_labels()
     }
 
-    pub fn draw_annotations_pb(pa: &PlotArea, annotations: &[Annotation], pb: &mut dyn PlotBackend) {
+    pub fn draw_annotations_pb(
+        pa: &PlotArea,
+        annotations: &[Annotation],
+        pb: &mut dyn PlotBackend,
+    ) {
         let default_color = Theme::get_default().annotation_color;
         for ann in annotations {
             let color = ann.color.unwrap_or(default_color);

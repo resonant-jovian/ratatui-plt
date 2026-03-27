@@ -26,7 +26,7 @@ use ratatui::widgets::Widget;
 
 use crate::axis::Axis;
 use crate::frame::{DataBounds, PlotFrame, ReferenceLine};
-use crate::plot_buffer::{PlotBackend, create_backend, Z_CHROME, Z_DATA, Z_FILL};
+use crate::plot_buffer::{PlotBackend, Z_CHROME, Z_DATA, Z_FILL, create_backend};
 use crate::spines::Spines;
 use crate::statistics::Kde;
 use crate::theme::Theme;

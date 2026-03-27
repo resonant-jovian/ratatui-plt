@@ -25,7 +25,7 @@ use ratatui::widgets::Widget;
 use crate::annotation::Annotation;
 use crate::axis::Axis;
 use crate::frame::{DataBounds, PlotFrame, ReferenceLine};
-use crate::plot_buffer::{PlotBackend, create_backend, Z_CHROME, Z_DATA};
+use crate::plot_buffer::{PlotBackend, Z_CHROME, Z_DATA, create_backend};
 use crate::spines::Spines;
 use crate::theme::Theme;
 use crate::ticker::NullLocator;

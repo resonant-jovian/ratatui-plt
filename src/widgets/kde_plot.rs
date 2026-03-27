@@ -26,7 +26,7 @@ use crate::annotation::Annotation;
 use crate::axis::Axis;
 use crate::frame::{DataBounds, PlotFrame, ReferenceLine};
 use crate::legend::{Legend, LegendEntry, LegendPosition};
-use crate::plot_buffer::{PlotBackend, create_backend, Z_DATA, Z_FILL};
+use crate::plot_buffer::{PlotBackend, Z_DATA, Z_FILL, create_backend};
 use crate::spines::Spines;
 use crate::statistics::{BandwidthMethod, Kde};
 use crate::theme::Theme;

@@ -20,7 +20,7 @@
 - **51 gallery-quality examples** — including 13 multi-panel matplotlib-style showcases
 
 > [!IMPORTANT]
-> **Status (0.0.3):** Rapidly evolving. 80 widgets covering the full matplotlib/seaborn/plotly chart taxonomy. Breaking API changes from 0.0.2: `StackedArea` renamed to `AreaChart`, `Wireframe3D` merged into `Surface3D` (use `SurfaceRenderMode::Wireframe`). Expect further breaking changes before 0.1.0.
+> **Status (0.1.0):** First stable API release. 80 widgets covering the full matplotlib/seaborn/plotly chart taxonomy. Pluggable `PlotBackend` trait with Unicode (default), Kitty, and Sixel rendering backends. Breaking changes from 0.0.3: all widgets now render through `dyn PlotBackend` instead of `PlotBuffer` directly.
 
 ## Contents
 
@@ -60,7 +60,7 @@ Each widget follows a **builder pattern** — configure data, axes, colors, and 
 
 ```toml
 [dependencies]
-ratatui-plt = "0.0.3"
+ratatui-plt = "0.1.0"
 ratatui = "0.30"
 
 # Optional features:
@@ -90,7 +90,7 @@ frame.render_widget(&plot, area);
 ```
 
 > [!NOTE]
-> **Minimum Supported Rust Version:** Rust edition 2024 (requires Rust 1.85+).
+> **Minimum Supported Rust Version:** Rust edition 2024 (requires Rust 1.87+).
 
 ---
 

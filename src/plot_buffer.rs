@@ -88,7 +88,16 @@ impl PlotBackend for Box<dyn PlotBackend> {
         (**self).set_braille(x, y, bits, fg, z);
     }
     #[allow(clippy::too_many_arguments)]
-    fn draw_line(&mut self, x0: f64, y0: f64, x1: f64, y1: f64, color: Color, pa: &PlotArea, z: u8) {
+    fn draw_line(
+        &mut self,
+        x0: f64,
+        y0: f64,
+        x1: f64,
+        y1: f64,
+        color: Color,
+        pa: &PlotArea,
+        z: u8,
+    ) {
         (**self).draw_line(x0, y0, x1, y1, color, pa, z);
     }
     fn contains(&self, x: u16, y: u16) -> bool {

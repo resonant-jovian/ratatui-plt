@@ -30,7 +30,7 @@ use crate::colormap::{Colormap, Viridis};
 use crate::drawing::BRAILLE_BITS;
 use crate::frame::{DataBounds, PlotFrame, ReferenceLine};
 use crate::norm::{LinearNorm, Normalize};
-use crate::plot_buffer::{PlotBackend, create_backend, Z_DATA, Z_MARKER};
+use crate::plot_buffer::{PlotBackend, Z_DATA, Z_MARKER, create_backend};
 use crate::series::VectorFieldData;
 use crate::spines::Spines;
 use crate::theme::Theme;

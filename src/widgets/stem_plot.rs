@@ -8,7 +8,7 @@ use ratatui::widgets::Widget;
 use crate::annotation::Annotation;
 use crate::axis::Axis;
 use crate::frame::{DataBounds, PlotFrame, ReferenceLine};
-use crate::plot_buffer::{PlotBackend, create_backend, Z_CHROME, Z_DATA, Z_MARKER};
+use crate::plot_buffer::{PlotBackend, Z_CHROME, Z_DATA, Z_MARKER, create_backend};
 use crate::spines::Spines;
 use crate::style::MarkerShape;
 use crate::theme::Theme;

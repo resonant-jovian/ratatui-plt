@@ -11,7 +11,7 @@ use crate::axis::Axis;
 use crate::colormap::{Colorbar, Colormap, Viridis};
 use crate::frame::{DataBounds, PlotFrame, ReferenceLine};
 use crate::norm::{LinearNorm, Normalize};
-use crate::plot_buffer::{PlotBackend, create_backend, Z_DATA};
+use crate::plot_buffer::{PlotBackend, Z_DATA, create_backend};
 use crate::spines::Spines;
 use crate::theme::Theme;
 

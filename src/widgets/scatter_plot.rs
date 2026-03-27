@@ -15,7 +15,7 @@ use crate::linked_view::SharedView;
 use crate::norm::{LinearNorm, Normalize};
 #[cfg(feature = "statistics")]
 use crate::plot_buffer::Z_DATA;
-use crate::plot_buffer::{PlotBackend, create_backend, Z_MARKER};
+use crate::plot_buffer::{PlotBackend, Z_MARKER, create_backend};
 use crate::series::Series;
 use crate::spines::Spines;
 use crate::style::MarkerShape;

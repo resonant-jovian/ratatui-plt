@@ -24,7 +24,7 @@ use crate::axis::Axis;
 use crate::color_cycle::ColorCycle;
 use crate::frame::{DataBounds, PlotFrame, ReferenceLine};
 use crate::legend::{Legend, LegendEntry, LegendPosition};
-use crate::plot_buffer::{PlotBackend, create_backend, Z_MARKER};
+use crate::plot_buffer::{PlotBackend, Z_MARKER, create_backend};
 use crate::spines::Spines;
 use crate::style::MarkerShape;
 use crate::theme::Theme;

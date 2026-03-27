@@ -24,7 +24,7 @@ use crate::axis::{AspectRatio, Axis};
 use crate::frame::{DataBounds, PlotArea, PlotFrame, ReferenceLine};
 use crate::legend::{Legend, LegendPosition};
 use crate::linked_view::SharedView;
-use crate::plot_buffer::{PlotBackend, create_backend, Z_DATA, Z_FILL, Z_MARKER};
+use crate::plot_buffer::{PlotBackend, Z_DATA, Z_FILL, Z_MARKER, create_backend};
 use crate::series::{Series, is_valid_point};
 use crate::spines::Spines;
 use crate::style::DashPattern;

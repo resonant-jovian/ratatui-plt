@@ -116,10 +116,7 @@ impl KittyBackend {
             && y >= self.area.y
             && y < self.area.y + self.area.height
         {
-            Some(
-                (y - self.area.y) as usize * self.area.width as usize
-                    + (x - self.area.x) as usize,
-            )
+            Some((y - self.area.y) as usize * self.area.width as usize + (x - self.area.x) as usize)
         } else {
             None
         }
@@ -142,10 +139,10 @@ impl PlotBackend for KittyBackend {
 
     fn set_char(&mut self, x: u16, y: u16, ch: char, fg: Color, z: u8) {
         // Text elements rendered to ratatui cells, not pixels
-        if let Some(i) = self.cell_index(x, y) {
-            if self.text_cells[i].is_none_or(|(_, _, _, ez)| z >= ez) {
-                self.text_cells[i] = Some((ch, fg, Color::Reset, z));
-            }
+        if let Some(i) = self.cell_index(x, y)
+            && self.text_cells[i].is_none_or(|(_, _, _, ez)| z >= ez)
+        {
+            self.text_cells[i] = Some((ch, fg, Color::Reset, z));
         }
     }
 
@@ -198,7 +195,16 @@ impl PlotBackend for KittyBackend {
     }
 
     #[allow(clippy::too_many_arguments)]
-    fn draw_line(&mut self, x0: f64, y0: f64, x1: f64, y1: f64, color: Color, pa: &PlotArea, _z: u8) {
+    fn draw_line(
+        &mut self,
+        x0: f64,
+        y0: f64,
+        x1: f64,
+        y1: f64,
+        color: Color,
+        pa: &PlotArea,
+        _z: u8,
+    ) {
         // Anti-aliased pixel-level line drawing (Bresenham at pixel resolution)
         let (r, g, b) = color_to_rgb(color);
 
@@ -260,10 +266,10 @@ impl PlotBackend for KittyBackend {
             // Fall back: just render text cells
             for y in self.area.y..self.area.y + self.area.height {
                 for x in self.area.x..self.area.x + self.area.width {
-                    if let Some(i) = self.cell_index(x, y) {
-                        if let Some((ch, fg, bg, _)) = self.text_cells[i] {
-                            buf[(x, y)].set_char(ch).set_fg(fg).set_bg(bg);
-                        }
+                    if let Some(i) = self.cell_index(x, y)
+                        && let Some((ch, fg, bg, _)) = self.text_cells[i]
+                    {
+                        buf[(x, y)].set_char(ch).set_fg(fg).set_bg(bg);
                     }
                 }
             }
@@ -295,12 +301,11 @@ impl PlotBackend for KittyBackend {
         // Overlay text cells on top (axis labels, legends, etc.)
         for y in self.area.y..self.area.y + self.area.height {
             for x in self.area.x..self.area.x + self.area.width {
-                if let Some(i) = self.cell_index(x, y) {
-                    if let Some((ch, fg, _bg, _)) = self.text_cells[i] {
-                        if ch != ' ' {
-                            buf[(x, y)].set_char(ch).set_fg(fg).set_skip(false);
-                        }
-                    }
+                if let Some(i) = self.cell_index(x, y)
+                    && let Some((ch, fg, _bg, _)) = self.text_cells[i]
+                    && ch != ' '
+                {
+                    buf[(x, y)].set_char(ch).set_fg(fg).set_skip(false);
                 }
             }
         }
@@ -311,9 +316,8 @@ impl PlotBackend for KittyBackend {
 fn encode_rgba_png(pixels: &[u8], width: u32, height: u32) -> Result<Vec<u8>, String> {
     use image::{ImageBuffer, Rgba};
 
-    let img: ImageBuffer<Rgba<u8>, Vec<u8>> =
-        ImageBuffer::from_raw(width, height, pixels.to_vec())
-            .ok_or_else(|| "invalid image dimensions".to_string())?;
+    let img: ImageBuffer<Rgba<u8>, Vec<u8>> = ImageBuffer::from_raw(width, height, pixels.to_vec())
+        .ok_or_else(|| "invalid image dimensions".to_string())?;
 
     let mut buf = std::io::Cursor::new(Vec::new());
     img.write_to(&mut buf, image::ImageFormat::Png)
@@ -324,7 +328,7 @@ fn encode_rgba_png(pixels: &[u8], width: u32, height: u32) -> Result<Vec<u8>, St
 /// Base64-encode a byte slice.
 fn base64_encode(data: &[u8]) -> String {
     const CHARS: &[u8] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
-    let mut out = String::with_capacity((data.len() + 2) / 3 * 4);
+    let mut out = String::with_capacity(data.len().div_ceil(3) * 4);
     for chunk in data.chunks(3) {
         let b0 = chunk[0] as u32;
         let b1 = chunk.get(1).copied().unwrap_or(0) as u32;

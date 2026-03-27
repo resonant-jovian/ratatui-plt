@@ -30,7 +30,7 @@ use crate::axis::Axis;
 use crate::chars::CharSet;
 use crate::frame::{DataBounds, PlotFrame, ReferenceLine};
 use crate::legend::{Legend, LegendPosition};
-use crate::plot_buffer::{PlotBackend, create_backend, Z_MARKER};
+use crate::plot_buffer::{PlotBackend, Z_MARKER, create_backend};
 use crate::series::Series;
 use crate::spines::Spines;
 use crate::style::MarkerShape;

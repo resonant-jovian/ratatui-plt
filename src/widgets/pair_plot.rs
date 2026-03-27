@@ -26,7 +26,7 @@ use ratatui::style::Color;
 use ratatui::widgets::Widget;
 
 use crate::frame::PlotArea;
-use crate::plot_buffer::{PlotBackend, create_backend, Z_DATA, Z_MARKER};
+use crate::plot_buffer::{PlotBackend, Z_DATA, Z_MARKER, create_backend};
 use crate::statistics::Kde;
 use crate::style::MarkerShape;
 use crate::theme::Theme;

@@ -5,7 +5,7 @@ use ratatui::layout::Rect;
 use ratatui::widgets::Widget;
 
 use crate::drawing::BRAILLE_BITS;
-use crate::plot_buffer::{PlotBackend, create_backend, Z_CHROME, Z_DATA, Z_FILL, Z_GRID, Z_MARKER};
+use crate::plot_buffer::{PlotBackend, Z_CHROME, Z_DATA, Z_FILL, Z_GRID, Z_MARKER, create_backend};
 use crate::series::Series;
 use crate::theme::Theme;
 
