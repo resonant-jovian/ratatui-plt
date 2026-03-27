@@ -15,7 +15,7 @@ use crate::linked_view::SharedView;
 use crate::norm::{LinearNorm, Normalize};
 #[cfg(feature = "statistics")]
 use crate::plot_buffer::Z_DATA;
-use crate::plot_buffer::{PlotBuffer, Z_MARKER};
+use crate::plot_buffer::{PlotBackend, create_backend, Z_MARKER};
 use crate::series::Series;
 use crate::spines::Spines;
 use crate::style::MarkerShape;
@@ -282,7 +282,7 @@ impl Widget for &ScatterPlot {
             }
         }
 
-        let mut pb = PlotBuffer::new(area);
+        let mut pb = create_backend(area);
 
         // Create and render the plot frame (title, axes, grid, ticks, labels, spines, ref lines)
         let frame = PlotFrame::new(&self.x_axis, &self.y_axis, &self.theme)

@@ -1,8 +1,8 @@
 //! Showcase: Basic 2D plots replicating matplotlib reference gallery.
 //!
-//! 7 plots in a 3x3 mosaic grid (ABC / DEF / GH.):
+//! 9 plots in a 3x3 mosaic grid (ABC / DEF / GHI):
 //! A) LinePlot, B) ScatterPlot, C) BarChart, D) Histogram,
-//! E) PieChart, F) StairsPlot, G) StemPlot (spanning two columns).
+//! E) PieChart, F) StairsPlot, G) StemPlot, H) ImagePlot, I) DataTable.
 
 use std::io;
 
@@ -184,8 +184,41 @@ fn main() -> color_eyre::Result<()> {
         .x_axis(Axis::new().label("x").grid(true))
         .y_axis(Axis::new().label("y").grid(true));
 
-    // ---- MultiPanel mosaic layout: ABC / DEF / GH. ----
-    let panel = MultiPanel::from_mosaic("ABC\nDEF\nGH.")
+    // ---- Panel H: ImagePlot (radial pattern) ----
+    let img_rows = 20;
+    let img_cols = 30;
+    let img_matrix: Vec<Vec<f64>> = (0..img_rows)
+        .map(|r| {
+            (0..img_cols)
+                .map(|c| {
+                    let cx = img_cols as f64 / 2.0;
+                    let cy = img_rows as f64 / 2.0;
+                    let dx = c as f64 - cx;
+                    let dy = r as f64 - cy;
+                    let dist = (dx * dx + dy * dy).sqrt();
+                    (dist * 0.3).sin()
+                })
+                .collect()
+        })
+        .collect();
+
+    let image_plot = ImagePlot::new(ImageData::Scalar(img_matrix))
+        .colormap(Viridis)
+        .title("Image Plot");
+
+    // ---- Panel I: DataTable (model metrics) ----
+    let data_table = DataTable::new()
+        .headers(vec!["Model", "Accuracy", "Precision", "Recall", "F1"])
+        .row(vec!["LogReg", "0.923", "0.911", "0.937", "0.924"])
+        .row(vec!["SVM", "0.945", "0.938", "0.952", "0.945"])
+        .row(vec!["RF", "0.961", "0.957", "0.964", "0.960"])
+        .row(vec!["XGBoost", "0.973", "0.969", "0.978", "0.973"])
+        .row(vec!["MLP", "0.958", "0.950", "0.967", "0.958"])
+        .header_color(blue_dark)
+        .title("Model Metrics");
+
+    // ---- MultiPanel mosaic layout: ABC / DEF / GHI ----
+    let panel = MultiPanel::from_mosaic("ABC\nDEF\nGHI")
         .gap(1)
         .suptitle("Basic 2D Plots Showcase (q to quit)")
         .mosaic_panel('A', move |area: Rect, buf: &mut Buffer| {
@@ -208,6 +241,12 @@ fn main() -> color_eyre::Result<()> {
         })
         .mosaic_panel('G', move |area: Rect, buf: &mut Buffer| {
             (&stem_plot).render(area, buf);
+        })
+        .mosaic_panel('H', move |area: Rect, buf: &mut Buffer| {
+            (&image_plot).render(area, buf);
+        })
+        .mosaic_panel('I', move |area: Rect, buf: &mut Buffer| {
+            (&data_table).render(area, buf);
         });
 
     loop {

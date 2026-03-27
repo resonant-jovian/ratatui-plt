@@ -25,7 +25,7 @@ use crate::annotation::Annotation;
 use crate::axis::Axis;
 use crate::color_cycle::ColorCycle;
 use crate::frame::{DataBounds, PlotFrame, ReferenceLine};
-use crate::plot_buffer::{PlotBuffer, Z_CHROME, Z_DATA};
+use crate::plot_buffer::{PlotBackend, create_backend, Z_CHROME, Z_DATA};
 use crate::spines::Spines;
 use crate::theme::Theme;
 use crate::ticker::NullLocator;
@@ -204,7 +204,7 @@ impl Widget for &GanttChart {
             self.x_axis.clone()
         };
 
-        let mut pb = PlotBuffer::new(area);
+        let mut pb = create_backend(area);
 
         let frame = PlotFrame::new(&x_axis, &y_axis, &self.theme)
             .title(self.title.as_deref())

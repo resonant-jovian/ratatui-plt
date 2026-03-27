@@ -56,11 +56,85 @@ pub trait PlotBackend {
     #[allow(clippy::too_many_arguments)]
     fn draw_line(&mut self, x0: f64, y0: f64, x1: f64, y1: f64, color: Color, pa: &PlotArea, z: u8);
 
+    /// Set braille dots at cell (x, y) at the given Z-level.
+    ///
+    /// For Unicode backends, braille bits are OR'd together at the same Z-level.
+    /// For pixel backends, this translates to setting small sub-cell regions.
+    fn set_braille(&mut self, x: u16, y: u16, bits: u8, fg: Color, z: u8);
+
     /// Check if cell (x, y) is within this backend's renderable area.
     fn contains(&self, x: u16, y: u16) -> bool;
 
+    /// Get the renderable area covered by this backend.
+    fn area(&self) -> Rect;
+
     /// Composite the backend's internal state into a ratatui Buffer.
     fn composite(&self, buf: &mut Buffer);
+}
+
+/// Blanket implementation so `Box<dyn PlotBackend>` can be passed where
+/// `&mut dyn PlotBackend` is expected.
+impl PlotBackend for Box<dyn PlotBackend> {
+    fn set_bg(&mut self, x: u16, y: u16, color: Color, z: u8) {
+        (**self).set_bg(x, y, color, z);
+    }
+    fn set_char(&mut self, x: u16, y: u16, ch: char, fg: Color, z: u8) {
+        (**self).set_char(x, y, ch, fg, z);
+    }
+    fn set_cell(&mut self, x: u16, y: u16, ch: char, fg: Color, bg: Color, z: u8) {
+        (**self).set_cell(x, y, ch, fg, bg, z);
+    }
+    fn set_braille(&mut self, x: u16, y: u16, bits: u8, fg: Color, z: u8) {
+        (**self).set_braille(x, y, bits, fg, z);
+    }
+    #[allow(clippy::too_many_arguments)]
+    fn draw_line(&mut self, x0: f64, y0: f64, x1: f64, y1: f64, color: Color, pa: &PlotArea, z: u8) {
+        (**self).draw_line(x0, y0, x1, y1, color, pa, z);
+    }
+    fn contains(&self, x: u16, y: u16) -> bool {
+        (**self).contains(x, y)
+    }
+    fn area(&self) -> Rect {
+        (**self).area()
+    }
+    fn composite(&self, buf: &mut Buffer) {
+        (**self).composite(buf);
+    }
+}
+
+/// Create a rendering backend for the given area, using the configured backend
+/// from [`PlotConfig`](crate::config::PlotConfig).
+///
+/// Returns `PlotBuffer` (Unicode) by default. When the `kitty` or `sixel`
+/// features are enabled and the corresponding backend is selected, returns
+/// a pixel-level backend instead.
+pub fn create_backend(area: Rect) -> Box<dyn PlotBackend> {
+    use crate::config::{PlotConfig, RenderBackend};
+
+    let cfg = PlotConfig::get_default();
+    match cfg.render_backend {
+        RenderBackend::Unicode => Box::new(PlotBuffer::new(area)),
+        #[cfg(feature = "kitty")]
+        RenderBackend::Kitty => Box::new(crate::kitty_backend::KittyBackend::new(area)),
+        #[cfg(feature = "sixel")]
+        RenderBackend::Sixel => Box::new(crate::sixel_backend::SixelBackend::new(area)),
+        RenderBackend::Auto => {
+            #[cfg(feature = "kitty")]
+            if crate::config::detect_kitty() {
+                return Box::new(crate::kitty_backend::KittyBackend::new(area));
+            }
+            #[cfg(feature = "sixel")]
+            if crate::config::detect_sixel() {
+                return Box::new(crate::sixel_backend::SixelBackend::new(area));
+            }
+            Box::new(PlotBuffer::new(area))
+        }
+        // If feature not enabled but backend was requested, fall back to Unicode
+        #[cfg(not(feature = "kitty"))]
+        RenderBackend::Kitty => Box::new(PlotBuffer::new(area)),
+        #[cfg(not(feature = "sixel"))]
+        RenderBackend::Sixel => Box::new(PlotBuffer::new(area)),
+    }
 }
 
 /// Plot area background.
@@ -378,8 +452,16 @@ impl PlotBackend for PlotBuffer {
         PlotBuffer::draw_line(self, x0, y0, x1, y1, color, pa, z);
     }
 
+    fn set_braille(&mut self, x: u16, y: u16, bits: u8, fg: Color, z: u8) {
+        PlotBuffer::set_braille(self, x, y, bits, fg, z);
+    }
+
     fn contains(&self, x: u16, y: u16) -> bool {
         PlotBuffer::contains(self, x, y)
+    }
+
+    fn area(&self) -> Rect {
+        self.area
     }
 
     fn composite(&self, buf: &mut Buffer) {

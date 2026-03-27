@@ -23,7 +23,7 @@ use ratatui::layout::Rect;
 use ratatui::style::Color;
 use ratatui::widgets::Widget;
 
-use crate::plot_buffer::{PlotBuffer, Z_CHROME, Z_DATA};
+use crate::plot_buffer::{PlotBackend, create_backend, Z_CHROME, Z_DATA};
 use crate::theme::Theme;
 
 /// A single slice of the pie chart.
@@ -155,7 +155,7 @@ impl Widget for &PieChart {
             return;
         }
 
-        let mut pb = PlotBuffer::new(area);
+        let mut pb = create_backend(area);
 
         // Reserve space for title
         let title_height: u16 = if self.title.is_some() { 1 } else { 0 };

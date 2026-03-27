@@ -84,7 +84,7 @@ pub use crate::colormap::{
     colormap_names,
     get_colormap,
 };
-pub use crate::config::{ConfigGuard, PlotConfig};
+pub use crate::config::{ConfigGuard, PlotConfig, RenderBackend};
 #[cfg(feature = "export")]
 pub use crate::export::{ExportError, ExportOptions, buffer_to_png};
 pub use crate::export::{
@@ -105,7 +105,8 @@ pub use crate::norm::{
 };
 pub use crate::picking::{PickResult, pick_nearest};
 pub use crate::plot_buffer::{
-    PlotBackend, PlotBuffer, Z_ANNOTATION, Z_BACKGROUND, Z_CHROME, Z_DATA, Z_FILL, Z_GRID, Z_MARKER,
+    PlotBackend, PlotBuffer, Z_ANNOTATION, Z_BACKGROUND, Z_CHROME, Z_DATA, Z_FILL, Z_GRID,
+    Z_MARKER, create_backend,
 };
 pub use crate::series::{GridData, Series, Series3D, VectorFieldData, split_at_nan};
 pub use crate::spines::Spines;

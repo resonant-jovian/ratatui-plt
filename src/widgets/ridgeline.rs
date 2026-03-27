@@ -26,7 +26,7 @@ use ratatui::widgets::Widget;
 
 use crate::axis::Axis;
 use crate::frame::{DataBounds, PlotFrame, ReferenceLine};
-use crate::plot_buffer::{PlotBuffer, Z_CHROME, Z_DATA, Z_FILL};
+use crate::plot_buffer::{PlotBackend, create_backend, Z_CHROME, Z_DATA, Z_FILL};
 use crate::spines::Spines;
 use crate::statistics::Kde;
 use crate::theme::Theme;
@@ -265,7 +265,7 @@ impl Widget for &RidgelinePlot {
             .min(12)
             + 1;
 
-        let mut pb = PlotBuffer::new(area);
+        let mut pb = create_backend(area);
 
         // Use NullLocator for y-axis (categorical labels drawn manually)
         let y_axis = Axis::new().locator(NullLocator);

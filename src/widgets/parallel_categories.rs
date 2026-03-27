@@ -29,7 +29,7 @@ use ratatui::layout::Rect;
 use ratatui::style::Color;
 use ratatui::widgets::Widget;
 
-use crate::plot_buffer::{PlotBuffer, Z_CHROME, Z_DATA};
+use crate::plot_buffer::{PlotBackend, create_backend, Z_CHROME, Z_DATA};
 use crate::spines::Spines;
 use crate::theme::Theme;
 
@@ -244,7 +244,7 @@ impl Widget for &ParallelCategories {
             return;
         }
 
-        let mut pb = PlotBuffer::new(area);
+        let mut pb = create_backend(area);
         let title_h: u16 = if self.title.is_some() { 1 } else { 0 };
         let label_row = area.y + title_h;
         let plot_top = label_row + 1;

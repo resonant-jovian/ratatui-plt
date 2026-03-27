@@ -24,7 +24,7 @@ use crate::axis::Axis;
 use crate::color_cycle::ColorCycle;
 use crate::frame::{DataBounds, PlotFrame, ReferenceLine};
 use crate::legend::{Legend, LegendEntry, LegendPosition};
-use crate::plot_buffer::{PlotBuffer, Z_MARKER};
+use crate::plot_buffer::{PlotBackend, create_backend, Z_MARKER};
 use crate::spines::Spines;
 use crate::style::MarkerShape;
 use crate::theme::Theme;
@@ -275,7 +275,7 @@ impl Widget for &DotPlot {
             .clone()
             .bounds(crate::axis::Bounds::Manual(y_lo, y_hi));
 
-        let mut pb = PlotBuffer::new(area);
+        let mut pb = create_backend(area);
 
         // Create and render the plot frame
         let frame = PlotFrame::new(&self.x_axis, &y_axis_fixed, &self.theme)

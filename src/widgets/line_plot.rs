@@ -24,7 +24,7 @@ use crate::axis::{AspectRatio, Axis};
 use crate::frame::{DataBounds, PlotArea, PlotFrame, ReferenceLine};
 use crate::legend::{Legend, LegendPosition};
 use crate::linked_view::SharedView;
-use crate::plot_buffer::{PlotBuffer, Z_DATA, Z_FILL, Z_MARKER};
+use crate::plot_buffer::{PlotBackend, create_backend, Z_DATA, Z_FILL, Z_MARKER};
 use crate::series::{Series, is_valid_point};
 use crate::spines::Spines;
 use crate::style::DashPattern;
@@ -224,7 +224,7 @@ impl Widget for &LinePlot {
             }
         }
 
-        let mut pb = PlotBuffer::new(area);
+        let mut pb = create_backend(area);
 
         // Create and render the plot frame (title, axes, grid, ticks, labels, spines, ref lines)
         let frame = PlotFrame::new(&self.x_axis, &self.y_axis, &self.theme)
@@ -645,7 +645,7 @@ struct LineSegment {
 /// Draw a line between two screen points using Bresenham's at braille sub-pixel resolution,
 /// writing into a [`PlotBuffer`] at the given Z-level.
 fn draw_line_pb(
-    pb: &mut PlotBuffer,
+    pb: &mut dyn PlotBackend,
     seg: &LineSegment,
     color: Color,
     pattern: &DashPattern,

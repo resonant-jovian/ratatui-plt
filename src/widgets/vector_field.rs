@@ -10,7 +10,7 @@ use crate::axis::{AspectRatio, Axis};
 use crate::colormap::{Colormap, Viridis};
 use crate::frame::{DataBounds, PlotFrame, ReferenceLine};
 use crate::norm::{LinearNorm, Normalize};
-use crate::plot_buffer::{PlotBuffer, Z_DATA};
+use crate::plot_buffer::{PlotBackend, create_backend, Z_DATA};
 use crate::series::VectorFieldData;
 use crate::spines::Spines;
 use crate::theme::Theme;
@@ -246,7 +246,7 @@ impl Widget for &VectorField {
         let (x_lo, x_hi) = self.x_axis.resolve_bounds(x_min, x_max);
         let (y_lo, y_hi) = self.y_axis.resolve_bounds(y_min, y_max);
 
-        let mut pb = PlotBuffer::new(area);
+        let mut pb = create_backend(area);
 
         // Create and render the plot frame (title, axes, grid, ticks, labels, spines, ref lines)
         let frame = PlotFrame::new(&self.x_axis, &self.y_axis, &self.theme)

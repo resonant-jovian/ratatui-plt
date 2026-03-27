@@ -30,7 +30,7 @@ use crate::axis::Axis;
 use crate::chars::CharSet;
 use crate::frame::{DataBounds, PlotFrame, ReferenceLine};
 use crate::legend::{Legend, LegendPosition};
-use crate::plot_buffer::{PlotBuffer, Z_MARKER};
+use crate::plot_buffer::{PlotBackend, create_backend, Z_MARKER};
 use crate::series::Series;
 use crate::spines::Spines;
 use crate::style::MarkerShape;
@@ -243,7 +243,7 @@ impl Widget for &JointPlot {
         let (y_lo, y_hi) = self.y_axis.resolve_bounds(y_min, y_max);
 
         // Render central scatter plot with PlotFrame
-        let mut pb = PlotBuffer::new(central_area);
+        let mut pb = create_backend(central_area);
 
         let frame = PlotFrame::new(&self.x_axis, &self.y_axis, &self.theme)
             .title(self.title.as_deref())

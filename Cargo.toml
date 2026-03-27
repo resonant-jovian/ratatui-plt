@@ -68,14 +68,6 @@ version = "0.13.0"
 optional = true
 
 [[example]]
-name = "statistics"
-required-features = ["statistics"]
-
-[[example]]
-name = "trendline"
-required-features = ["statistics"]
-
-[[example]]
 name = "kitty_export"
 required-features = ["kitty"]
 
@@ -96,8 +88,7 @@ name = "showcase_features"
 required-features = ["statistics"]
 
 [[example]]
-name = "kde_plot"
-required-features = ["statistics"]
+name = "showcase_scientific"
 
 [[example]]
 name = "regression_plot"
@@ -108,24 +99,8 @@ name = "ridgeline"
 required-features = ["statistics"]
 
 [[example]]
-name = "qq_plot"
-required-features = ["statistics"]
-
-[[example]]
 name = "pair_plot"
 required-features = ["statistics"]
-
-[[example]]
-name = "confidence_ellipse"
-required-features = ["statistics"]
-
-[[example]]
-name = "psd"
-required-features = ["fft"]
-
-[[example]]
-name = "tricontour"
-required-features = ["triangulation"]
 
 [dependencies.image]
 version = "0.25.10"

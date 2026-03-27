@@ -29,7 +29,7 @@ use ratatui::widgets::Widget;
 
 use crate::axis::Axis;
 use crate::frame::{DataBounds, PlotFrame, ReferenceLine};
-use crate::plot_buffer::{PlotBuffer, Z_DATA};
+use crate::plot_buffer::{PlotBackend, create_backend, Z_DATA};
 use crate::series::Series;
 use crate::spines::Spines;
 use crate::theme::Theme;
@@ -251,7 +251,7 @@ impl Widget for &HorizonGraph {
         // Create a dummy y-axis with no ticks/labels for frame rendering
         let y_axis_hidden = Axis::new();
 
-        let mut pb = PlotBuffer::new(area);
+        let mut pb = create_backend(area);
 
         let frame = PlotFrame::new(&self.x_axis, &y_axis_hidden, &self.theme)
             .title(self.title.as_deref())

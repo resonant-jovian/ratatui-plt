@@ -2,10 +2,75 @@
 //!
 //! Provides a thread-local default configuration that widgets read during
 //! construction, similar to matplotlib's `rcParams` system.
+//!
+//! # Rendering Backends
+//!
+//! The [`RenderBackend`] enum selects the rendering strategy:
+//! - [`RenderBackend::Unicode`] — Braille sub-pixel dots and half-block characters (default, works everywhere)
+//! - [`RenderBackend::Kitty`] — Pixel-level rendering via Kitty graphics protocol (requires `kitty` feature)
+//! - [`RenderBackend::Sixel`] — Pixel-level rendering via Sixel protocol (requires `sixel` feature)
+//! - [`RenderBackend::Auto`] — Auto-detect best available backend from terminal environment
 
 use crate::legend::LegendPosition;
 use crate::style::MarkerShape;
 use crate::theme::Theme;
+
+/// Rendering backend selection for plot widgets.
+///
+/// Controls how plot data is rendered to the terminal. The default is
+/// [`RenderBackend::Unicode`] which uses Braille characters for lines and
+/// half-block characters for fills, working in all terminals.
+///
+/// When `kitty` or `sixel` features are enabled, pixel-level rendering
+/// backends are available for higher-fidelity output.
+///
+/// # Example
+///
+/// ```
+/// use ratatui_plt::config::{PlotConfig, RenderBackend};
+///
+/// let mut cfg = PlotConfig::get_default();
+/// cfg.render_backend = RenderBackend::Auto;
+/// PlotConfig::set_default(cfg);
+/// ```
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub enum RenderBackend {
+    /// Auto-detect best available backend from terminal environment variables.
+    /// Falls back to Unicode if no graphics protocol is detected.
+    Auto,
+    /// Braille sub-pixel dots and half-block characters. Works in all terminals.
+    #[default]
+    Unicode,
+    /// Pixel-level rendering via Kitty graphics protocol.
+    /// Requires the `kitty` feature. Falls back to Unicode if feature is not enabled.
+    Kitty,
+    /// Pixel-level rendering via Sixel protocol.
+    /// Requires the `sixel` feature. Falls back to Unicode if feature is not enabled.
+    Sixel,
+}
+
+/// Detect if the terminal supports Kitty graphics protocol.
+///
+/// Checks the `TERM_PROGRAM` environment variable for known Kitty-compatible terminals.
+pub fn detect_kitty() -> bool {
+    matches!(
+        std::env::var("TERM_PROGRAM").ok().as_deref(),
+        Some("kitty") | Some("WezTerm") | Some("Ghostty")
+    )
+}
+
+/// Detect if the terminal supports the Sixel protocol.
+///
+/// Checks for the `SIXEL_SUPPORT` environment variable or known Sixel terminals.
+pub fn detect_sixel() -> bool {
+    if std::env::var("SIXEL_SUPPORT").is_ok() {
+        return true;
+    }
+    matches!(
+        std::env::var("TERM_PROGRAM").ok().as_deref(),
+        Some("foot") | Some("mlterm") | Some("contour")
+    )
+}
 
 /// Global plot configuration controlling default widget behavior.
 ///
@@ -36,6 +101,8 @@ pub struct PlotConfig {
     pub legend_position: LegendPosition,
     /// Default colormap name.
     pub colormap: String,
+    /// Rendering backend for plot widgets.
+    pub render_backend: RenderBackend,
 }
 
 impl Default for PlotConfig {
@@ -48,6 +115,7 @@ impl Default for PlotConfig {
             legend_visible: true,
             legend_position: LegendPosition::TopRight,
             colormap: "viridis".to_string(),
+            render_backend: RenderBackend::default(),
         }
     }
 }

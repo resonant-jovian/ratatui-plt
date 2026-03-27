@@ -26,7 +26,7 @@ use ratatui::style::Color;
 use ratatui::widgets::Widget;
 
 use crate::frame::PlotArea;
-use crate::plot_buffer::{PlotBuffer, Z_DATA, Z_MARKER};
+use crate::plot_buffer::{PlotBackend, create_backend, Z_DATA, Z_MARKER};
 use crate::statistics::Kde;
 use crate::style::MarkerShape;
 use crate::theme::Theme;
@@ -491,7 +491,7 @@ fn render_kde(
         area: Rect::new(area.x, area.y, area.width, area.height),
     };
 
-    let mut pb = PlotBuffer::new(area);
+    let mut pb = create_backend(area);
 
     for i in 0..eval_xs.len().saturating_sub(1) {
         let sx0 = pa.screen_x(eval_xs[i]);
@@ -542,7 +542,7 @@ fn render_scatter(
     }
 
     let len = x_data.len().min(y_data.len());
-    let mut pb = PlotBuffer::new(inner);
+    let mut pb = create_backend(inner);
 
     let marker_ch = marker.char();
 

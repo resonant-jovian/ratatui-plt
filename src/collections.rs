@@ -8,7 +8,7 @@ use ratatui::style::Color;
 
 use crate::drawing::draw_braille_line;
 use crate::frame::PlotArea;
-use crate::plot_buffer::{PlotBuffer, Z_DATA};
+use crate::plot_buffer::{PlotBackend, Z_DATA};
 use crate::style::LineStyle;
 
 /// A single line segment with color.
@@ -79,7 +79,7 @@ impl LineCollection {
     }
 
     /// Render the line collection into a [`PlotBuffer`] using Braille sub-pixel line drawing.
-    pub fn render_to_pb(&self, pa: &PlotArea, pb: &mut PlotBuffer) {
+    pub fn render_to_pb(&self, pa: &PlotArea, pb: &mut dyn PlotBackend) {
         for &((x0, y0), (x1, y1), color) in &self.segments {
             let sx0 = pa.screen_x(x0);
             let sy0 = pa.screen_y(y0);
@@ -153,7 +153,7 @@ impl PathCollection {
     }
 
     /// Render all paths into a [`PlotBuffer`] using Braille sub-pixel line drawing.
-    pub fn render_to_pb(&self, pa: &PlotArea, pb: &mut PlotBuffer) {
+    pub fn render_to_pb(&self, pa: &PlotArea, pb: &mut dyn PlotBackend) {
         for (vertices, color, closed) in &self.paths {
             if vertices.len() < 2 {
                 continue;

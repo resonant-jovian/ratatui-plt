@@ -31,7 +31,7 @@ use crate::axis::Axis;
 use crate::colormap::{Colorbar, Colormap, Viridis};
 use crate::frame::{DataBounds, PlotFrame, ReferenceLine};
 use crate::norm::{LinearNorm, Normalize};
-use crate::plot_buffer::{PlotBuffer, Z_DATA, Z_GRID};
+use crate::plot_buffer::{PlotBackend, create_backend, Z_DATA, Z_GRID};
 use crate::spines::Spines;
 use crate::theme::Theme;
 
@@ -260,7 +260,7 @@ impl Widget for &CarpetPlot {
 
         let colorbar_width: u16 = if self.show_colorbar { 10 } else { 0 };
 
-        let mut pb = PlotBuffer::new(area);
+        let mut pb = create_backend(area);
 
         let frame = PlotFrame::new(&self.x_axis, &self.y_axis, &self.theme)
             .title(self.title.as_deref())

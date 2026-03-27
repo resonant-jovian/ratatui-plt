@@ -1,7 +1,10 @@
-//! Regression plot example: scatter with OLS fit and confidence band.
+//! Regression plot gallery: linear vs polynomial fit comparison.
 //!
-//! Generates a noisy linear relationship y = 2x + 1 + noise and shows
-//! the scatter points, fitted regression line, and 95% confidence band.
+//! Two side-by-side panels showing different regression scenarios:
+//! - Left: Linear regression (order=1) on noisy linear data with 95% CI band
+//! - Right: Polynomial regression (order=3) on noisy cubic data with 95% CI band
+//!
+//! Demonstrates when each fit type is appropriate.
 
 use std::io;
 
@@ -70,36 +73,70 @@ fn main() -> color_eyre::Result<()> {
 
     let theme = Theme::get_default();
 
-    // Generate noisy linear data: y = 2x + 1 + noise
+    // ── Left panel: Linear regression on y = 2x + 3 + noise ───────────
     let mut rng = Rng::new(42);
-    let n = 60;
-    let data: Vec<(f64, f64)> = (0..n)
+    let n_linear = 80;
+    let linear_data: Vec<(f64, f64)> = (0..n_linear)
         .map(|i| {
-            let x = i as f64 * 0.15;
-            let y = 2.0 * x + 1.0 + 1.5 * rng.next_normal();
+            let x = i as f64 * 0.12;
+            let y = 2.0 * x + 3.0 + 1.5 * rng.next_normal();
             (x, y)
         })
         .collect();
 
-    let series = Series::new("Observations")
-        .data(data)
+    let linear_series = Series::new("Observations")
+        .data(linear_data)
         .color(theme.primary)
         .marker(MarkerShape::Circle);
 
-    let plot = RegressionPlot::new(series)
+    let linear_plot = RegressionPlot::new(linear_series)
         .order(1)
         .ci(0.95)
         .show_scatter(true)
         .show_ci(true)
         .line_color(theme.accent)
-        .title("Linear Regression: y = 2x + 1 + noise (q to quit)")
+        .title("Linear: y = 2x + 3 + noise")
         .x_axis(Axis::new().label("x").grid(true))
         .y_axis(Axis::new().label("y").grid(true));
 
+    // ── Right panel: Polynomial regression on cubic data ───────────────
+    // y = 0.02*x^3 - 0.3*x^2 + x + 2 + noise
+    let mut rng2 = Rng::new(1337);
+    let n_poly = 80;
+    let poly_data: Vec<(f64, f64)> = (0..n_poly)
+        .map(|i| {
+            let x = -4.0 + i as f64 * 0.12;
+            let y = 0.02 * x.powi(3) - 0.3 * x * x + x + 2.0 + 0.8 * rng2.next_normal();
+            (x, y)
+        })
+        .collect();
+
+    let poly_series = Series::new("Observations")
+        .data(poly_data)
+        .color(theme.secondary)
+        .marker(MarkerShape::Diamond);
+
+    let poly_plot = RegressionPlot::new(poly_series)
+        .order(3)
+        .ci(0.95)
+        .show_scatter(true)
+        .show_ci(true)
+        .line_color(theme.accent)
+        .title("Cubic: 0.02x\u{00b3} - 0.3x\u{00b2} + x + 2")
+        .x_axis(Axis::new().label("x").grid(true))
+        .y_axis(Axis::new().label("y").grid(true));
+
+    // ── Event loop ─────────────────────────────────────────────────────
     loop {
         terminal.draw(|frame| {
             let area = square_area(frame.area());
-            frame.render_widget(&plot, area);
+            let cols = Layout::default()
+                .direction(Direction::Horizontal)
+                .constraints([Constraint::Ratio(1, 2), Constraint::Ratio(1, 2)])
+                .split(area);
+
+            frame.render_widget(&linear_plot, cols[0]);
+            frame.render_widget(&poly_plot, cols[1]);
         })?;
 
         if let Event::Key(key) = event::read()?

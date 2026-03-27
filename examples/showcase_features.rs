@@ -3,8 +3,8 @@
 //! Demonstrates statistical and dashboard features in a 2x2 MultiPanel:
 //!   A: ScatterPlot with polynomial(2) trendline overlay
 //!   B: JointPlot with histogram marginals on correlated data
-//!   C: WaterfallChart showing revenue breakdown
-//!   D: GaugeChart showing a KPI value with colored sectors
+//!   C: QQPlot — normal Q-Q diagnostic with reference line
+//!   D: ConfidenceEllipse — 2D scatter with 1-sigma and 2-sigma ellipses
 //!
 //! Requires the `statistics` feature:
 //!   cargo run --features statistics --example showcase_features
@@ -112,27 +112,44 @@ fn main() -> color_eyre::Result<()> {
         .y_axis(Axis::new().label("y").grid(true))
         .show_legend(false);
 
-    // ---- Panel C: WaterfallChart — revenue breakdown ----
-    let waterfall = WaterfallChart::new()
-        .entry(WaterfallEntry::new("Revenue", 500.0))
-        .entry(WaterfallEntry::new("COGS", -180.0))
-        .entry(WaterfallEntry::new("Gross", 320.0))
-        .entry(WaterfallEntry::new("Marketing", -75.0))
-        .entry(WaterfallEntry::new("R&D", -60.0))
-        .entry(WaterfallEntry::new("Admin", -35.0))
-        .entry(WaterfallEntry::new("OpIncome", 150.0))
-        .entry(WaterfallEntry::new("Tax", -40.0))
-        .entry(WaterfallEntry::total("Net", 110.0))
-        .title("C: Waterfall (P&L Breakdown)");
+    // ---- Panel C: QQPlot — normal Q-Q diagnostic ----
+    let mut seed_c = 7777u64;
+    let qq_data: Vec<f64> = (0..200)
+        .map(|_| box_muller(&mut seed_c, 0.0, 1.0))
+        .collect();
 
-    // ---- Panel D: GaugeChart — KPI at 73% ----
-    let gauge = GaugeChart::new(73.0)
-        .min(0.0)
-        .max(100.0)
-        .sector(GaugeSector::new(0.0, 40.0, theme.positive_color))
-        .sector(GaugeSector::new(40.0, 70.0, theme.highlight))
-        .sector(GaugeSector::new(70.0, 100.0, theme.negative_color))
-        .title("D: Gauge (KPI = 73%)");
+    let qq_plot = QQPlot::new(qq_data)
+        .distribution(QQDistribution::Normal)
+        .show_reference_line(true)
+        .color(blue_dark)
+        .marker(MarkerShape::Circle)
+        .title("C: Q-Q Plot (Normal)")
+        .x_axis(Axis::new().label("Theoretical Quantiles").grid(true))
+        .y_axis(Axis::new().label("Sample Quantiles").grid(true));
+
+    // ---- Panel D: ConfidenceEllipse — 2D scatter with ellipse ----
+    let mut seed_d = 9999u64;
+    let n_ell = 200;
+    let ell_x: Vec<f64> = (0..n_ell)
+        .map(|_| box_muller(&mut seed_d, 2.0, 1.5))
+        .collect();
+    let ell_y: Vec<f64> = ell_x
+        .iter()
+        .map(|&xi| {
+            let noise = box_muller(&mut seed_d, 0.0, 0.8);
+            0.7 * xi + 1.0 + noise
+        })
+        .collect();
+
+    let conf_ellipse = ConfidenceEllipse::new(ell_x, ell_y)
+        .level(0.95)
+        .show_points(true)
+        .point_color(blue_dark)
+        .ellipse_color(theme.accent)
+        .marker(MarkerShape::Dot)
+        .title("D: 95% Confidence Ellipse")
+        .x_axis(Axis::new().label("x").grid(true))
+        .y_axis(Axis::new().label("y").grid(true));
 
     // ---- Assemble 2x2 MultiPanel ----
     let panel = MultiPanel::new(2, 2)
@@ -147,10 +164,10 @@ fn main() -> color_eyre::Result<()> {
             (&joint_plot).render(area, buf);
         })
         .panel(1, 0, move |area: Rect, buf: &mut Buffer| {
-            (&waterfall).render(area, buf);
+            (&qq_plot).render(area, buf);
         })
         .panel(1, 1, move |area: Rect, buf: &mut Buffer| {
-            (&gauge).render(area, buf);
+            (&conf_ellipse).render(area, buf);
         });
 
     loop {

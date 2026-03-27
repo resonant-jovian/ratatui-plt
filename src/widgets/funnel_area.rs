@@ -23,7 +23,7 @@ use ratatui::style::Color;
 use ratatui::widgets::Widget;
 
 use crate::color_cycle::ColorCycle;
-use crate::plot_buffer::{PlotBuffer, Z_CHROME, Z_DATA};
+use crate::plot_buffer::{PlotBackend, create_backend, Z_CHROME, Z_DATA};
 use crate::spines::Spines;
 use crate::theme::Theme;
 
@@ -136,7 +136,7 @@ impl Widget for &FunnelArea {
             return;
         }
 
-        let mut pb = PlotBuffer::new(area);
+        let mut pb = create_backend(area);
 
         // Reserve space for title
         let title_height: u16 = if self.title.is_some() { 1 } else { 0 };

@@ -9,7 +9,7 @@ use crate::annotation::Annotation;
 use crate::axis::Axis;
 use crate::frame::{DataBounds, PlotFrame, ReferenceLine};
 use crate::legend::{Legend, LegendEntry, LegendPosition};
-use crate::plot_buffer::{PlotBuffer, Z_DATA, Z_FILL};
+use crate::plot_buffer::{PlotBackend, create_backend, Z_DATA, Z_FILL};
 use crate::spines::Spines;
 use crate::theme::Theme;
 
@@ -495,7 +495,7 @@ impl Widget for &Histogram {
         // Determine if we're in multi-dataset mode
         let has_datasets = !self.datasets.is_empty();
 
-        let mut pb = PlotBuffer::new(area);
+        let mut pb = create_backend(area);
 
         if has_datasets {
             self.render_multi(area, buf, &mut pb);
@@ -507,7 +507,7 @@ impl Widget for &Histogram {
 
 impl Histogram {
     /// Render the single-dataset histogram (legacy path).
-    fn render_single(&self, area: Rect, buf: &mut Buffer, pb: &mut PlotBuffer) {
+    fn render_single(&self, area: Rect, buf: &mut Buffer, pb: &mut dyn PlotBackend) {
         let (edges, heights) = self.compute_bins();
         if edges.len() < 2 || heights.is_empty() {
             return;
@@ -572,7 +572,7 @@ impl Histogram {
     }
 
     /// Render multiple datasets according to hist_mode.
-    fn render_multi(&self, area: Rect, buf: &mut Buffer, pb: &mut PlotBuffer) {
+    fn render_multi(&self, area: Rect, buf: &mut Buffer, pb: &mut dyn PlotBackend) {
         let (global_lo, global_hi) = self.compute_global_range();
 
         // Resolve bin count from all data combined
@@ -781,7 +781,7 @@ impl Histogram {
         edges: &[f64],
         heights: &[f64],
         color: Color,
-        pb: &mut PlotBuffer,
+        pb: &mut dyn PlotBackend,
         slot: BarSlotLayout,
     ) {
         for i in 0..heights.len() {
@@ -875,7 +875,7 @@ impl Histogram {
         pa: &crate::frame::PlotArea,
         rect: &BarRect,
         color: Color,
-        pb: &mut PlotBuffer,
+        pb: &mut dyn PlotBackend,
     ) {
         #[cfg(feature = "unicode-extended")]
         {
@@ -917,7 +917,7 @@ impl Histogram {
         &self,
         data: &[f64],
         pa: &crate::frame::PlotArea,
-        pb: &mut PlotBuffer,
+        pb: &mut dyn PlotBackend,
         color: Color,
         _y_lo: f64,
         _y_hi: f64,

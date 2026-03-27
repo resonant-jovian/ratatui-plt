@@ -21,7 +21,7 @@ use crate::annotation::Annotation;
 use crate::axis::Axis;
 use crate::frame::{DataBounds, PlotFrame, ReferenceLine};
 use crate::legend::{Legend, LegendEntry, LegendPosition};
-use crate::plot_buffer::{PlotBuffer, Z_DATA};
+use crate::plot_buffer::{PlotBackend, create_backend, Z_DATA};
 use crate::spines::Spines;
 use crate::theme::Theme;
 
@@ -234,7 +234,7 @@ impl Widget for &EcdfPlot {
         let (x_lo, x_hi) = self.x_axis.resolve_bounds(x_min, x_max);
         let (y_lo, y_hi) = self.y_axis.resolve_bounds(data_y_min, data_y_max);
 
-        let mut pb = PlotBuffer::new(area);
+        let mut pb = create_backend(area);
 
         // Create and render the plot frame
         let frame = PlotFrame::new(&self.x_axis, &self.y_axis, &self.theme)

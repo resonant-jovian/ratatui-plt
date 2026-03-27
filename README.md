@@ -17,7 +17,7 @@
 - **7 axis scales** — linear, log, symlog, power, logit, asinh, function
 - **6 export formats** — text, ANSI, SVG, PNG, Sixel, Kitty
 - **PlotBackend trait** — extensible rendering backend for Unicode, Kitty, Sixel
-- **98 runnable examples** — including 6 matplotlib showcase replicas
+- **51 gallery-quality examples** — including 13 multi-panel matplotlib-style showcases
 
 > [!IMPORTANT]
 > **Status (0.0.3):** Rapidly evolving. 80 widgets covering the full matplotlib/seaborn/plotly chart taxonomy. Breaking API changes from 0.0.2: `StackedArea` renamed to `AreaChart`, `Wireframe3D` merged into `Surface3D` (use `SurfaceRenderMode::Wireframe`). Expect further breaking changes before 0.1.0.
@@ -325,7 +325,7 @@ All 3D widgets support interactive camera control via `Camera3DState` (arrow key
 
 ### Examples
 
-98 examples are included. Run any interactive example with:
+51 gallery-quality examples organized as 13 multi-panel showcases + 36 focused standalone demos. Run any example with:
 ```bash
 cargo run --example <name>
 # Pass a theme:
@@ -334,134 +334,56 @@ cargo run --example line_plot -- light
 
 Feature-gated examples require the feature flag:
 ```bash
-cargo run --example statistics --features statistics
-cargo run --example trendline --features statistics
+cargo run --example showcase_features --features statistics
+cargo run --example showcase_scientific --features fft
 cargo run --example kitty_export --features kitty
 cargo run --example sixel_export --features sixel
-cargo run --example toml_theme --features toml-themes
 ```
 
 Run examples with `dev.sh`:
 ```bash
 ./dev.sh examples line_plot              # single example
 ./dev.sh examples line_plot --theme dark # with theme
+./dev.sh examples --group showcase      # all 13 showcases
 ./dev.sh examples --group 3d            # all 3D examples
 ./dev.sh examples --all --theme dark    # all examples, dark theme
 ./dev.sh examples --list                # list groups
 ```
 
-#### Showcase Examples (matplotlib reference replicas)
+#### Showcases (13 multi-panel matplotlib-style galleries)
 
-Eight showcase examples replicate matplotlib's reference plot gallery using `MultiPanel` grids:
+Each showcase combines 5-11 related widgets in a single `MultiPanel` grid, replicating matplotlib's reference gallery:
 
-| Example | Plots |
-|---------|-------|
-| `showcase_basic_2d` | LinePlot, ScatterPlot, BarChart, Histogram, PieChart, StairsPlot, StemPlot |
-| `showcase_statistical` | BoxPlot, ViolinPlot, ErrorBarPlot, EcdfPlot, EventPlot |
-| `showcase_grid` | ContourPlot (unfilled + filled), Heatmap, Pcolormesh, HexbinPlot, Hist2D, VectorField, StreamPlot |
-| `showcase_fill` | BandPlot (fill_between), AreaChart |
-| `showcase_tri` | TriPlot, TriContour (unfilled + filled), TriColor |
-| `showcase_3d` | Surface3D (filled + wireframe), Scatter3D, Bar3D, Quiver3D |
-| `showcase_features` | Feature demonstration (statistics, trendlines, KDE) |
-| `showcase_unicode` | Extended Unicode character rendering (pie chart arcs) |
+| Showcase | Widgets | Panels |
+|----------|---------|--------|
+| `showcase_basic_2d` | LinePlot, ScatterPlot, BarChart, Histogram, PieChart, AreaChart, StairsPlot, StemPlot, DataTable | 9 |
+| `showcase_statistical` | BoxPlot, ViolinPlot, KDEPlot, EcdfPlot, SwarmPlot, StripPlot, DotPlot, RugPlot, ErrorBarPlot, BoxenPlot, EventPlot | 11 |
+| `showcase_grid` | ContourPlot (unfilled + filled), Heatmap, Pcolormesh, HexbinPlot, Hist2D, VectorField, StreamPlot | 8 |
+| `showcase_fill` | BandPlot, AreaChart (plain, stacked, normalized, streamgraph) | 5 |
+| `showcase_tri` | TriPlot, TriContour (unfilled + filled), TriColor | 4 |
+| `showcase_3d` | Surface3D (filled + wireframe), Scatter3D, Bar3D, Line3D, Contour3D, Quiver3D | 7 |
+| `showcase_hierarchical` | Treemap, Sunburst, IcicleChart, SankeyDiagram, Dendrogram, ClusterMap | 6 |
+| `showcase_financial` | CandlestickChart, WaterfallChart, GaugeChart, GanttChart, FunnelChart, FunnelArea | 6 |
+| `showcase_polar` | RadialPlot (line, scatter, bar, fill modes), TernaryPlot | 5 |
+| `showcase_network` | NetworkGraph, ParallelCoords, ParallelCategories | 3 |
+| `showcase_scientific` | HorizonGraph, CarpetPlot, SmithChart, ChoroplethMap, PSD, Spectrogram | 6 |
+| `showcase_features` | ScatterPlot+trendline, JointPlot, QQPlot, ConfidenceEllipse | 4 |
+| `showcase_unicode` | Marker gallery, arrow styles, border styles, fill levels | 6 |
 
 <details>
-<summary><strong>All 98 examples</strong></summary>
+<summary><strong>Standalone examples (36)</strong></summary>
 
-| Example | Description |
-|---------|-------------|
-| `line_plot` | Sine/cosine with fill, legend, grid |
-| `scatter_plot` | Color-mapped point cloud |
-| `heatmap` | Correlation matrix with Viridis colorbar |
-| `image_plot` | Matrix display with `matshow`, `spy`, bilinear interpolation |
-| `histogram` | Stacked distributions |
-| `contour` | Filled 2D potential field |
-| `surface3d` | Interactive 3D surface with camera |
-| `wireframe3d` | Depth-cued 3D wireframe (Surface3D wireframe mode) |
-| `scatter3d` | 3D point cloud |
-| `bar3d` | 3D bar chart with axis lines |
-| `box_plot` | Standard, notched, and bootstrap CI |
-| `violin_plot` | KDE distribution shapes |
-| `candlestick` | OHLC financial price action |
-| `ecdf` | Empirical CDFs for 3 distributions |
-| `stairs` | Step function plot |
-| `band` | Uncertainty bands (confidence intervals) |
-| `rug` | Histogram + KDE + rug marks |
-| `swarm` | Beeswarm by browser |
-| `strip` | Gene expression by cell type |
-| `stem_plot` | Discrete impulse events |
-| `error_bar` | Symmetric/asymmetric error bars |
-| `area_chart` | Plain, stacked, normalized, streamgraph area charts |
-| `bar_chart` | Grouped/stacked bars |
-| `pie_chart` | Pie/donut chart |
-| `hexbin` | Hexagonal binning |
-| `hist2d` | 2D histogram |
-| `event_plot` | Spike raster |
-| `joint_plot` | Scatter with marginal histograms and KDE |
-| `waterfall` | Financial waterfall (P&L) chart |
-| `funnel` | Sales conversion funnel |
-| `gauge` | KPI gauge with colored sectors |
-| `gantt` | Project timeline Gantt chart |
-| `facet_grid` | Seaborn-style faceted scatter |
-| `radial` | Polar line, scatter, bar, fill |
-| `ternary` | Soil texture triangle |
-| `network` | Social network graph |
-| `parallel_coords` | Iris dataset parallel coordinates |
-| `sankey` | Energy flow Sankey diagram |
-| `sunburst` | World population sunburst |
-| `treemap` | Hierarchical treemap |
-| `dendrogram` | Clustering tree |
-| `streamplot` | Circular flow field |
-| `vector_field` | 3D vector field dipole |
-| `collections` | LineCollection / PathCollection |
-| `multi_panel` | 4-panel subplot grid |
-| `twin_axes` | Dual y-axis overlay |
-| `inset` | Damped sine with zoomed inset |
-| `crosshair` | Interactive crosshair |
-| `picking` | Nearest-point data picking |
-| `interactive_legend` | Click-to-toggle series visibility |
-| `span_selector` | Horizontal range selection |
-| `scientific_dashboard` | Full 4-panel simulation monitor |
-| `theme_config` | Built-in theme gallery |
-| `pcolormesh` | Pseudocolor mesh plot |
-| `triplot` | Triangulation mesh |
-| `tricolor` | Triangulated color map |
-| `contour3d` | 3D contour surface |
-| `quiver3d` | 3D vector arrows |
-| `boxen` | Letter-value (boxen) plot |
-| `statistics` | Regression + KDE + LOWESS overlays (requires `statistics`) |
-| `trendline` | Scatter with polynomial trendline (requires `statistics`) |
-| `kitty_export` | Inline Kitty image output (requires `kitty`) |
-| `sixel_export` | Inline Sixel image output (requires `sixel`) |
-| `toml_theme` | Load theme from TOML string (requires `toml-themes`) |
-| `kde_plot` | Smooth kernel density estimation curves (requires `statistics`) |
-| `regression_plot` | Scatter + OLS/polynomial fit + CI band (requires `statistics`) |
-| `ridgeline` | Overlapping KDE curves by category (requires `statistics`) |
-| `qq_plot` | Quantile-quantile diagnostic plot (requires `statistics`) |
-| `pair_plot` | N×N scatter matrix with KDE diagonals (requires `statistics`) |
-| `confidence_ellipse` | 2D covariance ellipse overlay (requires `statistics`) |
-| `clustermap` | Heatmap with row/column dendrograms |
-| `horizon` | Compact multi-band time-series |
-| `data_table` | Styled data table with colormap cells |
-| `dot_plot` | Wilkinson stacked dot distribution |
-| `icicle` | Rectangular hierarchy chart |
-| `parallel_categories` | Categorical flow ribbons between dimensions |
-| `tricontour` | Contours on triangulated data (requires `triangulation`) |
-| `psd` | Power spectral density plot (requires `fft`) |
-| `smith_chart` | RF impedance Smith chart |
-| `line3d` | 3D helix trajectory with camera control |
-| `mesh3d` | 3D triangle mesh with camera control |
-| `voxels` | 3D colored cube grid |
-| `isosurface` | Marching cubes 3D iso-extraction |
-| `volume3d` | 3D volumetric rendering |
-| `streamtube` | 3D depth-cued streamlines |
-| `rect_selector` | 2D rectangular brush selection |
-| `lasso_selector` | Freehand polygon selection |
-| `carpet` | Parametric curvilinear grid with coloring |
-| `choropleth` | Tile-based geographic region coloring |
-| `funnel_area` | Trapezoidal proportional-area funnel |
-| `showcase_features` | Feature demonstration showcase (requires `statistics`) |
-| `showcase_unicode` | Extended Unicode character rendering (requires `unicode-extended`) |
+**Core** — `line_plot`, `scatter_plot`, `bar_chart`, `histogram`, `heatmap`, `image_plot`, `pie_chart`
+
+**3D (interactive camera)** — `surface3d`, `scatter3d`, `line3d`, `mesh3d`, `bar3d`, `voxels`, `isosurface`, `volume3d`, `streamtube`, `contour3d`, `quiver3d`
+
+**Interactive** — `crosshair`, `picking`, `interactive_legend`, `span_selector`, `rect_selector`, `lasso_selector`
+
+**Layout** — `multi_panel`, `facet_grid`, `twin_axes`, `inset`, `joint_plot`, `pair_plot` (requires `statistics`)
+
+**Composite** — `scientific_dashboard`, `collections`, `regression_plot` (requires `statistics`), `ridgeline` (requires `statistics`)
+
+**Export + Config** — `kitty_export` (requires `kitty`), `sixel_export` (requires `sixel`), `toml_theme` (requires `toml-themes`), `theme_config`
 
 </details>
 

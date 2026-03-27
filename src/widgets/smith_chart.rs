@@ -24,7 +24,7 @@ use ratatui::style::Color;
 use ratatui::widgets::Widget;
 
 use crate::frame::PlotArea;
-use crate::plot_buffer::{PlotBuffer, Z_CHROME, Z_DATA, Z_GRID, Z_MARKER};
+use crate::plot_buffer::{PlotBackend, create_backend, Z_CHROME, Z_DATA, Z_GRID, Z_MARKER};
 use crate::style::MarkerShape;
 use crate::theme::Theme;
 
@@ -208,7 +208,7 @@ impl Widget for &SmithChart {
             return;
         }
 
-        let mut pb = PlotBuffer::new(area);
+        let mut pb = create_backend(area);
 
         // Draw title
         if let Some(ref title) = self.title {
@@ -393,7 +393,7 @@ fn standard_x_values(n: usize) -> Vec<f64> {
 
 /// Draw a circle in the Gamma plane using Braille line segments.
 fn draw_circle_braille(
-    pb: &mut PlotBuffer,
+    pb: &mut dyn PlotBackend,
     geom: &ChartGeometry,
     center_gr: f64,
     center_gi: f64,
@@ -424,7 +424,7 @@ fn draw_circle_braille(
 
 /// Draw an arc in the Gamma plane, clipped to the unit circle.
 fn draw_arc_clipped(
-    pb: &mut PlotBuffer,
+    pb: &mut dyn PlotBackend,
     geom: &ChartGeometry,
     center_gr: f64,
     center_gi: f64,

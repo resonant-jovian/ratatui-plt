@@ -9,7 +9,7 @@ use crate::annotation::Annotation;
 use crate::axis::Axis;
 use crate::frame::{DataBounds, PlotFrame, ReferenceLine};
 use crate::legend::{Legend, LegendEntry, LegendPosition};
-use crate::plot_buffer::{PlotBuffer, Z_ANNOTATION, Z_CHROME, Z_DATA};
+use crate::plot_buffer::{PlotBackend, create_backend, Z_ANNOTATION, Z_CHROME, Z_DATA};
 use crate::spines::Spines;
 use crate::theme::Theme;
 use crate::ticker::NullLocator;
@@ -214,7 +214,7 @@ struct ValueLabelParams {
 /// For horizontal orientation, the label is placed 1 column to the right of
 /// the bar end, vertically centered on the bar span.
 fn draw_value_label(
-    pb: &mut PlotBuffer,
+    pb: &mut dyn PlotBackend,
     orientation: &Orientation,
     p: &ValueLabelParams,
     fg: Color,
@@ -327,7 +327,7 @@ impl Widget for &BarChart {
         let x_lo = 0.0;
         let x_hi = n_cats as f64;
 
-        let mut pb = PlotBuffer::new(area);
+        let mut pb = create_backend(area);
 
         // Build reference lines: include user-supplied ones, plus a zero line for diverging mode
         let mut ref_lines = self.reference_lines.clone();

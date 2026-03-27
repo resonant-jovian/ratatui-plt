@@ -1,7 +1,8 @@
 //! Showcase: Fill plots replicating matplotlib reference gallery.
 //!
-//! 2 plots stacked vertically in a 2x1 MultiPanel:
-//! Top) BandPlot (fill_between), Bottom) AreaChart (stackplot).
+//! 5 plots in a mosaic grid (ABC / DE.):
+//! A) BandPlot (fill_between), B) AreaChart plain fill,
+//! C) AreaChart stacked, D) AreaChart normalized, E) AreaChart streamgraph.
 
 use std::io;
 
@@ -55,16 +56,55 @@ fn main() -> color_eyre::Result<()> {
     let band_plot = BandPlot::new()
         .band(filled_band)
         .band(center_line)
-        .title("Band Plot (fill_between)")
+        .title("A: Band Plot (fill_between)")
         .x_axis(Axis::new().label("x").grid(true))
         .y_axis(Axis::new().label("y").grid(true))
         .show_legend(true)
         .legend_position(LegendPosition::TopRight);
 
-    // ---- Panel B: AreaChart (3 series, stacked) ----
+    // ---- Shared data for area chart modes (B-E) ----
     let n_stack = 200;
 
-    let series_a = Series::new("Research")
+    // Helper to build the 3 area series with fresh clones
+    let make_area_series = || {
+        let s_a = Series::new("Research")
+            .data(
+                (0..n_stack)
+                    .map(|i| {
+                        let t = i as f64;
+                        (t, 10.0 + 5.0 * (t * std::f64::consts::TAU / 60.0).sin())
+                    })
+                    .collect(),
+            )
+            .color(blue_dark);
+
+        let s_b = Series::new("Development")
+            .data(
+                (0..n_stack)
+                    .map(|i| {
+                        let t = i as f64;
+                        (t, 15.0 + 4.0 * (t * std::f64::consts::TAU / 40.0).cos())
+                    })
+                    .collect(),
+            )
+            .color(blue_mid);
+
+        let s_c = Series::new("Operations")
+            .data(
+                (0..n_stack)
+                    .map(|i| {
+                        let t = i as f64;
+                        (t, 8.0 + 3.0 * (t * std::f64::consts::TAU / 80.0).sin())
+                    })
+                    .collect(),
+            )
+            .color(blue_light);
+
+        (s_a, s_b, s_c)
+    };
+
+    // ---- Panel B: AreaChart plain fill (single series) ----
+    let plain_series = Series::new("Signal")
         .data(
             (0..n_stack)
                 .map(|i| {
@@ -75,33 +115,27 @@ fn main() -> color_eyre::Result<()> {
         )
         .color(blue_dark);
 
-    let series_b = Series::new("Development")
-        .data(
-            (0..n_stack)
-                .map(|i| {
-                    let t = i as f64;
-                    (t, 15.0 + 4.0 * (t * std::f64::consts::TAU / 40.0).cos())
-                })
-                .collect(),
+    let area_plain = AreaChart::new()
+        .series(plain_series)
+        .mode(AreaMode::Plain)
+        .title("B: Area (Plain)")
+        .x_axis(Axis::new().label("Time").grid(true))
+        .y_axis(
+            Axis::new()
+                .label("Value")
+                .label_position(LabelPosition::End)
+                .grid(true),
         )
-        .color(blue_mid);
+        .show_legend(false);
 
-    let series_c = Series::new("Operations")
-        .data(
-            (0..n_stack)
-                .map(|i| {
-                    let t = i as f64;
-                    (t, 8.0 + 3.0 * (t * std::f64::consts::TAU / 80.0).sin())
-                })
-                .collect(),
-        )
-        .color(blue_light);
-
-    let stacked = AreaChart::new()
-        .series(series_a)
-        .series(series_b)
-        .series(series_c)
-        .title("Stacked Area Plot")
+    // ---- Panel C: AreaChart stacked (3 series) ----
+    let (sc_a, sc_b, sc_c) = make_area_series();
+    let area_stacked = AreaChart::new()
+        .series(sc_a)
+        .series(sc_b)
+        .series(sc_c)
+        .mode(AreaMode::Stacked)
+        .title("C: Area (Stacked)")
         .x_axis(Axis::new().label("Time").grid(true))
         .y_axis(
             Axis::new()
@@ -110,15 +144,56 @@ fn main() -> color_eyre::Result<()> {
                 .grid(true),
         );
 
-    // ---- MultiPanel: 2 rows x 1 col ----
-    let panel = MultiPanel::new(2, 1)
+    // ---- Panel D: AreaChart normalized (3 series) ----
+    let (sd_a, sd_b, sd_c) = make_area_series();
+    let area_normalized = AreaChart::new()
+        .series(sd_a)
+        .series(sd_b)
+        .series(sd_c)
+        .mode(AreaMode::Normalized)
+        .title("D: Area (Normalized)")
+        .x_axis(Axis::new().label("Time").grid(true))
+        .y_axis(
+            Axis::new()
+                .label("Fraction")
+                .label_position(LabelPosition::End)
+                .grid(true),
+        );
+
+    // ---- Panel E: AreaChart streamgraph (3 series) ----
+    let (se_a, se_b, se_c) = make_area_series();
+    let area_stream = AreaChart::new()
+        .series(se_a)
+        .series(se_b)
+        .series(se_c)
+        .mode(AreaMode::StreamGraph)
+        .title("E: Area (StreamGraph)")
+        .x_axis(Axis::new().label("Time").grid(true))
+        .y_axis(
+            Axis::new()
+                .label("Value")
+                .label_position(LabelPosition::End)
+                .grid(true),
+        );
+
+    // ---- MultiPanel mosaic: ABC / DE. ----
+    let panel = MultiPanel::from_mosaic("ABC\nDE.")
         .gap(1)
         .suptitle("Fill Plots Showcase (q to quit)")
-        .panel(0, 0, move |area: Rect, buf: &mut Buffer| {
+        .mosaic_panel('A', move |area: Rect, buf: &mut Buffer| {
             (&band_plot).render(area, buf);
         })
-        .panel(1, 0, move |area: Rect, buf: &mut Buffer| {
-            (&stacked).render(area, buf);
+        .mosaic_panel('B', move |area: Rect, buf: &mut Buffer| {
+            (&area_plain).render(area, buf);
+        })
+        .mosaic_panel('C', move |area: Rect, buf: &mut Buffer| {
+            (&area_stacked).render(area, buf);
+        })
+        .mosaic_panel('D', move |area: Rect, buf: &mut Buffer| {
+            (&area_normalized).render(area, buf);
+        })
+        .mosaic_panel('E', move |area: Rect, buf: &mut Buffer| {
+            (&area_stream).render(area, buf);
         });
 
     loop {

@@ -30,7 +30,7 @@ use ratatui::widgets::StatefulWidget;
 
 use crate::axis::Axis;
 use crate::frame::{DataBounds, PlotFrame};
-use crate::plot_buffer::{PlotBuffer, Z_DATA, Z_FILL, Z_MARKER};
+use crate::plot_buffer::{PlotBackend, create_backend, Z_DATA, Z_FILL, Z_MARKER};
 use crate::spines::Spines;
 use crate::theme::Theme;
 
@@ -211,7 +211,7 @@ impl StatefulWidget for &LassoSelector {
         let (x_lo, x_hi) = self.x_axis.resolve_bounds(x_min, x_max);
         let (y_lo, y_hi) = self.y_axis.resolve_bounds(y_min, y_max);
 
-        let mut pb = PlotBuffer::new(area);
+        let mut pb = create_backend(area);
 
         let frame =
             PlotFrame::new(&self.x_axis, &self.y_axis, &self.theme).spines(self.spines.clone());

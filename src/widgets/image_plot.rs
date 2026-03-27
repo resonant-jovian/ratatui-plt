@@ -14,7 +14,7 @@ use crate::axis::{AspectRatio, Axis, Bounds};
 use crate::colormap::{Colorbar, Colormap, Viridis};
 use crate::frame::{DataBounds, PlotFrame, ReferenceLine};
 use crate::norm::{LinearNorm, Normalize};
-use crate::plot_buffer::{PlotBuffer, Z_DATA};
+use crate::plot_buffer::{PlotBackend, create_backend, Z_DATA};
 use crate::spines::Spines;
 use crate::theme::Theme;
 
@@ -355,7 +355,7 @@ impl Widget for &ImagePlot {
             0
         };
 
-        let mut pb = PlotBuffer::new(area);
+        let mut pb = create_backend(area);
 
         // Create and render the plot frame (title, axes, grid, ticks, labels, spines, ref lines)
         let frame = PlotFrame::new(&self.x_axis, &self.y_axis, &self.theme)

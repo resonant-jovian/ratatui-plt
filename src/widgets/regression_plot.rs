@@ -28,7 +28,7 @@ use ratatui::widgets::Widget;
 use crate::annotation::Annotation;
 use crate::axis::Axis;
 use crate::frame::{DataBounds, PlotFrame, ReferenceLine};
-use crate::plot_buffer::{PlotBuffer, Z_DATA, Z_FILL, Z_MARKER};
+use crate::plot_buffer::{PlotBackend, create_backend, Z_DATA, Z_FILL, Z_MARKER};
 use crate::series::Series;
 use crate::spines::Spines;
 use crate::style::MarkerShape;
@@ -207,7 +207,7 @@ impl Widget for &RegressionPlot {
         let (y_lo, y_hi) = self.y_axis.resolve_bounds(data_y_min, data_y_max);
 
         // ── 3. Set up PlotFrame ─────────────────────────────────────────
-        let mut pb = PlotBuffer::new(area);
+        let mut pb = create_backend(area);
 
         let frame = PlotFrame::new(&self.x_axis, &self.y_axis, &self.theme)
             .title(self.title.as_deref())

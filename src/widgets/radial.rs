@@ -5,7 +5,7 @@ use ratatui::layout::Rect;
 use ratatui::widgets::Widget;
 
 use crate::drawing::BRAILLE_BITS;
-use crate::plot_buffer::{PlotBuffer, Z_CHROME, Z_DATA, Z_FILL, Z_GRID, Z_MARKER};
+use crate::plot_buffer::{PlotBackend, create_backend, Z_CHROME, Z_DATA, Z_FILL, Z_GRID, Z_MARKER};
 use crate::series::Series;
 use crate::theme::Theme;
 
@@ -162,7 +162,7 @@ impl Widget for &RadialPlot {
         let ph = area.height.saturating_sub(title_height);
         let pw = area.width;
 
-        let mut pb = PlotBuffer::new(area);
+        let mut pb = create_backend(area);
 
         if let Some(ref title) = self.title {
             let start = area.x + (area.width.saturating_sub(title.len() as u16)) / 2;
@@ -435,7 +435,7 @@ struct ClipRect {
 /// rendered at 2x4 sub-pixel resolution using Unicode Braille characters.
 #[allow(clippy::too_many_arguments)]
 fn draw_braille_line_clipped_pb(
-    pb: &mut PlotBuffer,
+    pb: &mut dyn PlotBackend,
     x0: f64,
     y0: f64,
     x1: f64,

@@ -8,7 +8,7 @@ use ratatui::widgets::Widget;
 use crate::annotation::Annotation;
 use crate::axis::Axis;
 use crate::frame::{DataBounds, PlotFrame, ReferenceLine};
-use crate::plot_buffer::{PlotBuffer, Z_CHROME, Z_DATA, Z_MARKER};
+use crate::plot_buffer::{PlotBackend, create_backend, Z_CHROME, Z_DATA, Z_MARKER};
 use crate::spines::Spines;
 use crate::style::MarkerShape;
 use crate::theme::Theme;
@@ -149,7 +149,7 @@ impl Widget for &StemPlot {
         let (x_lo, x_hi) = self.x_axis.resolve_bounds(x_min, x_max);
         let (y_lo, y_hi) = self.y_axis.resolve_bounds(y_min, y_max);
 
-        let mut pb = PlotBuffer::new(area);
+        let mut pb = create_backend(area);
 
         // Create and render the plot frame (title, axes, grid, ticks, labels, spines, ref lines)
         let frame = PlotFrame::new(&self.x_axis, &self.y_axis, &self.theme)

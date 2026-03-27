@@ -1,8 +1,9 @@
-//! Showcase 3D: 5 three-dimensional plot types with interactive camera.
+//! Showcase 3D: 7 three-dimensional plot types with interactive camera.
 //!
 //! Replicates matplotlib reference plots:
 //!   Top row:    Surface3D  |  Wireframe3D  |  Scatter3D
-//!   Bottom row: Bar3D      |  Quiver3D
+//!   Bottom row: Bar3D      |  Quiver3D     |  Line3D
+//!   Extra row:  Contour3D
 //!
 //! Uses manual Layout splitting because 3D widgets require StatefulWidget
 //! with mutable Camera3DState, which is incompatible with MultiPanel closures.
@@ -152,12 +153,38 @@ fn main() -> color_eyre::Result<()> {
         .camera(Camera3D::new().azimuth(-40.0).elevation(25.0))
         .title("Quiver3D: rotation");
 
+    // ── 6. Line3D: helix trajectory ──────────────────────────────────────
+    let helix_data: Vec<(f64, f64, f64)> = (0..300)
+        .map(|i| {
+            let t = i as f64 * 0.05;
+            (t.cos() * 2.0, t.sin() * 2.0, t * 0.3)
+        })
+        .collect();
+
+    let helix_series = Series3D::new("helix").data(helix_data);
+    let line3d = Line3D::new()
+        .series(helix_series)
+        .camera(Camera3D::new().azimuth(-45.0).elevation(30.0))
+        .title("Line3D: helix");
+
+    // ── 7. Contour3D: Gaussian surface contours ──────────────────────────
+    let contour_data = GridData::from_fn((-3.0, 3.0), (-3.0, 3.0), 30, 30, |x, y| {
+        (-(x * x + y * y) / 4.0).exp()
+    });
+    let contour3d = Contour3D::new(contour_data)
+        .levels(8)
+        .colormap(Viridis)
+        .camera(Camera3D::new().azimuth(-50.0).elevation(30.0))
+        .title("Contour3D: Gaussian");
+
     // ── Camera states (one per 3D widget) ───────────────────────────────
     let mut cam_surface = Camera3DState::default();
     let mut cam_wire = Camera3DState::default();
     let mut cam_scatter = Camera3DState::default();
     let mut cam_bar = Camera3DState::default();
     let mut cam_quiver = Camera3DState::default();
+    let mut cam_line = Camera3DState::default();
+    let mut cam_contour = Camera3DState::default();
 
     loop {
         terminal.draw(|frame| {
@@ -181,10 +208,14 @@ fn main() -> color_eyre::Result<()> {
                 }
             }
 
-            // Split remaining area into 2 rows
+            // Split remaining area into 3 rows
             let rows = Layout::default()
                 .direction(Direction::Vertical)
-                .constraints([Constraint::Percentage(50), Constraint::Percentage(50)])
+                .constraints([
+                    Constraint::Ratio(1, 3),
+                    Constraint::Ratio(1, 3),
+                    Constraint::Ratio(1, 3),
+                ])
                 .split(outer[1]);
 
             // Top row: 3 columns
@@ -197,8 +228,8 @@ fn main() -> color_eyre::Result<()> {
                 ])
                 .split(rows[0]);
 
-            // Bottom row: 2 columns (+ empty space)
-            let bot_cols = Layout::default()
+            // Middle row: 3 columns
+            let mid_cols = Layout::default()
                 .direction(Direction::Horizontal)
                 .constraints([
                     Constraint::Ratio(1, 3),
@@ -207,12 +238,23 @@ fn main() -> color_eyre::Result<()> {
                 ])
                 .split(rows[1]);
 
+            // Bottom row: 1 panel (+ empty space)
+            let bot_cols = Layout::default()
+                .direction(Direction::Horizontal)
+                .constraints([
+                    Constraint::Ratio(1, 3),
+                    Constraint::Ratio(1, 3),
+                    Constraint::Ratio(1, 3),
+                ])
+                .split(rows[2]);
+
             frame.render_stateful_widget(&surface, top_cols[0], &mut cam_surface);
             frame.render_stateful_widget(&wireframe, top_cols[1], &mut cam_wire);
             frame.render_stateful_widget(&scatter, top_cols[2], &mut cam_scatter);
-            frame.render_stateful_widget(&bar3d, bot_cols[0], &mut cam_bar);
-            frame.render_stateful_widget(&quiver3d, bot_cols[1], &mut cam_quiver);
-            // bot_cols[2] intentionally left empty
+            frame.render_stateful_widget(&bar3d, mid_cols[0], &mut cam_bar);
+            frame.render_stateful_widget(&quiver3d, mid_cols[1], &mut cam_quiver);
+            frame.render_stateful_widget(&line3d, mid_cols[2], &mut cam_line);
+            frame.render_stateful_widget(&contour3d, bot_cols[0], &mut cam_contour);
         })?;
 
         match event::read()? {
@@ -224,6 +266,8 @@ fn main() -> color_eyre::Result<()> {
                     cam_scatter.rotate(-5.0, 0.0);
                     cam_bar.rotate(-5.0, 0.0);
                     cam_quiver.rotate(-5.0, 0.0);
+                    cam_line.rotate(-5.0, 0.0);
+                    cam_contour.rotate(-5.0, 0.0);
                 }
                 KeyCode::Right => {
                     cam_surface.rotate(5.0, 0.0);
@@ -231,6 +275,8 @@ fn main() -> color_eyre::Result<()> {
                     cam_scatter.rotate(5.0, 0.0);
                     cam_bar.rotate(5.0, 0.0);
                     cam_quiver.rotate(5.0, 0.0);
+                    cam_line.rotate(5.0, 0.0);
+                    cam_contour.rotate(5.0, 0.0);
                 }
                 KeyCode::Up => {
                     cam_surface.rotate(0.0, 5.0);
@@ -238,6 +284,8 @@ fn main() -> color_eyre::Result<()> {
                     cam_scatter.rotate(0.0, 5.0);
                     cam_bar.rotate(0.0, 5.0);
                     cam_quiver.rotate(0.0, 5.0);
+                    cam_line.rotate(0.0, 5.0);
+                    cam_contour.rotate(0.0, 5.0);
                 }
                 KeyCode::Down => {
                     cam_surface.rotate(0.0, -5.0);
@@ -245,6 +293,8 @@ fn main() -> color_eyre::Result<()> {
                     cam_scatter.rotate(0.0, -5.0);
                     cam_bar.rotate(0.0, -5.0);
                     cam_quiver.rotate(0.0, -5.0);
+                    cam_line.rotate(0.0, -5.0);
+                    cam_contour.rotate(0.0, -5.0);
                 }
                 KeyCode::Char('+') | KeyCode::Char('=') => {
                     cam_surface.zoom(1.2);
@@ -252,6 +302,8 @@ fn main() -> color_eyre::Result<()> {
                     cam_scatter.zoom(1.2);
                     cam_bar.zoom(1.2);
                     cam_quiver.zoom(1.2);
+                    cam_line.zoom(1.2);
+                    cam_contour.zoom(1.2);
                 }
                 KeyCode::Char('-') => {
                     cam_surface.zoom(0.8);
@@ -259,6 +311,8 @@ fn main() -> color_eyre::Result<()> {
                     cam_scatter.zoom(0.8);
                     cam_bar.zoom(0.8);
                     cam_quiver.zoom(0.8);
+                    cam_line.zoom(0.8);
+                    cam_contour.zoom(0.8);
                 }
                 _ => {}
             },
@@ -269,6 +323,8 @@ fn main() -> color_eyre::Result<()> {
                     cam_scatter.zoom(1.2);
                     cam_bar.zoom(1.2);
                     cam_quiver.zoom(1.2);
+                    cam_line.zoom(1.2);
+                    cam_contour.zoom(1.2);
                 }
                 MouseEventKind::ScrollDown => {
                     cam_surface.zoom(0.8);
@@ -276,6 +332,8 @@ fn main() -> color_eyre::Result<()> {
                     cam_scatter.zoom(0.8);
                     cam_bar.zoom(0.8);
                     cam_quiver.zoom(0.8);
+                    cam_line.zoom(0.8);
+                    cam_contour.zoom(0.8);
                 }
                 _ => {}
             },
