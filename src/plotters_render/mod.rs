@@ -72,19 +72,32 @@ pub trait PlottersRenderable {
 /// Returns `true` when:
 /// 1. The `plotters-render` feature is enabled (compile-time)
 /// 2. The detected backend is Kitty (runtime)
-/// 3. stdout is a terminal (not piped/redirected/testing)
+/// 3. stdout is a terminal OR `RATATUI_PLT_PLOTTERS=1` is set
+///    (allows headless export with plotters quality)
 pub fn should_use_plotters() -> bool {
     use std::io::IsTerminal;
     use crate::config::{PlotConfig, RenderBackend, detect_backend};
 
-    // Kitty protocol only works in a real terminal.
-    if !std::io::stdout().is_terminal() {
+    // Allow forcing plotters mode for headless export.
+    let force_plotters =
+        std::env::var("RATATUI_PLT_PLOTTERS").is_ok();
+
+    // Kitty protocol only works in a real terminal, but for
+    // headless export with plotters, we render to pixmap and the
+    // buffer_to_png/svg path captures the result.
+    if !force_plotters && !std::io::stdout().is_terminal() {
         return false;
     }
 
     let cfg = PlotConfig::get_default();
     let backend = match cfg.render_backend {
-        RenderBackend::Auto => detect_backend(),
+        RenderBackend::Auto => {
+            if force_plotters {
+                RenderBackend::Kitty
+            } else {
+                detect_backend()
+            }
+        }
         other => other,
     };
     matches!(backend, RenderBackend::Kitty)

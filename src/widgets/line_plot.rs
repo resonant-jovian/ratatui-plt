@@ -346,7 +346,7 @@ impl crate::plotters_render::PlottersRenderable for LinePlot {
                         plotters::series::LineSeries::new(
                             points.iter().copied(),
                             plotters::style::ShapeStyle::from(pc)
-                                .stroke_width(2),
+                                .stroke_width(4),
                         ),
                     );
                 }

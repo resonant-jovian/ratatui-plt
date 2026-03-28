@@ -400,14 +400,6 @@ impl crate::plotters_render::PlottersRenderable for FacetGrid {
 
 impl Widget for &FacetGrid {
     fn render(self, area: Rect, buf: &mut Buffer) {
-        #[cfg(feature = "plotters-render")]
-        {
-            if crate::plotters_render::should_use_plotters() {
-                use crate::plotters_render::PlottersRenderable;
-                self.render_plotters(area, buf, &self.theme);
-                return;
-            }
-        }
         if area.width < 4 || area.height < 4 {
             return;
         }
