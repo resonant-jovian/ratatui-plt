@@ -76,8 +76,10 @@ impl TinySkiaDrawingBackend {
         b: u8,
         a: f64,
     ) -> Paint<'static> {
-        let mut paint = Paint::default();
-        paint.anti_alias = true;
+        let mut paint = Paint {
+            anti_alias: true,
+            ..Paint::default()
+        };
         paint.set_color_rgba8(r, g, b, (a * 255.0) as u8);
         paint
     }
@@ -89,11 +91,12 @@ impl TinySkiaDrawingBackend {
     }
 
     fn make_stroke(width: u32) -> Stroke {
-        let mut stroke = Stroke::default();
-        stroke.width = width.max(1) as f32;
-        stroke.line_cap = LineCap::Round;
-        stroke.line_join = LineJoin::Round;
-        stroke
+        Stroke {
+            width: width.max(1) as f32,
+            line_cap: LineCap::Round,
+            line_join: LineJoin::Round,
+            ..Stroke::default()
+        }
     }
 }
 
@@ -343,8 +346,10 @@ impl DrawingBackend for TinySkiaDrawingBackend {
         let mut x = pos.0 as f32;
         let y = pos.1 as f32;
 
-        let mut paint = Paint::default();
-        paint.anti_alias = true;
+        let mut paint = Paint {
+            anti_alias: true,
+            ..Paint::default()
+        };
         paint.set_color_rgba8(r, g, b, 255);
 
         for _ch in text.chars() {

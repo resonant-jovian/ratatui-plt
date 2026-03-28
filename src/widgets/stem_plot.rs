@@ -120,8 +120,105 @@ impl StemPlot {
     }
 }
 
+#[cfg(feature = "plotters-render")]
+impl crate::plotters_render::PlottersRenderable for StemPlot {
+    fn render_plotters(
+        &self,
+        area: ratatui::layout::Rect,
+        buf: &mut ratatui::buffer::Buffer,
+        theme: &crate::theme::Theme,
+    ) {
+        use crate::plotters_render::{bridge, helpers, theme_bridge};
+        use crate::series::is_valid_point;
+
+        if self.data.is_empty() {
+            return;
+        }
+
+        // Compute bounds
+        let mut x_min = f64::INFINITY;
+        let mut x_max = f64::NEG_INFINITY;
+        let mut y_min = self.baseline;
+        let mut y_max = self.baseline;
+        for &(x, y) in &self.data {
+            if is_valid_point(x, y) {
+                x_min = x_min.min(x);
+                x_max = x_max.max(x);
+                y_min = y_min.min(y);
+                y_max = y_max.max(y);
+            }
+        }
+        if x_min.is_infinite() { return; }
+        let y_padding = (y_max - y_min).abs() * 0.05;
+        y_min -= y_padding;
+        y_max += y_padding;
+        if (y_max - y_min).abs() < 1e-12 { y_max = y_min + 1.0; }
+
+        let (x_lo, x_hi) = self.x_axis.resolve_bounds(x_min, x_max);
+        let (y_lo, y_hi) = self.y_axis.resolve_bounds(y_min, y_max);
+
+        let x_axis_ref = &self.x_axis;
+        let y_axis_ref = &self.y_axis;
+        let title_ref = self.title.as_deref();
+        let data_ref = &self.data;
+        let baseline = self.baseline;
+        let stem_color = self.color.unwrap_or(theme.color_cycle.at(0));
+
+        bridge::render_plotters_to_buf(
+            area,
+            buf,
+            theme_bridge::theme_bg_rgb(theme),
+            |root| {
+                let Ok(mut chart) = helpers::build_cartesian_2d(
+                    root, x_axis_ref, y_axis_ref, title_ref, theme,
+                    x_lo..x_hi, y_lo..y_hi,
+                ) else { return; };
+
+                let pc = theme_bridge::to_plotters_color(stem_color);
+
+                // Draw baseline
+                let _ = chart.draw_series(
+                    plotters::series::LineSeries::new(
+                        vec![(x_lo, baseline), (x_hi, baseline)],
+                        plotters::style::ShapeStyle::from(pc).stroke_width(1),
+                    ),
+                );
+
+                // Draw stems (vertical lines) and markers
+                for &(x, y) in data_ref {
+                    if !is_valid_point(x, y) { continue; }
+
+                    // Vertical line from baseline to point
+                    let _ = chart.draw_series(
+                        plotters::series::LineSeries::new(
+                            vec![(x, baseline), (x, y)],
+                            plotters::style::ShapeStyle::from(pc).stroke_width(1),
+                        ),
+                    );
+
+                    // Marker at the top
+                    let _ = chart.draw_series(std::iter::once(
+                        plotters::element::Circle::new(
+                            (x, y), 4,
+                            plotters::style::ShapeStyle::from(pc).filled(),
+                        ),
+                    ));
+                }
+            },
+        );
+    }
+}
+
 impl Widget for &StemPlot {
     fn render(self, area: Rect, buf: &mut Buffer) {
+        #[cfg(feature = "plotters-render")]
+        {
+            if crate::plotters_render::should_use_plotters() {
+                use crate::plotters_render::PlottersRenderable;
+                self.render_plotters(area, buf, &self.theme);
+                return;
+            }
+        }
         if area.width < 4 || area.height < 4 || self.data.is_empty() {
             return;
         }

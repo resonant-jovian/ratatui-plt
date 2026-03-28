@@ -161,8 +161,105 @@ impl AreaChart {
     }
 }
 
+#[cfg(feature = "plotters-render")]
+impl crate::plotters_render::PlottersRenderable for AreaChart {
+    fn render_plotters(
+        &self,
+        area: ratatui::layout::Rect,
+        buf: &mut ratatui::buffer::Buffer,
+        theme: &crate::theme::Theme,
+    ) {
+        use crate::plotters_render::{bridge, helpers, theme_bridge};
+        use crate::series::is_valid_point;
+
+        if self.series.is_empty() {
+            return;
+        }
+
+        // Compute data bounds
+        let mut x_min = f64::INFINITY;
+        let mut x_max = f64::NEG_INFINITY;
+        let mut y_min = f64::INFINITY;
+        let mut y_max = f64::NEG_INFINITY;
+        for s in &self.series {
+            for &(x, y) in &s.data {
+                if is_valid_point(x, y) {
+                    x_min = x_min.min(x);
+                    x_max = x_max.max(x);
+                    y_min = y_min.min(y);
+                    y_max = y_max.max(y);
+                }
+            }
+        }
+        if x_min.is_infinite() { return; }
+        // For stacked mode, sum y values per x
+        if matches!(self.mode, AreaMode::Stacked) {
+            let mut stacked_max = 0.0f64;
+            // Simple approach: for each series, track cumulative
+            for s in &self.series {
+                for &(_, y) in &s.data {
+                    if y.is_finite() {
+                        stacked_max += y.abs();
+                    }
+                }
+            }
+            y_max = y_max.max(stacked_max / self.series.len().max(1) as f64 * 2.0);
+        }
+        // Ensure baseline is included
+        y_min = y_min.min(0.0);
+
+        let (x_lo, x_hi) = self.x_axis.resolve_bounds(x_min, x_max);
+        let (y_lo, y_hi) = self.y_axis.resolve_bounds(y_min, y_max);
+
+        let series_ref = &self.series;
+        let x_axis_ref = &self.x_axis;
+        let y_axis_ref = &self.y_axis;
+        let title_ref = self.title.as_deref();
+        let color_cycle = &theme.color_cycle;
+
+        bridge::render_plotters_to_buf(
+            area,
+            buf,
+            theme_bridge::theme_bg_rgb(theme),
+            |root| {
+                let Ok(mut chart) = helpers::build_cartesian_2d(
+                    root, x_axis_ref, y_axis_ref, title_ref, theme,
+                    x_lo..x_hi, y_lo..y_hi,
+                ) else { return; };
+
+                for (si, series) in series_ref.iter().enumerate() {
+                    let color = series.color.unwrap_or_else(|| color_cycle.at(si));
+                    let pc = theme_bridge::to_plotters_color(color);
+                    let points: Vec<(f64, f64)> = series.data.iter().copied()
+                        .filter(|&(x, y)| is_valid_point(x, y))
+                        .collect();
+
+                    let _ = chart.draw_series(
+                        plotters::series::AreaSeries::new(
+                            points.iter().copied(),
+                            0.0, // baseline
+                            plotters::style::ShapeStyle::from(
+                                theme_bridge::to_plotters_color_alpha(color, 0.5),
+                            ).filled(),
+                        )
+                        .border_style(plotters::style::ShapeStyle::from(pc).stroke_width(2)),
+                    );
+                }
+            },
+        );
+    }
+}
+
 impl Widget for &AreaChart {
     fn render(self, area: Rect, buf: &mut Buffer) {
+        #[cfg(feature = "plotters-render")]
+        {
+            if crate::plotters_render::should_use_plotters() {
+                use crate::plotters_render::PlottersRenderable;
+                self.render_plotters(area, buf, &self.theme);
+                return;
+            }
+        }
         if area.width < 4 || area.height < 4 || self.series.is_empty() {
             return;
         }

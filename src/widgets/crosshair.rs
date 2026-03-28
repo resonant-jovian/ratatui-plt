@@ -75,6 +75,15 @@ impl Crosshair {
     /// This should be called after the main widget has been rendered,
     /// using the `PlotArea` returned by `PlotFrame::render`.
     pub fn render_on(&self, pa: &PlotArea, buf: &mut Buffer) {
+        #[cfg(feature = "plotters-render")]
+        {
+            if crate::plotters_render::should_use_plotters() {
+                use crate::plotters_render::PlottersRenderable;
+                let area = ratatui::layout::Rect::new(pa.x, pa.y, pa.width, pa.height);
+                self.render_plotters(area, buf, &crate::theme::Theme::get_default());
+                return;
+            }
+        }
         let theme = Theme::get_default();
         let sx = pa.screen_x(self.data_x);
         let sy = pa.screen_y(self.data_y);
@@ -150,5 +159,21 @@ impl Crosshair {
                 }
             }
         }
+    }
+}
+
+#[cfg(feature = "plotters-render")]
+impl crate::plotters_render::PlottersRenderable for Crosshair {
+    fn render_plotters(
+        &self,
+        area: ratatui::layout::Rect,
+        buf: &mut ratatui::buffer::Buffer,
+        theme: &crate::theme::Theme,
+    ) {
+        use crate::plotters_render::{bridge, theme_bridge};
+        bridge::render_plotters_to_buf(
+            area, buf, theme_bridge::theme_bg_rgb(theme),
+            |_root| { /* Minimal stub - full plotters rendering TBD */ },
+        );
     }
 }

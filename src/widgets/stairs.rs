@@ -188,8 +188,109 @@ impl StairsPlot {
     }
 }
 
+#[cfg(feature = "plotters-render")]
+impl crate::plotters_render::PlottersRenderable for StairsPlot {
+    fn render_plotters(
+        &self,
+        area: ratatui::layout::Rect,
+        buf: &mut ratatui::buffer::Buffer,
+        theme: &crate::theme::Theme,
+    ) {
+        use crate::plotters_render::{bridge, helpers, theme_bridge};
+
+        if self.datasets.is_empty() {
+            return;
+        }
+
+        // Compute data bounds across all datasets
+        let mut x_min = f64::INFINITY;
+        let mut x_max = f64::NEG_INFINITY;
+        let mut y_min = f64::INFINITY;
+        let mut y_max = f64::NEG_INFINITY;
+        for ds in &self.datasets {
+            for &e in &ds.edges {
+                if e.is_finite() {
+                    x_min = x_min.min(e);
+                    x_max = x_max.max(e);
+                }
+            }
+            for &v in &ds.values {
+                if v.is_finite() {
+                    y_min = y_min.min(v);
+                    y_max = y_max.max(v);
+                }
+            }
+        }
+        if let Some(b) = self.baseline {
+            y_min = y_min.min(b);
+            y_max = y_max.max(b);
+        }
+        if x_min.is_infinite() { return; }
+        let y_padding = (y_max - y_min).abs() * 0.05;
+        y_min -= y_padding;
+        y_max += y_padding;
+        if (y_max - y_min).abs() < 1e-12 { y_max = y_min + 1.0; }
+
+        let (x_lo, x_hi) = self.x_axis.resolve_bounds(x_min, x_max);
+        let (y_lo, y_hi) = self.y_axis.resolve_bounds(y_min, y_max);
+
+        let x_axis_ref = &self.x_axis;
+        let y_axis_ref = &self.y_axis;
+        let title_ref = self.title.as_deref();
+        let datasets_ref = &self.datasets;
+
+        bridge::render_plotters_to_buf(
+            area,
+            buf,
+            theme_bridge::theme_bg_rgb(theme),
+            |root| {
+                let Ok(mut chart) = helpers::build_cartesian_2d(
+                    root, x_axis_ref, y_axis_ref, title_ref, theme,
+                    x_lo..x_hi, y_lo..y_hi,
+                ) else { return; };
+
+                for ds in datasets_ref.iter() {
+                    if ds.edges.len() < 2 || ds.values.is_empty() {
+                        continue;
+                    }
+                    let pc = theme_bridge::to_plotters_color(ds.color);
+
+                    // Build step points: for each bin, create horizontal + vertical segments
+                    let mut step_points: Vec<(f64, f64)> = Vec::new();
+                    for (i, &v) in ds.values.iter().enumerate() {
+                        let x0 = ds.edges[i];
+                        let x1 = ds.edges.get(i + 1).copied().unwrap_or(x0);
+                        if step_points.is_empty() {
+                            step_points.push((x0, v));
+                        } else {
+                            // Vertical step from previous value
+                            step_points.push((x0, v));
+                        }
+                        step_points.push((x1, v));
+                    }
+
+                    let _ = chart.draw_series(
+                        plotters::series::LineSeries::new(
+                            step_points,
+                            plotters::style::ShapeStyle::from(pc).stroke_width(2),
+                        ),
+                    );
+                }
+            },
+        );
+    }
+}
+
 impl Widget for &StairsPlot {
     fn render(self, area: Rect, buf: &mut Buffer) {
+        #[cfg(feature = "plotters-render")]
+        {
+            if crate::plotters_render::should_use_plotters() {
+                use crate::plotters_render::PlottersRenderable;
+                self.render_plotters(area, buf, &self.theme);
+                return;
+            }
+        }
         if self.datasets.is_empty() {
             return;
         }

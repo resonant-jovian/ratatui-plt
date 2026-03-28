@@ -195,8 +195,90 @@ struct RingData {
     r_outer: f64,
 }
 
+#[cfg(feature = "plotters-render")]
+impl crate::plotters_render::PlottersRenderable for PieChart {
+    fn render_plotters(
+        &self,
+        area: ratatui::layout::Rect,
+        buf: &mut ratatui::buffer::Buffer,
+        theme: &crate::theme::Theme,
+    ) {
+        use crate::plotters_render::{bridge, theme_bridge};
+        use plotters::prelude::*;
+
+        if self.slices.is_empty() {
+            return;
+        }
+
+        let total: f64 = self.slices.iter().map(|s| s.value.max(0.0)).sum();
+        if total <= 0.0 {
+            return;
+        }
+
+        bridge::render_plotters_to_buf(
+            area,
+            buf,
+            theme_bridge::theme_bg_rgb(theme),
+            |root| {
+                let (w, h) = root.dim_in_pixel();
+                let cx = w as f64 / 2.0;
+                let cy = h as f64 / 2.0;
+                let radius = (cx.min(cy) * 0.75).max(10.0);
+
+                // Draw title if present
+                let fg = theme_bridge::fg_color(theme);
+                if let Some(ref title) = self.title {
+                    let _ = root.draw(&plotters::element::Text::new(
+                        title.clone(),
+                        (cx as i32, 10),
+                        ("sans-serif", 16.0).into_font().color(&fg),
+                    ));
+                }
+
+                let n_segments = 64; // segments per wedge for smoothness
+                let mut start_angle = -std::f64::consts::FRAC_PI_2; // start at top
+
+                for (si, slice) in self.slices.iter().enumerate() {
+                    let fraction = slice.value.max(0.0) / total;
+                    let sweep = fraction * 2.0 * std::f64::consts::PI;
+                    let end_angle = start_angle + sweep;
+
+                    let color = slice.color.unwrap_or_else(|| theme.color_cycle.at(si));
+                    let pc = theme_bridge::to_plotters_color(color);
+
+                    // Build polygon points: center -> arc -> center
+                    let mut points: Vec<(i32, i32)> = Vec::with_capacity(n_segments + 2);
+                    points.push((cx as i32, cy as i32));
+                    for i in 0..=n_segments {
+                        let angle = start_angle + sweep * i as f64 / n_segments as f64;
+                        let px = cx + radius * angle.cos();
+                        let py = cy + radius * angle.sin();
+                        points.push((px as i32, py as i32));
+                    }
+                    points.push((cx as i32, cy as i32));
+
+                    let _ = root.draw(&plotters::element::Polygon::new(
+                        points,
+                        ShapeStyle::from(pc).filled(),
+                    ));
+
+                    start_angle = end_angle;
+                }
+            },
+        );
+    }
+}
+
 impl Widget for &PieChart {
     fn render(self, area: Rect, buf: &mut Buffer) {
+        #[cfg(feature = "plotters-render")]
+        {
+            if crate::plotters_render::should_use_plotters() {
+                use crate::plotters_render::PlottersRenderable;
+                self.render_plotters(area, buf, &self.theme);
+                return;
+            }
+        }
         if area.width < 8 || area.height < 6 || self.slices.is_empty() {
             return;
         }

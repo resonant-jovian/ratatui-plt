@@ -287,8 +287,84 @@ impl LinePlot {
     }
 }
 
+#[cfg(feature = "plotters-render")]
+impl crate::plotters_render::PlottersRenderable for LinePlot {
+    fn render_plotters(
+        &self,
+        area: Rect,
+        buf: &mut Buffer,
+        theme: &Theme,
+    ) {
+        use crate::plotters_render::{bridge, helpers, theme_bridge};
+        use crate::series::is_valid_point;
+
+        let (data_x_min, data_x_max) = self.compute_x_bounds();
+        let (data_y_min, data_y_max) = self.compute_y_bounds();
+        let (x_lo, x_hi) =
+            self.x_axis.resolve_bounds(data_x_min, data_x_max);
+        let (y_lo, y_hi) =
+            self.y_axis.resolve_bounds(data_y_min, data_y_max);
+
+        let series_ref = &self.series;
+        let x_axis_ref = &self.x_axis;
+        let y_axis_ref = &self.y_axis;
+        let title_ref = self.title.as_deref();
+        let color_cycle = &theme.color_cycle;
+
+        bridge::render_plotters_to_buf(
+            area,
+            buf,
+            theme_bridge::theme_bg_rgb(theme),
+            |root| {
+                let Ok(mut chart) = helpers::build_cartesian_2d(
+                    root,
+                    x_axis_ref,
+                    y_axis_ref,
+                    title_ref,
+                    theme,
+                    x_lo..x_hi,
+                    y_lo..y_hi,
+                ) else {
+                    return;
+                };
+
+                for (si, series) in series_ref.iter().enumerate()
+                {
+                    let color = series
+                        .color
+                        .unwrap_or_else(|| color_cycle.at(si));
+                    let pc = theme_bridge::to_plotters_color(color);
+
+                    let points: Vec<(f64, f64)> = series
+                        .data
+                        .iter()
+                        .copied()
+                        .filter(|&(x, y)| is_valid_point(x, y))
+                        .collect();
+
+                    let _ = chart.draw_series(
+                        plotters::series::LineSeries::new(
+                            points.iter().copied(),
+                            plotters::style::ShapeStyle::from(pc)
+                                .stroke_width(2),
+                        ),
+                    );
+                }
+            },
+        );
+    }
+}
+
 impl Widget for &LinePlot {
     fn render(self, area: Rect, buf: &mut Buffer) {
+        #[cfg(feature = "plotters-render")]
+        {
+            if crate::plotters_render::should_use_plotters() {
+                use crate::plotters_render::PlottersRenderable;
+                self.render_plotters(area, buf, &self.theme);
+                return;
+            }
+        }
         // Compute data bounds
         let (data_x_min, data_x_max) = self.compute_x_bounds();
         let (data_y_min, data_y_max) = self.compute_y_bounds();

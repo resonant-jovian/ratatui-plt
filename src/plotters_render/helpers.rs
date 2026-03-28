@@ -24,6 +24,7 @@ pub const Y_LABEL_SIZE: u32 = 50;
 ///
 /// Returns a configured `ChartContext` with axes, grid, and labels
 /// drawn. The caller adds data series via `chart.draw_series(...)`.
+#[allow(clippy::type_complexity)]
 pub fn build_cartesian_2d<'a>(
     root: &'a DrawingArea<TinySkiaDrawingBackend, Shift>,
     x_axis: &Axis,

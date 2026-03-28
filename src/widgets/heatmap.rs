@@ -235,8 +235,97 @@ fn percentile(sorted: &[f64], p: f64) -> f64 {
     sorted[lo] * (1.0 - frac) + sorted[hi] * frac
 }
 
+#[cfg(feature = "plotters-render")]
+impl crate::plotters_render::PlottersRenderable for Heatmap {
+    fn render_plotters(
+        &self,
+        area: ratatui::layout::Rect,
+        buf: &mut ratatui::buffer::Buffer,
+        theme: &crate::theme::Theme,
+    ) {
+        use crate::plotters_render::{bridge, helpers, theme_bridge};
+
+        let nrows = self.data.nrows();
+        let ncols = self.data.ncols();
+        if nrows == 0 || ncols == 0 || self.data.values.is_empty() {
+            return;
+        }
+
+        let x_lo = *self.data.x.first().unwrap_or(&0.0);
+        let x_hi = *self.data.x.last().unwrap_or(&1.0);
+        let y_lo = *self.data.y.first().unwrap_or(&0.0);
+        let y_hi = *self.data.y.last().unwrap_or(&1.0);
+
+        let (x_lo, x_hi) = self.x_axis.resolve_bounds(x_lo, x_hi);
+        let (y_lo, y_hi) = self.y_axis.resolve_bounds(y_lo, y_hi);
+
+        let x_axis_ref = &self.x_axis;
+        let y_axis_ref = &self.y_axis;
+        let title_ref = self.title.as_deref();
+        let data_ref = &self.data;
+        let norm_ref = &self.norm;
+        let cmap_ref = &self.colormap;
+
+        bridge::render_plotters_to_buf(
+            area,
+            buf,
+            theme_bridge::theme_bg_rgb(theme),
+            |root| {
+                let Ok(mut chart) = helpers::build_cartesian_2d(
+                    root, x_axis_ref, y_axis_ref, title_ref, theme,
+                    x_lo..x_hi, y_lo..y_hi,
+                ) else { return; };
+
+                // Compute cell widths and heights
+                let dx = if ncols > 1 {
+                    (data_ref.x.last().unwrap_or(&1.0) - data_ref.x.first().unwrap_or(&0.0))
+                        / (ncols - 1) as f64
+                } else {
+                    1.0
+                };
+                let dy = if nrows > 1 {
+                    (data_ref.y.last().unwrap_or(&1.0) - data_ref.y.first().unwrap_or(&0.0))
+                        / (nrows - 1) as f64
+                } else {
+                    1.0
+                };
+
+                // Draw each cell as a filled rectangle
+                let _ = chart.draw_series(
+                    (0..nrows).flat_map(|row| {
+                        (0..ncols).map(move |col| {
+                            let val = data_ref.values[row][col];
+                            let t = norm_ref.normalize(val).clamp(0.0, 1.0);
+                            let color = cmap_ref.color_at(t);
+                            let pc = theme_bridge::to_plotters_color(color);
+
+                            let cx = data_ref.x[col];
+                            let cy = data_ref.y[row];
+                            plotters::element::Rectangle::new(
+                                [
+                                    (cx - dx * 0.5, cy - dy * 0.5),
+                                    (cx + dx * 0.5, cy + dy * 0.5),
+                                ],
+                                plotters::style::ShapeStyle::from(pc).filled(),
+                            )
+                        })
+                    }),
+                );
+            },
+        );
+    }
+}
+
 impl Widget for &Heatmap {
     fn render(self, area: Rect, buf: &mut Buffer) {
+        #[cfg(feature = "plotters-render")]
+        {
+            if crate::plotters_render::should_use_plotters() {
+                use crate::plotters_render::PlottersRenderable;
+                self.render_plotters(area, buf, &self.theme);
+                return;
+            }
+        }
         let nrows = self.data.nrows();
         let ncols = self.data.ncols();
         if nrows == 0 || ncols == 0 || self.data.values.is_empty() || self.data.values[0].is_empty()

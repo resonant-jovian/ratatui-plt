@@ -490,8 +490,108 @@ fn percentile_sorted(sorted: &[f64], p: f64) -> f64 {
     }
 }
 
+#[cfg(feature = "plotters-render")]
+impl crate::plotters_render::PlottersRenderable for Histogram {
+    fn render_plotters(
+        &self,
+        area: ratatui::layout::Rect,
+        buf: &mut ratatui::buffer::Buffer,
+        theme: &crate::theme::Theme,
+    ) {
+        use crate::plotters_render::{bridge, helpers, theme_bridge};
+
+        let has_datasets = !self.datasets.is_empty();
+
+        // Collect all bin data
+        let mut all_edges: Vec<Vec<f64>> = Vec::new();
+        let mut all_heights: Vec<Vec<f64>> = Vec::new();
+        let mut colors: Vec<ratatui::style::Color> = Vec::new();
+
+        if has_datasets {
+            let (global_lo, global_hi) = self.compute_global_range();
+            for ds in &self.datasets {
+                let n_bins = self.resolve_bin_count(&ds.data);
+                let (edges, heights) = self.compute_bins_for_data(&ds.data, n_bins, global_lo, global_hi);
+                all_edges.push(edges);
+                all_heights.push(heights);
+                colors.push(ds.color);
+            }
+        } else if !self.data.is_empty() {
+            let (edges, heights) = self.compute_bins();
+            all_edges.push(edges);
+            all_heights.push(heights);
+            colors.push(self.color.unwrap_or(theme.color_cycle.at(0)));
+        } else {
+            return;
+        }
+
+        // Compute global x/y bounds
+        let mut x_lo = f64::INFINITY;
+        let mut x_hi = f64::NEG_INFINITY;
+        let mut y_max = 0.0f64;
+        for edges in &all_edges {
+            if let (Some(&first), Some(&last)) = (edges.first(), edges.last()) {
+                x_lo = x_lo.min(first);
+                x_hi = x_hi.max(last);
+            }
+        }
+        for heights in &all_heights {
+            for &h in heights {
+                y_max = y_max.max(h);
+            }
+        }
+        if x_lo.is_infinite() { return; }
+        let y_padding = y_max * 0.05;
+        y_max += y_padding;
+        if y_max <= 0.0 { y_max = 1.0; }
+
+        let (x_lo, x_hi) = self.x_axis.resolve_bounds(x_lo, x_hi);
+        let (y_lo, y_hi) = self.y_axis.resolve_bounds(0.0, y_max);
+
+        let x_axis_ref = &self.x_axis;
+        let y_axis_ref = &self.y_axis;
+        let title_ref = self.title.as_deref();
+
+        bridge::render_plotters_to_buf(
+            area,
+            buf,
+            theme_bridge::theme_bg_rgb(theme),
+            |root| {
+                let Ok(mut chart) = helpers::build_cartesian_2d(
+                    root, x_axis_ref, y_axis_ref, title_ref, theme,
+                    x_lo..x_hi, y_lo..y_hi,
+                ) else { return; };
+
+                for (di, (edges, heights)) in all_edges.iter().zip(all_heights.iter()).enumerate() {
+                    let color = colors.get(di).copied().unwrap_or(theme.color_cycle.at(di));
+                    let pc = theme_bridge::to_plotters_color(color);
+
+                    let _ = chart.draw_series(
+                        heights.iter().enumerate().map(|(i, &h)| {
+                            let x0 = edges[i];
+                            let x1 = edges[i + 1];
+                            plotters::element::Rectangle::new(
+                                [(x0, 0.0), (x1, h)],
+                                plotters::style::ShapeStyle::from(pc).filled(),
+                            )
+                        }),
+                    );
+                }
+            },
+        );
+    }
+}
+
 impl Widget for &Histogram {
     fn render(self, area: Rect, buf: &mut Buffer) {
+        #[cfg(feature = "plotters-render")]
+        {
+            if crate::plotters_render::should_use_plotters() {
+                use crate::plotters_render::PlottersRenderable;
+                self.render_plotters(area, buf, &self.theme);
+                return;
+            }
+        }
         // Determine if we're in multi-dataset mode
         let has_datasets = !self.datasets.is_empty();
 
