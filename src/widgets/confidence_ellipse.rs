@@ -220,37 +220,9 @@ fn eigen_2x2(a: f64, b: f64, c: f64) -> (f64, f64, f64) {
     (lambda1.max(0.0), lambda2.max(0.0), theta)
 }
 
-#[cfg(feature = "plotters-render")]
-impl crate::plotters_render::PlottersRenderable for ConfidenceEllipse {
-    fn render_plotters(
-        &self,
-        area: ratatui::layout::Rect,
-        buf: &mut ratatui::buffer::Buffer,
-        theme: &crate::theme::Theme,
-    ) {
-        use crate::plotters_render::{bridge, theme_bridge};
-
-        bridge::render_plotters_to_buf(
-            area,
-            buf,
-            theme_bridge::theme_bg_rgb(theme),
-            |_root| {
-                // Minimal implementation - full plotters rendering TBD.
-            },
-        );
-    }
-}
 
 impl Widget for &ConfidenceEllipse {
     fn render(self, area: Rect, buf: &mut Buffer) {
-        #[cfg(feature = "plotters-render")]
-        {
-            if crate::plotters_render::should_use_plotters() {
-                use crate::plotters_render::PlottersRenderable;
-                self.render_plotters(area, buf, &self.theme);
-                return;
-            }
-        }
         if self.x.is_empty() || self.y.is_empty() {
             return;
         }

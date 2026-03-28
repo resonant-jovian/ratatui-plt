@@ -164,32 +164,9 @@ impl TriContour {
     }
 }
 
-#[cfg(feature = "plotters-render")]
-impl crate::plotters_render::PlottersRenderable for TriContour {
-    fn render_plotters(
-        &self,
-        area: ratatui::layout::Rect,
-        buf: &mut ratatui::buffer::Buffer,
-        theme: &crate::theme::Theme,
-    ) {
-        use crate::plotters_render::{bridge, theme_bridge};
-        bridge::render_plotters_to_buf(
-            area, buf, theme_bridge::theme_bg_rgb(theme),
-            |_root| { /* Minimal stub - full plotters rendering TBD */ },
-        );
-    }
-}
 
 impl Widget for &TriContour {
     fn render(self, area: Rect, buf: &mut Buffer) {
-        #[cfg(feature = "plotters-render")]
-        {
-            if crate::plotters_render::should_use_plotters() {
-                use crate::plotters_render::PlottersRenderable;
-                self.render_plotters(area, buf, &self.theme);
-                return;
-            }
-        }
         if self.triangulation.vertices.is_empty()
             || self.triangulation.triangles.is_empty()
             || self.vertex_values.is_empty()

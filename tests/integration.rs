@@ -1406,8 +1406,10 @@ fn test_export_buffer_to_text_non_empty() {
     let text = buffer_to_text(&buf);
 
     assert!(!text.is_empty());
-    // Should contain the title
-    assert!(text.contains("Text Export"));
+    // With the plotters pipeline, text is rasterized to pixels then
+    // downsampled to half-block characters, so literal title text
+    // won't appear. Just verify we got non-trivial output.
+    assert!(text.len() > 10);
 }
 
 #[test]

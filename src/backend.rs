@@ -188,10 +188,10 @@ impl DrawingBackend for TinySkiaDrawingBackend {
     ) -> Result<(), DrawingErrorKind<Self::ErrorType>> {
         let x = upper_left.0.min(bottom_right.0) as f32;
         let y = upper_left.1.min(bottom_right.1) as f32;
-        let w = (bottom_right.0 - upper_left.0).unsigned_abs() as f32;
-        let h = (bottom_right.1 - upper_left.1).unsigned_abs() as f32;
+        let w = (bottom_right.0 - upper_left.0).unsigned_abs().max(1) as f32;
+        let h = (bottom_right.1 - upper_left.1).unsigned_abs().max(1) as f32;
 
-        if let Some(rect) = Rect::from_xywh(x, y, w.max(1.0), h.max(1.0))
+        if let Some(rect) = Rect::from_xywh(x, y, w, h)
         {
             let paint = Self::paint_from_style(style);
             if fill {
@@ -266,7 +266,7 @@ impl DrawingBackend for TinySkiaDrawingBackend {
         let r = radius as f32;
 
         // Approximate circle with 4 cubic beziers.
-        let k = 0.552_284_8; // magic constant for cubic circle approx
+        let k = 0.552_284_8;
         let mut pb = PathBuilder::new();
         pb.move_to(cx + r, cy);
         pb.cubic_to(cx + r, cy + r * k, cx + r * k, cy + r, cx, cy + r);
@@ -336,9 +336,6 @@ impl DrawingBackend for TinySkiaDrawingBackend {
         style: &TStyle,
         pos: BackendCoord,
     ) -> Result<(), DrawingErrorKind<Self::ErrorType>> {
-        // Simple bitmap text rendering — each character is a filled
-        // rectangle with approximate glyph width. For production
-        // quality, integrate cosmic-text or fontdue.
         let c = style.color();
         let (r, g, b) = c.rgb;
         let font_size = style.size() as f32;
@@ -350,12 +347,11 @@ impl DrawingBackend for TinySkiaDrawingBackend {
             anti_alias: true,
             ..Paint::default()
         };
-        paint.set_color_rgba8(r, g, b, 255);
+        paint.set_color_rgba8(r, g, b, (c.alpha * 255.0) as u8);
 
+        // Stub: draws approximate rectangles per character.
+        // Full glyph rendering requires fontdue/ab_glyph integration.
         for _ch in text.chars() {
-            // Placeholder: draw small filled rect per character.
-            // This gives approximate text positioning for layout
-            // purposes. Full glyph rendering is a future enhancement.
             if let Some(rect) = Rect::from_xywh(
                 x,
                 y,
@@ -381,7 +377,7 @@ impl DrawingBackend for TinySkiaDrawingBackend {
     ) -> Result<(u32, u32), DrawingErrorKind<Self::ErrorType>> {
         let font_size = style.size();
         let char_w = (font_size * 0.6) as u32;
-        let width = char_w * text.len() as u32;
+        let width = char_w * text.chars().count() as u32;
         let height = font_size as u32;
         Ok((width, height))
     }

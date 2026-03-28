@@ -280,83 +280,9 @@ impl ScatterPlot {
     }
 }
 
-#[cfg(feature = "plotters-render")]
-impl crate::plotters_render::PlottersRenderable for ScatterPlot {
-    fn render_plotters(
-        &self,
-        area: ratatui::layout::Rect,
-        buf: &mut ratatui::buffer::Buffer,
-        theme: &crate::theme::Theme,
-    ) {
-        use crate::plotters_render::{bridge, helpers, theme_bridge};
-        use crate::series::is_valid_point;
-
-        // Compute data bounds
-        let mut x_min = f64::INFINITY;
-        let mut x_max = f64::NEG_INFINITY;
-        let mut y_min = f64::INFINITY;
-        let mut y_max = f64::NEG_INFINITY;
-        for s in &self.series {
-            if let Some((lo, hi)) = s.x_bounds() {
-                x_min = x_min.min(lo);
-                x_max = x_max.max(hi);
-            }
-            if let Some((lo, hi)) = s.y_bounds() {
-                y_min = y_min.min(lo);
-                y_max = y_max.max(hi);
-            }
-        }
-        if x_min.is_infinite() { x_min = 0.0; x_max = 1.0; }
-        if y_min.is_infinite() { y_min = 0.0; y_max = 1.0; }
-
-        let (x_lo, x_hi) = self.x_axis.resolve_bounds(x_min, x_max);
-        let (y_lo, y_hi) = self.y_axis.resolve_bounds(y_min, y_max);
-
-        let series_ref = &self.series;
-        let x_axis_ref = &self.x_axis;
-        let y_axis_ref = &self.y_axis;
-        let title_ref = self.title.as_deref();
-        let color_cycle = &theme.color_cycle;
-
-        bridge::render_plotters_to_buf(
-            area,
-            buf,
-            theme_bridge::theme_bg_rgb(theme),
-            |root| {
-                let Ok(mut chart) = helpers::build_cartesian_2d(
-                    root, x_axis_ref, y_axis_ref, title_ref, theme,
-                    x_lo..x_hi, y_lo..y_hi,
-                ) else { return; };
-
-                for (si, series) in series_ref.iter().enumerate() {
-                    let color = series.color.unwrap_or_else(|| color_cycle.at(si));
-                    let pc = theme_bridge::to_plotters_color(color);
-                    let points: Vec<(f64, f64)> = series.data.iter().copied()
-                        .filter(|&(x, y)| is_valid_point(x, y))
-                        .collect();
-
-                    let _ = chart.draw_series(points.iter().map(|&(x, y)| {
-                        plotters::element::Circle::new(
-                            (x, y), 4,
-                            plotters::style::ShapeStyle::from(pc).filled(),
-                        )
-                    }));
-                }
-            },
-        );
-    }
-}
 
 impl Widget for &ScatterPlot {
     fn render(self, area: Rect, buf: &mut Buffer) {
-        #[cfg(feature = "plotters-render")]
-        {
-            if crate::plotters_render::should_use_plotters() {
-                use crate::plotters_render::PlottersRenderable;
-                self.render_plotters(area, buf, &self.theme);
-                return;
-            }
-        }
         if area.width < 6 || area.height < 6 {
             return;
         }

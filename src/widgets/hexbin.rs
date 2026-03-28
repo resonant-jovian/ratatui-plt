@@ -190,37 +190,9 @@ fn pixel_to_hex_with_edge(dx: f64, dy: f64, s: f64) -> ((i32, i32), f64) {
     (key, dq.max(dr).max(ds))
 }
 
-#[cfg(feature = "plotters-render")]
-impl crate::plotters_render::PlottersRenderable for HexbinPlot {
-    fn render_plotters(
-        &self,
-        area: ratatui::layout::Rect,
-        buf: &mut ratatui::buffer::Buffer,
-        theme: &crate::theme::Theme,
-    ) {
-        use crate::plotters_render::{bridge, theme_bridge};
-
-        bridge::render_plotters_to_buf(
-            area,
-            buf,
-            theme_bridge::theme_bg_rgb(theme),
-            |_root| {
-                // Minimal implementation - full plotters rendering TBD.
-            },
-        );
-    }
-}
 
 impl Widget for &HexbinPlot {
     fn render(self, area: Rect, buf: &mut Buffer) {
-        #[cfg(feature = "plotters-render")]
-        {
-            if crate::plotters_render::should_use_plotters() {
-                use crate::plotters_render::PlottersRenderable;
-                self.render_plotters(area, buf, &self.theme);
-                return;
-            }
-        }
         if area.width < 4 || area.height < 4 || self.data.is_empty() {
             return;
         }

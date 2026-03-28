@@ -317,32 +317,9 @@ impl Streamtube {
     }
 }
 
-#[cfg(feature = "plotters-render")]
-impl crate::plotters_render::PlottersRenderable for Streamtube {
-    fn render_plotters(
-        &self,
-        area: ratatui::layout::Rect,
-        buf: &mut ratatui::buffer::Buffer,
-        theme: &crate::theme::Theme,
-    ) {
-        use crate::plotters_render::{bridge, theme_bridge};
-        bridge::render_plotters_to_buf(
-            area, buf, theme_bridge::theme_bg_rgb(theme),
-            |_root| { /* Minimal stub - full plotters rendering TBD */ },
-        );
-    }
-}
 
 impl Widget for &Streamtube {
     fn render(self, area: Rect, buf: &mut Buffer) {
-        #[cfg(feature = "plotters-render")]
-        {
-            if crate::plotters_render::should_use_plotters() {
-                use crate::plotters_render::PlottersRenderable;
-                self.render_plotters(area, buf, &self.theme);
-                return;
-            }
-        }
         self.render_with_camera(area, buf, &self.camera);
     }
 }

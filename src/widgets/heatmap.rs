@@ -11,7 +11,9 @@ use crate::annotation::Annotation;
 use crate::axis::{AspectRatio, Axis};
 use crate::colormap::{Colorbar, Colormap, Viridis};
 use crate::frame::{DataBounds, PlotFrame, ReferenceLine};
+use crate::helpers;
 use crate::norm::{LinearNorm, Normalize, TwoSlopeNorm};
+use crate::output::{self, OutputMode, UnicodeMode};
 use crate::plot_buffer::{PlotBackend, Z_ANNOTATION, Z_DATA, create_backend};
 use crate::series::GridData;
 use crate::spines::Spines;
@@ -59,6 +61,8 @@ pub struct Heatmap {
     spines: Spines,
     reference_lines: Vec<ReferenceLine>,
     annotations: Vec<Annotation>,
+    backend: Option<OutputMode>,
+    unicode_mode: UnicodeMode,
 }
 
 impl Heatmap {
@@ -84,6 +88,8 @@ impl Heatmap {
             spines: Spines::default(),
             reference_lines: Vec::new(),
             annotations: Vec::new(),
+            backend: None,
+            unicode_mode: UnicodeMode::HalfBlock,
         }
     }
 
@@ -200,6 +206,18 @@ impl Heatmap {
         self.annotations.push(ann);
         self
     }
+
+    /// Override the rendering backend for this widget only.
+    pub fn backend(mut self, mode: OutputMode) -> Self {
+        self.backend = Some(mode);
+        self
+    }
+
+    /// Set the Unicode rendering sub-mode (HalfBlock or Braille).
+    pub fn unicode_mode(mut self, mode: UnicodeMode) -> Self {
+        self.unicode_mode = mode;
+        self
+    }
 }
 
 /// Format a value with an optional precision string.
@@ -235,97 +253,135 @@ fn percentile(sorted: &[f64], p: f64) -> f64 {
     sorted[lo] * (1.0 - frac) + sorted[hi] * frac
 }
 
-#[cfg(feature = "plotters-render")]
-impl crate::plotters_render::PlottersRenderable for Heatmap {
-    fn render_plotters(
-        &self,
-        area: ratatui::layout::Rect,
-        buf: &mut ratatui::buffer::Buffer,
-        theme: &crate::theme::Theme,
-    ) {
-        use crate::plotters_render::{bridge, helpers, theme_bridge};
 
+impl Widget for &Heatmap {
+    fn render(self, area: Rect, buf: &mut Buffer) {
+        let mode = self.backend.unwrap_or_default();
+        let bg = helpers::theme_bg_rgb(&self.theme);
+        let unicode_mode = self.unicode_mode;
+        output::render_chart(area, buf, bg, mode, unicode_mode, |root| {
+            self.draw_chart(root, &self.theme);
+        });
+    }
+}
+
+impl Heatmap {
+    /// Draw the heatmap using plotters.
+    fn draw_chart(
+        &self,
+        root: &plotters::prelude::DrawingArea<
+            crate::backend::TinySkiaDrawingBackend,
+            plotters::coord::Shift,
+        >,
+        theme: &Theme,
+    ) {
         let nrows = self.data.nrows();
         let ncols = self.data.ncols();
         if nrows == 0 || ncols == 0 || self.data.values.is_empty() {
             return;
         }
 
-        let x_lo = *self.data.x.first().unwrap_or(&0.0);
-        let x_hi = *self.data.x.last().unwrap_or(&1.0);
-        let y_lo = *self.data.y.first().unwrap_or(&0.0);
-        let y_hi = *self.data.y.last().unwrap_or(&1.0);
+        let x_lo_data = *self.data.x.first().unwrap_or(&0.0);
+        let x_hi_data = *self.data.x.last().unwrap_or(&1.0);
+        let y_lo_data = *self.data.y.first().unwrap_or(&0.0);
+        let y_hi_data = *self.data.y.last().unwrap_or(&1.0);
 
-        let (x_lo, x_hi) = self.x_axis.resolve_bounds(x_lo, x_hi);
-        let (y_lo, y_hi) = self.y_axis.resolve_bounds(y_lo, y_hi);
+        let (x_lo, x_hi) = self.x_axis.resolve_bounds(x_lo_data, x_hi_data);
+        let (y_lo, y_hi) = self.y_axis.resolve_bounds(y_lo_data, y_hi_data);
 
-        let x_axis_ref = &self.x_axis;
-        let y_axis_ref = &self.y_axis;
-        let title_ref = self.title.as_deref();
-        let data_ref = &self.data;
-        let norm_ref = &self.norm;
-        let cmap_ref = &self.colormap;
+        // Resolve normalization (robust percentile / diverging center)
+        let effective_norm = self.resolve_norm();
 
-        bridge::render_plotters_to_buf(
-            area,
-            buf,
-            theme_bridge::theme_bg_rgb(theme),
-            |root| {
-                let Ok(mut chart) = helpers::build_cartesian_2d(
-                    root, x_axis_ref, y_axis_ref, title_ref, theme,
-                    x_lo..x_hi, y_lo..y_hi,
-                ) else { return; };
+        let Ok(mut chart) = helpers::build_cartesian_2d(
+            root, &self.x_axis, &self.y_axis,
+            self.title.as_deref(), theme,
+            x_lo..x_hi, y_lo..y_hi,
+        ) else {
+            return;
+        };
 
-                // Compute cell widths and heights
-                let dx = if ncols > 1 {
-                    (data_ref.x.last().unwrap_or(&1.0) - data_ref.x.first().unwrap_or(&0.0))
-                        / (ncols - 1) as f64
+        // Compute cell dimensions
+        let dx = if ncols > 1 {
+            (x_hi_data - x_lo_data) / (ncols - 1) as f64
+        } else {
+            x_hi_data - x_lo_data
+        };
+        let dy = if nrows > 1 {
+            (y_hi_data - y_lo_data) / (nrows - 1) as f64
+        } else {
+            y_hi_data - y_lo_data
+        };
+        let half_dx = dx / 2.0;
+        let half_dy = dy / 2.0;
+
+        // Pre-compute all cell rectangles with colors
+        let bad_pc = helpers::to_plotters_color(self.bad_color);
+        let cells: Vec<_> = (0..nrows)
+            .flat_map(|row| {
+                (0..ncols).map(move |col| (row, col))
+            })
+            .map(|(row, col)| {
+                let val = self.data.values[row][col];
+                let cx = self.data.x[col];
+                let cy = self.data.y[row];
+
+                let is_masked = self.mask.as_ref()
+                    .is_some_and(|m| m.get(row).is_some_and(|r| r.get(col).copied().unwrap_or(false)));
+
+                let color = if is_masked || !val.is_finite() {
+                    bad_pc
                 } else {
-                    1.0
-                };
-                let dy = if nrows > 1 {
-                    (data_ref.y.last().unwrap_or(&1.0) - data_ref.y.first().unwrap_or(&0.0))
-                        / (nrows - 1) as f64
-                } else {
-                    1.0
+                    let t = effective_norm.normalize(val).clamp(0.0, 1.0);
+                    helpers::to_plotters_color(self.colormap.color_at(t))
                 };
 
-                // Draw each cell as a filled rectangle
-                let _ = chart.draw_series(
-                    (0..nrows).flat_map(|row| {
-                        (0..ncols).map(move |col| {
-                            let val = data_ref.values[row][col];
-                            let t = norm_ref.normalize(val).clamp(0.0, 1.0);
-                            let color = cmap_ref.color_at(t);
-                            let pc = theme_bridge::to_plotters_color(color);
+                plotters::prelude::Rectangle::new(
+                    [
+                        (cx - half_dx, cy - half_dy),
+                        (cx + half_dx, cy + half_dy),
+                    ],
+                    plotters::style::ShapeStyle::from(color).filled(),
+                )
+            })
+            .collect();
 
-                            let cx = data_ref.x[col];
-                            let cy = data_ref.y[row];
-                            plotters::element::Rectangle::new(
-                                [
-                                    (cx - dx * 0.5, cy - dy * 0.5),
-                                    (cx + dx * 0.5, cy + dy * 0.5),
-                                ],
-                                plotters::style::ShapeStyle::from(pc).filled(),
-                            )
-                        })
-                    }),
-                );
-            },
-        );
+        let _ = chart.draw_series(cells);
+    }
+
+    /// Resolve the effective normalization, applying robust percentile
+    /// and diverging center logic.
+    fn resolve_norm(&self) -> Box<dyn Normalize> {
+        let (mut vmin, mut vmax) = self.data.value_bounds();
+
+        if self.robust {
+            let mut sorted: Vec<f64> = self.data.values.iter()
+                .flat_map(|row| row.iter().copied())
+                .filter(|v| v.is_finite())
+                .collect();
+            sorted.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
+            if !sorted.is_empty() {
+                vmin = percentile(&sorted, 0.02);
+                vmax = percentile(&sorted, 0.98);
+            }
+        }
+
+        if !vmin.is_finite() || !vmax.is_finite() || vmin >= vmax {
+            return Box::new(LinearNorm::new(0.0, 1.0));
+        }
+
+        if let Some(center) = self.center {
+            Box::new(TwoSlopeNorm::new(vmin, center, vmax))
+        } else {
+            Box::new(LinearNorm::new(vmin, vmax))
+        }
     }
 }
 
-impl Widget for &Heatmap {
-    fn render(self, area: Rect, buf: &mut Buffer) {
-        #[cfg(feature = "plotters-render")]
-        {
-            if crate::plotters_render::should_use_plotters() {
-                use crate::plotters_render::PlottersRenderable;
-                self.render_plotters(area, buf, &self.theme);
-                return;
-            }
-        }
+// ── Legacy character-based rendering (kept during migration) ─
+
+#[allow(dead_code)]
+impl Heatmap {
+    fn render_legacy(&self, area: Rect, buf: &mut Buffer) {
         let nrows = self.data.nrows();
         let ncols = self.data.ncols();
         if nrows == 0 || ncols == 0 || self.data.values.is_empty() || self.data.values[0].is_empty()
@@ -507,18 +563,9 @@ impl Widget for &Heatmap {
 
                         // Determine contrasting text color based on cell luminance
                         let t = effective_norm.normalize(val);
-                        let fg_color = match self.colormap.color_at(t) {
-                            Color::Rgb(r, g, b) => {
-                                let luminance =
-                                    (r as u32 * 299 + g as u32 * 587 + b as u32 * 114) / 1000;
-                                if luminance > 128 {
-                                    Color::Black
-                                } else {
-                                    Color::White
-                                }
-                            }
-                            _ => Color::White,
-                        };
+                        let fg_color = crate::drawing::contrasting_color(
+                            self.colormap.color_at(t),
+                        );
 
                         // Center the label horizontally within the cell
                         let label_start = xi.saturating_sub(label.len() as u16 / 2);
@@ -550,7 +597,7 @@ impl Widget for &Heatmap {
             let cb_area = Rect::new(
                 px + aw + 2,
                 py,
-                colorbar_width.min(area.x + area.width - px - aw - 2),
+                colorbar_width.min((area.x + area.width).saturating_sub(px + aw + 2)),
                 ah,
             );
             if cb_area.x + cb_area.width <= area.x + area.width {

@@ -42,6 +42,7 @@
 
 pub mod annotation;
 pub mod axis;
+pub mod backend;
 pub mod brushing;
 pub mod chars;
 pub mod collections;
@@ -51,10 +52,12 @@ pub mod config;
 pub mod drawing;
 pub mod export;
 pub mod frame;
+pub mod helpers;
 pub mod legend;
 pub mod macros;
 pub mod mathtext;
 pub mod norm;
+pub mod output;
 pub mod picking;
 pub mod plot_buffer;
 pub mod prelude;
@@ -73,9 +76,6 @@ pub mod linked_view;
 pub mod kitty_backend;
 #[cfg(feature = "sixel")]
 pub mod sixel_backend;
-
-#[cfg(feature = "plotters-render")]
-pub mod plotters_render;
 
 #[cfg(feature = "statistics")]
 pub mod statistics;
