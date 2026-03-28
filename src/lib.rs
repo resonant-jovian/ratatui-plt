@@ -74,6 +74,9 @@ pub mod kitty_backend;
 #[cfg(feature = "sixel")]
 pub mod sixel_backend;
 
+#[cfg(feature = "plotters-render")]
+pub mod plotters_render;
+
 #[cfg(feature = "statistics")]
 pub mod statistics;
 

@@ -25,6 +25,7 @@ kitty = ["export"]
 sixel = ["export", "dep:image"]
 toml-themes = ["dep:toml", "serde"]
 unicode-extended = []
+plotters-render = ["dep:plotters", "dep:plotters-backend", "dep:tiny-skia"]
 
 [dependencies]
 ratatui = "0.30.0"
@@ -110,6 +111,16 @@ version = "0.25.10"
 optional = true
 default-features = false
 features = ["png"]
+
+[dependencies.plotters]
+version = "0.3"
+optional = true
+default-features = false
+features = ["line_series", "area_series", "point_series", "histogram"]
+
+[dependencies.plotters-backend]
+version = "0.3"
+optional = true
 
 [dependencies.toml]
 version = "1.1.0"
