@@ -144,8 +144,8 @@ impl Series {
             if !y.is_finite() {
                 continue;
             }
-            let lo = y - self.y_err_low.as_ref().map_or(0.0, |e| e[i]);
-            let hi = y + self.y_err_high.as_ref().map_or(0.0, |e| e[i]);
+            let lo = y - self.y_err_low.as_ref().map_or(0.0, |e| e.get(i).copied().unwrap_or(0.0));
+            let hi = y + self.y_err_high.as_ref().map_or(0.0, |e| e.get(i).copied().unwrap_or(0.0));
             if lo < min {
                 min = lo;
             }

@@ -29,3 +29,12 @@ jobs:
       run: cargo build --release --verbose
     - name: Run all tests (release, sequential)
       run: cargo test --release --verbose -- --test-threads=1
+
+  docs:
+    name: Documentation
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    - uses: dtolnay/rust-toolchain@stable
+    - name: Check documentation builds without warnings
+      run: RUSTDOCFLAGS="-D warnings" cargo doc --all-features --no-deps

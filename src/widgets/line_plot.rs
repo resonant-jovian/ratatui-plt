@@ -19,16 +19,27 @@ use ratatui::layout::Rect;
 use ratatui::style::Color;
 use ratatui::widgets::Widget;
 
+#[cfg(feature = "statistics")]
+use std::collections::BTreeMap;
+
+#[cfg(feature = "statistics")]
+use ordered_float::OrderedFloat;
+
 use crate::annotation::Annotation;
 use crate::axis::{AspectRatio, Axis};
 use crate::frame::{DataBounds, PlotArea, PlotFrame, ReferenceLine};
+use crate::helpers;
 use crate::legend::{Legend, LegendPosition};
 use crate::linked_view::SharedView;
-use crate::plot_buffer::{PlotBackend, create_backend, Z_DATA, Z_FILL, Z_MARKER};
+use crate::output::{self, OutputMode, UnicodeMode};
+use crate::plot_buffer::{PlotBackend, Z_DATA, Z_FILL, Z_MARKER, create_backend};
 use crate::series::{Series, is_valid_point};
 use crate::spines::Spines;
 use crate::style::DashPattern;
 use crate::theme::Theme;
+
+#[cfg(feature = "statistics")]
+use crate::statistics::{bootstrap_ci, mean_estimator, median_estimator};
 
 /// Interpolation mode for line rendering.
 ///
@@ -43,17 +54,46 @@ pub enum InterpolationMode {
     CubicSpline,
 }
 
-/// Line plot step mode.
+/// Line plot step mode (matches matplotlib convention).
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum StepMode {
     /// No stepping (linear interpolation between points).
     None,
-    /// Step before the point (horizontal then vertical).
+    /// Step before the point: vertical then horizontal
+    /// (y changes at the left boundary of each interval).
     Pre,
     /// Step at midpoint.
     Mid,
-    /// Step after the point (vertical then horizontal).
+    /// Step after the point: horizontal then vertical
+    /// (y changes at the right boundary of each interval).
     Post,
+}
+
+/// CI lower and upper bound vectors for one series.
+#[cfg(feature = "statistics")]
+#[allow(dead_code)]
+type CiBounds = Option<(Vec<f64>, Vec<f64>)>;
+
+/// Method for aggregating multiple y-values at each x.
+#[cfg(feature = "statistics")]
+#[derive(Clone, Debug, Default)]
+pub enum EstimatorType {
+    /// Use the arithmetic mean as the point estimate.
+    #[default]
+    Mean,
+    /// Use the median as the point estimate.
+    Median,
+}
+
+/// How to display the confidence interval.
+#[cfg(feature = "statistics")]
+#[derive(Clone, Debug, Default)]
+pub enum ErrorStyle {
+    /// Render the CI as a shaded band between the lower and upper bounds.
+    #[default]
+    Band,
+    /// Render the CI as vertical error bars at each aggregated point.
+    Bars,
 }
 
 /// A 2D line plot widget.
@@ -73,6 +113,16 @@ pub struct LinePlot {
     spines: Spines,
     reference_lines: Vec<ReferenceLine>,
     shared_view: Option<SharedView>,
+    backend: Option<OutputMode>,
+    unicode_mode: UnicodeMode,
+    #[cfg(feature = "statistics")]
+    estimator: Option<EstimatorType>,
+    #[cfg(feature = "statistics")]
+    error_style: ErrorStyle,
+    #[cfg(feature = "statistics")]
+    ci_level: f64,
+    #[cfg(feature = "statistics")]
+    n_bootstrap: usize,
 }
 
 impl Default for LinePlot {
@@ -92,6 +142,16 @@ impl Default for LinePlot {
             spines: Spines::default(),
             reference_lines: Vec::new(),
             shared_view: None,
+            backend: None,
+            unicode_mode: UnicodeMode::Braille,
+            #[cfg(feature = "statistics")]
+            estimator: None,
+            #[cfg(feature = "statistics")]
+            error_style: ErrorStyle::default(),
+            #[cfg(feature = "statistics")]
+            ci_level: 0.95,
+            #[cfg(feature = "statistics")]
+            n_bootstrap: 1000,
         }
     }
 }
@@ -201,10 +261,174 @@ impl LinePlot {
         self.shared_view = Some(sv);
         self
     }
+
+    /// Override the rendering backend for this widget only.
+    pub fn backend(mut self, mode: OutputMode) -> Self {
+        self.backend = Some(mode);
+        self
+    }
+
+    /// Set the Unicode rendering sub-mode (Braille or HalfBlock).
+    pub fn unicode_mode(mut self, mode: UnicodeMode) -> Self {
+        self.unicode_mode = mode;
+        self
+    }
+
+    /// Set the estimator for aggregating repeated y-values per x.
+    ///
+    /// When set, multiple y-values sharing the same x coordinate are
+    /// aggregated using the chosen estimator. A bootstrap confidence
+    /// interval is computed and rendered according to [`ErrorStyle`].
+    #[cfg(feature = "statistics")]
+    pub fn estimator(mut self, e: EstimatorType) -> Self {
+        self.estimator = Some(e);
+        self
+    }
+
+    /// Set the error style for confidence interval display.
+    #[cfg(feature = "statistics")]
+    pub fn error_style(mut self, s: ErrorStyle) -> Self {
+        self.error_style = s;
+        self
+    }
+
+    /// Set the confidence level for bootstrap CI (default 0.95).
+    #[cfg(feature = "statistics")]
+    pub fn ci_level(mut self, level: f64) -> Self {
+        self.ci_level = level;
+        self
+    }
+
+    /// Set the number of bootstrap resamples (default 1000).
+    #[cfg(feature = "statistics")]
+    pub fn n_bootstrap(mut self, n: usize) -> Self {
+        self.n_bootstrap = n;
+        self
+    }
 }
+
 
 impl Widget for &LinePlot {
     fn render(self, area: Rect, buf: &mut Buffer) {
+        let mode = self.backend.unwrap_or_default();
+        let bg = helpers::theme_bg_rgb(&self.theme);
+        let unicode_mode = self.unicode_mode;
+        output::render_chart(area, buf, bg, mode, unicode_mode, |root| {
+            self.draw_chart(root, &self.theme);
+        });
+    }
+}
+
+impl LinePlot {
+    /// Draw the chart content using plotters.
+    fn draw_chart(
+        &self,
+        root: &plotters::prelude::DrawingArea<
+            crate::backend::TinySkiaDrawingBackend,
+            plotters::coord::Shift,
+        >,
+        theme: &Theme,
+    ) {
+        let (data_x_min, data_x_max) = self.compute_x_bounds();
+        let (data_y_min, data_y_max) = self.compute_y_bounds();
+
+        let (x_lo, x_hi) = self.x_axis.resolve_bounds(data_x_min, data_x_max);
+        let (y_lo, y_hi) = self.y_axis.resolve_bounds(data_y_min, data_y_max);
+
+        let Ok(mut chart) = helpers::build_cartesian_2d(
+            root, &self.x_axis, &self.y_axis,
+            self.title.as_deref(), theme,
+            x_lo..x_hi, y_lo..y_hi,
+        ) else {
+            return;
+        };
+
+        let color_cycle = &theme.color_cycle;
+
+        for (si, series) in self.series.iter().enumerate() {
+            let color = series.color.unwrap_or_else(|| color_cycle.at(si));
+            let pc = helpers::to_plotters_color(color);
+
+            let points: Vec<(f64, f64)> = series
+                .data
+                .iter()
+                .copied()
+                .filter(|&(x, y)| is_valid_point(x, y))
+                .collect();
+
+            // Apply interpolation if requested
+            let rendered_points = if self.interpolation == InterpolationMode::CubicSpline {
+                cubic_spline_interpolate(&points)
+            } else {
+                points.clone()
+            };
+
+            // Apply step mode if configured
+            let final_points = match &self.step_mode {
+                StepMode::None => rendered_points,
+                mode => apply_step_mode(&rendered_points, mode),
+            };
+
+            // Draw fill region if configured
+            if series.fill_to.is_some() {
+                let fill_color = helpers::to_plotters_color_alpha(color, 0.3);
+                let _ = chart.draw_series(
+                    plotters::prelude::AreaSeries::new(
+                        final_points.iter().copied(),
+                        y_lo,
+                        fill_color,
+                    ),
+                );
+            }
+
+            // Draw the line series
+            let _ = chart.draw_series(
+                plotters::series::LineSeries::new(
+                    final_points.iter().copied(),
+                    plotters::style::ShapeStyle::from(pc)
+                        .stroke_width(2),
+                ),
+            );
+
+            // Draw markers if configured
+            if series.marker.is_some() {
+                let _ = chart.draw_series(
+                    final_points.iter().map(|&(x, y)| {
+                        plotters::prelude::Circle::new(
+                            (x, y),
+                            3,
+                            plotters::style::ShapeStyle::from(pc).filled(),
+                        )
+                    }),
+                );
+            }
+
+            // Draw error bars if present
+            if let (Some(err_low), Some(err_high)) = (&series.y_err_low, &series.y_err_high) {
+                let err_color = helpers::to_plotters_color_alpha(color, 0.5);
+                for (i, &(x, y)) in series.data.iter().enumerate() {
+                    if !is_valid_point(x, y) {
+                        continue;
+                    }
+                    if let (Some(&lo), Some(&hi)) = (err_low.get(i), err_high.get(i)) {
+                        let _ = chart.draw_series(std::iter::once(
+                            plotters::prelude::PathElement::new(
+                                vec![(x, y - lo), (x, y + hi)],
+                                plotters::style::ShapeStyle::from(err_color).stroke_width(1),
+                            ),
+                        ));
+                    }
+                }
+            }
+        }
+    }
+}
+
+// ── Legacy character-based rendering (kept during migration) ─
+
+#[allow(dead_code)]
+impl LinePlot {
+    fn render_legacy(&self, area: Rect, buf: &mut Buffer) {
         // Compute data bounds
         let (data_x_min, data_x_max) = self.compute_x_bounds();
         let (data_y_min, data_y_max) = self.compute_y_bounds();
@@ -260,12 +484,36 @@ impl Widget for &LinePlot {
             })
             .collect();
 
+        // When a statistical estimator is configured, aggregate each
+        // series (grouping y-values by x) and collect CI bounds.
+        // The aggregated series replace the originals for all
+        // downstream rendering.
+        #[cfg(feature = "statistics")]
+        let (agg_series, ci_bounds): (Vec<Series>, Vec<CiBounds>) = if let Some(ref est) =
+            self.estimator
+        {
+            self.series
+                .iter()
+                .map(|s| {
+                    let (agg, lo, hi) = aggregate_series(s, est, self.ci_level, self.n_bootstrap);
+                    (agg, Some((lo, hi)))
+                })
+                .unzip()
+        } else {
+            self.series.iter().map(|s| (s.clone(), None)).unzip()
+        };
+
+        #[cfg(feature = "statistics")]
+        let render_series: &[Series] = &agg_series;
+        #[cfg(not(feature = "statistics"))]
+        let render_series: &[Series] = &self.series;
+
         // Apply cubic spline interpolation when requested.
         // This produces denser point arrays for smooth curves while leaving
         // the downstream rendering code unchanged.
         let interpolated: Vec<Vec<(f64, f64)>> =
             if self.interpolation == InterpolationMode::CubicSpline {
-                self.series
+                render_series
                     .iter()
                     .map(|s| {
                         let valid: Vec<(f64, f64)> = s
@@ -282,11 +530,11 @@ impl Widget for &LinePlot {
                     })
                     .collect()
             } else {
-                self.series.iter().map(|s| s.data.clone()).collect()
+                render_series.iter().map(|s| s.data.clone()).collect()
             };
 
         // Draw fill regions (using interpolated data for smoother fill)
-        for (si, s) in self.series.iter().enumerate() {
+        for (si, s) in render_series.iter().enumerate() {
             if let Some(ref fill_to) = s.fill_to {
                 let baseline = match fill_to {
                     crate::series::FillTo::Baseline(y) => *y,
@@ -325,8 +573,119 @@ impl Widget for &LinePlot {
             }
         }
 
-        // Draw error bars
-        for (si, s) in self.series.iter().enumerate() {
+        // Draw confidence interval regions (statistics feature)
+        #[cfg(feature = "statistics")]
+        for (si, ci_opt) in ci_bounds.iter().enumerate() {
+            if let Some((y_lo_ci, y_hi_ci)) = ci_opt {
+                let color = resolved_colors[si];
+                let series_data = &render_series[si].data;
+
+                match self.error_style {
+                    ErrorStyle::Band => {
+                        // Build sorted (x, lo, hi) triples for
+                        // interpolation
+                        let ci_pts: Vec<(f64, f64, f64)> = series_data
+                            .iter()
+                            .enumerate()
+                            .filter_map(|(i, &(x, _))| {
+                                if i < y_lo_ci.len() && i < y_hi_ci.len() && x.is_finite() {
+                                    Some((x, y_lo_ci[i], y_hi_ci[i]))
+                                } else {
+                                    None
+                                }
+                            })
+                            .collect();
+
+                        if ci_pts.is_empty() {
+                            continue;
+                        }
+
+                        let fill_char = self.theme.chars.fill.light;
+                        for col_offset in 0..pa.width {
+                            let screen_x = pa.x + col_offset;
+                            let data_x = x_lo
+                                + (col_offset as f64 / (pa.width.saturating_sub(1)).max(1) as f64)
+                                    * (x_hi - x_lo);
+
+                            let lo_y = interp_ci_at(&ci_pts, data_x, true);
+                            let hi_y = interp_ci_at(&ci_pts, data_x, false);
+
+                            if !lo_y.is_finite() || !hi_y.is_finite() {
+                                continue;
+                            }
+
+                            let sy_lo_px = pa.screen_y(lo_y);
+                            let sy_hi_px = pa.screen_y(hi_y);
+
+                            // screen_y is inverted (higher data
+                            // y = lower screen y)
+                            let y_top = sy_hi_px.round().min(sy_lo_px.round()) as u16;
+                            let y_bot = sy_hi_px.round().max(sy_lo_px.round()) as u16;
+
+                            for y in y_top..=y_bot {
+                                if pa.contains(screen_x, y) {
+                                    pb.set_char(screen_x, y, fill_char, color, Z_FILL);
+                                }
+                            }
+                        }
+                    }
+                    ErrorStyle::Bars => {
+                        for (i, &(x, _y)) in series_data.iter().enumerate() {
+                            if i >= y_lo_ci.len() || i >= y_hi_ci.len() {
+                                continue;
+                            }
+                            let sx = pa.screen_x(x);
+                            let xi = sx.round() as u16;
+                            if xi < pa.x || xi >= pa.x + pa.width {
+                                continue;
+                            }
+
+                            let lo = y_lo_ci[i];
+                            let hi = y_hi_ci[i];
+
+                            let sy_lo_px = pa.screen_y(lo);
+                            let sy_hi_px = pa.screen_y(hi);
+
+                            let y_top = sy_hi_px.round() as u16;
+                            let y_bot = sy_lo_px.round() as u16;
+
+                            for ey in y_top..=y_bot {
+                                if pa.contains(xi, ey) {
+                                    pb.set_char(
+                                        xi,
+                                        ey,
+                                        self.theme.chars.border.vertical,
+                                        color,
+                                        Z_DATA,
+                                    );
+                                }
+                            }
+                            if pa.contains(xi, y_top) {
+                                pb.set_char(
+                                    xi,
+                                    y_top,
+                                    self.theme.chars.tick.cap_top,
+                                    color,
+                                    Z_DATA,
+                                );
+                            }
+                            if pa.contains(xi, y_bot) {
+                                pb.set_char(
+                                    xi,
+                                    y_bot,
+                                    self.theme.chars.tick.cap_bottom,
+                                    color,
+                                    Z_DATA,
+                                );
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // Draw error bars (from series-level y_err)
+        for (si, s) in render_series.iter().enumerate() {
             let color = resolved_colors[si];
             if s.y_err_low.is_some() || s.y_err_high.is_some() {
                 for (i, &(x, y)) in s.data.iter().enumerate() {
@@ -336,8 +695,8 @@ impl Widget for &LinePlot {
                         continue;
                     }
 
-                    let lo = y - s.y_err_low.as_ref().map_or(0.0, |e| e[i]);
-                    let hi = y + s.y_err_high.as_ref().map_or(0.0, |e| e[i]);
+                    let lo = y - s.y_err_low.as_ref().map_or(0.0, |e| e.get(i).copied().unwrap_or(0.0));
+                    let hi = y + s.y_err_high.as_ref().map_or(0.0, |e| e.get(i).copied().unwrap_or(0.0));
 
                     let sy_lo = pa.screen_y(lo);
                     let sy_hi = pa.screen_y(hi);
@@ -362,7 +721,7 @@ impl Widget for &LinePlot {
         }
 
         // Draw line series (using interpolated data for line segments)
-        for (si, s) in self.series.iter().enumerate() {
+        for (si, s) in render_series.iter().enumerate() {
             let color = resolved_colors[si];
             let line_data = &interpolated[si];
             if line_data.len() < 2 {
@@ -414,41 +773,6 @@ impl Widget for &LinePlot {
                         );
                     }
                     StepMode::Pre => {
-                        // Horizontal then vertical: (x0,y0) -> (x1,y0) -> (x1,y1)
-                        let sx0 = pa.screen_x(x0);
-                        let sy0 = pa.screen_y(y0);
-                        let sx1 = pa.screen_x(x1);
-                        let sy1 = pa.screen_y(y1);
-                        // Horizontal segment at y0
-                        draw_line_pb(
-                            &mut pb,
-                            &LineSegment {
-                                x0: sx0,
-                                y0: sy0,
-                                x1: sx1,
-                                y1: sy0,
-                            },
-                            color,
-                            &s.line_style.pattern,
-                            &clip,
-                            Z_DATA + si as u8,
-                        );
-                        // Vertical segment at x1
-                        draw_line_pb(
-                            &mut pb,
-                            &LineSegment {
-                                x0: sx1,
-                                y0: sy0,
-                                x1: sx1,
-                                y1: sy1,
-                            },
-                            color,
-                            &s.line_style.pattern,
-                            &clip,
-                            Z_DATA + si as u8,
-                        );
-                    }
-                    StepMode::Post => {
                         // Vertical then horizontal: (x0,y0) -> (x0,y1) -> (x1,y1)
                         let sx0 = pa.screen_x(x0);
                         let sy0 = pa.screen_y(y0);
@@ -474,6 +798,41 @@ impl Widget for &LinePlot {
                             &LineSegment {
                                 x0: sx0,
                                 y0: sy1,
+                                x1: sx1,
+                                y1: sy1,
+                            },
+                            color,
+                            &s.line_style.pattern,
+                            &clip,
+                            Z_DATA + si as u8,
+                        );
+                    }
+                    StepMode::Post => {
+                        // Horizontal then vertical: (x0,y0) -> (x1,y0) -> (x1,y1)
+                        let sx0 = pa.screen_x(x0);
+                        let sy0 = pa.screen_y(y0);
+                        let sx1 = pa.screen_x(x1);
+                        let sy1 = pa.screen_y(y1);
+                        // Horizontal segment at y0
+                        draw_line_pb(
+                            &mut pb,
+                            &LineSegment {
+                                x0: sx0,
+                                y0: sy0,
+                                x1: sx1,
+                                y1: sy0,
+                            },
+                            color,
+                            &s.line_style.pattern,
+                            &clip,
+                            Z_DATA + si as u8,
+                        );
+                        // Vertical segment at x1
+                        draw_line_pb(
+                            &mut pb,
+                            &LineSegment {
+                                x0: sx1,
+                                y0: sy0,
                                 x1: sx1,
                                 y1: sy1,
                             },
@@ -605,6 +964,65 @@ impl LinePlot {
             (min, max)
         }
     }
+}
+
+/// Aggregate a series by grouping y-values at each unique x,
+/// computing a point estimate and bootstrap confidence interval.
+///
+/// Returns a new `Series` with one point per unique x (sorted),
+/// plus vectors of CI lower and upper bounds aligned to those points.
+#[cfg(feature = "statistics")]
+#[allow(dead_code)]
+fn aggregate_series(
+    series: &Series,
+    estimator: &EstimatorType,
+    ci_level: f64,
+    n_bootstrap: usize,
+) -> (Series, Vec<f64>, Vec<f64>) {
+    // Group (x, y) pairs by x using OrderedFloat for BTreeMap key.
+    let mut groups: BTreeMap<OrderedFloat<f64>, Vec<f64>> = BTreeMap::new();
+    for &(x, y) in &series.data {
+        if !is_valid_point(x, y) {
+            continue;
+        }
+        groups.entry(OrderedFloat(x)).or_default().push(y);
+    }
+
+    let est_fn = match estimator {
+        EstimatorType::Mean => mean_estimator,
+        EstimatorType::Median => median_estimator,
+    };
+
+    let mut agg_data = Vec::with_capacity(groups.len());
+    let mut y_low = Vec::with_capacity(groups.len());
+    let mut y_high = Vec::with_capacity(groups.len());
+
+    for (ox, ys) in &groups {
+        let x = ox.into_inner();
+        let point_est = est_fn(ys);
+
+        if ys.len() < 2 {
+            // Not enough data for bootstrap; CI collapses to point.
+            agg_data.push((x, point_est));
+            y_low.push(point_est);
+            y_high.push(point_est);
+        } else {
+            let ci = bootstrap_ci(ys, est_fn, n_bootstrap, ci_level, 42);
+            agg_data.push((x, ci.estimate));
+            y_low.push(ci.lower);
+            y_high.push(ci.upper);
+        }
+    }
+
+    let mut agg_series = Series::new(&series.name).data(agg_data);
+    if let Some(c) = series.color {
+        agg_series = agg_series.color(c);
+    }
+    if let Some(m) = series.marker {
+        agg_series = agg_series.marker(m);
+    }
+
+    (agg_series, y_low, y_high)
 }
 
 /// Clipping rectangle for line drawing.
@@ -765,10 +1183,91 @@ fn interp_y_at(data: &[(f64, f64)], x: f64) -> f64 {
     data[last].1
 }
 
+/// Linearly interpolate CI bounds from sorted (x, lo, hi) triples.
+///
+/// When `lower` is true, interpolates the lower bound; otherwise the
+/// upper bound. Returns `f64::NAN` when `data` is empty.
+#[cfg(feature = "statistics")]
+fn interp_ci_at(data: &[(f64, f64, f64)], x: f64, lower: bool) -> f64 {
+    if data.is_empty() {
+        return f64::NAN;
+    }
+    let pick = |t: &(f64, f64, f64)| {
+        if lower { t.1 } else { t.2 }
+    };
+    if data.len() == 1 {
+        return pick(&data[0]);
+    }
+    if x <= data[0].0 {
+        return pick(&data[0]);
+    }
+    let last = data.len() - 1;
+    if x >= data[last].0 {
+        return pick(&data[last]);
+    }
+    for i in 0..last {
+        let x0 = data[i].0;
+        let x1 = data[i + 1].0;
+        if x >= x0 && x <= x1 {
+            let dx = x1 - x0;
+            if dx.abs() < 1e-15 {
+                return pick(&data[i]);
+            }
+            let t = (x - x0) / dx;
+            let v0 = pick(&data[i]);
+            let v1 = pick(&data[i + 1]);
+            return v0 + t * (v1 - v0);
+        }
+    }
+    pick(&data[last])
+}
+
 /// Compute a natural cubic spline through `pts` and evaluate at 4x density.
 ///
 /// `pts` must be sorted by x, contain no NaN values, and have at least 3
 /// elements. Returns evenly-spaced evaluated points from x_min to x_max.
+///
+/// Expand data points for step-mode rendering.
+///
+/// Inserts intermediate points so that plotters' LineSeries draws
+/// horizontal/vertical steps instead of diagonal lines.
+fn apply_step_mode(points: &[(f64, f64)], mode: &StepMode) -> Vec<(f64, f64)> {
+    if points.len() < 2 {
+        return points.to_vec();
+    }
+    let mut result = Vec::with_capacity(points.len() * 2);
+    for window in points.windows(2) {
+        let (x0, y0) = window[0];
+        let (x1, y1) = window[1];
+        match mode {
+            StepMode::Pre => {
+                // Vertical then horizontal (matplotlib convention)
+                result.push((x0, y0));
+                result.push((x0, y1));
+            }
+            StepMode::Post => {
+                // Horizontal then vertical (matplotlib convention)
+                result.push((x0, y0));
+                result.push((x1, y0));
+            }
+            StepMode::Mid => {
+                let mid_x = (x0 + x1) / 2.0;
+                result.push((x0, y0));
+                result.push((mid_x, y0));
+                result.push((mid_x, y1));
+            }
+            StepMode::None => {
+                result.push((x0, y0));
+            }
+        }
+    }
+    if let Some(&last) = points.last() {
+        result.push(last);
+    }
+    result
+}
+
+/// Natural cubic spline interpolation for smooth curves.
 ///
 /// Algorithm:
 /// 1. Build the tridiagonal system for natural spline second derivatives.

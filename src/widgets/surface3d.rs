@@ -450,6 +450,7 @@ impl Surface3D {
     }
 }
 
+
 impl Widget for &Surface3D {
     fn render(self, area: Rect, buf: &mut Buffer) {
         self.render_with_camera(&self.camera, area, buf);

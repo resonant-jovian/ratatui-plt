@@ -510,6 +510,7 @@ fn draw_axis_lines(
 
 // ── Widget / StatefulWidget impls ───────────────────────────────────────────
 
+
 impl Widget for &Mesh3D {
     fn render(self, area: Rect, buf: &mut Buffer) {
         self.render_with_camera(&self.camera, area, buf);

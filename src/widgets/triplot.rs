@@ -109,6 +109,7 @@ impl TriPlot {
     }
 }
 
+
 impl Widget for &TriPlot {
     fn render(self, area: Rect, buf: &mut Buffer) {
         if self.triangulation.vertices.is_empty() || self.triangulation.triangles.is_empty() {

@@ -12,7 +12,7 @@ use crate::annotation::Annotation;
 use crate::axis::Axis;
 use crate::frame::{DataBounds, PlotFrame, ReferenceLine};
 use crate::legend::{Legend, LegendEntry, LegendPosition};
-use crate::plot_buffer::{PlotBackend, create_backend, Z_FILL};
+use crate::plot_buffer::{PlotBackend, Z_FILL, create_backend};
 use crate::series::Series;
 use crate::spines::Spines;
 use crate::theme::Theme;
@@ -160,6 +160,7 @@ impl AreaChart {
         self
     }
 }
+
 
 impl Widget for &AreaChart {
     fn render(self, area: Rect, buf: &mut Buffer) {
@@ -385,10 +386,19 @@ fn compute_normalized(
     (upper, lower, 0.0, 1.0)
 }
 
-/// Streamgraph mode: symmetric baseline centered on zero.
+/// Streamgraph mode: wiggle-minimizing baseline (Byron & Wattenberg 2008).
 ///
-/// Uses a simple symmetric baseline: offset = -total/2 at each x.
-/// The wiggle-minimizing baseline (ThemeRiver algorithm) is planned for Phase 7.
+/// Implements the weighted-wiggle algorithm from "Stacked Graphs --
+/// Geometry & Aesthetics" (Byron & Wattenberg, 2008), equivalent to
+/// D3's `stackOffsetWiggle`. The baseline offset at each x column is:
+///
+/// ```text
+/// offset = sum_i( (n - i) * thickness_i ) / -(n + 1)
+/// ```
+///
+/// where n is the number of layers and thickness_i is the value of
+/// layer i at that column. This minimises the sum of squared wiggle
+/// across all layers, producing a smoother streamgraph.
 fn compute_streamgraph(
     y_values: &[Vec<f64>],
     n_x: usize,
@@ -399,9 +409,17 @@ fn compute_streamgraph(
     let mut y_min = 0.0f64;
     let mut y_max = 0.0f64;
 
+    let n = n_series as f64;
+
     for xi in 0..n_x {
-        let total: f64 = (0..n_series).map(|si| y_values[si][xi].max(0.0)).sum();
-        let offset = -total / 2.0;
+        // Byron & Wattenberg weighted-wiggle offset.
+        let mut weighted_sum = 0.0;
+        for (si, row) in y_values.iter().enumerate().take(n_series) {
+            let thickness = row[xi].max(0.0);
+            weighted_sum += (n - si as f64) * thickness;
+        }
+        let offset = weighted_sum / -(n + 1.0);
+
         let mut running = offset;
         for si in 0..n_series {
             lower[si][xi] = running;

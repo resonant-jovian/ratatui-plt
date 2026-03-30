@@ -33,10 +33,6 @@ fn parse_theme() -> Theme {
 fn main() -> color_eyre::Result<()> {
     color_eyre::install()?;
     Theme::set_default(parse_theme());
-    io::stdout().execute(EnterAlternateScreen)?;
-    enable_raw_mode()?;
-    let mut terminal = Terminal::new(CrosstermBackend::new(io::stdout()))?;
-
     let theme = Theme::get_default();
     let n = 200;
     let s = Series::new("sin(x)")
@@ -58,6 +54,20 @@ fn main() -> color_eyre::Result<()> {
 
     let x_axis = Axis::new().label("x").grid(true);
     let y_axis = Axis::new().label("y").grid(true);
+
+    let headless_plot = LinePlot::new()
+        .series(s.clone())
+        .title("Span Selector")
+        .x_axis(x_axis.clone())
+        .y_axis(y_axis.clone());
+
+    if headless_export(|area, buf| (&headless_plot).render(area, buf))? {
+        return Ok(());
+    }
+
+    io::stdout().execute(EnterAlternateScreen)?;
+    enable_raw_mode()?;
+    let mut terminal = Terminal::new(CrosstermBackend::new(io::stdout()))?;
 
     loop {
         terminal.draw(|frame| {

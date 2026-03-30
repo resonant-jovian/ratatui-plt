@@ -9,7 +9,7 @@ use crate::axis::{AspectRatio, Axis};
 use crate::colormap::{Colorbar, Colormap, Viridis};
 use crate::frame::{DataBounds, PlotFrame, ReferenceLine};
 use crate::norm::{LinearNorm, Normalize};
-use crate::plot_buffer::{PlotBackend, create_backend, Z_DATA};
+use crate::plot_buffer::{PlotBackend, Z_DATA, create_backend};
 use crate::spines::Spines;
 use crate::theme::Theme;
 
@@ -210,6 +210,7 @@ fn point_in_quad(px: f64, py: f64, quad: &[(f64, f64); 4]) -> bool {
     }
     true
 }
+
 
 impl Widget for &Pcolormesh {
     fn render(self, area: Rect, buf: &mut Buffer) {

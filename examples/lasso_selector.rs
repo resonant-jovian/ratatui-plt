@@ -33,10 +33,6 @@ fn parse_theme() -> Theme {
 fn main() -> color_eyre::Result<()> {
     color_eyre::install()?;
     Theme::set_default(parse_theme());
-    io::stdout().execute(EnterAlternateScreen)?;
-    enable_raw_mode()?;
-    let mut terminal = Terminal::new(CrosstermBackend::new(io::stdout()))?;
-
     let theme = Theme::get_default();
 
     // Generate scatter data: ring of points plus inner cluster
@@ -69,6 +65,30 @@ fn main() -> color_eyre::Result<()> {
         (2.0, 5.5),
     ];
     let mut next_vertex: usize = 0;
+
+    let headless_plot = ScatterPlot::new()
+        .series(scatter.clone())
+        .title("Lasso Selector")
+        .x_axis(
+            Axis::new()
+                .label("x")
+                .bounds(Bounds::Manual(0.0, 10.0))
+                .grid(true),
+        )
+        .y_axis(
+            Axis::new()
+                .label("y")
+                .bounds(Bounds::Manual(0.0, 10.0))
+                .grid(true),
+        );
+
+    if headless_export(|area, buf| (&headless_plot).render(area, buf))? {
+        return Ok(());
+    }
+
+    io::stdout().execute(EnterAlternateScreen)?;
+    enable_raw_mode()?;
+    let mut terminal = Terminal::new(CrosstermBackend::new(io::stdout()))?;
 
     let lasso = LassoSelector::new()
         .x_axis(

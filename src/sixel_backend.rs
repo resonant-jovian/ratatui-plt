@@ -107,10 +107,7 @@ impl SixelBackend {
             && y >= self.area.y
             && y < self.area.y + self.area.height
         {
-            Some(
-                (y - self.area.y) as usize * self.area.width as usize
-                    + (x - self.area.x) as usize,
-            )
+            Some((y - self.area.y) as usize * self.area.width as usize + (x - self.area.x) as usize)
         } else {
             None
         }
@@ -131,10 +128,10 @@ impl PlotBackend for SixelBackend {
     }
 
     fn set_char(&mut self, x: u16, y: u16, ch: char, fg: Color, z: u8) {
-        if let Some(i) = self.cell_index(x, y) {
-            if self.text_cells[i].is_none_or(|(_, _, _, ez)| z >= ez) {
-                self.text_cells[i] = Some((ch, fg, Color::Reset, z));
-            }
+        if let Some(i) = self.cell_index(x, y)
+            && self.text_cells[i].is_none_or(|(_, _, _, ez)| z >= ez)
+        {
+            self.text_cells[i] = Some((ch, fg, Color::Reset, z));
         }
     }
 
@@ -180,7 +177,16 @@ impl PlotBackend for SixelBackend {
     }
 
     #[allow(clippy::too_many_arguments)]
-    fn draw_line(&mut self, x0: f64, y0: f64, x1: f64, y1: f64, color: Color, pa: &PlotArea, _z: u8) {
+    fn draw_line(
+        &mut self,
+        x0: f64,
+        y0: f64,
+        x1: f64,
+        y1: f64,
+        color: Color,
+        pa: &PlotArea,
+        _z: u8,
+    ) {
         let (r, g, b) = color_to_rgb(color);
 
         let px0 = ((x0 - self.area.x as f64) * CELL_PX_W as f64).round() as i32;
@@ -252,12 +258,11 @@ impl PlotBackend for SixelBackend {
         // Overlay text cells
         for y in self.area.y..self.area.y + self.area.height {
             for x in self.area.x..self.area.x + self.area.width {
-                if let Some(i) = self.cell_index(x, y) {
-                    if let Some((ch, fg, _bg, _)) = self.text_cells[i] {
-                        if ch != ' ' {
-                            buf[(x, y)].set_char(ch).set_fg(fg).set_skip(false);
-                        }
-                    }
+                if let Some(i) = self.cell_index(x, y)
+                    && let Some((ch, fg, _bg, _)) = self.text_cells[i]
+                    && ch != ' '
+                {
+                    buf[(x, y)].set_char(ch).set_fg(fg).set_skip(false);
                 }
             }
         }
@@ -318,11 +323,7 @@ fn encode_sixel(pixels: &[u8], width: u32, height: u32) -> String {
                 for dy in 0..band_height {
                     let py = y + dy;
                     let i = (py * width + x) as usize * 3;
-                    let prgb = (
-                        pixels[i] & 0xFC,
-                        pixels[i + 1] & 0xFC,
-                        pixels[i + 2] & 0xFC,
-                    );
+                    let prgb = (pixels[i] & 0xFC, pixels[i + 1] & 0xFC, pixels[i + 2] & 0xFC);
                     if prgb == color_rgb {
                         sixel_bits |= 1 << dy;
                         has_pixels = true;

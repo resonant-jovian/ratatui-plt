@@ -29,7 +29,7 @@ use ratatui::widgets::Widget;
 
 use crate::axis::Axis;
 use crate::frame::{DataBounds, PlotFrame, ReferenceLine};
-use crate::plot_buffer::{PlotBackend, create_backend, Z_DATA};
+use crate::plot_buffer::{PlotBackend, Z_DATA, create_backend};
 use crate::series::Series;
 use crate::spines::Spines;
 use crate::theme::Theme;
@@ -223,6 +223,7 @@ impl HorizonGraph {
         }
     }
 }
+
 
 impl Widget for &HorizonGraph {
     fn render(self, area: Rect, buf: &mut Buffer) {

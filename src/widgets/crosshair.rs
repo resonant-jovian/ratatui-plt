@@ -14,7 +14,7 @@ use crate::theme::Theme;
 /// Given data coordinates, draws intersecting dashed lines across the plot
 /// area with an optional coordinate readout label. This is designed to be
 /// rendered *on top of* an existing plot by calling [`Crosshair::render_on`]
-/// with a [`PlotArea`] reference obtained from [`PlotFrame::render`].
+/// with a [`PlotArea`] reference obtained from [`PlotFrame::render`](crate::frame::PlotFrame::render).
 ///
 /// # Example
 ///
@@ -152,3 +152,4 @@ impl Crosshair {
         }
     }
 }
+

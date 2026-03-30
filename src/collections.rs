@@ -78,7 +78,7 @@ impl LineCollection {
         }
     }
 
-    /// Render the line collection into a [`PlotBuffer`] using Braille sub-pixel line drawing.
+    /// Render the line collection into a [`PlotBuffer`](crate::plot_buffer::PlotBuffer) using Braille sub-pixel line drawing.
     pub fn render_to_pb(&self, pa: &PlotArea, pb: &mut dyn PlotBackend) {
         for &((x0, y0), (x1, y1), color) in &self.segments {
             let sx0 = pa.screen_x(x0);
@@ -152,7 +152,7 @@ impl PathCollection {
         }
     }
 
-    /// Render all paths into a [`PlotBuffer`] using Braille sub-pixel line drawing.
+    /// Render all paths into a [`PlotBuffer`](crate::plot_buffer::PlotBuffer) using Braille sub-pixel line drawing.
     pub fn render_to_pb(&self, pa: &PlotArea, pb: &mut dyn PlotBackend) {
         for (vertices, color, closed) in &self.paths {
             if vertices.len() < 2 {

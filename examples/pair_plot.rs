@@ -64,10 +64,6 @@ fn parse_theme() -> Theme {
 fn main() -> color_eyre::Result<()> {
     color_eyre::install()?;
     Theme::set_default(parse_theme());
-    io::stdout().execute(EnterAlternateScreen)?;
-    enable_raw_mode()?;
-    let mut terminal = Terminal::new(CrosstermBackend::new(io::stdout()))?;
-
     let theme = Theme::get_default();
 
     // Generate correlated 4-variable dataset (80 samples)
@@ -100,6 +96,14 @@ fn main() -> color_eyre::Result<()> {
         .marker(MarkerShape::Dot)
         .color(theme.primary)
         .title("Pair Plot (q to quit)");
+
+    if headless_export(|area, buf| (&plot).render(area, buf))? {
+        return Ok(());
+    }
+
+    io::stdout().execute(EnterAlternateScreen)?;
+    enable_raw_mode()?;
+    let mut terminal = Terminal::new(CrosstermBackend::new(io::stdout()))?;
 
     loop {
         terminal.draw(|frame| {

@@ -32,10 +32,6 @@ fn parse_theme() -> Theme {
 fn main() -> color_eyre::Result<()> {
     color_eyre::install()?;
     Theme::set_default(parse_theme());
-    io::stdout().execute(EnterAlternateScreen)?;
-    enable_raw_mode()?;
-    let mut terminal = Terminal::new(CrosstermBackend::new(io::stdout()))?;
-
     // Build synthetic data: 2 rows x 3 cols x 2 hue levels
     let row_labels = ["Low", "High"];
     let col_labels = ["Alpha", "Beta", "Gamma"];
@@ -73,6 +69,14 @@ fn main() -> color_eyre::Result<()> {
         .col_titles(true)
         .row_titles(true)
         .gap(1);
+
+    if headless_export(|area, buf| (&grid).render(area, buf))? {
+        return Ok(());
+    }
+
+    io::stdout().execute(EnterAlternateScreen)?;
+    enable_raw_mode()?;
+    let mut terminal = Terminal::new(CrosstermBackend::new(io::stdout()))?;
 
     loop {
         terminal.draw(|frame| {

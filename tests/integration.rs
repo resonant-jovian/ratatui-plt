@@ -351,6 +351,25 @@ fn test_bar_chart_stacked_renders() {
 }
 
 #[test]
+fn test_bar_chart_pattern_fill_renders() {
+    let cats = vec!["A", "B", "C"];
+    let ds1 =
+        BarDataset::new("G1", vec![10.0, 20.0, 15.0], Color::Cyan).pattern(FillPattern::CrossHatch);
+    let ds2 = BarDataset::new("G2", vec![12.0, 18.0, 22.0], Color::Yellow)
+        .pattern(FillPattern::DiagonalRight);
+    let chart = BarChart::new()
+        .categories(cats)
+        .dataset(ds1)
+        .dataset(ds2)
+        .mode(BarMode::Grouped)
+        .title("Patterned");
+
+    let area = Rect::new(0, 0, 40, 20);
+    let mut buf = Buffer::empty(area);
+    (&chart).render(area, &mut buf);
+}
+
+#[test]
 fn test_box_plot_renders() {
     let g1 = BoxData::new(
         "A",
@@ -444,6 +463,28 @@ fn test_pie_chart_renders() {
     let area = Rect::new(0, 0, 40, 20);
     let mut buf = Buffer::empty(area);
     (&plot).render(area, &mut buf);
+}
+
+#[test]
+fn test_pie_chart_multi_ring_renders() {
+    let chart = PieChart::new()
+        .slice(PieSlice::new("Inner A", 40.0).color(Color::Cyan))
+        .slice(PieSlice::new("Inner B", 35.0).color(Color::Yellow))
+        .slice(PieSlice::new("Inner C", 25.0).color(Color::Red))
+        .ring(PieRing::new(vec![
+            PieSlice::new("Outer 1", 20.0).color(Color::Blue),
+            PieSlice::new("Outer 2", 30.0).color(Color::Green),
+            PieSlice::new("Outer 3", 25.0).color(Color::Magenta),
+            PieSlice::new("Outer 4", 25.0).color(Color::White),
+        ]))
+        .donut_ratio(0.2)
+        .show_labels(true)
+        .show_percentages(true)
+        .title("Multi-Ring Pie");
+
+    let area = Rect::new(0, 0, 60, 30);
+    let mut buf = Buffer::empty(area);
+    (&chart).render(area, &mut buf);
 }
 
 #[test]
@@ -1365,8 +1406,10 @@ fn test_export_buffer_to_text_non_empty() {
     let text = buffer_to_text(&buf);
 
     assert!(!text.is_empty());
-    // Should contain the title
-    assert!(text.contains("Text Export"));
+    // With the plotters pipeline, text is rasterized to pixels then
+    // downsampled to half-block characters, so literal title text
+    // won't appear. Just verify we got non-trivial output.
+    assert!(text.len() > 10);
 }
 
 #[test]
@@ -3637,4 +3680,777 @@ fn test_enclosed_numbers() {
     assert_eq!(enclosed_number(10), "⑩");
     assert_eq!(enclosed_number(20), "⑳");
     assert_eq!(enclosed_number(21), "21"); // falls back to string
+}
+
+#[test]
+fn test_area_chart_streamgraph_renders() {
+    let s1 = Series::new("A")
+        .data(
+            (0..10)
+                .map(|i| (i as f64, (i as f64 * 0.3).sin().abs()))
+                .collect(),
+        )
+        .color(Color::Cyan);
+    let s2 = Series::new("B")
+        .data(
+            (0..10)
+                .map(|i| (i as f64, (i as f64 * 0.2).cos().abs()))
+                .collect(),
+        )
+        .color(Color::Yellow);
+    let s3 = Series::new("C")
+        .data((0..10).map(|i| (i as f64, 0.5)).collect())
+        .color(Color::Magenta);
+    let plot = AreaChart::new()
+        .series(s1)
+        .series(s2)
+        .series(s3)
+        .mode(AreaMode::StreamGraph)
+        .title("StreamGraph Wiggle");
+
+    let area = Rect::new(0, 0, 40, 20);
+    let mut buf = Buffer::empty(area);
+    (&plot).render(area, &mut buf);
+}
+
+#[test]
+fn test_sankey_vertical_orientation_renders() {
+    let d = SankeyDiagram::new()
+        .node(SankeyNode {
+            label: "A".into(),
+            color: Some(Color::Red),
+        })
+        .node(SankeyNode {
+            label: "B".into(),
+            color: Some(Color::Blue),
+        })
+        .node(SankeyNode {
+            label: "C".into(),
+            color: Some(Color::Green),
+        })
+        .node(SankeyNode {
+            label: "D".into(),
+            color: Some(Color::Yellow),
+        })
+        .flow(SankeyFlow {
+            source: 0,
+            target: 2,
+            value: 5.0,
+            color: None,
+        })
+        .flow(SankeyFlow {
+            source: 0,
+            target: 3,
+            value: 2.0,
+            color: None,
+        })
+        .flow(SankeyFlow {
+            source: 1,
+            target: 3,
+            value: 3.0,
+            color: None,
+        })
+        .orientation(SankeyOrientation::Vertical)
+        .title("Vertical Sankey");
+    let area = Rect::new(0, 0, 60, 20);
+    let mut buf = Buffer::empty(area);
+    (&d).render(area, &mut buf);
+}
+
+#[cfg(feature = "statistics")]
+#[test]
+fn test_lineplot_ci_mean_band() {
+    use ratatui_plt::widgets::line_plot::EstimatorType;
+
+    // 3 y-values at each of 5 x positions
+    let data: Vec<(f64, f64)> = vec![
+        (1.0, 2.0),
+        (1.0, 2.5),
+        (1.0, 3.0),
+        (2.0, 4.0),
+        (2.0, 4.5),
+        (2.0, 5.0),
+        (3.0, 1.0),
+        (3.0, 1.5),
+        (3.0, 2.0),
+        (4.0, 3.0),
+        (4.0, 3.5),
+        (4.0, 4.0),
+        (5.0, 5.0),
+        (5.0, 5.5),
+        (5.0, 6.0),
+    ];
+    let s = Series::new("noisy").data(data).color(Color::Cyan);
+    let plot = LinePlot::new()
+        .series(s)
+        .estimator(EstimatorType::Mean)
+        .title("CI Band");
+    let area = Rect::new(0, 0, 60, 20);
+    let mut buf = Buffer::empty(area);
+    (&plot).render(area, &mut buf);
+}
+
+#[cfg(feature = "statistics")]
+#[test]
+fn test_lineplot_ci_median_bars() {
+    use ratatui_plt::widgets::line_plot::{ErrorStyle, EstimatorType};
+
+    let data: Vec<(f64, f64)> = vec![
+        (1.0, 10.0),
+        (1.0, 12.0),
+        (1.0, 11.0),
+        (2.0, 20.0),
+        (2.0, 22.0),
+        (2.0, 21.0),
+        (3.0, 15.0),
+        (3.0, 17.0),
+        (3.0, 16.0),
+    ];
+    let s = Series::new("err").data(data).color(Color::Red);
+    let plot = LinePlot::new()
+        .series(s)
+        .estimator(EstimatorType::Median)
+        .error_style(ErrorStyle::Bars)
+        .ci_level(0.90)
+        .n_bootstrap(500)
+        .title("CI Bars");
+    let area = Rect::new(0, 0, 60, 20);
+    let mut buf = Buffer::empty(area);
+    (&plot).render(area, &mut buf);
+}
+
+// ===== ScatterPlot marginal distribution tests =====
+
+#[test]
+fn test_scatter_plot_histogram_marginals() {
+    use ratatui_plt::widgets::joint_plot::MarginalType;
+
+    let s = Series::new("pts")
+        .data(vec![
+            (0.0, 0.0),
+            (1.0, 2.0),
+            (2.0, 1.0),
+            (3.0, 3.0),
+            (4.0, 2.5),
+        ])
+        .color(Color::Cyan)
+        .marker(MarkerShape::FilledCircle);
+    let plot = ScatterPlot::new()
+        .series(s)
+        .marginal_x(MarginalType::Histogram)
+        .marginal_y(MarginalType::Histogram)
+        .title("Scatter + Marginals");
+
+    let area = Rect::new(0, 0, 60, 30);
+    let mut buf = Buffer::empty(area);
+    (&plot).render(area, &mut buf);
+}
+
+#[test]
+fn test_scatter_plot_kde_marginals() {
+    use ratatui_plt::widgets::joint_plot::MarginalType;
+
+    let s = Series::new("pts")
+        .data(vec![
+            (0.0, 0.0),
+            (1.0, 1.5),
+            (2.0, 1.0),
+            (3.0, 2.5),
+            (4.0, 3.0),
+            (5.0, 4.0),
+        ])
+        .color(Color::Green)
+        .marker(MarkerShape::Circle);
+    let plot = ScatterPlot::new()
+        .series(s)
+        .marginal_x(MarginalType::Kde)
+        .marginal_y(MarginalType::Kde)
+        .title("Scatter KDE Marginals");
+
+    let area = Rect::new(0, 0, 60, 30);
+    let mut buf = Buffer::empty(area);
+    (&plot).render(area, &mut buf);
+}
+
+#[test]
+fn test_scatter_plot_rug_marginals() {
+    use ratatui_plt::widgets::joint_plot::MarginalType;
+
+    let s = Series::new("pts")
+        .data(vec![(1.0, 2.0), (2.0, 3.0), (3.0, 1.0), (4.0, 4.0)])
+        .color(Color::Yellow)
+        .marker(MarkerShape::Dot);
+    let plot = ScatterPlot::new()
+        .series(s)
+        .marginal_x(MarginalType::Rug)
+        .marginal_y(MarginalType::Rug)
+        .title("Scatter Rug Marginals");
+
+    let area = Rect::new(0, 0, 60, 30);
+    let mut buf = Buffer::empty(area);
+    (&plot).render(area, &mut buf);
+}
+
+#[test]
+fn test_scatter_plot_mixed_marginals() {
+    use ratatui_plt::widgets::joint_plot::MarginalType;
+
+    let s = Series::new("pts")
+        .data(vec![(0.0, 1.0), (1.0, 3.0), (2.0, 2.0), (3.0, 4.0)])
+        .color(Color::Magenta)
+        .marker(MarkerShape::Cross);
+    let plot = ScatterPlot::new()
+        .series(s)
+        .marginal_x(MarginalType::Histogram)
+        .marginal_y(MarginalType::Kde)
+        .marginal_ratio(0.25)
+        .marginal_bins(10)
+        .title("Scatter Mixed Marginals");
+
+    let area = Rect::new(0, 0, 60, 30);
+    let mut buf = Buffer::empty(area);
+    (&plot).render(area, &mut buf);
+}
+
+#[test]
+fn test_scatter_plot_no_marginals_unchanged() {
+    let s = Series::new("pts")
+        .data(vec![(0.0, 0.0), (1.0, 1.0), (2.0, 2.0)])
+        .color(Color::Red)
+        .marker(MarkerShape::Cross);
+    let plot = ScatterPlot::new().series(s).title("No Marginals");
+
+    let area = Rect::new(0, 0, 40, 20);
+    let mut buf = Buffer::empty(area);
+    (&plot).render(area, &mut buf);
+}
+
+// ===== Extended Edge-Case Tests =====
+
+#[test]
+fn test_nan_data_core_2d() {
+    let area = Rect::new(0, 0, 40, 20);
+
+    let nan_data = vec![
+        (0.0, f64::NAN),
+        (1.0, 2.0),
+        (f64::NAN, 3.0),
+        (2.0, f64::NAN),
+    ];
+    let s = Series::new("nan").data(nan_data).color(Color::White);
+
+    // LinePlot
+    let p = LinePlot::new().series(s.clone()).title("NaN line");
+    let mut buf = Buffer::empty(area);
+    (&p).render(area, &mut buf);
+
+    // ScatterPlot
+    let p = ScatterPlot::new().series(s.clone()).title("NaN scatter");
+    let mut buf = Buffer::empty(area);
+    (&p).render(area, &mut buf);
+
+    // BarChart (category-based, NaN values)
+    let ds = BarDataset::new("nan", vec![f64::NAN, 2.0, f64::NAN], Color::Cyan);
+    let b = BarChart::new()
+        .categories(vec!["A", "B", "C"])
+        .dataset(ds)
+        .title("NaN bar");
+    let mut buf = Buffer::empty(area);
+    (&b).render(area, &mut buf);
+
+    // AreaChart
+    let p = AreaChart::new().series(s.clone()).title("NaN area");
+    let mut buf = Buffer::empty(area);
+    (&p).render(area, &mut buf);
+
+    // StairsPlot (uses StairsDataset with edges/values)
+    let ds = StairsDataset::new(
+        "nan",
+        vec![0.0, 1.0, 2.0, 3.0],
+        vec![f64::NAN, 2.0, f64::NAN],
+        Color::White,
+    );
+    let p = StairsPlot::new().dataset(ds).title("NaN stairs");
+    let mut buf = Buffer::empty(area);
+    (&p).render(area, &mut buf);
+
+    // StemPlot
+    let p = StemPlot::new(vec![
+        (0.0, f64::NAN),
+        (1.0, 2.0),
+        (f64::NAN, 3.0),
+        (2.0, f64::NAN),
+    ])
+    .title("NaN stem");
+    let mut buf = Buffer::empty(area);
+    (&p).render(area, &mut buf);
+}
+
+#[test]
+fn test_nan_data_statistical() {
+    let area = Rect::new(0, 0, 40, 20);
+
+    // BoxPlot
+    let box_data = BoxData::new("nan", vec![1.0, f64::NAN, 3.0, f64::NAN, 5.0], Color::White);
+    let p = BoxPlot::new().box_data(box_data).title("NaN box");
+    let mut buf = Buffer::empty(area);
+    (&p).render(area, &mut buf);
+
+    // ViolinPlot
+    let vdata = ViolinData::new("nan", vec![1.0, f64::NAN, 3.0, f64::NAN, 5.0], Color::White);
+    let p = ViolinPlot::new().dataset(vdata).title("NaN violin");
+    let mut buf = Buffer::empty(area);
+    (&p).render(area, &mut buf);
+
+    // Histogram
+    let p = Histogram::new(vec![1.0, f64::NAN, 3.0, f64::NAN, 5.0]).title("NaN hist");
+    let mut buf = Buffer::empty(area);
+    (&p).render(area, &mut buf);
+}
+
+#[test]
+fn test_nan_data_grid() {
+    let area = Rect::new(0, 0, 40, 20);
+
+    let grid = GridData::new(
+        vec![-1.0, 0.0, 1.0],
+        vec![-1.0, 0.0, 1.0],
+        vec![
+            vec![1.0, 2.0, 3.0],
+            vec![4.0, f64::NAN, 6.0],
+            vec![7.0, 8.0, 9.0],
+        ],
+    );
+
+    // Heatmap
+    let hm = Heatmap::new(grid.clone()).title("NaN heatmap");
+    let mut buf = Buffer::empty(area);
+    (&hm).render(area, &mut buf);
+
+    // ContourPlot
+    let ct = ContourPlot::new(grid).title("NaN contour");
+    let mut buf = Buffer::empty(area);
+    (&ct).render(area, &mut buf);
+}
+
+#[test]
+fn test_empty_data_extended() {
+    let area = Rect::new(0, 0, 40, 20);
+
+    // Histogram with empty data
+    let p = Histogram::new(vec![]).title("Empty");
+    let mut buf = Buffer::empty(area);
+    (&p).render(area, &mut buf);
+
+    // AreaChart with no series
+    let p = AreaChart::new().title("Empty");
+    let mut buf = Buffer::empty(area);
+    (&p).render(area, &mut buf);
+
+    // StairsPlot with no datasets
+    let p = StairsPlot::new().title("Empty");
+    let mut buf = Buffer::empty(area);
+    (&p).render(area, &mut buf);
+
+    // StemPlot with empty data
+    let p = StemPlot::new(vec![]).title("Empty");
+    let mut buf = Buffer::empty(area);
+    (&p).render(area, &mut buf);
+
+    // BoxPlot with no data
+    let p = BoxPlot::new().title("Empty");
+    let mut buf = Buffer::empty(area);
+    (&p).render(area, &mut buf);
+
+    // ViolinPlot with no datasets
+    let p = ViolinPlot::new().title("Empty");
+    let mut buf = Buffer::empty(area);
+    (&p).render(area, &mut buf);
+
+    // Heatmap with tiny 1x1 grid
+    let grid = GridData::from_fn((0.0, 1.0), (0.0, 1.0), 1, 1, |_, _| 0.0);
+    let hm = Heatmap::new(grid).title("Tiny");
+    let mut buf = Buffer::empty(area);
+    (&hm).render(area, &mut buf);
+
+    // Treemap with minimal root
+    let root = TreemapNode::new("empty", 0.0);
+    let tm = Treemap::new(root).title("Empty");
+    let mut buf = Buffer::empty(area);
+    (&tm).render(area, &mut buf);
+
+    // CandlestickChart with no candles
+    let cs = CandlestickChart::new().title("Empty");
+    let mut buf = Buffer::empty(area);
+    (&cs).render(area, &mut buf);
+}
+
+#[test]
+fn test_single_point_2d() {
+    let area = Rect::new(0, 0, 40, 20);
+    let s = Series::new("one")
+        .data(vec![(1.0, 2.0)])
+        .color(Color::White);
+
+    // LinePlot
+    let p = LinePlot::new().series(s.clone()).title("One pt line");
+    let mut buf = Buffer::empty(area);
+    (&p).render(area, &mut buf);
+
+    // ScatterPlot
+    let p = ScatterPlot::new().series(s.clone()).title("One pt scatter");
+    let mut buf = Buffer::empty(area);
+    (&p).render(area, &mut buf);
+
+    // AreaChart
+    let p = AreaChart::new().series(s.clone()).title("One pt area");
+    let mut buf = Buffer::empty(area);
+    (&p).render(area, &mut buf);
+
+    // BarChart with one bar
+    let ds = BarDataset::new("one", vec![5.0], Color::Cyan);
+    let b = BarChart::new()
+        .categories(vec!["solo"])
+        .dataset(ds)
+        .title("One bar");
+    let mut buf = Buffer::empty(area);
+    (&b).render(area, &mut buf);
+}
+
+#[test]
+fn test_single_point_advanced() {
+    let area = Rect::new(0, 0, 40, 20);
+
+    // BoxPlot with one value
+    let box_data = BoxData::new("one", vec![42.0], Color::White);
+    let p = BoxPlot::new().box_data(box_data).title("One box");
+    let mut buf = Buffer::empty(area);
+    (&p).render(area, &mut buf);
+
+    // ViolinPlot with one value
+    let vdata = ViolinData::new("one", vec![42.0], Color::White);
+    let p = ViolinPlot::new().dataset(vdata).title("One violin");
+    let mut buf = Buffer::empty(area);
+    (&p).render(area, &mut buf);
+
+    // Histogram with one value
+    let p = Histogram::new(vec![42.0]).title("One hist");
+    let mut buf = Buffer::empty(area);
+    (&p).render(area, &mut buf);
+
+    // Heatmap with 1x1 grid
+    let grid = GridData::from_fn((0.0, 1.0), (0.0, 1.0), 1, 1, |_, _| 42.0);
+    let hm = Heatmap::new(grid).title("One cell");
+    let mut buf = Buffer::empty(area);
+    (&hm).render(area, &mut buf);
+
+    // CandlestickChart with one candle
+    let cs = CandlestickChart::new()
+        .candles(vec![Candle::new(0.0, 10.0, 12.0, 8.0, 11.0)])
+        .title("One candle");
+    let mut buf = Buffer::empty(area);
+    (&cs).render(area, &mut buf);
+}
+
+#[test]
+fn test_edge_data_3d() {
+    let area = Rect::new(0, 0, 40, 20);
+
+    // Empty Scatter3D
+    let s = Series3D::new("empty").data(vec![]);
+    let plot = Scatter3D::new().series(s).title("Empty 3D");
+    let mut buf = Buffer::empty(area);
+    let mut state = Camera3DState::default();
+    StatefulWidget::render(&plot, area, &mut buf, &mut state);
+
+    // Single point Scatter3D
+    let s = Series3D::new("one").data(vec![(1.0, 2.0, 3.0)]);
+    let plot = Scatter3D::new().series(s).title("One pt 3D");
+    let mut buf = Buffer::empty(area);
+    let mut state = Camera3DState::default();
+    StatefulWidget::render(&plot, area, &mut buf, &mut state);
+
+    // Surface3D with NaN values
+    let grid = GridData::from_fn((-1.0, 1.0), (-1.0, 1.0), 5, 5, |x, y| {
+        if x.abs() < 0.3 && y.abs() < 0.3 {
+            f64::NAN
+        } else {
+            x + y
+        }
+    });
+    let srf = Surface3D::new(grid).title("NaN Surface");
+    let mut buf = Buffer::empty(area);
+    StatefulWidget::render(&srf, area, &mut buf, &mut Camera3DState::default());
+}
+
+// --- Backend detection tests (subprocess isolation) ---
+
+#[test]
+fn test_detect_kitty_env() {
+    let output = std::process::Command::new(std::env::current_exe().unwrap())
+        .arg("--exact")
+        .arg("test_detect_kitty_env_subprocess")
+        .env("KITTY_WINDOW_ID", "1")
+        .env("RATATUI_PLT_TEST_SUBPROCESS", "1")
+        .output()
+        .expect("failed to spawn subprocess");
+    assert!(
+        output.status.success(),
+        "Kitty env detection failed: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+}
+
+#[test]
+fn test_detect_kitty_env_subprocess() {
+    if std::env::var("RATATUI_PLT_TEST_SUBPROCESS").is_err() {
+        return;
+    }
+    assert!(ratatui_plt::config::detect_kitty_env());
+}
+
+#[test]
+fn test_detect_sixel_env() {
+    let output = std::process::Command::new(std::env::current_exe().unwrap())
+        .arg("--exact")
+        .arg("test_detect_sixel_env_subprocess")
+        .env("SIXEL_SUPPORT", "1")
+        .env("RATATUI_PLT_TEST_SUBPROCESS", "1")
+        .output()
+        .expect("failed to spawn subprocess");
+    assert!(
+        output.status.success(),
+        "Sixel env detection failed: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+}
+
+#[test]
+fn test_detect_sixel_env_subprocess() {
+    if std::env::var("RATATUI_PLT_TEST_SUBPROCESS").is_err() {
+        return;
+    }
+    assert!(ratatui_plt::config::detect_sixel_env());
+}
+
+#[test]
+fn test_detect_override_kitty() {
+    let output = std::process::Command::new(std::env::current_exe().unwrap())
+        .arg("--exact")
+        .arg("test_detect_override_kitty_subprocess")
+        .env("RATATUI_PLT_BACKEND", "kitty")
+        .env("RATATUI_PLT_TEST_SUBPROCESS", "1")
+        .output()
+        .expect("failed to spawn subprocess");
+    assert!(
+        output.status.success(),
+        "Override kitty detection failed: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+}
+
+#[test]
+fn test_detect_override_kitty_subprocess() {
+    if std::env::var("RATATUI_PLT_TEST_SUBPROCESS").is_err() {
+        return;
+    }
+    use ratatui_plt::config::{RenderBackend, detect_backend};
+    assert_eq!(detect_backend(), RenderBackend::Kitty);
+}
+
+#[test]
+fn test_detect_wezterm_kitty() {
+    let output = std::process::Command::new(std::env::current_exe().unwrap())
+        .arg("--exact")
+        .arg("test_detect_wezterm_kitty_subprocess")
+        .env("TERM_PROGRAM", "WezTerm")
+        .env("RATATUI_PLT_TEST_SUBPROCESS", "1")
+        .env_remove("KITTY_WINDOW_ID")
+        .env_remove("RATATUI_PLT_BACKEND")
+        .env_remove("SIXEL_SUPPORT")
+        .output()
+        .expect("failed to spawn subprocess");
+    assert!(
+        output.status.success(),
+        "WezTerm kitty detection failed: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+}
+
+#[test]
+fn test_detect_wezterm_kitty_subprocess() {
+    if std::env::var("RATATUI_PLT_TEST_SUBPROCESS").is_err() {
+        return;
+    }
+    assert!(ratatui_plt::config::detect_kitty_env());
+}
+
+#[test]
+fn test_detect_unknown_falls_back() {
+    let output = std::process::Command::new(std::env::current_exe().unwrap())
+        .arg("--exact")
+        .arg("test_detect_unknown_falls_back_subprocess")
+        .env("RATATUI_PLT_TEST_SUBPROCESS", "1")
+        .env_remove("KITTY_WINDOW_ID")
+        .env_remove("RATATUI_PLT_BACKEND")
+        .env_remove("SIXEL_SUPPORT")
+        .env_remove("TERM_PROGRAM")
+        .output()
+        .expect("failed to spawn subprocess");
+    assert!(
+        output.status.success(),
+        "Unknown fallback detection failed: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+}
+
+#[test]
+fn test_detect_unknown_falls_back_subprocess() {
+    if std::env::var("RATATUI_PLT_TEST_SUBPROCESS").is_err() {
+        return;
+    }
+    // With no env vars set and no terminal, should fall back to Unicode
+    use ratatui_plt::config::{RenderBackend, detect_backend};
+    assert_eq!(detect_backend(), RenderBackend::Unicode);
+}
+
+// --- Unicode / special character tests ---
+
+#[test]
+fn test_unicode_axis_labels() {
+    let area = Rect::new(0, 0, 40, 20);
+    let s = Series::new("data")
+        .data(vec![(0.0, 0.0), (1.0, 1.0)])
+        .color(Color::White);
+    let p = LinePlot::new()
+        .series(s)
+        .title("\u{4E2D}\u{6587}\u{6807}\u{9898} Arabic \u{0639}\u{0631}\u{0628}\u{064A}")
+        .x_axis(Axis::new().label("X\u{8EF8}\u{30E9}\u{30D9}\u{30EB}"))
+        .y_axis(Axis::new().label("\u{03A8}\u{2082}(x)"));
+    let mut buf = Buffer::empty(area);
+    (&p).render(area, &mut buf);
+}
+
+#[test]
+fn test_very_long_title() {
+    let s = Series::new("data")
+        .data(vec![(0.0, 0.0), (1.0, 1.0)])
+        .color(Color::White);
+    let long_title = "A".repeat(200);
+    let p = LinePlot::new().series(s).title(&*long_title);
+    let narrow = Rect::new(0, 0, 20, 10);
+    let mut buf = Buffer::empty(narrow);
+    (&p).render(narrow, &mut buf);
+}
+
+#[test]
+fn test_empty_string_labels() {
+    let area = Rect::new(0, 0, 40, 20);
+    let s = Series::new("")
+        .data(vec![(0.0, 0.0), (1.0, 1.0)])
+        .color(Color::White);
+    let p = LinePlot::new()
+        .series(s)
+        .title("")
+        .x_axis(Axis::new().label(""))
+        .y_axis(Axis::new().label(""));
+    let mut buf = Buffer::empty(area);
+    (&p).render(area, &mut buf);
+}
+
+#[test]
+fn test_special_chars_in_legend() {
+    let area = Rect::new(0, 0, 40, 20);
+    let s1 = Series::new("[brackets]")
+        .data(vec![(0.0, 0.0)])
+        .color(Color::White);
+    let s2 = Series::new("pipe|sep")
+        .data(vec![(1.0, 1.0)])
+        .color(Color::Red);
+    let s3 = Series::new("back\\slash")
+        .data(vec![(2.0, 2.0)])
+        .color(Color::Blue);
+    let p = LinePlot::new()
+        .series(s1)
+        .series(s2)
+        .series(s3)
+        .show_legend(true);
+    let mut buf = Buffer::empty(area);
+    (&p).render(area, &mut buf);
+}
+
+// --- Tiny / huge area tests ---
+
+#[test]
+fn test_render_area_1x1() {
+    let area = Rect::new(0, 0, 1, 1);
+
+    // LinePlot
+    let s = Series::new("t")
+        .data(vec![(0.0, 0.0), (1.0, 1.0)])
+        .color(Color::White);
+    let p = LinePlot::new().series(s);
+    let mut buf = Buffer::empty(area);
+    (&p).render(area, &mut buf);
+
+    // Heatmap
+    let grid = GridData::from_fn((0.0, 1.0), (0.0, 1.0), 2, 2, |x, y| x + y);
+    let hm = Heatmap::new(grid);
+    let mut buf = Buffer::empty(area);
+    (&hm).render(area, &mut buf);
+}
+
+#[test]
+fn test_render_area_2x2() {
+    let area = Rect::new(0, 0, 2, 2);
+
+    // LinePlot
+    let s = Series::new("t")
+        .data(vec![(0.0, 0.0), (1.0, 1.0)])
+        .color(Color::White);
+    let p = LinePlot::new().series(s);
+    let mut buf = Buffer::empty(area);
+    (&p).render(area, &mut buf);
+
+    // ScatterPlot
+    let s = Series::new("t")
+        .data(vec![(0.0, 0.0), (1.0, 1.0)])
+        .color(Color::White);
+    let p = ScatterPlot::new().series(s);
+    let mut buf = Buffer::empty(area);
+    (&p).render(area, &mut buf);
+
+    // Heatmap
+    let grid = GridData::from_fn((0.0, 1.0), (0.0, 1.0), 3, 3, |x, y| x + y);
+    let hm = Heatmap::new(grid);
+    let mut buf = Buffer::empty(area);
+    (&hm).render(area, &mut buf);
+
+    // BarChart
+    let ds = BarDataset::new("t", vec![1.0, 2.0], Color::Cyan);
+    let b = BarChart::new().categories(vec!["A", "B"]).dataset(ds);
+    let mut buf = Buffer::empty(area);
+    (&b).render(area, &mut buf);
+}
+
+#[test]
+fn test_render_area_huge() {
+    let area = Rect::new(0, 0, 300, 100);
+    let s = Series::new("t")
+        .data(vec![(0.0, 0.0), (1.0, 1.0)])
+        .color(Color::White);
+    let p = LinePlot::new().series(s);
+    let mut buf = Buffer::empty(area);
+    (&p).render(area, &mut buf);
+}
+
+#[test]
+fn test_render_area_zero() {
+    let area = Rect::ZERO;
+    let s = Series::new("t")
+        .data(vec![(0.0, 0.0), (1.0, 1.0)])
+        .color(Color::White);
+    let p = LinePlot::new().series(s);
+    let mut buf = Buffer::empty(area);
+    (&p).render(area, &mut buf);
 }

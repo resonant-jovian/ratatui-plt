@@ -613,6 +613,7 @@ fn render_spines(buf: &mut Buffer, area: Rect, spines: &Spines, theme: &Theme) {
     }
 }
 
+
 impl Widget for &ClusterMap {
     fn render(self, area: Rect, buf: &mut Buffer) {
         if area.width < 8 || area.height < 4 {

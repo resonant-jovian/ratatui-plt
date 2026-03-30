@@ -557,6 +557,138 @@ cmd_info() {
     echo -e "  ${DIM}(run ./dev.sh examples --list for details)${RESET}"
 }
 
+# ── screenshots ──────────────────────────────────────────────────────────────
+
+cmd_screenshots() {
+    local theme="dark"
+    local format="svg"
+    local width=""
+    local height=""
+    local resolution=""
+    local output_dir="assets/screenshots"
+    local group=""
+
+    while [[ $# -gt 0 ]]; do
+        case "$1" in
+            --theme)      theme="$2"; shift 2 ;;
+            --format)     format="$2"; shift 2 ;;
+            --width)      width="$2"; shift 2 ;;
+            --height)     height="$2"; shift 2 ;;
+            --resolution) resolution="$2"; shift 2 ;;
+            --output)     output_dir="$2"; shift 2 ;;
+            --group)      group="$2"; shift 2 ;;
+            --help|-h)    cmd_screenshots_help; return ;;
+            *)            err "unknown flag: $1"; cmd_screenshots_help; return 1 ;;
+        esac
+    done
+
+    # Apply resolution preset (custom --width/--height override)
+    case "${resolution:-standard}" in
+        standard) : "${width:=120}"; : "${height:=40}" ;;
+        hd)       : "${width:=240}"; : "${height:=68}" ;;
+        4k)       : "${width:=480}"; : "${height:=135}" ;;
+        *)        err "unknown resolution: $resolution (use standard, hd, or 4k)"; return 1 ;;
+    esac
+
+    # Determine which examples to run
+    local examples=()
+    if [[ -n "$group" ]]; then
+        mapfile -t examples < <(get_group_examples "$group")
+    else
+        # All example groups
+        examples=(
+            "${GROUP_SHOWCASE[@]}"
+            "${GROUP_CORE[@]}"
+            "${GROUP_3D[@]}"
+            "${GROUP_INTERACTIVE[@]}"
+            "${GROUP_LAYOUT[@]}"
+            "${GROUP_COMPOSITE[@]}"
+            "${GROUP_EXPORT[@]}"
+        )
+    fi
+
+    # Include resolution in output dir for non-standard resolutions
+    local res_name="${resolution:-standard}"
+    local out_subdir="$output_dir/$res_name"
+    mkdir -p "$out_subdir"
+
+    hdr "Generating screenshots (${#examples[@]} examples, theme=$theme, format=$format, ${width}x${height}, ${res_name})"
+
+    local count=0
+    local failed=0
+    for name in "${examples[@]}"; do
+        local ext="$format"
+        [[ "$ext" == "both" ]] && ext="svg"
+        local output_path="$out_subdir/${name}_${theme}.${ext}"
+        local cargo_args=(--release --example "$name")
+
+        local feature="${EXAMPLE_FEATURES[$name]:-}"
+        if [[ -n "$feature" ]]; then
+            cargo_args+=(--features "$feature")
+        fi
+        # PNG export needs the export feature
+        if [[ "$format" == "png" || "$format" == "both" ]]; then
+            if [[ ! " ${cargo_args[*]} " =~ " --features " ]]; then
+                cargo_args+=(--features "export")
+            else
+                # Append export to existing features
+                local last_idx=$((${#cargo_args[@]} - 1))
+                cargo_args[$last_idx]="${cargo_args[$last_idx]},export"
+            fi
+        fi
+
+        printf "  %-40s" "$name"
+
+        if RATATUI_PLT_EXPORT=1 \
+           RATATUI_PLT_EXPORT_OUTPUT="$output_path" \
+           RATATUI_PLT_EXPORT_WIDTH="$width" \
+           RATATUI_PLT_EXPORT_HEIGHT="$height" \
+           RATATUI_PLT_EXPORT_FORMAT="$format" \
+           RATATUI_PLT_THEME="$theme" \
+           cargo run "${cargo_args[@]}" 2>/dev/null; then
+            echo -e "${GREEN}✓${RESET} $(du -h "$output_path" | cut -f1)"
+            count=$((count + 1))
+        else
+            echo -e "${RED}✗ FAILED${RESET}"
+            failed=$((failed + 1))
+        fi
+    done
+
+    echo ""
+    ok "$count screenshots generated in $out_subdir/"
+    if [[ $failed -gt 0 ]]; then
+        warn "$failed screenshots failed"
+    fi
+}
+
+cmd_screenshots_help() {
+    cat <<EOF
+${BOLD}Usage:${RESET} ./dev.sh screenshots [flags]
+
+Generate SVG/PNG screenshots of all examples.
+
+${BOLD}Flags:${RESET}
+  --resolution <p>  Preset: standard (120x40), hd (240x68), 4k (480x135) (default: standard)
+  --theme <name>    Theme: dark, light, minimal, publication, solarized (default: dark)
+  --format <fmt>    Output format: svg, png, both (default: svg)
+  --group <name>    Only run one group: showcase, core, 3d, interactive, layout, composite, export
+  --width <cols>    Custom width in columns (overrides --resolution)
+  --height <rows>   Custom height in rows (overrides --resolution)
+  --output <dir>    Output directory (default: assets/screenshots)
+
+${BOLD}Resolution presets:${RESET}
+  standard  120 x 40   →   960 x 640 px
+  hd        240 x 68   →  1920 x 1088 px
+  4k        480 x 135  →  3840 x 2160 px
+
+${BOLD}Examples:${RESET}
+  ./dev.sh screenshots                                  # all examples, standard SVG
+  ./dev.sh screenshots --resolution 4k --format both    # 4K SVG + PNG
+  ./dev.sh screenshots --group showcase --theme light    # showcases only, light theme
+  ./dev.sh screenshots --width 160 --height 50           # custom size
+EOF
+}
+
 # ── help ─────────────────────────────────────────────────────────────────────
 
 cmd_help() {
@@ -576,6 +708,8 @@ ${BOLD}Commands:${RESET}
                --release  --all  --features <f>
   ${CYAN}lint${RESET}       clippy + fmt
                --fix  --all
+  ${CYAN}screenshots${RESET} generate SVG/PNG screenshots of showcases
+               --theme <name>  --format <fmt>  --width <n>  --height <n>
   ${CYAN}clean${RESET}      clean build artifacts
   ${CYAN}info${RESET}       show project info, features, examples
   ${CYAN}help${RESET}       this message
@@ -590,6 +724,8 @@ ${BOLD}Examples:${RESET}
   ./dev.sh test --all --release                 # all features, release mode
   ./dev.sh build --all                          # build with all features
   ./dev.sh lint --fix                           # auto-fix lint issues
+  ./dev.sh screenshots                           # generate all showcase SVGs
+  ./dev.sh screenshots --theme light              # light theme screenshots
   ./dev.sh info                                 # project info
 EOF
 }
@@ -606,7 +742,8 @@ fi
 command="$1"; shift
 
 case "$command" in
-    examples)  cmd_examples "$@" ;;
+    examples)     cmd_examples "$@" ;;
+    screenshots)  cmd_screenshots "$@" ;;
     test)      cmd_test "$@" ;;
     bench)     cmd_bench "$@" ;;
     build)     cmd_build "$@" ;;

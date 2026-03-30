@@ -317,6 +317,7 @@ impl Streamtube {
     }
 }
 
+
 impl Widget for &Streamtube {
     fn render(self, area: Rect, buf: &mut Buffer) {
         self.render_with_camera(area, buf, &self.camera);

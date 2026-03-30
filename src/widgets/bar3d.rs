@@ -434,6 +434,7 @@ impl Bar3D {
     }
 }
 
+
 impl Widget for &Bar3D {
     fn render(self, area: Rect, buf: &mut Buffer) {
         self.render_with_camera(&self.camera, area, buf);

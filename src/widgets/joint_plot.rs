@@ -30,7 +30,7 @@ use crate::axis::Axis;
 use crate::chars::CharSet;
 use crate::frame::{DataBounds, PlotFrame, ReferenceLine};
 use crate::legend::{Legend, LegendPosition};
-use crate::plot_buffer::{PlotBackend, create_backend, Z_MARKER};
+use crate::plot_buffer::{PlotBackend, Z_MARKER, create_backend};
 use crate::series::Series;
 use crate::spines::Spines;
 use crate::style::MarkerShape;
@@ -183,6 +183,7 @@ impl JointPlot {
         self
     }
 }
+
 
 impl Widget for &JointPlot {
     fn render(self, area: Rect, buf: &mut Buffer) {
@@ -359,22 +360,22 @@ impl Widget for &JointPlot {
 }
 
 /// Configuration for rendering a marginal distribution.
-struct MarginalConfig<'a> {
-    data: &'a [f64],
-    marginal_type: &'a MarginalType,
-    bins: usize,
-    data_lo: f64,
-    data_hi: f64,
+pub(crate) struct MarginalConfig<'a> {
+    pub(crate) data: &'a [f64],
+    pub(crate) marginal_type: &'a MarginalType,
+    pub(crate) bins: usize,
+    pub(crate) data_lo: f64,
+    pub(crate) data_hi: f64,
     /// Screen origin of the aligned axis in the central plot.
-    plot_origin: u16,
+    pub(crate) plot_origin: u16,
     /// Screen extent of the aligned axis in the central plot.
-    plot_extent: u16,
-    color: Color,
-    chars: &'a CharSet,
+    pub(crate) plot_extent: u16,
+    pub(crate) color: Color,
+    pub(crate) chars: &'a CharSet,
 }
 
 /// Render the top marginal distribution.
-fn render_marginal_top(buf: &mut Buffer, area: Rect, cfg: &MarginalConfig<'_>) {
+pub(crate) fn render_marginal_top(buf: &mut Buffer, area: Rect, cfg: &MarginalConfig<'_>) {
     if cfg.data.is_empty() || area.width < 2 || area.height < 1 {
         return;
     }
@@ -465,7 +466,7 @@ fn render_marginal_top(buf: &mut Buffer, area: Rect, cfg: &MarginalConfig<'_>) {
 }
 
 /// Render the right marginal distribution.
-fn render_marginal_right(buf: &mut Buffer, area: Rect, cfg: &MarginalConfig<'_>) {
+pub(crate) fn render_marginal_right(buf: &mut Buffer, area: Rect, cfg: &MarginalConfig<'_>) {
     if cfg.data.is_empty() || area.width < 1 || area.height < 2 {
         return;
     }
@@ -557,7 +558,7 @@ fn render_marginal_right(buf: &mut Buffer, area: Rect, cfg: &MarginalConfig<'_>)
 }
 
 /// Compute a histogram of `data` into `bins` equally-spaced bins over `[lo, hi]`.
-fn compute_histogram(data: &[f64], bins: usize, lo: f64, hi: f64) -> Vec<usize> {
+pub(crate) fn compute_histogram(data: &[f64], bins: usize, lo: f64, hi: f64) -> Vec<usize> {
     let bins = bins.max(1);
     let mut counts = vec![0usize; bins];
     let range = hi - lo;

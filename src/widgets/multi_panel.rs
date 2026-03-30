@@ -220,7 +220,7 @@ impl MultiPanel {
         mp
     }
 
-    /// Return the mosaic panel metadata produced by [`from_mosaic`].
+    /// Return the mosaic panel metadata produced by [`from_mosaic`](Self::from_mosaic).
     ///
     /// Returns an empty slice if the `MultiPanel` was not built from a mosaic.
     pub fn mosaic_panel_info(&self) -> &[MosaicPanel] {
@@ -378,6 +378,7 @@ impl MultiPanel {
         self
     }
 }
+
 
 impl Widget for &MultiPanel {
     fn render(self, area: Rect, buf: &mut Buffer) {

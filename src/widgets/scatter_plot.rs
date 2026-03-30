@@ -15,11 +15,13 @@ use crate::linked_view::SharedView;
 use crate::norm::{LinearNorm, Normalize};
 #[cfg(feature = "statistics")]
 use crate::plot_buffer::Z_DATA;
-use crate::plot_buffer::{PlotBackend, create_backend, Z_MARKER};
+use crate::plot_buffer::{PlotBackend, Z_MARKER, create_backend};
 use crate::series::Series;
 use crate::spines::Spines;
 use crate::style::MarkerShape;
 use crate::theme::Theme;
+
+use super::joint_plot::{MarginalConfig, MarginalType, render_marginal_right, render_marginal_top};
 
 /// Type of trendline to overlay on a scatter plot.
 ///
@@ -45,6 +47,7 @@ pub enum TrendlineType {
 /// let plot = ScatterPlot::new()
 ///     .series(Series::new("data").data(vec![(1.0, 2.0), (3.0, 4.0)]).marker(MarkerShape::Circle));
 /// ```
+#[allow(dead_code)]
 pub struct ScatterPlot {
     series: Vec<Series>,
     x_axis: Axis,
@@ -68,6 +71,14 @@ pub struct ScatterPlot {
     reference_lines: Vec<ReferenceLine>,
     annotations: Vec<Annotation>,
     shared_view: Option<SharedView>,
+    /// Top marginal distribution type (x-axis).
+    marginal_x: MarginalType,
+    /// Right marginal distribution type (y-axis).
+    marginal_y: MarginalType,
+    /// Fraction of area used for marginal panels (default 0.2).
+    marginal_ratio: f64,
+    /// Number of histogram bins for marginal panels (default 20).
+    marginal_bins: usize,
     /// Trendline type to overlay.
     #[cfg(feature = "statistics")]
     trendline: Option<TrendlineType>,
@@ -99,6 +110,10 @@ impl Default for ScatterPlot {
             reference_lines: Vec::new(),
             annotations: Vec::new(),
             shared_view: None,
+            marginal_x: MarginalType::None,
+            marginal_y: MarginalType::None,
+            marginal_ratio: 0.2,
+            marginal_bins: 20,
             #[cfg(feature = "statistics")]
             trendline: None,
             #[cfg(feature = "statistics")]
@@ -221,6 +236,31 @@ impl ScatterPlot {
         self
     }
 
+    /// Set the top marginal distribution type (x-axis).
+    pub fn marginal_x(mut self, mt: MarginalType) -> Self {
+        self.marginal_x = mt;
+        self
+    }
+
+    /// Set the right marginal distribution type (y-axis).
+    pub fn marginal_y(mut self, mt: MarginalType) -> Self {
+        self.marginal_y = mt;
+        self
+    }
+
+    /// Set the fraction of area used for marginals (default 0.2).
+    pub fn marginal_ratio(mut self, ratio: f64) -> Self {
+        self.marginal_ratio = ratio;
+        self
+    }
+
+    /// Set the number of histogram bins for marginals
+    /// (default 20).
+    pub fn marginal_bins(mut self, bins: usize) -> Self {
+        self.marginal_bins = bins;
+        self
+    }
+
     /// Set the trendline type to overlay on the scatter plot.
     ///
     /// Requires the `statistics` feature.
@@ -240,8 +280,38 @@ impl ScatterPlot {
     }
 }
 
+
 impl Widget for &ScatterPlot {
     fn render(self, area: Rect, buf: &mut Buffer) {
+        if area.width < 6 || area.height < 6 {
+            return;
+        }
+
+        let has_top = self.marginal_x != MarginalType::None;
+        let has_right = self.marginal_y != MarginalType::None;
+
+        // Compute marginal sizes
+        let top_height = if has_top {
+            (area.height as f64 * self.marginal_ratio).round() as u16
+        } else {
+            0
+        };
+        let right_width = if has_right {
+            (area.width as f64 * self.marginal_ratio).round() as u16
+        } else {
+            0
+        };
+
+        // Central scatter area (reduced when marginals
+        // are present)
+        let central_width = area.width.saturating_sub(right_width);
+        let central_height = area.height.saturating_sub(top_height);
+        if central_width < 6 || central_height < 6 {
+            return;
+        }
+
+        let central_area = Rect::new(area.x, area.y + top_height, central_width, central_height);
+
         // Compute data bounds
         let mut x_min = f64::INFINITY;
         let mut x_max = f64::NEG_INFINITY;
@@ -282,9 +352,9 @@ impl Widget for &ScatterPlot {
             }
         }
 
-        let mut pb = create_backend(area);
+        let mut pb = create_backend(central_area);
 
-        // Create and render the plot frame (title, axes, grid, ticks, labels, spines, ref lines)
+        // Create and render the plot frame
         let frame = PlotFrame::new(&self.x_axis, &self.y_axis, &self.theme)
             .title(self.title.as_deref())
             .aspect_ratio(self.aspect_ratio.clone())
@@ -298,7 +368,7 @@ impl Widget for &ScatterPlot {
             y_hi,
         };
 
-        let Some(pa) = frame.render_to_pb(&mut pb, area, bounds) else {
+        let Some(pa) = frame.render_to_pb(&mut pb, central_area, bounds) else {
             return;
         };
 
@@ -329,7 +399,7 @@ impl Widget for &ScatterPlot {
                         fallback
                     };
 
-                    // Bubble mode: draw filled circle of variable radius
+                    // Bubble mode: variable radius
                     if let Some(ref sv) = self.size_values {
                         if global_point_idx < sv.len() {
                             let sv_min = sv
@@ -352,7 +422,6 @@ impl Widget for &ScatterPlot {
                                 + t * (self.size_range.1 - self.size_range.0))
                                 .max(0.5);
                             let r_int = radius.round() as i16;
-                            // Fill a circle of the computed radius
                             for dy in -r_int..=r_int {
                                 for dx in -r_int..=r_int {
                                     if dx * dx + dy * dy <= r_int * r_int {
@@ -388,7 +457,6 @@ impl Widget for &ScatterPlot {
         // Draw trendline (statistics feature)
         #[cfg(feature = "statistics")]
         if let Some(ref ttype) = self.trendline {
-            // Collect all (x, y) from all series
             let all_x: Vec<f64> = self
                 .series
                 .iter()
@@ -409,7 +477,6 @@ impl Widget for &ScatterPlot {
                     .unwrap_or(self.theme.primary)
             });
 
-            // Generate evaluation x values across the plot range
             let n_eval = self.trendline_n_points;
             let eval_xs: Vec<f64> = (0..n_eval)
                 .map(|i| x_lo + (x_hi - x_lo) * i as f64 / (n_eval - 1).max(1) as f64)
@@ -422,19 +489,16 @@ impl Widget for &ScatterPlot {
                     crate::statistics::poly_fit(&all_x, &all_y, *degree)
                         .map(|fit| eval_xs.iter().map(|&x| fit.eval(x)).collect())
                 }
-                TrendlineType::Lowess(frac) => {
-                    crate::statistics::lowess(&all_x, &all_y, *frac).map(|result| {
-                        // Interpolate LOWESS result onto eval_xs
+                TrendlineType::Lowess(frac) => crate::statistics::lowess(&all_x, &all_y, *frac)
+                    .map(|result| {
                         eval_xs
                             .iter()
                             .map(|&ex| interpolate_lowess(&result.x, &result.y, ex))
                             .collect()
-                    })
-                }
+                    }),
             };
 
             if let Some(ys) = eval_ys {
-                // Draw as connected braille line segments
                 for i in 0..eval_xs.len() - 1 {
                     let sx0 = pa.screen_x(eval_xs[i]);
                     let sy0 = pa.screen_y(ys[i]);
@@ -451,7 +515,7 @@ impl Widget for &ScatterPlot {
         // Composite to buffer before legend
         pb.composite(buf);
 
-        frame.draw_end_labels(buf, area, &pa);
+        frame.draw_end_labels(buf, central_area, &pa);
 
         // Draw legend (directly to buf, after composite)
         if self.show_legend && !self.series.is_empty() && self.color_values.is_none() {
@@ -460,6 +524,67 @@ impl Widget for &ScatterPlot {
                 .theme(self.theme.clone());
             let legend_area = Rect::new(pa.x, pa.y, pa.width, pa.height);
             (&legend).render(legend_area, buf);
+        }
+
+        // Render marginal distributions
+        if has_top || has_right {
+            let marginal_color = self
+                .series
+                .first()
+                .and_then(|s| s.color)
+                .unwrap_or(self.theme.primary);
+
+            let all_x: Vec<f64> = self
+                .series
+                .iter()
+                .flat_map(|s| s.data.iter().map(|&(x, _)| x))
+                .filter(|v| v.is_finite())
+                .collect();
+            let all_y: Vec<f64> = self
+                .series
+                .iter()
+                .flat_map(|s| s.data.iter().map(|&(_, y)| y))
+                .filter(|v| v.is_finite())
+                .collect();
+
+            // Top marginal (x-axis distribution)
+            if has_top && top_height >= 2 {
+                let top_area = Rect::new(
+                    pa.x,
+                    area.y,
+                    pa.width,
+                    top_height.min(area.y + top_height - area.y),
+                );
+                let cfg = MarginalConfig {
+                    data: &all_x,
+                    marginal_type: &self.marginal_x,
+                    bins: self.marginal_bins,
+                    data_lo: pa.x_lo,
+                    data_hi: pa.x_hi,
+                    plot_origin: pa.x,
+                    plot_extent: pa.width,
+                    color: marginal_color,
+                    chars: &self.theme.chars,
+                };
+                render_marginal_top(buf, top_area, &cfg);
+            }
+
+            // Right marginal (y-axis distribution)
+            if has_right && right_width >= 2 {
+                let right_area = Rect::new(area.x + central_width, pa.y, right_width, pa.height);
+                let cfg = MarginalConfig {
+                    data: &all_y,
+                    marginal_type: &self.marginal_y,
+                    bins: self.marginal_bins,
+                    data_lo: pa.y_lo,
+                    data_hi: pa.y_hi,
+                    plot_origin: pa.y,
+                    plot_extent: pa.height,
+                    color: marginal_color,
+                    chars: &self.theme.chars,
+                };
+                render_marginal_right(buf, right_area, &cfg);
+            }
         }
     }
 }

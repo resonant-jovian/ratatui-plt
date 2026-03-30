@@ -402,6 +402,7 @@ fn shade_color(color: Color, factor: f64) -> Color {
     }
 }
 
+
 impl Widget for &Contour3D {
     fn render(self, area: Rect, buf: &mut Buffer) {
         self.render_with_camera(&self.camera, area, buf);

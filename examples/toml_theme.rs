@@ -4,6 +4,7 @@
 //!
 //! Run with: `cargo run --example toml_theme --features toml-themes`
 
+use ratatui::prelude::*;
 use ratatui_plt::prelude::*;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -48,6 +49,10 @@ colors = ["#e94560", "#0f3460", "#16c79a", "#f5a623", "#b721ff"]
         .title("TOML Theme Demo")
         .x_axis(Axis::new().label("x"))
         .y_axis(Axis::new().label("f(x)").label_position(LabelPosition::End));
+
+    if headless_export(|area, buf| (&plot).render(area, buf))? {
+        return Ok(());
+    }
 
     let buf = render_to_buffer(&plot, 60, 20);
     let text = buffer_to_text(&buf);

@@ -126,6 +126,7 @@ impl Spectrogram {
     }
 }
 
+
 impl Widget for &Spectrogram {
     fn render(self, area: Rect, buf: &mut Buffer) {
         let nrows = self.data.nrows();

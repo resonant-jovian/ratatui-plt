@@ -35,10 +35,6 @@ fn parse_theme() -> Theme {
 fn main() -> color_eyre::Result<()> {
     color_eyre::install()?;
     Theme::set_default(parse_theme());
-    io::stdout().execute(EnterAlternateScreen)?;
-    enable_raw_mode()?;
-    io::stdout().execute(crossterm::event::EnableMouseCapture)?;
-    let mut terminal = Terminal::new(CrosstermBackend::new(io::stdout()))?;
 
     // Build a 20x20x20 scalar field: f(x,y,z) = x^2 + y^2 + z^2
     let n = 20;
@@ -65,6 +61,17 @@ fn main() -> color_eyre::Result<()> {
         .z_range(-1.0, 1.0)
         .colormap(Plasma)
         .title("Sphere Isosurface (r=1) - Arrow keys: rotate, +/-: zoom, q: quit");
+
+    if headless_export(|area, buf| {
+        StatefulWidget::render(&iso, area, buf, &mut Camera3DState::default());
+    })? {
+        return Ok(());
+    }
+
+    io::stdout().execute(EnterAlternateScreen)?;
+    enable_raw_mode()?;
+    io::stdout().execute(crossterm::event::EnableMouseCapture)?;
+    let mut terminal = Terminal::new(CrosstermBackend::new(io::stdout()))?;
 
     let mut camera_state = Camera3DState::default();
 

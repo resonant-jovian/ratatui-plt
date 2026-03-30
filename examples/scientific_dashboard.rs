@@ -36,9 +36,6 @@ fn main() -> color_eyre::Result<()> {
     color_eyre::install()?;
     Theme::set_default(parse_theme());
     let theme = Theme::get_default();
-    io::stdout().execute(EnterAlternateScreen)?;
-    enable_raw_mode()?;
-    let mut terminal = Terminal::new(CrosstermBackend::new(io::stdout()))?;
 
     // --- Panel 1: Energy tracking line plot with references and annotations ---
     let energy_data: Vec<(f64, f64)> = (0..200)
@@ -177,6 +174,31 @@ fn main() -> color_eyre::Result<()> {
         .legend_position(LegendPosition::BottomRight)
         .spines(Spines::new().top(false).right(false))
         .reference_line(ReferenceLine::hline_dashed(0.5, theme.muted));
+
+    if headless_export(|area, buf| {
+        let rows = Layout::default()
+            .direction(Direction::Vertical)
+            .constraints([Constraint::Percentage(50), Constraint::Percentage(50)])
+            .split(area);
+        let top_cols = Layout::default()
+            .direction(Direction::Horizontal)
+            .constraints([Constraint::Percentage(55), Constraint::Percentage(45)])
+            .split(rows[0]);
+        let bottom_cols = Layout::default()
+            .direction(Direction::Horizontal)
+            .constraints([Constraint::Percentage(50), Constraint::Percentage(50)])
+            .split(rows[1]);
+        (&energy_plot).render(top_cols[0], buf);
+        (&band_plot).render(top_cols[1], buf);
+        (&heatmap).render(bottom_cols[0], buf);
+        (&ecdf_plot).render(bottom_cols[1], buf);
+    })? {
+        return Ok(());
+    }
+
+    io::stdout().execute(EnterAlternateScreen)?;
+    enable_raw_mode()?;
+    let mut terminal = Terminal::new(CrosstermBackend::new(io::stdout()))?;
 
     loop {
         terminal.draw(|frame| {

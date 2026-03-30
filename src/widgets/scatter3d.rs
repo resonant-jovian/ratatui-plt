@@ -372,6 +372,7 @@ fn draw_braille_line(
     }
 }
 
+
 impl Widget for &Scatter3D {
     fn render(self, area: Rect, buf: &mut Buffer) {
         self.render_with_camera(&self.camera, area, buf);

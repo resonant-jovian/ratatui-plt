@@ -26,7 +26,7 @@ use ratatui::widgets::Widget;
 
 use crate::axis::Axis;
 use crate::frame::{DataBounds, PlotFrame, ReferenceLine};
-use crate::plot_buffer::{PlotBackend, create_backend, Z_DATA, Z_MARKER};
+use crate::plot_buffer::{PlotBackend, Z_DATA, Z_MARKER, create_backend};
 use crate::spines::Spines;
 use crate::style::MarkerShape;
 use crate::theme::Theme;
@@ -219,6 +219,7 @@ fn eigen_2x2(a: f64, b: f64, c: f64) -> (f64, f64, f64) {
 
     (lambda1.max(0.0), lambda2.max(0.0), theta)
 }
+
 
 impl Widget for &ConfidenceEllipse {
     fn render(self, area: Rect, buf: &mut Buffer) {

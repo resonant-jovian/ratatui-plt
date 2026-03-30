@@ -33,10 +33,6 @@ fn parse_theme() -> Theme {
 fn main() -> color_eyre::Result<()> {
     color_eyre::install()?;
     Theme::set_default(parse_theme());
-    io::stdout().execute(EnterAlternateScreen)?;
-    enable_raw_mode()?;
-    let mut terminal = Terminal::new(CrosstermBackend::new(io::stdout()))?;
-
     let theme = Theme::get_default();
     let mut cycle = theme.color_cycle.clone();
 
@@ -81,6 +77,21 @@ fn main() -> color_eyre::Result<()> {
         .x_axis(Axis::new().bounds(Bounds::Manual(-3.5, 3.5)).grid(true))
         .y_axis(Axis::new().bounds(Bounds::Manual(-3.5, 3.5)).grid(true))
         .show_legend(false);
+
+    if headless_export(|area, buf| {
+        let cols = Layout::default()
+            .direction(Direction::Horizontal)
+            .constraints([Constraint::Percentage(50), Constraint::Percentage(50)])
+            .split(area);
+        (&lc_frame_plot).render(cols[0], buf);
+        (&pc_frame_plot).render(cols[1], buf);
+    })? {
+        return Ok(());
+    }
+
+    io::stdout().execute(EnterAlternateScreen)?;
+    enable_raw_mode()?;
+    let mut terminal = Terminal::new(CrosstermBackend::new(io::stdout()))?;
 
     loop {
         terminal.draw(|frame| {

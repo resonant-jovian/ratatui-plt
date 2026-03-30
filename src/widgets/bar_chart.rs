@@ -7,9 +7,10 @@ use ratatui::widgets::Widget;
 
 use crate::annotation::Annotation;
 use crate::axis::Axis;
+use crate::chars::PatternChars;
 use crate::frame::{DataBounds, PlotFrame, ReferenceLine};
 use crate::legend::{Legend, LegendEntry, LegendPosition};
-use crate::plot_buffer::{PlotBackend, create_backend, Z_ANNOTATION, Z_CHROME, Z_DATA};
+use crate::plot_buffer::{PlotBackend, Z_ANNOTATION, Z_CHROME, Z_DATA, create_backend};
 use crate::spines::Spines;
 use crate::theme::Theme;
 use crate::ticker::NullLocator;
@@ -33,6 +34,35 @@ pub enum BarMode {
     DivergingStacked,
 }
 
+/// Pattern fill style for bar chart datasets.
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub enum FillPattern {
+    #[default]
+    Solid,
+    DiagonalRight,
+    DiagonalLeft,
+    CrossHatch,
+    Horizontal,
+    Vertical,
+    Dot,
+}
+
+/// Resolve a `FillPattern` to its theme character.
+///
+/// Returns `None` for `Solid` (use default fill), or `Some(char)`
+/// for patterned fills.
+fn resolve_pattern(chars: &PatternChars, pattern: &FillPattern) -> Option<char> {
+    match pattern {
+        FillPattern::Solid => None,
+        FillPattern::DiagonalRight => Some(chars.diagonal_right),
+        FillPattern::DiagonalLeft => Some(chars.diagonal_left),
+        FillPattern::CrossHatch => Some(chars.cross_hatch),
+        FillPattern::Horizontal => Some(chars.horizontal),
+        FillPattern::Vertical => Some(chars.vertical),
+        FillPattern::Dot => Some(chars.dot),
+    }
+}
+
 /// A single bar group dataset.
 #[derive(Clone, Debug)]
 pub struct BarDataset {
@@ -42,6 +72,8 @@ pub struct BarDataset {
     pub values: Vec<f64>,
     /// Bar color.
     pub color: Color,
+    /// Fill pattern (default: Solid).
+    pub pattern: FillPattern,
 }
 
 impl BarDataset {
@@ -50,7 +82,14 @@ impl BarDataset {
             name: name.into(),
             values,
             color,
+            pattern: FillPattern::Solid,
         }
+    }
+
+    /// Set the fill pattern for this dataset.
+    pub fn pattern(mut self, p: FillPattern) -> Self {
+        self.pattern = p;
+        self
     }
 }
 
@@ -256,6 +295,7 @@ fn draw_value_label(
     }
 }
 
+
 impl Widget for &BarChart {
     fn render(self, area: Rect, buf: &mut Buffer) {
         if area.width < 4
@@ -373,10 +413,15 @@ impl Widget for &BarChart {
                             .round() as u16;
 
                         let effective_width = bar_width.max(1);
+                        let pat_ch = resolve_pattern(&self.theme.chars.pattern, &ds.pattern);
                         for x in bar_x..bar_x + effective_width {
                             for y in bar_top..pa.y + pa.height {
                                 if pa.contains(x, y) {
-                                    pb.set_cell(x, y, ' ', ds.color, ds.color, Z_DATA);
+                                    if let Some(ch) = pat_ch {
+                                        pb.set_cell(x, y, ch, ds.color, Color::Reset, Z_DATA);
+                                    } else {
+                                        pb.set_cell(x, y, ' ', ds.color, ds.color, Z_DATA);
+                                    }
                                 }
                             }
                         }
@@ -414,10 +459,15 @@ impl Widget for &BarChart {
                             data_to_screen(bottom + val, y_lo, y_hi, screen_bottom, screen_top)
                                 .round() as u16;
 
+                        let pat_ch = resolve_pattern(&self.theme.chars.pattern, &ds.pattern);
                         for x in bar_x..bar_x + bar_width {
                             for y in y_top..y_bot {
                                 if pa.contains(x, y) {
-                                    pb.set_cell(x, y, ' ', ds.color, ds.color, Z_DATA);
+                                    if let Some(ch) = pat_ch {
+                                        pb.set_cell(x, y, ch, ds.color, Color::Reset, Z_DATA);
+                                    } else {
+                                        pb.set_cell(x, y, ' ', ds.color, ds.color, Z_DATA);
+                                    }
                                 }
                             }
                         }
@@ -452,6 +502,7 @@ impl Widget for &BarChart {
 
                     for ds in &self.datasets {
                         let val = ds.values.get(cat_i).copied().unwrap_or(0.0);
+                        let pat_ch = resolve_pattern(&self.theme.chars.pattern, &ds.pattern);
                         if val >= 0.0 {
                             // Stack upward from zero
                             let seg_bot =
@@ -469,7 +520,11 @@ impl Widget for &BarChart {
                             for x in bar_x..bar_x + bar_width {
                                 for y in seg_top..seg_bot {
                                     if pa.contains(x, y) {
-                                        pb.set_cell(x, y, ' ', ds.color, ds.color, Z_DATA);
+                                        if let Some(ch) = pat_ch {
+                                            pb.set_cell(x, y, ch, ds.color, Color::Reset, Z_DATA);
+                                        } else {
+                                            pb.set_cell(x, y, ' ', ds.color, ds.color, Z_DATA);
+                                        }
                                     }
                                 }
                             }
@@ -492,7 +547,11 @@ impl Widget for &BarChart {
                             for x in bar_x..bar_x + bar_width {
                                 for y in seg_top..seg_bot {
                                     if pa.contains(x, y) {
-                                        pb.set_cell(x, y, ' ', ds.color, ds.color, Z_DATA);
+                                        if let Some(ch) = pat_ch {
+                                            pb.set_cell(x, y, ch, ds.color, Color::Reset, Z_DATA);
+                                        } else {
+                                            pb.set_cell(x, y, ' ', ds.color, ds.color, Z_DATA);
+                                        }
                                     }
                                 }
                             }
@@ -579,10 +638,14 @@ impl Widget for &BarChart {
             let entries: Vec<LegendEntry> = self
                 .datasets
                 .iter()
-                .map(|ds| LegendEntry {
-                    name: ds.name.clone(),
-                    color: ds.color,
-                    marker: Some(self.theme.chars.fill.solid),
+                .map(|ds| {
+                    let marker = resolve_pattern(&self.theme.chars.pattern, &ds.pattern)
+                        .unwrap_or(self.theme.chars.fill.solid);
+                    LegendEntry {
+                        name: ds.name.clone(),
+                        color: ds.color,
+                        marker: Some(marker),
+                    }
                 })
                 .collect();
             let legend = Legend::new(entries)

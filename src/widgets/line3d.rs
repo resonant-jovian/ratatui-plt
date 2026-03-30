@@ -394,6 +394,7 @@ fn dim_color(color: Color, brightness: f64) -> Color {
 
 // ── Widget / StatefulWidget impls ───────────────────────────────────────────
 
+
 impl Widget for &Line3D {
     fn render(self, area: Rect, buf: &mut Buffer) {
         self.render_with_camera(&self.camera, area, buf);

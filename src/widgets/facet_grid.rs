@@ -382,6 +382,7 @@ impl FacetGrid {
     }
 }
 
+
 impl Widget for &FacetGrid {
     fn render(self, area: Rect, buf: &mut Buffer) {
         if area.width < 4 || area.height < 4 {

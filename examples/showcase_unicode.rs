@@ -58,10 +58,6 @@ fn main() -> color_eyre::Result<()> {
     color_eyre::install()?;
     Theme::set_default(parse_theme());
     let theme = Theme::get_default();
-    io::stdout().execute(EnterAlternateScreen)?;
-    enable_raw_mode()?;
-    let mut terminal = Terminal::new(CrosstermBackend::new(io::stdout()))?;
-
     let blue_dark = theme.color_cycle.at(0);
     let blue_mid = theme.color_cycle.at(1);
     let blue_light = theme.color_cycle.at(2);
@@ -382,6 +378,14 @@ fn main() -> color_eyre::Result<()> {
                 }
             }
         });
+
+    if headless_export(|area, buf| (&panel).render(area, buf))? {
+        return Ok(());
+    }
+
+    io::stdout().execute(EnterAlternateScreen)?;
+    enable_raw_mode()?;
+    let mut terminal = Terminal::new(CrosstermBackend::new(io::stdout()))?;
 
     loop {
         terminal.draw(|frame| {

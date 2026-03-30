@@ -34,10 +34,6 @@ fn parse_theme() -> Theme {
 fn main() -> color_eyre::Result<()> {
     color_eyre::install()?;
     Theme::set_default(parse_theme());
-    io::stdout().execute(EnterAlternateScreen)?;
-    enable_raw_mode()?;
-    io::stdout().execute(crossterm::event::EnableMouseCapture)?;
-    let mut terminal = Terminal::new(CrosstermBackend::new(io::stdout()))?;
 
     let theme = Theme::get_default();
     let mut cycle = theme.color_cycle.clone();
@@ -73,6 +69,17 @@ fn main() -> color_eyre::Result<()> {
     let chart = Bar3D::new(bars)
         .camera(Camera3D::new().azimuth(-50.0).elevation(25.0))
         .title("3D Bar Chart: Regional Sales - Arrow keys: rotate, +/-: zoom, q: quit");
+
+    if headless_export(|area, buf| {
+        StatefulWidget::render(&chart, area, buf, &mut Camera3DState::default());
+    })? {
+        return Ok(());
+    }
+
+    io::stdout().execute(EnterAlternateScreen)?;
+    enable_raw_mode()?;
+    io::stdout().execute(crossterm::event::EnableMouseCapture)?;
+    let mut terminal = Terminal::new(CrosstermBackend::new(io::stdout()))?;
 
     let mut camera_state = Camera3DState::default();
 

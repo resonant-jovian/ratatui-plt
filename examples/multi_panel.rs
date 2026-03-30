@@ -30,10 +30,6 @@ fn main() -> color_eyre::Result<()> {
     color_eyre::install()?;
     Theme::set_default(parse_theme());
     let theme = Theme::get_default();
-    io::stdout().execute(EnterAlternateScreen)?;
-    enable_raw_mode()?;
-    let mut terminal = Terminal::new(CrosstermBackend::new(io::stdout()))?;
-
     // Panel (0,0): Heatmap with gradient
     let heatmap_data = GridData::from_fn((-3.0, 3.0), (-3.0, 3.0), 360, 360, |x, y| {
         (-(x * x + y * y) / 4.0).exp()
@@ -108,6 +104,14 @@ fn main() -> color_eyre::Result<()> {
         .panel(1, 1, move |area: Rect, buf: &mut Buffer| {
             (&line_plot).render(area, buf);
         });
+
+    if headless_export(|area, buf| (&panel).render(area, buf))? {
+        return Ok(());
+    }
+
+    io::stdout().execute(EnterAlternateScreen)?;
+    enable_raw_mode()?;
+    let mut terminal = Terminal::new(CrosstermBackend::new(io::stdout()))?;
 
     loop {
         terminal.draw(|frame| {

@@ -10,7 +10,7 @@ use crate::axis::{AspectRatio, Axis};
 use crate::colormap::{Colormap, Viridis};
 use crate::frame::{DataBounds, PlotFrame, ReferenceLine};
 use crate::norm::{LinearNorm, Normalize};
-use crate::plot_buffer::{PlotBackend, create_backend, Z_DATA};
+use crate::plot_buffer::{PlotBackend, Z_DATA, create_backend};
 use crate::series::VectorFieldData;
 use crate::spines::Spines;
 use crate::theme::Theme;
@@ -224,6 +224,7 @@ fn arrow_char(dx: f64, dy: f64, char_set: &ArrowCharSet, theme: &Theme) -> char 
         },
     }
 }
+
 
 impl Widget for &VectorField {
     fn render(self, area: Rect, buf: &mut Buffer) {

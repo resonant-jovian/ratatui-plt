@@ -11,7 +11,7 @@ use crate::axis::Axis;
 use crate::colormap::{Colormap, Viridis};
 use crate::frame::{DataBounds, PlotFrame, ReferenceLine};
 use crate::norm::{LinearNorm, Normalize};
-use crate::plot_buffer::{PlotBackend, create_backend, Z_DATA};
+use crate::plot_buffer::{PlotBackend, Z_DATA, create_backend};
 use crate::spines::Spines;
 use crate::theme::Theme;
 
@@ -189,6 +189,7 @@ fn pixel_to_hex_with_edge(dx: f64, dy: f64, s: f64) -> ((i32, i32), f64) {
     };
     (key, dq.max(dr).max(ds))
 }
+
 
 impl Widget for &HexbinPlot {
     fn render(self, area: Rect, buf: &mut Buffer) {

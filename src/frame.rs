@@ -1116,7 +1116,7 @@ impl<'a> PlotFrame<'a> {
         }
     }
 
-    /// Render all plot chrome into a [`PlotBuffer`] and return the inner drawing area.
+    /// Render all plot chrome into a [`PlotBuffer`](crate::plot_buffer::PlotBuffer) and return the inner drawing area.
     ///
     /// This is the Z-buffered counterpart of [`PlotFrame::render`]. Every visual
     /// element is written with an explicit Z-level so that compositing produces
@@ -1618,7 +1618,11 @@ impl<'a> PlotFrame<'a> {
         // All y-axis labels are rendered after composite via draw_end_labels()
     }
 
-    pub fn draw_annotations_pb(pa: &PlotArea, annotations: &[Annotation], pb: &mut dyn PlotBackend) {
+    pub fn draw_annotations_pb(
+        pa: &PlotArea,
+        annotations: &[Annotation],
+        pb: &mut dyn PlotBackend,
+    ) {
         let default_color = Theme::get_default().annotation_color;
         for ann in annotations {
             let color = ann.color.unwrap_or(default_color);

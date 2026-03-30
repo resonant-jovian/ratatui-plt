@@ -35,10 +35,6 @@ fn main() -> color_eyre::Result<()> {
     color_eyre::install()?;
     Theme::set_default(parse_theme());
 
-    io::stdout().execute(EnterAlternateScreen)?;
-    enable_raw_mode()?;
-    let mut terminal = Terminal::new(CrosstermBackend::new(io::stdout()))?;
-
     // Generate deterministic scatter data simulating a galaxy-like spiral pattern
     // with a central bulge, two spiral arms, and scattered halo stars.
     let mut points = Vec::new();
@@ -115,6 +111,21 @@ fn main() -> color_eyre::Result<()> {
 
     // Store the last PlotArea for snapping cursor to pixel-exact coordinates
     let mut last_pa: Option<PlotArea> = None;
+
+    let headless_plot = ScatterPlot::new()
+        .series(series.clone())
+        .title("Galaxy Crosshair")
+        .x_axis(x_axis.clone())
+        .y_axis(y_axis.clone())
+        .aspect_ratio(AspectRatio::Equal);
+
+    if headless_export(|area, buf| (&headless_plot).render(area, buf))? {
+        return Ok(());
+    }
+
+    io::stdout().execute(EnterAlternateScreen)?;
+    enable_raw_mode()?;
+    let mut terminal = Terminal::new(CrosstermBackend::new(io::stdout()))?;
 
     loop {
         terminal.draw(|frame| {

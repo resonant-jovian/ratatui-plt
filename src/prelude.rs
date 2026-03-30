@@ -84,11 +84,12 @@ pub use crate::colormap::{
     colormap_names,
     get_colormap,
 };
-pub use crate::config::{ConfigGuard, PlotConfig, RenderBackend};
+pub use crate::config::{ConfigGuard, PlotConfig, RenderBackend, detect_backend};
 #[cfg(feature = "export")]
 pub use crate::export::{ExportError, ExportOptions, buffer_to_png};
 pub use crate::export::{
-    buffer_to_ansi, buffer_to_svg, buffer_to_text, render_to_buffer, save_ansi, save_svg, save_text,
+    buffer_to_ansi, buffer_to_svg, buffer_to_text, headless_export, render_to_buffer, save_ansi,
+    save_svg, save_text,
 };
 #[cfg(feature = "kitty")]
 pub use crate::export::{buffer_to_kitty, print_kitty};
@@ -121,14 +122,16 @@ pub use crate::transform::{Camera3D, Camera3DState, aspect_area, square_area};
 
 // ── Core Visualization Widgets ───────────────────────────────────────────────
 pub use crate::widgets::area_chart::{AreaChart, AreaMode};
-pub use crate::widgets::bar_chart::{BarChart, BarMode};
+pub use crate::widgets::bar_chart::{BarChart, BarMode, FillPattern};
 pub use crate::widgets::data_table::DataTable;
 pub use crate::widgets::histogram::Histogram;
 pub use crate::widgets::image_plot::{
     ImageData, ImageOrigin, ImagePlot, Interpolation, matshow, spy,
 };
+#[cfg(feature = "statistics")]
+pub use crate::widgets::line_plot::{ErrorStyle, EstimatorType};
 pub use crate::widgets::line_plot::{InterpolationMode, LinePlot};
-pub use crate::widgets::pie_chart::{PieChart, PieSlice};
+pub use crate::widgets::pie_chart::{PieChart, PieRing, PieSlice};
 pub use crate::widgets::scatter_plot::ScatterPlot;
 #[cfg(feature = "statistics")]
 pub use crate::widgets::scatter_plot::TrendlineType;
@@ -187,7 +190,7 @@ pub use crate::widgets::parallel_categories::{
     CategoricalDimension, CategoricalRecord, ParallelCategories,
 };
 pub use crate::widgets::parallel_coords::{ParallelAxis, ParallelCoords, ParallelRecord};
-pub use crate::widgets::sankey::{SankeyDiagram, SankeyFlow, SankeyNode};
+pub use crate::widgets::sankey::{SankeyDiagram, SankeyFlow, SankeyNode, SankeyOrientation};
 pub use crate::widgets::sunburst::{Sunburst, SunburstNode};
 pub use crate::widgets::treemap::{Treemap, TreemapNode};
 

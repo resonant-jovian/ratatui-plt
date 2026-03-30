@@ -31,7 +31,7 @@ use crate::axis::Axis;
 use crate::colormap::{Colorbar, Colormap, Viridis};
 use crate::frame::{DataBounds, PlotFrame, ReferenceLine};
 use crate::norm::{LinearNorm, Normalize};
-use crate::plot_buffer::{PlotBackend, create_backend, Z_DATA, Z_GRID};
+use crate::plot_buffer::{PlotBackend, Z_DATA, Z_GRID, create_backend};
 use crate::spines::Spines;
 use crate::theme::Theme;
 
@@ -214,6 +214,7 @@ fn grid_bounds(x: &[Vec<f64>], y: &[Vec<f64>]) -> (f64, f64, f64, f64) {
     }
     (x_min, x_max, y_min, y_max)
 }
+
 
 impl Widget for &CarpetPlot {
     fn render(self, area: Rect, buf: &mut Buffer) {

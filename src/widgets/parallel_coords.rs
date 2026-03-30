@@ -29,7 +29,7 @@ use ratatui::widgets::Widget;
 use crate::annotation::Annotation;
 use crate::frame::PlotArea;
 use crate::legend::{Legend, LegendEntry, LegendPosition};
-use crate::plot_buffer::{PlotBackend, create_backend, Z_ANNOTATION, Z_CHROME, Z_DATA, Z_MARKER};
+use crate::plot_buffer::{PlotBackend, Z_ANNOTATION, Z_CHROME, Z_DATA, Z_MARKER, create_backend};
 use crate::spines::Spines;
 use crate::theme::Theme;
 use crate::transform::data_to_screen;
@@ -191,6 +191,7 @@ impl ParallelCoords {
         self
     }
 }
+
 
 impl Widget for &ParallelCoords {
     fn render(self, area: Rect, buf: &mut Buffer) {

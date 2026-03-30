@@ -164,6 +164,7 @@ impl TriContour {
     }
 }
 
+
 impl Widget for &TriContour {
     fn render(self, area: Rect, buf: &mut Buffer) {
         if self.triangulation.vertices.is_empty()

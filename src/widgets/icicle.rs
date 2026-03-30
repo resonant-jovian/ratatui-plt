@@ -29,7 +29,7 @@ use ratatui::widgets::Widget;
 
 use crate::color_cycle::ColorCycle;
 use crate::colormap::{Colormap, Viridis};
-use crate::plot_buffer::{PlotBackend, create_backend, Z_CHROME, Z_DATA};
+use crate::plot_buffer::{PlotBackend, Z_CHROME, Z_DATA, create_backend};
 use crate::theme::Theme;
 use crate::widgets::treemap::TreemapNode;
 
@@ -200,6 +200,7 @@ fn flatten_rects(
         cursor = child_end;
     }
 }
+
 
 impl Widget for &IcicleChart {
     fn render(self, area: Rect, buf: &mut Buffer) {

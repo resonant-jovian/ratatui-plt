@@ -5,6 +5,7 @@
 //! Run with: `cargo run --example kitty_export --features kitty`
 //! (requires a Kitty-compatible terminal)
 
+use ratatui::prelude::*;
 use ratatui_plt::export::{ExportOptions, buffer_to_kitty, render_to_buffer};
 use ratatui_plt::prelude::*;
 
@@ -31,6 +32,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 .label("sin(x)")
                 .label_position(LabelPosition::End),
         );
+
+    if headless_export(|area, buf| (&plot).render(area, buf))? {
+        return Ok(());
+    }
 
     let buf = render_to_buffer(&plot, 80, 24);
     let options = ExportOptions::default();

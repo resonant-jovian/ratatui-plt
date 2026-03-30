@@ -120,6 +120,7 @@ impl TwinAxes {
     }
 }
 
+
 impl Widget for &TwinAxes {
     fn render(self, area: Rect, buf: &mut Buffer) {
         if area.width < 10 || area.height < 4 {

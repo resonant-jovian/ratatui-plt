@@ -310,6 +310,7 @@ impl Volume3D {
     }
 }
 
+
 impl Widget for &Volume3D {
     fn render(self, area: Rect, buf: &mut Buffer) {
         self.render_with_camera(area, buf, &self.camera);

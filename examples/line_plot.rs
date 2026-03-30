@@ -36,10 +36,6 @@ fn main() -> color_eyre::Result<()> {
     Theme::set_default(parse_theme());
     let theme = Theme::get_default();
     let mut cycle = theme.color_cycle.clone();
-    io::stdout().execute(EnterAlternateScreen)?;
-    enable_raw_mode()?;
-    let mut terminal = Terminal::new(CrosstermBackend::new(io::stdout()))?;
-
     let n = 200;
 
     // Regular sin(x) with error band
@@ -151,6 +147,26 @@ fn main() -> color_eyre::Result<()> {
         .step_mode(StepMode::Post)
         .reference_line(ReferenceLine::hline_dashed(0.0, theme.muted))
         .show_legend(true);
+
+    if headless_export(|area, buf| {
+        let rows = Layout::default()
+            .direction(Direction::Vertical)
+            .constraints([Constraint::Percentage(55), Constraint::Percentage(45)])
+            .split(area);
+        let bottom_cols = Layout::default()
+            .direction(Direction::Horizontal)
+            .constraints([Constraint::Percentage(50), Constraint::Percentage(50)])
+            .split(rows[1]);
+        (&plot).render(rows[0], buf);
+        (&plot_step_pre).render(bottom_cols[0], buf);
+        (&plot_step_post).render(bottom_cols[1], buf);
+    })? {
+        return Ok(());
+    }
+
+    io::stdout().execute(EnterAlternateScreen)?;
+    enable_raw_mode()?;
+    let mut terminal = Terminal::new(CrosstermBackend::new(io::stdout()))?;
 
     loop {
         terminal.draw(|frame| {

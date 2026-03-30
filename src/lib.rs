@@ -42,6 +42,7 @@
 
 pub mod annotation;
 pub mod axis;
+pub mod backend;
 pub mod brushing;
 pub mod chars;
 pub mod collections;
@@ -51,10 +52,12 @@ pub mod config;
 pub mod drawing;
 pub mod export;
 pub mod frame;
+pub mod helpers;
 pub mod legend;
 pub mod macros;
 pub mod mathtext;
 pub mod norm;
+pub mod output;
 pub mod picking;
 pub mod plot_buffer;
 pub mod prelude;

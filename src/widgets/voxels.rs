@@ -387,6 +387,7 @@ impl Voxels {
     }
 }
 
+
 impl Widget for &Voxels {
     fn render(self, area: Rect, buf: &mut Buffer) {
         self.render_with_camera(&self.camera, area, buf);

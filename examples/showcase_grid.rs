@@ -33,10 +33,6 @@ fn lcg_normal(seed: &mut u64) -> f64 {
 fn main() -> color_eyre::Result<()> {
     color_eyre::install()?;
     Theme::set_default(Theme::light());
-    io::stdout().execute(EnterAlternateScreen)?;
-    enable_raw_mode()?;
-    let mut terminal = Terminal::new(CrosstermBackend::new(io::stdout()))?;
-
     // ── A: Contour plot (unfilled) ──────────────────────────────────────
     let contour_data = GridData::from_fn((-3.0, 3.0), (-3.0, 3.0), 120, 120, |x, y| {
         x.sin() * y.cos() + (x * y / 3.0).sin()
@@ -196,6 +192,14 @@ fn main() -> color_eyre::Result<()> {
         .mosaic_panel('H', move |area: Rect, buf: &mut Buffer| {
             (&streamplot).render(area, buf);
         });
+
+    if headless_export(|area, buf| (&panel).render(area, buf))? {
+        return Ok(());
+    }
+
+    io::stdout().execute(EnterAlternateScreen)?;
+    enable_raw_mode()?;
+    let mut terminal = Terminal::new(CrosstermBackend::new(io::stdout()))?;
 
     loop {
         terminal.draw(|frame| {

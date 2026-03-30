@@ -52,10 +52,6 @@ fn integrate_streamline(seed: (f64, f64, f64), steps: usize, dt: f64) -> Vec<(f6
 fn main() -> color_eyre::Result<()> {
     color_eyre::install()?;
     Theme::set_default(parse_theme());
-    io::stdout().execute(EnterAlternateScreen)?;
-    enable_raw_mode()?;
-    io::stdout().execute(crossterm::event::EnableMouseCapture)?;
-    let mut terminal = Terminal::new(CrosstermBackend::new(io::stdout()))?;
 
     // Generate streamlines from several seed points at different radii.
     let seeds = [
@@ -75,6 +71,17 @@ fn main() -> color_eyre::Result<()> {
     let stream = Streamtube::new(paths)
         .tube_radius(0.08)
         .title("3D Streamlines - Arrow keys: rotate, +/-: zoom, q: quit");
+
+    if headless_export(|area, buf| {
+        StatefulWidget::render(&stream, area, buf, &mut Camera3DState::default());
+    })? {
+        return Ok(());
+    }
+
+    io::stdout().execute(EnterAlternateScreen)?;
+    enable_raw_mode()?;
+    io::stdout().execute(crossterm::event::EnableMouseCapture)?;
+    let mut terminal = Terminal::new(CrosstermBackend::new(io::stdout()))?;
 
     let mut camera_state = Camera3DState::default();
 

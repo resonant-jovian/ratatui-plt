@@ -32,10 +32,6 @@ fn parse_theme() -> Theme {
 fn main() -> color_eyre::Result<()> {
     color_eyre::install()?;
     Theme::set_default(parse_theme());
-    io::stdout().execute(EnterAlternateScreen)?;
-    enable_raw_mode()?;
-    let mut terminal = Terminal::new(CrosstermBackend::new(io::stdout()))?;
-
     let n = 500;
     let data: Vec<(f64, f64)> = (0..n)
         .map(|i| {
@@ -97,6 +93,19 @@ fn main() -> color_eyre::Result<()> {
     let inset = InsetAxes::new(0.55, 0.10, 0.40, 0.42)
         .border(true)
         .border_color(theme.highlight);
+
+    if headless_export(|area, buf| {
+        (&main_plot).render(area, buf);
+        inset.render_with(area, buf, |inset_area, buf| {
+            (&inset_plot).render(inset_area, buf);
+        });
+    })? {
+        return Ok(());
+    }
+
+    io::stdout().execute(EnterAlternateScreen)?;
+    enable_raw_mode()?;
+    let mut terminal = Terminal::new(CrosstermBackend::new(io::stdout()))?;
 
     loop {
         terminal.draw(|frame| {

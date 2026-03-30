@@ -30,7 +30,7 @@ use ratatui::widgets::StatefulWidget;
 
 use crate::axis::Axis;
 use crate::frame::{DataBounds, PlotFrame};
-use crate::plot_buffer::{PlotBackend, create_backend, Z_DATA, Z_FILL, Z_MARKER};
+use crate::plot_buffer::{PlotBackend, Z_DATA, Z_FILL, Z_MARKER, create_backend};
 use crate::spines::Spines;
 use crate::theme::Theme;
 
@@ -180,6 +180,7 @@ impl LassoSelector {
         self
     }
 }
+
 
 impl StatefulWidget for &LassoSelector {
     type State = LassoSelectorState;

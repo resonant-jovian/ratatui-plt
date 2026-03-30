@@ -14,7 +14,7 @@ use crate::axis::{AspectRatio, Axis, Bounds};
 use crate::colormap::{Colorbar, Colormap, Viridis};
 use crate::frame::{DataBounds, PlotFrame, ReferenceLine};
 use crate::norm::{LinearNorm, Normalize};
-use crate::plot_buffer::{PlotBackend, create_backend, Z_DATA};
+use crate::plot_buffer::{PlotBackend, Z_DATA, create_backend};
 use crate::spines::Spines;
 use crate::theme::Theme;
 
@@ -334,6 +334,7 @@ fn scalar_value_bounds(data: &ImageData) -> (f64, f64) {
         _ => (0.0, 1.0),
     }
 }
+
 
 impl Widget for &ImagePlot {
     fn render(self, area: Rect, buf: &mut Buffer) {

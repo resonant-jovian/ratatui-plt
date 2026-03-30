@@ -29,7 +29,7 @@ use ratatui::layout::Rect;
 use ratatui::style::Color;
 use ratatui::widgets::Widget;
 
-use crate::plot_buffer::{PlotBackend, create_backend, Z_CHROME, Z_DATA};
+use crate::plot_buffer::{PlotBackend, Z_CHROME, Z_DATA, create_backend};
 use crate::spines::Spines;
 use crate::theme::Theme;
 
@@ -236,6 +236,7 @@ fn layout_categories(totals: &[usize], top: u16, height: u16, pad: f64) -> Vec<(
 }
 
 // ── Widget implementation ───────────────────────────────────────────────────
+
 
 impl Widget for &ParallelCategories {
     fn render(self, area: Rect, buf: &mut Buffer) {

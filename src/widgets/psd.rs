@@ -166,6 +166,7 @@ impl PsdPlot {
     }
 }
 
+
 impl Widget for &PsdPlot {
     fn render(self, area: Rect, buf: &mut Buffer) {
         let (data_x_min, data_x_max) = self.compute_x_bounds();

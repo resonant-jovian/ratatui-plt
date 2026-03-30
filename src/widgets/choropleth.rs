@@ -31,7 +31,7 @@ use ratatui::widgets::Widget;
 use crate::colormap::{Colorbar, Colormap, Viridis};
 use crate::drawing::contrasting_color;
 use crate::norm::{LinearNorm, Normalize};
-use crate::plot_buffer::{PlotBackend, create_backend, Z_CHROME, Z_DATA};
+use crate::plot_buffer::{PlotBackend, Z_CHROME, Z_DATA, create_backend};
 use crate::theme::Theme;
 
 /// A named region with a data value.
@@ -199,6 +199,7 @@ fn world_map_cells() -> Vec<MapCell> {
         MapCell::new("Oceania", 6, 22, 8, 4),
     ]
 }
+
 
 impl Widget for &ChoroplethMap {
     fn render(self, area: Rect, buf: &mut Buffer) {

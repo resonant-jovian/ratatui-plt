@@ -294,6 +294,7 @@ fn arrow_head_char(dx: f64, dy: f64, arrows: &crate::chars::ArrowChars) -> char 
     }
 }
 
+
 impl Widget for &Quiver3D {
     fn render(self, area: Rect, buf: &mut Buffer) {
         self.render_with_camera(&self.camera, area, buf);
