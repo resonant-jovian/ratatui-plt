@@ -1,5 +1,8 @@
 # ratatui-plt
 
+> [!IMPORTANT]
+> Abandoned in favour of a more general plotting lib, see wip [starsight](https://github.com/resonant-jovian/starsight)
+
 **Scientific visualization widgets for [ratatui](https://ratatui.rs/) — matplotlib for the terminal.**
 
 [![Crates.io](https://img.shields.io/crates/v/ratatui-plt.svg)](https://crates.io/crates/ratatui-plt)
